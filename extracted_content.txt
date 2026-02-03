@@ -1,0 +1,883 @@
+================================================================================
+DOCUMENT CONTENT - PARAGRAPHS
+================================================================================
+[P8] TÀI LIỆU QUY TRÌNH IVFMD
+[P10] Version 1.0
+[P14] Project :IVF Information System
+[P15] System :Quy Trình IVF
+[P18] Lịch sử thay đổi
+[P21] Nội Dung
+[P23] 1	Giới thiệu	6
+[P24] 1.1	Mục đích	6
+[P25] 1.2	Phạm vi	6
+[P26] 1.3	Các định nghĩa, các từ ngữ viết tắt	6
+[P27] 1.4	Ý nghĩa các hình vẽ	6
+[P28] 2	QUY TRÌNH HIỆN TẠI	8
+[P29] 2.1	Quy trình chung của Hiếm muộn	8
+[P30] 2.1.1	Quy trình	8
+[P31] 2.1.2	Mô tả quy trình	9
+[P32] 2.3	Timeline hiếm muộn	11
+[P33] 2.4	Quy trình khám và tư vấn hiếm muộn cho BN đến lần đầu	12
+[P34] 2.4.1	Quy trình	12
+[P35] 2.4.2	Mô tả quy trình	13
+[P36] 2.5	Quy trình tư vấn hiếm muộn cho BN sau khi có KQ XN thường qui	17
+[P37] 2.5.1	Quy trình	17
+[P38] 2.5.2	Mô tả quy trình	18
+[P39] 2.6	Quy trình tái khám và theo dõi kích thích buồng trứng – BN IVF	20
+[P40] 2.6.1	Quy trình	21
+[P41] 2.6.2	Mô tả quy trình	21
+[P42] 2.7	Quy trình tái khám và chỉ định tiêm thuốc rụng trứng – BN IVF	25
+[P43] 2.7.1	Quy trình	25
+[P44] 2.7.2	Mô tả quy trình	26
+[P45] 2.8	Quy trình tái khám và theo dõi kích thích buồng trứng – BN BHTN+KTBT/IUI	30
+[P46] 2.8.1	Quy trình	30
+[P47] 2.8.2	Mô tả quy trình	31
+[P48] 2.9	Quy trình tái khám và chỉ định tiêm thuốc rụng trứng – BN IUI	33
+[P49] 2.9.1	Quy trình	33
+[P50] 2.9.2	Mô tả quy trình	34
+[P51] 2.10	Quy trình chọc hút	36
+[P52] 2.10.1	Quy trình	36
+[P53] 2.10.2	Mô tả quy trình	36
+[P54] 2.11	Quy trình bơm tinh trùng vào buồng tử cung - IUI	40
+[P55] 2.11.1	Quy trình	40
+[P56] 2.11.2	Mô tả quy trình	41
+[P57] 2.12	Quy trình khám chuẩn bị niêm mạc chuyển phôi trữ (N2 VK)	44
+[P58] 2.12.1	Quy trình	44
+[P59] 2.12.2	Mô tả quy trình	45
+[P60] 2.13	Quy trình siêu âm chuẩn bị niêm mạc chuyển phôi trữ	47
+[P61] 2.13.1	Quy trình	47
+[P62] 2.13.2	Mô tả quy trình	48
+[P63] 2.14	Quy trình siêu âm nang noãn cho bn qhtn (CK tự nhiên)	50
+[P64] 2.14.1	Quy trình	50
+[P65] 2.14.2	Mô tả quy trình	51
+[P66] 2.15	Quy trình báo phôi + chuyển phôi + trữ phôi	53
+[P67] 2.15.1	Quy trình	53
+[P68] 2.15.2	Mô tả quy trình	54
+[P69] 2.16	Quy trình thử thai	57
+[P70] 2.16.1	Quy trình	57
+[P71] 2.16.2	Mô tả quy trình	58
+[P72] 2.17	Quy trình tái khám và theo dõi thai 7 tuần	61
+[P73] 2.17.1	Quy trình	61
+[P74] 2.17.2	Mô tả quy trình	62
+[P75] 2.18	Timeline hiếm muộn & người cho trứng	65
+[P76] 2.18.1	Timeline	65
+[P77] 2.19	Quy trình khám và tư vấn người cho trứng đến lần đầu	66
+[P78] 2.19.1	Quy trình	66
+[P79] 2.19.2	Mô tả quy trình	67
+[P80] 2.20	Quy trình tư vấn người cho trứng sau khi có KQ XN thường qui	70
+[P81] 2.20.1	Quy trình	70
+[P82] 2.20.2	Mô tả quy trình	71
+[P83] 2.21	Quy trình tiếp nhận BN XN tinh dịch đồ	74
+[P84] 2.21.1	Quy trình	74
+[P85] 2.21.2	Mô tả quy trình	75
+[P86] 2.22	Quy trình lọc rửa TT - IUI	76
+[P87] 2.22.1	Quy trình	76
+[P88] 2.22.2	Mô tả quy trình	77
+[P89] 2.23	Quy trình lọc rửa TT – ICSI/IVM	78
+[P90] 2.23.1	Quy trình	78
+[P91] 2.23.2	Mô tả quy trình	79
+[P92] 2.24	Quy trình NHTT - GĐ1 - Kiểm tra đủ tiêu chuẩn nhận vào NHTT	80
+[P93] 2.24.1	Quy trình	80
+[P94] 2.24.2	Mô tả quy trình	81
+[P95] 2.25	Quy trình NHTT - GĐ2 - Lấy mẫu lần 1	84
+[P96] 2.25.1	Quy trình	84
+[P97] 2.25.2	Mô tả quy trình	85
+[P98] 2.26	Quy trình NHTT - GĐ2 - Lấy mẫu lần 2	87
+[P99] 2.26.1	Quy trình	87
+[P100] 2.26.2	Mô tả quy trình	88
+[P101] 2.27	Quy trình NHTT - GĐ3 - Sử dụng mẫu	91
+[P102] 2.27.1	Quy trình	91
+[P103] 2.27.2	Mô tả quy trình	92
+[P104] 2.28	Quy trình quản lý thuốc bù tủ trực	94
+[P105] 2.28.1	Quy trình	94
+[P106] 2.28.2	Mô tả quy trình	95
+[P107] 2.29	Quy trình vật tư tiêu hao không xuất kho	96
+[P108] 2.29.1	Quy trình	96
+[P109] 2.29.2	Mô tả quy trình	97
+[P110] 2.30	Quy trình vật tư tiêu hao có xuất kho	98
+[P111] 2.30.1	Quy trình	98
+[P112] 2.30.2	Mô tả quy trình	99
+[P113] 2.31	Những ghi chú chung	100
+[P114] 2.32	Những điểm khác nhau giữa quy trình của PK Ngọc Lan và IVFMD	101
+[P115] 3	QUY TRÌNH MỚI – GIẢI PHÁP ĐỀ XUẤT CỦA PHÒNG IT	102
+[P116] 3.1	Mục đích chung	102
+[P117] 3.2	Quy trình 1	102
+[P118] 3.2.1	Quy trình	102
+[P119] 3.2.2	Mô tả quy trình	102
+[P120] 4	TỔNG Hợp những cải tiến của QUY TRÌNH MỚI so với quy trình cũ	103
+[P122] Giới thiệu
+[P123] Tài liệu này mô tả quy trình tiếp nhận cho bệnh nhân điều trị hiếm muộn/vô sinh tại IVFMD.
+[P124] Mục đích
+[P125] Quy định về thủ tục và các bước thực hiện tiếp nhận bệnh nhân hiếm muộn.
+[P127] Phạm vi
+[P128] Áp dụng cho họat động hỗ trợ sinh sản của PK Ngọc Lan
+[P129] Các định nghĩa, các từ ngữ viết tắt
+[P131] HTSS	Hỗ trợ sinh sản
+[P132] HM	Hiếm muộn
+[P133] QHTN	Quan hệ tự nhiên
+[P134] IUI	Intra-Uterine Insemination – Bơm tinh trùng vào tử cung
+[P135] ICSI	Intra-Cytoplasmic Sperm Snjection – Bơm tinh trùng vào bào tương noãn
+[P136] IVM	In Vitro Maturation – Nuôi trưởng thành trứng non
+[P138] CĐHA	Chẩn đoán hình ảnh
+[P139] CLS	Cận lâm sàng
+[P140] XN	Xét nghiệm
+[P141] BN	Bệnh nhân
+[P142] BS	Bác sĩ
+[P143] SA	Siêu âm
+[P145] Ý nghĩa các hình vẽ
+[P150] QUY TRÌNH HIỆN TẠI
+[P151] Quy trình chung của Hiếm muộn
+[P152] Quy trình
+[P154] Mô tả quy trình
+[P158] Timeline hiếm muộn
+[P160] Quy trình khám và tư vấn hiếm muộn cho BN đến lần đầu
+[P161] Quy trình
+[P163] Mô tả quy trình
+[P166] Quy trình tư vấn hiếm muộn cho BN sau khi có KQ XN thường qui
+[P167] Quy trình
+[P169] Mô tả quy trình
+[P172] Quy trình tái khám và theo dõi kích thích buồng trứng – BN IVF
+[P173] Quy trình
+[P175] Mô tả quy trình
+[P179] Quy trình tái khám và chỉ định tiêm thuốc rụng trứng – BN IVF
+[P180] Quy trình
+[P182] Mô tả quy trình
+[P186] Quy trình tái khám và theo dõi kích thích buồng trứng – BN BHTN+KTBT/IUI
+[P187] Quy trình
+[P189] Mô tả quy trình
+[P193] Quy trình tái khám và chỉ định tiêm thuốc rụng trứng – BN IUI
+[P194] Quy trình
+[P196] Mô tả quy trình
+[P199] Quy trình chọc hút
+[P200] Quy trình
+[P202] Mô tả quy trình
+[P206] Quy trình bơm tinh trùng vào buồng tử cung - IUI
+[P207] Quy trình
+[P209] Mô tả quy trình
+[P213] Quy trình khám chuẩn bị niêm mạc chuyển phôi trữ (N2 VK)
+[P214] Quy trình
+[P216] Mô tả quy trình
+[P220] Quy trình siêu âm chuẩn bị niêm mạc chuyển phôi trữ
+[P221] Quy trình
+[P223] Mô tả quy trình
+[P227] Quy trình siêu âm nang noãn cho bn qhtn (CK tự nhiên)
+[P228] Quy trình
+[P230] Mô tả quy trình
+[P234] Quy trình báo phôi + chuyển phôi + trữ phôi
+[P235] Quy trình
+[P237] Mô tả quy trình
+[P241] Quy trình thử thai
+[P242] Quy trình
+[P244] Mô tả quy trình
+[P248] Quy trình tái khám và theo dõi thai 7 tuần
+[P249] Quy trình
+[P251] Mô tả quy trình
+[P255] Timeline hiếm muộn & người cho trứng
+[P256] Timeline
+[P261] Quy trình khám và tư vấn người cho trứng đến lần đầu
+[P262] Quy trình
+[P264] Mô tả quy trình
+[P268] Quy trình tư vấn người cho trứng sau khi có KQ XN thường qui
+[P269] Quy trình
+[P271] Mô tả quy trình
+[P273] Quy trình tiếp nhận BN XN tinh dịch đồ
+[P274] Quy trình
+[P276] Mô tả quy trình
+[P280] Quy trình lọc rửa TT - IUI
+[P281] Quy trình
+[P283] Mô tả quy trình
+[P287] Quy trình lọc rửa TT – ICSI/IVM
+[P288] Quy trình
+[P290] Mô tả quy trình
+[P293] Quy trình NHTT - GĐ1 - Kiểm tra đủ tiêu chuẩn nhận vào NHTT
+[P294] Quy trình
+[P296] Mô tả quy trình
+[P298] Quy trình NHTT - GĐ2 - Lấy mẫu lần 1
+[P299] Quy trình
+[P301] Mô tả quy trình
+[P303] Quy trình NHTT - GĐ2 - Lấy mẫu lần 2
+[P304] Quy trình
+[P306] Mô tả quy trình
+[P308] Quy trình NHTT - GĐ3 - Sử dụng mẫu
+[P309] Quy trình
+[P311] Mô tả quy trình
+[P313] Quy trình quản lý thuốc bù tủ trực
+[P314] Quy trình
+[P316] Mô tả quy trình
+[P318] Quy trình vật tư tiêu hao không xuất kho
+[P319] Quy trình
+[P321] Mô tả quy trình
+[P324] Quy trình vật tư tiêu hao có xuất kho
+[P325] Quy trình
+[P327] Mô tả quy trình
+[P334] Những ghi chú chung
+[P335] BS tư vấn chỉ định trên hồ sơ giấy và NHS sẽ nhập vào phần mềm
+[P336] BS tư vấn ra toa thuốc trên hồ sơ giấy và NHS sẽ nhập vào phần mềm
+[P337] Tiếp đón cấp phát nhiều STT cho BN cùng 1 lúc: STT Thu Ngân, STT BS Tư Vấn, STT Siêu Âm, STT Xét Nghiệm
+[P338] QT Khám và tư vấn hiếm muốn cho BN đến lần đầu: cần 2 BS: BS Siêu âm phụ khoa và BS tư vấn
+[P339] QT Tái khám và theo dõi KTBT: chỉ cần 1  BS Tư vấn để siêu âm và tư vấn cho BN
+[P340] QT Khám phát đồ E2 + P4 – Chuẩn bị chuyển phôi trữ: cần 2 BS: BS Siêu âm phụ khoa và BS tư vấn
+[P341] QT Tái khám phát đồ E2 + P4 – Chuẩn bị chuyển phôi trữ: chỉ cần 1  BS Tư vấn để siêu âm và tư vấn cho BN
+[P342] QT Thử thai thì BN đến thẳng Thu ngân để đóng tiền XN beta, không qua lấy quầy phát STT đầu tiền và tiếp đón.
+[P343] Nhà thuốc là chung của cả BV, vậy bệnh nhân IVF mua thuốc tại nhà thuốc của BV thì dung phần mới hay dung phần mềm hiện tại?
+[P344] Tương tự như câu hỏi trên của nhà thuốc cho các bộ phân khác: 
+[P345] BP Xét nghiệm: thực hiện các XN cho IVFMD
+[P346] Thu Ngân của BV: thu tiền XN BetaHCG (thử thai), thu tiền phí tiêm thuốc KTBT, KTRT
+[P347] Phòng cấp cứu do điện tim.
+[P348] BP Siêu âm: Siêu âm nhũ
+[P350] Những điểm khác nhau giữa quy trình của PK Ngọc Lan và IVFMD
+[P354] những đề xuất cải tiến QUY TRÌNH
+
+================================================================================
+DOCUMENT CONTENT - TABLES
+================================================================================
+
+--- TABLE 1 ---
+Row 0: Phiên bản || Ngày || Ban biên tập || Ban biên tập || Ban biên tập || Ghi chú
+Row 1: Phiên bản || Ngày || Người soạn || Người kiểm tra || Người phê duyệt || Ghi chú
+
+--- TABLE 2 ---
+Row 0: Bước || Tên sự kiện || Mô tả
+Row 1: IVF.00.01 || Khám tư vấn || Bệnh nhân đến và gặp bác sĩ khám và tư vấn. Trong quá trình khám và tư vấn sẽ cần thực hiện một số siêu âm và xét nghiệm để xác định tình trạng hiếm muốn của bệnh nhân.
+Row 2: IVF.00.02 || SA theo dõi nang noãn || SQ theo dõi nang noãn để theo dõi ngày rụng trứng và tư vấn cho BN ngày quan hệ tự nhiên
+Row 3: IVF.00.03 || QHTN || QHTN = Quan hệ tự nhiên: Trong quá trình này có thực hiện các siêu âm theo dõi thời điểm rụng trứng để quan hệ tự nhiên.
+Row 4: IVF.00.04 || Kích thích buồng trứng || Thông thường bệnh nhân cần kích thích buồng trứng trong quá trình điều trị hiếm muộn. Trong quá trỉnh kích thích buồn trứng này sẽ thực hiện một số siêu âm để theo dõi nang noãn hoặc sự rụng rứng
+Row 5: IVF.00.05 || QHTN || Đây là một trong 4 phương pháp chữa hiếm muộn. BN cần KTBT và theo dõi ngày rụng trứng để quan hệ tự nhiên.
+Row 6: IVF.00.06 || IUI || IUI – Bơm tinh trùng vào buồn trứng: Đây là một trong 4 phương pháp chữa hiếm muộn.
+Row 7: IVF.00.07 || ICSI || ICSI – Bơm tinh trùng vào bào tương noãn: Đây là một trong 4 phương pháp chữa hiếm muộn.
+Row 8: IVF.00.08 || IVM || IVM – Nuôi trưởng thành trứng non: Đây là một trong 4 phương pháp chữa hiếm muộn.
+Row 9: IVF.00.09 || Thủ thuật bơm tinh trùng || Thủ thuật này đi kèm với phương pháp IUI. Tinh trùng được lấy từ thủ công từ người chồng (không làm thủ thuật lấy tinh trùng), sau đó được lọc rửa và bơm vào buồng tử cung của người vợ.
+Row 10: IVF.00.10 || Chọc hút || Thủ thuật này dành cho ICSI. Sau khi theo dõi nang noãn, trứng sẽ được chọt hút chuẩn bị cho việc nuôi cấy phôi
+Row 11: IVF.00.11 || Chọc hút trứng non || Thủ thuật này dành cho IVM. Sau khi theo dõi nang noãn, trứng non sẽ được chọt hút chuẩn bị cho việc nuôi trưởng thành trứng non.
+Row 12: IVF.00.12 || Nuôi phôi || Kỹ thuật nuôi phôi được thực hiện trong LABO
+Row 13: IVF.00.13 || Nuôi trứng non || Kỹ thuật nuôi trưởng thành trứng non được thực hiện trong LABO
+Row 14: IVF.00.14 || Chuyển phôi || Sau khi phôi trưởng thành sẽ được chuyển vào buồng tử cung của người vợ
+Row 15: IVF.00.15 || Trữ phôi || Phôi có thể được trữ lại tại LABO dành cho những lần chuyển phôi tiếp theo
+Row 16: IVF.00.16 || Theo dõi thai đến 11 tuần || Thủ BetaHCG để xác định có thai hay không, nếu có theo dõi thay đến 11 tuần. Kết thúc quy trình chữa Hiếm Muộn.
+
+--- TABLE 3 ---
+Row 0: Bước || Tên sự kiện || Kiểu || Bộ phận thực hiện || Mô tả
+Row 1: IVFMD.01.01 || BN tự lấy STT đầu tiên (1 liên) || Xử lý trên hệ thống khác || Quầy phát STT || Bệnh nhân tự lấy STT – không có người phát STT đầu tiên
+Row 2: IVFMD.01.02 || YC BN điền thông tin hành chánh || Thực hiện bằng tay || Tiếp đón + Thu ngân || BN ghi tên theo CNMD, địa chỉ theo hộ khẩu
+Row 3: IVFMD.01.03 || Tạo ID bệnh nhân || Xử lý trên hệ thống || Tiếp đón + Thu ngân
+Row 4: IVFMD.01.04 || Không có hồ sơ từ BV khác, hoặc không cần S.A phụ khoa || Quyết định ký duyệt || Tiếp đón + Thu ngân || SA phụ khoa ở Mỹ Đức hoặc BV khác không quá 1 tháng
+Row 5: IVFMD.01.05 || Tạo hóa đơn thu Phí Tư Vấn || Xử lý trên hệ thống || Tiếp đón + Thu ngân
+Row 6: IVFMD.01.06 || Cấp phát STT BS Tư Vấn (Mỗi STT 2 liên, đưa cho BN 1 liên) || Xử lý trên hệ thống khác || Tiếp đón + Thu ngân
+Row 7: IVFMD.01.07 || Tạo hóa đơn thu tiền SA Phụ Khoa và Phí Tư Vấn || Xử lý trên hệ thống || Tiếp đón + Thu ngân
+Row 8: IVFMD.01.08 || Cấp phát STT SA phụ khoa (Mỗi STT 2 liên, đưa cho BN 1 liên) || Xử lý trên hệ thống khác || Tiếp đón + Thu ngân
+Row 9: IVFMD.01.09 || In hóa đơn cho BN || Tài liệu in ra || Tiếp đón + Thu ngân
+Row 10: IVFMD.01.10 || Thu tiền BN || Thực hiện bằng tay || Tiếp đón + Thu ngân
+Row 11: IVFMD.01.11 || Đưa BN liên hồng hóa đơn & Liên 2 STT SA Phụ Khoa || Thực hiện bằng tay || Tiếp đón + Thu ngân
+Row 12: IVFMD.01.12 || Tạo số hồ sơ lưu trữ || Xử lý trên hệ thống || NHS Hành chánh
+Row 13: IVFMD.01.13 || In “Phiếu khám hiếm muộn” || Tài liệu in ra || NHS Hành chánh
+Row 14: IVFMD.01.14 || Không có hồ sơ từ BV khác, hoặc không cần S.A phụ khoa || Quyết định ký duyệt || NHS Hành chánh
+Row 15: IVFMD.01.15 || Bấm STT tiếp theo để gọi BN vào S.A || Xử lý trên hệ thống khác || BS Siêu Âm
+Row 16: IVFMD.01.16 || Siêu âm phụ khoa || Xử lý trên hệ thống || BS Siêu Âm || BS thao tác trên máy siêu âm, và đọc kết quả cho NHS nhập trên máy tính
+Row 17: IVFMD.01.17 || In KQ Siêu Âm cho BN || Tài liệu in ra || BS Siêu Âm || NHS làm việc cùng với BS in KQ SA cho BN
+Row 18: IVFMD.01.18 || Cấp phát STT BS Tư Vấn (Mỗi STT 2 liên, đưa cho BN 1 liên) || Xử lý trên hệ thống khác || NHS Hành chánh
+Row 19: IVFMD.01.19 || HC gửi tập hồ sơ đến phòng SA || Thực hiện bằng tay || NHS Hành chánh
+Row 20: IVFMD.01.20 || BS khám và tư vấn cho BN. || Thực hiện bằng tay || BS Tư vấn
+Row 21: IVFMD.01.21 || Tick trên phiếu XN giấy các XN thường qui || Thực hiện bằng tay || BS Tư vấn || XN thường qui: | - Vợ: AMH | - Chồng: Tinh dịch đồ  | (CĐ XN bổ sung tùy bệnh sử)
+Row 22: IVFMD.01.22 || NHS hướng dẫn BN làm XN, BN mang chỉ định đến thu ngân đóng tiền || Thực hiện bằng tay || BS Tư vấn
+Row 23: IVFMD.01.23 || Nhận phiếu CĐ từ BN || Thực hiện bằng tay || Tiếp đón + Thu ngân
+Row 24: IVFMD.01.24 || Nhập các chỉ định và tạo hóa đơn || Xử lý trên hệ thống || Tiếp đón + Thu ngân || Thu ngân nhập tay từng dịch vụ và tạo hóa đơn vì chỉ định không được BS nhập vào phần mềm trước đó
+Row 25: IVFMD.01.25 || In hóa đơn cho BN || Tài liệu in ra || Tiếp đón + Thu ngân
+Row 26: IVFMD.01.26 || Thu tiền BN || Thực hiện bằng tay || Tiếp đón + Thu ngân
+Row 27: IVFMD.01.27 || Phát sinh STT XN và đưa cho BN (XN chỉ in 1 liên) || Xử lý trên hệ thống khác || Tiếp đón + Thu ngân
+Row 28: IVFMD.01.28 || Phát sinh STT SA và đưa cho BN liên 2, liên 1 kẹp trong HS || Xử lý trên hệ thống khác || Tiếp đón + Thu ngân
+Row 29: IVFMD.01.29 || Lấy tinh trùng của người chồng để làm Tinh Dịch Đồ || Thực hiện bằng tay || Nam Khoa
+Row 30: IVFMD.01.30 || Hẹn BN ngày giờ trả KQ || Thực hiện bằng tay || Nam Khoa
+Row 31: IVFMD.01.31 || Thực hiện XN || Xử lý trên hệ thống khác || Nam Khoa
+Row 32: IVFMD.01.32 || In KQ XN cho BN || Tài liệu in ra || Nam Khoa
+Row 33: IVFMD.01.33 || Phòng XN: Lấy máu để làm XN thường quy || Thực hiện bằng tay || Xét Nghiệm || BP Xét nghiệm chung của BV
+Row 34: IVFMD.01.34 || Hẹn BN ngày giờ trả KQ || Thực hiện bằng tay || Xét Nghiệm || BN không phải chờ lấy KQ tại phòng XN mà KQ sẽ được chuyển lên cho NHS và BN sẽ tiếp tục quy trình khám tại NHS
+Row 35: IVFMD.01.35 || Thực hiện XN || Xử lý trên hệ thống khác || Xét Nghiệm
+Row 36: IVFMD.01.36 || In KQ XN và chuyển cho HC || Thực hiện bằng tay || Xét Nghiệm
+
+--- TABLE 4 ---
+Row 0: Bước || Tên sự kiện || Kiểu || Bộ phận thực hiện || Mô tả
+Row 1: IVFMD.02.01 || BN chờ KQ trong ngày hoặc Quay lại sau 1 ngày || Quyết định ký duyệt || Thông thường nêu BN khám buổi sang thì buổi chiều có KQ XN, còn BN khám buổi chiều thì KQ XN sẽ có vào ngày hôm sau.
+Row 2: IVFMD.02.02 || Cấp phát STT Tư vấn (Mỗi STT 2 liên, đưa cho BN 1 liên) || Xử lý trên hệ thống khác || Quầy phát STT
+Row 3: IVFMD.02.03 || Phát STT đầu tiên (1 liên) || Xử lý trên hệ thống khác || Tiếp Đón + Thu Ngân
+Row 4: IVFMD.02.04 || Xin phiếu hẹn của BN || Thực hiện bằng tay || Tiếp Đón + Thu Ngân
+Row 5: IVFMD.02.05 || Lục tìm hồ sơ của BN || Thực hiện bằng tay || NHS Hành chánh
+Row 6: IVFMD.02.06 || Gửi tập hồ sơ cho Thu Ngân || Thực hiện bằng tay || NHS Hành chánh
+Row 7: IVFMD.02.07 || NHS quyết định có thu tiền phí tư vấn hay không || Thực hiện bằng tay || NHS Hành chánh || Thông thường BN quay lại vào ngày hôm sau thì NHS sẽ cho thu tiền phí tư vấn, tuy nhiên có một số trường hợp BS có ghi chú là không thu phí tư vấn thì NHS không cho thu nữa.
+Row 8: IVFMD.02.08 || Cấp phát STT Tư vấn (Mỗi STT 2 liên, đưa cho BN 1 liên) || Xử lý trên hệ thống khác || NHS Hành chánh
+Row 9: IVFMD.02.09 || Tạo hóa đơn thu tiền Phí Tư Vấn || Xử lý trên hệ thống || Tiếp Đón + Thu Ngân
+Row 10: IVFMD.02.10 || Cấp phát STT Tư vấn (Mỗi STT 2 liên, đưa cho BN 1 liên) || Xử lý trên hệ thống khác || Tiếp Đón + Thu Ngân
+Row 11: IVFMD.02.11 || In hóa đơn cho BN || Tài liệu in ra || Tiếp Đón + Thu Ngân
+Row 12: IVFMD.02.12 || Thu tiền BN || Thực hiện bằng tay || Tiếp Đón + Thu Ngân
+Row 13: IVFMD.02.13 || Đưa BN liên hồng hóa đơn & Liên 2 STT của BS Tư Vấn || Thực hiện bằng tay || Tiếp Đón + Thu Ngân
+Row 14: IVFMD.02.14 || Đưa HS cho NHS đem đến phòng TV || Thực hiện bằng tay || Tiếp Đón + Thu Ngân
+Row 15: IVFMD.02.15 || BS xem KQ CLS và tư vấn hướng điều trị || Thực hiện bằng tay || BS Tư vấn
+Row 16: IVFMD.02.16 || Tư vấn hướng điều trị: KTBT+QHTN/IUI/ICSI/IVM || Quyết định ký duyệt || BS Tư vấn
+Row 17: IVFMD.02.17 || Chưa cần thiết để can thiệp cho BN hiếm muộn || Thực hiện bằng tay || BS Tư vấn
+Row 18: IVFMD.02.18 || BN quyết định thực hiện ngay || Quyết định ký duyệt || BS Tư vấn || BN quyết định thực hiện ngay hoặc không muốn thực hiện ngay với nhiều lý do cá nhân
+Row 19: IVFMD.02.19 || Ngày khám vào N2/N3 VK || Quyết định ký duyệt || BS Tư vấn
+Row 20: IVFMD.02.20 || Hẹn N2 VK quay lại || Thực hiện bằng tay || BS Tư vấn
+Row 21: IVFMD.02.21 || Chỉ định tiêm thuốc kích thích buồng trứng (ghi trên giấy) || Thực hiện bằng tay || BS Tư vấn
+Row 22: IVFMD.02.22 || Nếu hướng điều trị là IVF (ICSI/IVM) || Quyết định ký duyệt || BS Tư vấn
+Row 23: IVFMD.02.23 || Chỉ định XN tiền mê + Đo điện tâm đồ (Tick trên giấy) || Thực hiện bằng tay || BS Tư vấn
+Row 24: IVFMD.02.24 || Hẹn ngày khám tiền mê sau khi có KQ XN || Thực hiện bằng tay || BS Tư vấn
+Row 25: IVFMD.02.25 || Nhập toa thuốc vào PM || Xử lý trên hệ thống || NHS
+Row 26: IVFMD.02.26 || In toa thuốc cho BN || Thực hiện bằng tay || NHS
+Row 27: IVFMD.02.27 || Hẹn ngày tái khám & Hướng dẫn các thủ tục HC cần thiết || Xử lý trên hệ thống || NHS
+Row 28: IVFMD.02.28 || Đo điện tâm đồ (ECG) || Thực hiện bằng tay || Phòng Cấp Cứu || Phòng cấp cứu của BV
+Row 29: IVFMD.02.29 || Phòng XN: Lấy máu để làm XN tiền mê || Thực hiện bằng tay || Xét nghiệm || BP Xét nghiệm của BV
+Row 30: IVFMD.02.30 || Tạo hóa đơn theo toa thuốc của BS || Xử lý trên hệ thống || Nhà thuốc || Nhà thuốc của BV
+Row 31: IVFMD.02.31 || In hóa đơn cho BN || Tài liệu in ra || Nhà thuốc
+Row 32: IVFMD.02.32 || Thu tiền, phát thuốc, hướng dẫn cho BN || Thực hiện bằng tay || Nhà thuốc
+Row 33: IVFMD.02.33 || Tiêm thuốc kích thích buồng trứng cho BN nếu có chỉ định || Thực hiện bằng tay || Phòng Tiêm Thuốc của BV
+
+--- TABLE 5 ---
+Row 0: Bước || Tên sự kiện || Kiểu || Bộ phận thực hiện || Mô tả
+Row 1: IVFMD.10.01 || Bốn/Năm ngày sau BN tiêm thuốc KTBT, BN đến S.A Theo dõi Nang Noãn || Thực hiện bằng tay
+Row 2: IVFMD.10.02 || BN tự lấy STT đầu tiên (1 liên) || Xử lý trên hệ thống khác || Quầy phát STT
+Row 3: IVFMD.10.03 || Xin toa thuốc của BN || Thực hiện bằng tay || Tiếp Đón + Thu Ngân
+Row 4: IVFMD.10.04 || Lục tìm phiếu Nang Noãn của BN || Thực hiện bằng tay || Tiếp Đón + Thu Ngân
+Row 5: IVFMD.10.05 || Cấp phát STT SA Nang Noãn (suốt chu kỳ), STT XN (S.A 2 liên, XN 1 liên) || Xử lý trên hệ thống khác || Tiếp Đón + Thu Ngân
+Row 6: IVFMD.10.06 || Tạo hóa đơn thu tiền SA Nang Noãn (suốt chu kỳ) Và XN Nội tiết (E2 + P4 + LH), hoặc các XN còn thiếu || Xử lý trên hệ thống || Tiếp Đón + Thu Ngân || Phí SA nang noãn được thu 1 lần suốt chu kỳ KTBT (bất kể số lần SA là bao nhiêu)
+Row 7: IVFMD.10.07 || In hóa đơn cho BN || Tài liệu in ra || Tiếp Đón + Thu Ngân
+Row 8: IVFMD.10.08 || Thu tiền BN || Thực hiện bằng tay || Tiếp Đón + Thu Ngân
+Row 9: IVFMD.10.09 || Đưa BN liên hồng hóa đơn & Liên 2 STT S.A, STT XN || Thực hiện bằng tay || Tiếp Đón + Thu Ngân
+Row 10: IVFMD.10.10 || Đưa HS cho NHS đem đến phòng SA || Thực hiện bằng tay || Tiếp Đón + Thu Ngân
+Row 11: IVFMD.10.11 || Siêu âm nang noãn || Xử lý trên hệ thống || BS Siêu âm
+Row 12: IVFMD.10.12 || In KQ SA cho BN || Tài liệu in ra || BS Siêu âm
+Row 13: IVFMD.10.13 || S.A nang noãn bất thường || Quyết định ký duyệt || BS Siêu âm
+Row 14: IVFMD.10.14 || Bất thường: IVM, TPTB, Ngưng điều trị || Quyết định ký duyệt || BS Siêu âm || Bất thường: | Chuyển IVM đối với BN buồng trứng đa nang | Trữ phôi toàn bộ, ngày báo phôi BN được SA bơm nước hoặc Chụp HSG (tuỳ trường hợp) | Ngưng điều trị nếu nang noãn không có hoặc không phát triển
+Row 15: IVFMD.10.15 || Chỉ định tiêm thuốc kích thích buồng trứng + Toa thuốc cho BN || Thực hiện bằng tay || BS Siêu âm
+Row 16: IVFMD.10.16 || Nhập toa thuốc vào phần mềm || Xử lý trên hệ thống || NHS
+Row 17: IVFMD.10.17 || In toa thuốc cho BN || Tài liệu in ra || NHS
+Row 18: IVFMD.10.18 || Hẹn ngày tái khám || Xử lý trên hệ thống || NHS
+Row 19: IVFMD.10.19 || Phòng XN: Lấy máu để làm XN Nội tiết || Thực hiện bằng tay || Xét nghiệm
+Row 20: IVFMD.10.20 || Không trả KQ XN cho BN || Tài liệu in ra || Xét nghiệm
+Row 21: IVFMD.10.21 || Thực hiện XN || Xử lý trên hệ thống khác || Xét nghiệm
+Row 22: IVFMD.10.22 || In KQ XN và chuyển cho HC || Tài liệu in ra || Xét nghiệm
+Row 23: IVFMD.10.23 || Thu tiền, phát thuốc, hướng dẫn cho BN || Thực hiện bằng tay || Nhà thuốc
+Row 24: IVFMD.10.24 || Tạo hóa đơn theo toa thuốc của BS || Xử lý trên hệ thống || Nhà thuốc
+Row 25: IVFMD.10.25 || In hóa đơn cho BN || Tài liệu in ra || Nhà thuốc
+Row 26: IVFMD.10.26 || Thu tiền phí tiêm thuốc || Xử lý trên hệ thống khác || Thu Ngân của BV
+Row 27: IVFMD.10.27 || Tiêm thuốc kích thích buồng trứng cho BN nếu có chỉ định || Thực hiện bằng tay || Phòng Tiêm Thuốc của BV
+Row 28: IVFMD.10.28 || BN tái khám và KTBT từ 10->12 ngày
+
+--- TABLE 6 ---
+Row 0: Bước || Tên sự kiện || Kiểu || Bộ phận thực hiện || Mô tả
+Row 1: IVFMD.11.01 || BN đến SA theo dõi Nang Noãn || Thực hiện bằng tay
+Row 2: IVFMD.11.02 || BN tự lấy STT đầu tiên (1 liên) || Xử lý trên hệ thống khác || Quầy phát STT
+Row 3: IVFMD.11.03 || Xin toa thuốc của BN || Thực hiện bằng tay || NHS Hành Chánh
+Row 4: IVFMD.11.04 || Lục tìm phiếu Nang Noãn của BN, trong đó có KQ XN Nội tiết lần trước của BN || Thực hiện bằng tay || NHS Hành Chánh
+Row 5: IVFMD.11.05 || Cấp phát STT SA Nang Noãn (suốt chu kỳ), STT XN (S.A 2 liên, XN 1 liên) || Xử lý trên hệ thống khác || NHS Hành Chánh
+Row 6: IVFMD.11.06 || Tạo hóa đơn thu tiền XN Nội tiết (E2 + P4 + LH); (Không thu tiền SA noãn noãn nữa vì lần trước đã thu suốt chu kỳ) || Xử lý trên hệ thống || NHS Hành Chánh
+Row 7: IVFMD.11.07 || In hóa đơn cho BN || Tài liệu in ra || NHS Hành Chánh
+Row 8: IVFMD.11.08 || Thu tiền BN || Thực hiện bằng tay || NHS Hành Chánh
+Row 9: IVFMD.11.09 || Đưa BN liên hồng hóa đơn & Liên 2 STT S.A, STT XN || Thực hiện bằng tay || NHS Hành Chánh
+Row 10: IVFMD.11.10 || Đưa HS cho NHS đem đến phòng SA || Thực hiện bằng tay || NHS Hành Chánh
+Row 11: IVFMD.11.11 || Siêu âm nang noãn || Xử lý trên hệ thống || BS Siêu âm
+Row 12: IVFMD.11.12 || In KQ SA cho BN || Tài liệu in ra || BS Siêu âm
+Row 13: IVFMD.11.13 || Nang noãn đã đạt và tiêm thuốc Rụng Trứng || Quyết định ký duyệt || BS Siêu âm
+Row 14: IVFMD.11.14 || Chỉ định tiêm thuốc Rụng Trứng || Thực hiện bằng tay || BS Siêu âm
+Row 15: IVFMD.11.15 || Chỉ định tiêm thuốc KTBT khoảng 1-2 ngày nữa, Và cả thuốc Rụng Trứng sẽ được tiêm sau 1-2 ngày || Thực hiện bằng tay || BS Siêu âm
+Row 16: IVFMD.11.16 || Nhập toa thuốc vào phần mềm || Xử lý trên hệ thống || NHS
+Row 17: IVFMD.11.17 || In toa thuốc cho BN || Tài liệu in ra || NHS
+Row 18: IVFMD.11.18 || Hướng dẫn BN giờ tiêm thuốc Rụng Trứng || Thực hiện bằng tay || NHS
+Row 19: IVFMD.11.19 || Hẹn BN đến chọc hút sau 36 giờ kể từ giờ tiêm thuốc + Hướng dẫn BN QT trước Chọc hút || Xử lý trên hệ thống || NHS
+Row 20: IVFMD.11.20 || Phòng XN: Lấy máu để làm XN Nội tiết || Thực hiện bằng tay || Xét nghiệm
+Row 21: IVFMD.11.21 || Không trả KQ XN cho BN || Thực hiện bằng tay || Xét nghiệm
+Row 22: IVFMD.11.22 || Thực hiện XN || Xử lý trên hệ thống khác || Xét nghiệm
+Row 23: IVFMD.11.23 || In KQ XN và chuyển cho HC || Thực hiện bằng tay || Xét nghiệm
+Row 24: IVFMD.11.24 || Tạo hóa đơn theo toa thuốc của BS || Xử lý trên hệ thống || Nhà thuốc
+Row 25: IVFMD.11.25 || In hóa đơn cho BN || Tài liệu in ra || Nhà thuốc
+Row 26: IVFMD.11.26 || Thu tiền, phát thuốc, hướng dẫn cho BN || Thực hiện bằng tay || Nhà thuốc
+Row 27: IVFMD.11.27 || Thu tiền phí tiêm thuốc || Xử lý trên hệ thống khác || Thu Ngân của BV
+Row 28: IVFMD.11.28 || Tiêm thuốc KTBT hoặc KTRT || Thực hiện bằng tay || Phòng Tiêm Thuốc của BV
+
+--- TABLE 7 ---
+Row 0: Bước || Tên sự kiện || Kiểu || Bộ phận thực hiện || Mô tả
+Row 1: IVFMD.20.01 || Bốn/Năm ngày sau BN tiêm thuốc KTBT, BN đến S.A Theo dõi Nang Noãn || Thực hiện bằng tay
+Row 2: IVFMD.20.02 || BN tự lấy STT đầu tiên (1 liên) || Xử lý trên hệ thống khác || Quầy phát STT
+Row 3: IVFMD.20.03 || Xin toa thuốc của BN || Thực hiện bằng tay || Tiếp Đón + Thu Ngân
+Row 4: IVFMD.20.04 || Lục tìm phiếu Nang Noãn của BN || Thực hiện bằng tay || Tiếp Đón + Thu Ngân
+Row 5: IVFMD.20.05 || Cấp phát STT SA Nang Noãn (suốt chu kỳ), STT XN (S.A 2 liên, XN 1 liên) || Xử lý trên hệ thống khác || Tiếp Đón + Thu Ngân
+Row 6: IVFMD.20.06 || Tạo hóa đơn thu tiền SA Nang Noãn (suốt chu kỳ) || Xử lý trên hệ thống || Tiếp Đón + Thu Ngân
+Row 7: IVFMD.20.07 || In hóa đơn cho BN || Tài liệu in ra || Tiếp Đón + Thu Ngân
+Row 8: IVFMD.20.08 || Thu tiền BN || Thực hiện bằng tay || Tiếp Đón + Thu Ngân
+Row 9: IVFMD.20.09 || Đưa BN liên hồng hóa đơn & Liên 2 STT S.A, STT XN || Thực hiện bằng tay || Tiếp Đón + Thu Ngân
+Row 10: IVFMD.20.10 || Đưa HS cho NHS đem đến phòng SA || Thực hiện bằng tay || Tiếp Đón + Thu Ngân
+Row 11: IVFMD.20.11 || Siêu âm nang noãn || Xử lý trên hệ thống || BS Siêu âm
+Row 12: IVFMD.20.12 || In KQ SA cho BN || Tài liệu in ra || BS Siêu âm
+Row 13: IVFMD.20.13 || S.A nang noãn bất thường || Quyết định ký duyệt || BS Siêu âm
+Row 14: IVFMD.20.14 || Bất thường: IVM, TPTB, Ngưng điều trị || Quyết định ký duyệt || BS Siêu âm
+Row 15: IVFMD.20.15 || Chỉ định tiêm thuốc kích thích buồng trứng + Toa thuốc cho BN || Thực hiện bằng tay || BS Siêu âm
+Row 16: IVFMD.20.16 || Nhập toa thuốc vào phần mềm || Xử lý trên hệ thống || NHS
+Row 17: IVFMD.20.17 || In toa thuốc cho BN || Tài liệu in ra || NHS
+Row 18: IVFMD.20.18 || Hẹn ngày tái khám || Xử lý trên hệ thống || NHS
+Row 19: IVFMD.20.19 || Thu tiền, phát thuốc, hướng dẫn cho BN || Thực hiện bằng tay || Nhà thuốc
+Row 20: IVFMD.20.20 || Tạo hóa đơn theo toa thuốc của BS || Xử lý trên hệ thống || Nhà thuốc
+Row 21: IVFMD.20.21 || In hóa đơn cho BN || Tài liệu in ra || Nhà thuốc
+Row 22: IVFMD.20.22 || Thu tiền phí tiêm thuốc || Xử lý trên hệ thống khác || Thu Ngân của BV
+Row 23: IVFMD.20.23 || Tiêm thuốc kích thích buồng trứng cho BN nếu có chỉ định || Thực hiện bằng tay || Phòng Tiêm Thuốc của BV
+
+--- TABLE 8 ---
+Row 0: Bước || Tên sự kiện || Kiểu || Bộ phận thực hiện || Mô tả
+Row 1: IVFMD.21.01 || BN đến SA theo dõi Nang Noãn || Thực hiện bằng tay
+Row 2: IVFMD.21.02 || BN tự lấy STT đầu tiên (1 liên) || Xử lý trên hệ thống khác || Quầy phát STT
+Row 3: IVFMD.21.03 || Xin toa thuốc của BN || Thực hiện bằng tay || NHS Hành Chánh
+Row 4: IVFMD.21.04 || Lục tìm phiếu Nang Noãn của BN, trong đó có KQ XN Nội tiết lần trước của BN || Thực hiện bằng tay || NHS Hành Chánh
+Row 5: IVFMD.21.05 || Cấp phát STT SA Nang Noãn (suốt chu kỳ), STT XN (S.A 2 liên, XN 1 liên) || Xử lý trên hệ thống khác || NHS Hành Chánh
+Row 6: IVFMD.21.06 || Không thu tiền SA noãn noãn nữa vì lần trước đã thu suốt chu kỳ || Thực hiện bằng tay || NHS Hành Chánh
+Row 7: IVFMD.21.07 || Đưa HS cho NHS đem đến phòng SA || Thực hiện bằng tay || NHS Hành Chánh
+Row 8: IVFMD.21.08 || Siêu âm nang noãn || Xử lý trên hệ thống || BS Siêu âm
+Row 9: IVFMD.21.09 || In KQ SA cho BN || Thực hiện bằng tay || BS Siêu âm
+Row 10: IVFMD.21.10 || Nang noãn đã đạt và tiêm thuốc Rụng Trứng || Quyết định ký duyệt || BS Siêu âm
+Row 11: IVFMD.21.11 || Chỉ định tiêm thuốc Rụng Trứng || BS Siêu âm
+Row 12: IVFMD.21.12 || Chỉ định tiêm thuốc KTBT khoảng 1-2 ngày nữa, Và cả thuốc Rụng Trứng sẽ được tiêm sau 1-2 ngày || Thực hiện bằng tay || BS Siêu âm
+Row 13: IVFMD.21.13 || Chỉ định thuốc hỗ trợ hoàng thể (cho trước – để ngày làm thủ thuật IUI không phải cho nữa) || Thực hiện bằng tay || BS Siêu âm
+Row 14: IVFMD.21.14 || Nhập toa thuốc vào phần mềm || Xử lý trên hệ thống || NHS
+Row 15: IVFMD.21.15 || In toa thuốc cho BN || Tài liệu in ra || NHS
+Row 16: IVFMD.21.16 || Hướng dẫn BN giờ tiêm thuốc Rụng Trứng || Thực hiện bằng tay || NHS
+Row 17: IVFMD.21.17 || Hẹn BN đến Bơm tinh trùng sau 36 giờ kể từ giờ tiêm thuốc || Thực hiện bằng tay || NHS
+Row 18: IVFMD.21.18 || Tạo hóa đơn theo toa thuốc của BS || Xử lý trên hệ thống || Nhà thuốc
+Row 19: IVFMD.21.19 || In hóa đơn cho BN || Tài liệu in ra || Nhà thuốc
+Row 20: IVFMD.21.20 || Thu tiền, phát thuốc, hướng dẫn cho BN || Thực hiện bằng tay || Nhà thuốc
+Row 21: IVFMD.21.21 || Thu tiền phí tiêm thuốc || Xử lý trên hệ thống khác || Thu Ngân của BV
+Row 22: IVFMD.21.22 || Tiêm thuốc KTBT hoặc KTRT || Thực hiện bằng tay || Phòng Tiêm Thuốc của BV
+
+--- TABLE 9 ---
+Row 0: Bước || Tên sự kiện || Kiểu || Bộ phận thực hiện || Mô tả
+Row 1: IVFMD.30.01 || BN đến chọc hút sau 36 giờ kể từ giờ tiêm thuốc rụng trứng || Thực hiện bằng tay
+Row 2: IVFMD.30.02 || BN tự lấy STT đầu tiên (1 liên) || Xử lý trên hệ thống khác || Quầy phát STT
+Row 3: IVFMD.30.03 || Xin toa thuốc (IVFMD) hoặc giấy giới thiệu (PKNL) || Thực hiện bằng tay || Tiếp Đón + Thu Ngân
+Row 4: IVFMD.30.04 || Tạo hóa đơn thu tiền Phí Chọc Hút + Chuyển phôi || Xử lý trên hệ thống || Tiếp Đón + Thu Ngân || Thu phí Chọc Hút và chuyển phôi cùng 1 lúc. Nếu BN không chuyển phôi thì sẽ hoàn tiền (thông thường BN trữ phôi, thì sẽ cấn trừ tiền chuyển phôi vào tiền trữ phôi)
+Row 5: IVFMD.30.05 || Cấp phát STT HC (Mỗi STT 2 liên, đưa cho BN 1 liên) || Xử lý trên hệ thống khác || Tiếp Đón + Thu Ngân
+Row 6: IVFMD.30.06 || In hóa đơn cho BN || Tài liệu in ra || Tiếp Đón + Thu Ngân
+Row 7: IVFMD.30.07 || Thu tiền BN || Thực hiện bằng tay || Tiếp Đón + Thu Ngân
+Row 8: IVFMD.30.08 || Đưa BN liên hồng hóa đơn & Liên 2 STT HC || Thực hiện bằng tay || Tiếp Đón + Thu Ngân
+Row 9: IVFMD.30.09 || Lục tìm HS của BN || Thực hiện bằng tay || NHS Hành Chánh
+Row 10: IVFMD.30.10 || Kiểm tra hồ sơ: thủ tục hành chánh, tiền căn bệnh sư (nội, ngoại, sản), kiểm tra các XN || Thực hiện bằng tay || NHS Hành Chánh
+Row 11: IVFMD.30.11 || Cấp phát STT lấy mẫu cho người chồng || Xử lý trên hệ thống khác || NHS Hành Chánh
+Row 12: IVFMD.30.12 || Hướng dẫn người vợ chờ Chọc Hút và Người chồng lấy Tinh Trùng || Thực hiện bằng tay || NHS Hành Chánh
+Row 13: IVFMD.30.13 || Người chồng lấy Tinh Trùng || Thực hiện bằng tay || Nam khoa
+Row 14: IVFMD.30.14 || KTV Gây mê: Lấy đường truyền cho BN || Thực hiện bằng tay || Gây Mê + BS Hiếm muộn
+Row 15: IVFMD.30.15 || KTV Gây mê: Gây mê cho BN || Thực hiện bằng tay || Gây Mê + BS Hiếm muộn
+Row 16: IVFMD.30.16 || BS HM: Chọc hút cho BN || Thực hiện bằng tay || Gây Mê + BS Hiếm muộn
+Row 17: IVFMD.30.17 || Theo dõi BN sau chọc hút: Đo huyết ấp + Hướng dẫn BN nghỉ ngơi || Thực hiện bằng tay || NHS
+Row 18: IVFMD.30.18 || Lấy toa thuốc cho BN: thuốc hỗ trợ hoàng thể + Kháng sinh || Xử lý trên hệ thống || NHS || Toa thuốc được chuẩn bị trước 1 ngày (được nhập vào PM trước)
+Row 19: IVFMD.30.19 || Đo huyết áp + Hướng dẫn BN tái khám || NHS
+Row 20: IVFMD.30.20 || Tạo hóa đơn theo toa thuốc của BS || Xử lý trên hệ thống || Nhà thuốc
+Row 21: IVFMD.30.21 || In hóa đơn cho BN || Tài liệu in ra || Nhà thuốc
+Row 22: IVFMD.30.22 || Thu tiền, phát thuốc, hướng dẫn cho BN || Thực hiện bằng tay || Nhà thuốc
+Row 23: IVFMD.30.23 || Chuyển tinh trùng và Trứng/Noãn cho LABO || Thực hiện bằng tay || NHS
+Row 24: IVFMD.30.24 || Nhận tinh trùng và Trứng/Noãn từ NHS || Thực hiện bằng tay || LABO || Tham khảo thêm tài liệu: Quy trình giao và nhận mẫu tinh dịch (IUI, ICSI, IVM, NHTT, TDĐ, TTT)
+
+--- TABLE 10 ---
+Row 0: Bước || Tên sự kiện || Kiểu || Bộ phận thực hiện || Mô tả
+Row 1: IVFMD.40.01 || BN đến làm thủ thuật IUI sau 36 giờ kể từ giờ tiêm thuốc rụng trứng || Thực hiện bằng tay
+Row 2: IVFMD.40.02 || BN tự lấy STT đầu tiên (1 liên) || Xử lý trên hệ thống khác || Quầy phát STT
+Row 3: IVFMD.40.03 || Xin toa thuốc (IVFMD) hoặc giấy giới thiệu (PKNL) || Thực hiện bằng tay || Tiếp Đón + Thu Ngân
+Row 4: IVFMD.40.04 || Tạo hóa đơn thu tiền Phí thủ thuật IUI || Xử lý trên hệ thống || Tiếp Đón + Thu Ngân
+Row 5: IVFMD.40.05 || Cấp phát STT HC (Mỗi STT 2 liên, đưa cho BN 1 liên) || Xử lý trên hệ thống khác || Tiếp Đón + Thu Ngân
+Row 6: IVFMD.40.06 || In hóa đơn cho BN || Tài liệu in ra || Tiếp Đón + Thu Ngân
+Row 7: IVFMD.40.07 || Thu tiền BN || Thực hiện bằng tay || Tiếp Đón + Thu Ngân
+Row 8: IVFMD.40.08 || Đưa BN liên hồng hóa đơn & Liên 2 STT HC || Thực hiện bằng tay || Tiếp Đón + Thu Ngân
+Row 9: IVFMD.40.09 || Lục tìm HS của BN || Thực hiện bằng tay || NHS Hành Chánh
+Row 10: IVFMD.40.10 || Kiểm tra hồ sơ: thủ tục hành chánh, tiền căn bệnh sư (nội, ngoại, sản), kiểm tra các XN, kiểm tra giờ tiêm mũi rụng trứng, ngày kiêng xuất tinh của chồng, số lần quan hệ || Thực hiện bằng tay || NHS Hành Chánh
+Row 11: IVFMD.40.11 || Cấp phát STT lấy mẫu cho người chồng || Xử lý trên hệ thống khác || NHS Hành Chánh
+Row 12: IVFMD.40.12 || Hướng dẫn người chồng chờ lấy Tinh Trùng || Thực hiện bằng tay || NHS Hành Chánh
+Row 13: IVFMD.40.13 || Người chồng lấy mẫu TT và đưa cho NHS || Thực hiện bằng tay || NHS Phòng Lấy Mẫu
+Row 14: IVFMD.40.14 || Hẹn BN 2 tiếng sau quay lại làm thủ thuật IUI || Thực hiện bằng tay || NHS Phòng Lấy Mẫu
+Row 15: IVFMD.40.15 || Gửi mẫu cho phòng Nam Khoa || Thực hiện bằng tay || NHS Phòng Lấy Mẫu || Tham khảo thêm tài liệu: Quy trình giao và nhận mẫu tinh dịch (IUI, ICSI, IVM, NHTT, TDĐ, TTT)
+Row 16: IVFMD.40.16 || Nhận và lọc rửa tinh trùng || Thực hiện bằng tay || Nam Khoa
+Row 17: IVFMD.40.17 || Gửi mẫu sau lọc rửa cho NHS || Thực hiện bằng tay || Nam Khoa
+Row 18: IVFMD.40.18 || In KQ sau lọc rửa cho NHS || Tài liệu in ra || Nam Khoa
+Row 19: IVFMD.40.19 || Nhận mẫu sau lọc rửa và Chuẩn bị bênh IUI || Thực hiện bằng tay || NHS Phòng Lấy Mẫu
+Row 20: IVFMD.40.20 || Mời BN-Người vợ vào làm thủ thuật || Thực hiện bằng tay || NHS Phòng Lấy Mẫu
+Row 21: IVFMD.40.21 || Thực hiện thủ thuật IUI || Thực hiện bằng tay || BS Hiếm muộn
+Row 22: IVFMD.40.22 || Hướng dẫn BN nghỉ ngơi || Thực hiện bằng tay || NHS || Không cấp toa, toa đã được cấp trước - vào ngày SA cuối (ngày KTRT)
+Row 23: IVFMD.40.23 || Hẹn BN tái khám ngày thử thai || Thực hiện bằng tay || NHS
+Row 24: IVFMD.40.24 || Nhập KQ thủ thuật IUI vào phần mềm: nhập giờ TT và BS TT || Xử lý trên hệ thống || NHS
+
+--- TABLE 11 ---
+Row 0: Bước || Tên sự kiện || Kiểu || Bộ phận thực hiện || Mô tả
+Row 1: IVFMD.50.01 || BN đến vào ngày 2 hoặc ngày 3 của chu kỳ kinh || Thực hiện bằng tay
+Row 2: IVFMD.50.02 || BN lấy STT đầu tiên (1 liên) || Xử lý trên hệ thống khác || Quầy phát STT
+Row 3: IVFMD.50.03 || Xin phiếu hẹn hoặc phiếu trữ phôi của BN || Thực hiện bằng tay || Tiếp đón + Thu Ngân
+Row 4: IVFMD.50.04 || Tạo HĐ thu tiền SA Phụ Khoa, Phí Tư vấn || Xử lý trên hệ thống || Tiếp đón + Thu Ngân || Bệnh nhân phải đóng tiền SA phụ khoa và phí tư vấn lại vì cần theo dõi và tư vấn lại để chuẩn bị cho quá trình chuẩn bị niêm mạc tử cung chuyển phôi trữ (những kết quả SA phụ khoa chuyển phôi tươi không còn đúng/ý nghĩa nữa)
+Row 5: IVFMD.50.05 || In hóa đơn cho BN || Tài liệu in ra || Tiếp đón + Thu Ngân
+Row 6: IVFMD.50.06 || Thu tiền BN || Thực hiện bằng tay || Tiếp đón + Thu Ngân
+Row 7: IVFMD.50.07 || Cấp phát STT SA Phụ khoa (2 liên) (STT Tư Vấn sẽ được cấp phát sau SA xong) || Xử lý trên hệ thống khác || Tiếp đón + Thu Ngân
+Row 8: IVFMD.50.08 || Đưa BN liên hồng hóa đơn & Liên 2 STT SA || Thực hiện bằng tay || Tiếp đón + Thu Ngân
+Row 9: IVFMD.50.09 || Lục tìm hồ sơ || Thực hiện bằng tay || NHS Hành chánh
+Row 10: IVFMD.50.10 || Siêu âm phụ khoa || Xử lý trên hệ thống || BS Siêu âm
+Row 11: IVFMD.50.11 || In KQ Siêu Âm cho BN || Tài liệu in ra || BS Siêu âm
+Row 12: IVFMD.50.12 || Cấp phát STT Tư vấn || Xử lý trên hệ thống khác || Tiếp đón + Thu Ngân
+Row 13: IVFMD.50.13 || Khám tư vấn và chỉ định CLS khác nếu hết hạn || Thực hiện bằng tay || BS Tư Vấn || Giống như quy trình tư vấn hiếm muộn lần đầu, quy trình này cũng cần 2 bác sĩ là BS Siêu âm và bác sĩ tư vấn
+Row 14: IVFMD.50.14 || Ghi thuốc CBNMTC vào HS giấy || Thực hiện bằng tay || BS Tư Vấn
+Row 15: IVFMD.50.15 || Nhập toa thuốc vào PM || Xử lý trên hệ thống || NHS Hành chánh
+Row 16: IVFMD.50.16 || In toa thuốc cho BN || Thực hiện bằng tay || NHS Hành chánh
+Row 17: IVFMD.50.17 || Hẹn ngày tái khám & Hướng dẫn thủ tục HC cần thiết || Xử lý trên hệ thống || NHS Hành chánh
+Row 18: IVFMD.50.18 || Tạo hóa đơn theo toa thuốc của BS || Xử lý trên hệ thống || Nhà thuốc
+Row 19: IVFMD.50.19 || In hóa đơn cho BN || Tài liệu in ra || Nhà thuốc
+Row 20: IVFMD.50.20 || Thu tiền, phát thuốc, và hướng dẫn cho BN || Thực hiện bằng tay || Nhà thuốc
+
+--- TABLE 12 ---
+Row 0: Bước || Tên sự kiện || Kiểu || Bộ phận thực hiện || Mô tả
+Row 1: IVFMD.51.01 || BN đến vào ngày 2 hoặc ngày 3 của chu kỳ kinh || Thực hiện bằng tay
+Row 2: IVFMD.51.02 || BN lấy STT đầu tiên (1 liên) || Xử lý trên hệ thống khác || Quầy phát STT
+Row 3: IVFMD.51.03 || Xin toa thuốc của BN || Thực hiện bằng tay || Tiếp đón + Thu Ngân
+Row 4: IVFMD.51.04 || Tạo HĐ thu tiền SA NMTC (suốt chu kỳ) || Xử lý trên hệ thống || Tiếp đón + Thu Ngân
+Row 5: IVFMD.51.05 || In hóa đơn cho BN || Tài liệu in ra || Tiếp đón + Thu Ngân
+Row 6: IVFMD.51.06 || Thu tiền BN || Thực hiện bằng tay || Tiếp đón + Thu Ngân
+Row 7: IVFMD.51.07 || Cấp phát STT SA NMTC (2 liên) || Xử lý trên hệ thống khác || Tiếp đón + Thu Ngân
+Row 8: IVFMD.51.08 || Đưa BN liên hồng hóa đơn & Liên 2 STT SA || Thực hiện bằng tay || Tiếp đón + Thu Ngân
+Row 9: IVFMD.51.09 || Lục tìm hồ sơ || Thực hiện bằng tay || NHS Hành chánh
+Row 10: IVFMD.51.10 || Siêu âm NMTC || Xử lý trên hệ thống || BS Tư Vấn || Quy trình này chỉ cần 1 BS tư vấn, BS tư vấn sẽ siêu âm và tư vấn NMTC cho BN
+Row 11: IVFMD.51.11 || Ghi KQ NM vào Phiếu nang noãn || Thực hiện bằng tay || BS Tư Vấn
+Row 12: IVFMD.51.12 || Ghi thuốc CBNMTC vào HS giấy || Thực hiện bằng tay || BS Tư Vấn
+Row 13: IVFMD.51.13 || Nhập KQ NM vào PM || Xử lý trên hệ thống || NHS Hành chánh
+Row 14: IVFMD.51.14 || Nhập toa thuốc vào PM || Xử lý trên hệ thống || NHS Hành chánh
+Row 15: IVFMD.51.15 || In toa thuốc và đưa BS kiểm tra + ký tên, sau đó đưa toa thuốc cho BN || Tài liệu in ra || NHS Hành chánh
+Row 16: IVFMD.51.16 || Hẹn ngày tái khám + Hướng dẫn toa thuốc || Xử lý trên hệ thống || NHS Hành chánh
+Row 17: IVFMD.51.17 || Tạo hóa đơn theo toa thuốc của BS || Xử lý trên hệ thống || Nhà thuốc
+Row 18: IVFMD.51.18 || In hóa đơn cho BN || Tài liệu in ra || Nhà thuốc
+Row 19: IVFMD.51.19 || Thu tiền, phát thuốc, và hướng dẫn cho BN || Thực hiện bằng tay || Nhà thuốc
+Row 20: IVFMD.51.20 || BN tái khám và uống từ 10->12 ngày
+
+--- TABLE 13 ---
+Row 0: Bước || Tên sự kiện || Kiểu || Bộ phận thực hiện || Mô tả
+Row 1: IVFMD.60.01 || BN đến theo ngày hẹn || Thực hiện bằng tay
+Row 2: IVFMD.60.02 || BN lấy STT đầu tiên (1 liên) || Xử lý trên hệ thống khác || Quầy phát STT
+Row 3: IVFMD.60.03 || Lục tìm Nang noãn của BN || Thực hiện bằng tay || Tiếp Đón + Thu Ngân
+Row 4: IVFMD.60.04 || Cấp phát STT SA Nang Noãn (2 liên) || Xử lý trên hệ thống khác || Tiếp Đón + Thu Ngân
+Row 5: IVFMD.60.05 || Tạo hoá đơn thu tiền SA Nang Noãn (suốt chu kỳ) || Xử lý trên hệ thống || Tiếp Đón + Thu Ngân
+Row 6: IVFMD.60.06 || In hóa đơn cho BN || Tài liệu in ra || Tiếp Đón + Thu Ngân
+Row 7: IVFMD.60.07 || Thu tiền BN || Thực hiện bằng tay || Tiếp Đón + Thu Ngân
+Row 8: IVFMD.60.08 || Đưa BN liên hồng hóa đơn & Liên 2 STT S.A || Thực hiện bằng tay || Tiếp Đón + Thu Ngân
+Row 9: IVFMD.60.09 || Đưa HS cho Hộ Lý đem đến các khoa phòng || Thực hiện bằng tay || Tiếp Đón + Thu Ngân
+Row 10: IVFMD.60.10 || Siêu âm nang noãn || Xử lý trên hệ thống || BS Siêu âm
+Row 11: IVFMD.60.11 || Ghi KQ SA vào phiếu nang noãn || BS Siêu âm
+Row 12: IVFMD.60.12 || Hẹn BN tái khám tiếp tục theo dõi nang noãn; Hoặc tư vấn ngày QHTN; Hoặc có thể tiêm thuốc KTRT || Thực hiện bằng tay || BS Siêu âm
+Row 13: IVFMD.60.13 || Hẹn BN 14 ngày sau ngày QH đến thử thai || Thực hiện bằng tay || BS Siêu âm
+Row 14: IVFMD.60.14 || Có thể có toa thuốc Hỗ trợ hoàng thể sau quan hệ (lúc này BN xuống nhà thuốc mua thuốc) || Thực hiện bằng tay || BS Siêu âm
+
+--- TABLE 14 ---
+Row 0: Bước || Tên sự kiện || Kiểu || Bộ phận thực hiện || Mô tả
+Row 1: IVFMD.80.01 || BN đến để được báo phôi & Chuyển phôi N3, N5, N6 || Thực hiện bằng tay
+Row 2: IVFMD.80.02 || BN tự lấy STT đầu tiên (1 liên) || Xử lý trên hệ thống khác || Quầy phát STT
+Row 3: IVFMD.80.03 || Xin toa thuốc của BN (toa thuốc sau chọc hút) || Thực hiện bằng tay || Tiếp Đón + Thu Ngân
+Row 4: IVFMD.80.04 || Toa thuốc có chỉ định Trữ phôi toàn bộ || Quyết định ký duyệt || Tiếp Đón + Thu Ngân
+Row 5: IVFMD.80.05 || Cấp phát STT Báo phôi || Xử lý trên hệ thống khác || Tiếp Đón + Thu Ngân
+Row 6: IVFMD.80.06 || Phát STT SA cho BN (STT đã bấm/cấp trước mỗi sáng cho những ca CP Tươi trong ngày) || Thực hiện bằng tay || Tiếp Đón + Thu Ngân
+Row 7: IVFMD.80.07 || Siêu âm niêm mạc || Xử lý trên hệ thống || BS Hiếm muộn || Trước lúc SA cho BN: | NV LABO chuyển HS Phôi cho NHS |   | NHS ghi thông tin phôi vào HS giấy |  | Chuyển HS cho phòng SA nếu chuyển phôi tươi. Hoặc chuyển Phòng tư vấn phôi nếu TPTB
+Row 8: IVFMD.80.08 || Ghi KQ SA bất thường trên phiếu nang noãn, Phiếu nang noãn sẽ được đưa cho BP Labo để BP Labo tư vấn cho BN || Thực hiện bằng tay || BS Hiếm muộn
+Row 9: IVFMD.80.09 || NV Labo báo phôi cho BN || Thực hiện bằng tay || LABO
+Row 10: IVFMD.80.10 || Làm hợp đồng trữ phôi (nếu TPTB hoặc CP Tươi và còn phôi để trữ) || Thực hiện bằng tay || LABO
+Row 11: IVFMD.80.11 || Chuyển phôi tươi / Trữ phôi toàn bộ || Quyết định ký duyệt || LABO
+Row 12: IVFMD.80.12 || Chuyển phôi cho BN || Thực hiện bằng tay || BS Hiếm muộn || Xem thêm quy trình chuyên môn chuyển phôi
+Row 13: IVFMD.80.13 || Hướng dẫn BN nghỉ ngơi || Thực hiện bằng tay || BS Hiếm muộn
+Row 14: IVFMD.80.14 || Có phôi trữ || Quyết định ký duyệt || BS Hiếm muộn
+Row 15: IVFMD.80.15 || Xem HĐ trữ phôi để Tạo hóa đơn thu tiền Trữ phôi || Xử lý trên hệ thống || Tiếp Đón + Thu Ngân
+Row 16: IVFMD.80.16 || Hoàn tiền chuyển phôi & Thu tiền Trữ phôi || Xử lý trên hệ thống || Tiếp Đón + Thu Ngân || Phí trữ phôi: | - 8tr/top đầu | - 2tr/top phát sinh | - Phôi N3: 1->3 phôi/top | - Phôi N5&N6: 1->2 phôi/top | - Phôi đặc biệt: 1 phôi/top |  | (*) Nếu BN có nhiều phôi (20 phôi) thì BS tư vấn nuôi phôi N5 (20 phôi N2 -> 2 phôi N5) để chất lượng phôi và chi phí trữ phôi tốt hơn cho BN.
+Row 17: IVFMD.80.17 || In hóa đơn cho BN || Tài liệu in ra || Tiếp Đón + Thu Ngân
+Row 18: IVFMD.80.18 || Thu tiền BN || Thực hiện bằng tay || Tiếp Đón + Thu Ngân
+Row 19: IVFMD.80.19 || Đưa BN liên hồng hóa đơn + Hợp đồng || Thực hiện bằng tay || Tiếp Đón + Thu Ngân
+Row 20: IVFMD.80.20 || Phát phiếu trữ phôi + Hợp đồng cho BN hướng dẫn BN tái khám || Thực hiện bằng tay || NHS Hành chánh
+
+--- TABLE 15 ---
+Row 0: Bước || Tên sự kiện || Kiểu || Bộ phận thực hiện || Mô tả
+Row 1: IVFMD.90.01 || Thu ngân dựa vào phiếu hẹn và tạo hóa đơn thu tiền XN BetaHCG || Xử lý trên hệ thống || Tiếp Đón + Thu Ngân của BV || BN đến Tiếp đón và thu ngân của BV để đóng tiền XN, không phải đến Tiếp đón và thu ngân của IVFMD
+Row 2: IVFMD.90.02 || In hóa đơn cho BN || Tài liệu in ra || Tiếp Đón + Thu Ngân của BV
+Row 3: IVFMD.90.03 || Thu tiền BN || Thực hiện bằng tay || Tiếp Đón + Thu Ngân của BV
+Row 4: IVFMD.90.04 || Đưa BN liên hồng hóa đơn & Liên 2 STT XN || Thực hiện bằng tay || Tiếp Đón + Thu Ngân của BV
+Row 5: IVFMD.90.05 || Lấy máu để làm XN BetaHCG || Thực hiện bằng tay || Xét Nghiệm
+Row 6: IVFMD.90.06 || Thực hiện XN || Xử lý trên hệ thống khác || Xét Nghiệm
+Row 7: IVFMD.90.07 || Không trả KQ XN cho BN, mà chuyển KQ cho NHS || Thực hiện bằng tay || Xét Nghiệm
+Row 8: IVFMD.90.08 || Nhận KQ XN giấy từ BP XN gửi lên || Thực hiện bằng tay || NHS
+Row 9: IVFMD.90.09 || Nhập KQ XN vào phần mềm || Xử lý trên hệ thống || NHS || NHS không được phép thông báo kết quả XN BetaHCG cho bệnh nhân, chỉ BS mới được phép.
+Row 10: IVFMD.90.10 || Beta HCG Âm tính / Dương tính || Quyết định ký duyệt || NHS
+Row 11: IVFMD.90.11 || Cấp phát STT Tư vấn (2 liên) || Xử lý trên hệ thống khác || NHS
+Row 12: IVFMD.90.12 || Gửi HS cho Thu Ngân để TN thu tiền phí tư vấn || Thực hiện bằng tay || NHS
+Row 13: IVFMD.90.13 || Xem KQ Beta HCG và tư vấn cho BN || Thực hiện bằng tay || BS Tư vấn
+Row 14: IVFMD.90.14 || Beta HCG Âm tính / Dương tính || Quyết định ký duyệt || BS Tư vấn
+Row 15: IVFMD.90.15 || Hẹn ngày 2 VK: CPT lần sau, hoặc QHTN/IUI/ISCI/IVM lần khác || Thực hiện bằng tay || BS Tư vấn
+Row 16: IVFMD.90.16 || Cho toa thuốc trong 3 tuần || Thực hiện bằng tay || BS Tư vấn
+Row 17: IVFMD.90.17 || Nhập toa thuốc vào PM || Xử lý trên hệ thống || NHS
+Row 18: IVFMD.90.18 || In toa thuốc và đưa BS kiểm tra + ký tên, sau đó đưa toa thuốc cho BN || Tài liệu in ra || NHS
+Row 19: IVFMD.90.19 || Hẹn ngày tái khám sau 3 tuần (lúc này là thai 7 tuần) hoặc bất kỳ lúc nào bất thường || Xử lý trên hệ thống || NHS
+Row 20: IVFMD.90.20 || Tạo hóa đơn theo toa thuốc của BS || Xử lý trên hệ thống || Nhà Thuốc
+Row 21: IVFMD.90.21 || In hóa đơn cho BN || Tài liệu in ra || Nhà Thuốc
+Row 22: IVFMD.90.22 || Thu tiền, phát thuốc, hướng dẫn cho BN || Thực hiện bằng tay || Nhà Thuốc
+
+--- TABLE 16 ---
+Row 0: Bước || Tên sự kiện || Kiểu || Bộ phận thực hiện || Mô tả
+Row 1: IVFMD.91.01 || Sau khi BN thử có thai và tái khám lúc thai 7 tuần tuổi || Thực hiện bằng tay
+Row 2: IVFMD.91.02 || BN lấy STT đầu tiên (1 liên) || Xử lý trên hệ thống khác || Quầy phát STT
+Row 3: IVFMD.91.03 || Xin toa thuốc của BN || Thực hiện bằng tay || Tiếp Đón + Thu Ngân
+Row 4: IVFMD.91.04 || Tạo hoá đơn thu tiền SA Thai và Phí Khám || Xử lý trên hệ thống || Tiếp Đón + Thu Ngân
+Row 5: IVFMD.91.05 || In hóa đơn cho BN || Tài liệu in ra || Tiếp Đón + Thu Ngân
+Row 6: IVFMD.91.06 || Thu tiền BN || Thực hiện bằng tay || Tiếp Đón + Thu Ngân
+Row 7: IVFMD.91.07 || Cấp phát STT SA Thai (2 liên) (STT Khám sẽ được cấp phát sau khi SA xong) || Xử lý trên hệ thống khác || Tiếp Đón + Thu Ngân
+Row 8: IVFMD.91.08 || Đưa BN liên hồng hóa đơn & Liên 2 STT SA || Thực hiện bằng tay || Tiếp Đón + Thu Ngân
+Row 9: IVFMD.91.09 || Lục tìm HS || Thực hiện bằng tay || NHS Hành Chánh
+Row 10: IVFMD.91.10 || Chuyển HS cho TK Y khoa || Thực hiện bằng tay || NHS Hành Chánh
+Row 11: IVFMD.91.11 || Siêu âm thai || Xử lý trên hệ thống || BS Siêu Âm
+Row 12: IVFMD.91.12 || In KQ SA cho BN (2 bản) || Tài liệu in ra || BS Siêu Âm
+Row 13: IVFMD.91.13 || Cấp phát STT Khám Thai (2 liên) (Kẹp vào KQ SA) || Xử lý trên hệ thống khác || NHS
+Row 14: IVFMD.91.14 || Kẹp STT vào 1 bản KQ SA, BN giữ 1 bản KQ SA || Thực hiện bằng tay || NHS
+Row 15: IVFMD.91.15 || Kẹp KQ SA vào HS và chuyển cho BS || Thực hiện bằng tay || NHS
+Row 16: IVFMD.91.16 || BS xem KQ SA, Khám và tư vấn cho BN || Thực hiện bằng tay || BS Khám
+Row 17: IVFMD.91.17 || Ra toa thuốc cho BN (Uống 4 tuần) || Xử lý trên hệ thống || BS Khám
+Row 18: IVFMD.91.18 || In toa thuốc cho BN || Tài liệu in ra || BS Khám
+Row 19: IVFMD.91.19 || Hẹn ngày tái khám || Xử lý trên hệ thống || BS Khám || Tái khái: | - Sau 2 tuần đối với 1 thai | - Sau 1 tuần đối với 2 thai | Tái khám lần 2, Tiếp đón phát sổ khám thai. | Sau lần tái khám lần 2 thì IVF không theo dõi thai nữa, mà chuyển qua QT theo dõi thai của BV như những thai bình thường khác.
+Row 20: IVFMD.91.20 || Tạo hóa đơn theo toa thuốc của BS || Xử lý trên hệ thống || Nhà thuốc
+Row 21: IVFMD.91.21 || In hóa đơn cho BN || Tài liệu in ra || Nhà thuốc
+Row 22: IVFMD.91.22 || Thu tiền, phát thuốc, hướng dẫn cho BN || Thực hiện bằng tay || Nhà thuốc
+
+--- TABLE 17 ---
+Row 0: Bước || Tên sự kiện || Kiểu || Bộ phận thực hiện || Mô tả
+Row 1: IVFMD.T1.01 || BN tự lấy STT đầu tiên (1 liên) || Xử lý trên hệ thống khác || Quầy phát STT
+Row 2: IVFMD.T1.02 || YC BN điền thông tin hành chánh || Thực hiện bằng tay || Thư ký y khoa
+Row 3: IVFMD.T1.03 || Kiểm tra trên phần mềm, xem người cho có từng cho hay chưa || Xử lý trên hệ thống || Thư ký y khoa
+Row 4: IVFMD.T1.04 || Tạo ID bệnh nhân || Xử lý trên hệ thống || Thư ký y khoa
+Row 5: IVFMD.T1.05 || Cấp phát STT SA phụ khoa (Mỗi STT 2 liên, đưa cho BN 1 liên) || Xử lý trên hệ thống khác || Thư ký y khoa
+Row 6: IVFMD.T1.06 || BN yêu cầu gặp BS tư vấn || Quyết định ký duyệt || Tiếp đón + Thu ngân
+Row 7: IVFMD.T1.07 || Tạo hóa đơn thu tiền SA Phụ Khoa và Phí Tư Vấn || Xử lý trên hệ thống || Tiếp đón + Thu ngân
+Row 8: IVFMD.T1.08 || Tạo hóa đơn thu tiền SA Phụ Khoa và Phí Tư Vấn || Xử lý trên hệ thống || Tiếp đón + Thu ngân
+Row 9: IVFMD.T1.09 || In hóa đơn cho BN || Tài liệu in ra || Tiếp đón + Thu ngân
+Row 10: IVFMD.T1.10 || Thu tiền BN || Thực hiện bằng tay || Tiếp đón + Thu ngân
+Row 11: IVFMD.T1.11 || Đưa BN liên hồng hóa đơn & Liên 2 STT SA Phụ Khoa || Thực hiện bằng tay || Tiếp đón + Thu ngân
+Row 12: IVFMD.T1.12 || Chụp hình bằng camera và đưa vào phần mềm || Xử lý trên hệ thống || NHS Hành chánh
+Row 13: IVFMD.T1.13 || Lấy dấu vân tay và đưa vào phần mềm || Xử lý trên hệ thống || NHS Hành chánh
+Row 14: IVFMD.T1.14 || Siêu âm phụ khoa || Xử lý trên hệ thống || BS Siêu âm
+Row 15: IVFMD.T1.15 || In KQ Siêu Âm cho BN || Tài liệu in ra || BS Siêu âm
+Row 16: IVFMD.T1.16 || KQ SA Bình Thường || Quyết định ký duyệt || BS Siêu âm
+Row 17: IVFMD.T1.17 || BN yêu cầu gặp BS tư vấn || Quyết định ký duyệt || BS Siêu âm
+Row 18: IVFMD.T1.18 || Tick trên phiếu XN giấy các XN thường qui || Thực hiện bằng tay || NHS Hành chánh
+Row 19: IVFMD.T1.19 || Hướng dẫn NCT làm XN, NCT mang chỉ định đến thu ngân đóng tiền || Thực hiện bằng tay || NHS Hành chánh
+Row 20: IVFMD.T1.20 || BS tư vấn || Thực hiện bằng tay || BS tư vấn
+Row 21: IVFMD.T1.21 || Tick trên phiếu XN giấy các XN thường qui || Thực hiện bằng tay || BS tư vấn
+Row 22: IVFMD.T1.22 || Hướng dẫn NCT làm XN, NCT mang chỉ định đến thu ngân đóng tiền || Thực hiện bằng tay || BS tư vấn
+Row 23: IVFMD.T1.23 || Nhận phiếu CĐ từ BN || Thực hiện bằng tay || Tiếp đón + Thu ngân
+Row 24: IVFMD.T1.24 || Nhập các chỉ định và tạo hóa đơn || Xử lý trên hệ thống || Tiếp đón + Thu ngân
+Row 25: IVFMD.T1.25 || In hóa đơn cho BN || Tài liệu in ra || Tiếp đón + Thu ngân
+Row 26: IVFMD.T1.26 || Thu tiền BN || Thực hiện bằng tay || Tiếp đón + Thu ngân
+Row 27: IVFMD.T1.27 || Phát sinh STT XN và đưa cho BN (XN chỉ in 1 liên) || Xử lý trên hệ thống khác || Tiếp đón + Thu ngân
+Row 28: IVFMD.T1.28 || Lấy máu để làm XN thường quy || Thực hiện bằng tay || Xét nghiệm
+Row 29: IVFMD.T1.29 || Hẹn BN ngày giờ trả KQ || Thực hiện bằng tay || Xét nghiệm
+Row 30: IVFMD.T1.30 || Thực hiện XN || Xử lý trên hệ thống khác || Xét nghiệm
+Row 31: IVFMD.T1.31 || In KQ XN và chuyển cho HC || Tài liệu in ra || Xét nghiệm
+
+--- TABLE 18 ---
+Row 0: Bước || Tên sự kiện || Kiểu || Bộ phận thực hiện || Mô tả
+Row 1: IVFMD.T2.01 || BN chờ KQ trong ngày hoặc Quay lại sau 1 ngày || Quyết định ký duyệt
+Row 2: IVFMD.T2.02 || Cấp phát STT Tư vấn (Mỗi STT 2 liên, đưa cho BN 1 liên) || Xử lý trên hệ thống khác || Tiếp Đón + Thu Ngân
+Row 3: IVFMD.T2.03 || Phát STT đầu tiên (1 liên) || Xử lý trên hệ thống khác || Quầy phát STT
+Row 4: IVFMD.T2.04 || Xin phiếu hẹn của BN || Thực hiện bằng tay || Tiếp Đón + Thu Ngân
+Row 5: IVFMD.T2.05 || Lục tìm hồ sơ của BN || Thực hiện bằng tay || NHS Hành chánh
+Row 6: IVFMD.T2.06 || NHS quyết định có thu tiền phí tư vấn hay không || Quyết định ký duyệt || NHS Hành chánh
+Row 7: IVFMD.T2.07 || Cấp phát STT Tư vấn (Mỗi STT 2 liên, đưa cho BN 1 liên) || Xử lý trên hệ thống khác || NHS Hành chánh
+Row 8: IVFMD.T2.08 || Gửi tập hồ sơ cho BS Tư vấn || Thực hiện bằng tay || NHS Hành chánh
+Row 9: IVFMD.T2.09 || Gửi tập hồ sơ cho Thu Ngân || Thực hiện bằng tay || NHS Hành chánh
+Row 10: IVFMD.T2.10 || Tạo hóa đơn thu tiền Phí Tư Vấn || Xử lý trên hệ thống || Tiếp Đón + Thu Ngân
+Row 11: IVFMD.T2.11 || Cấp phát STT Tư vấn (Mỗi STT 2 liên, đưa cho BN 1 liên) || Xử lý trên hệ thống khác || Tiếp Đón + Thu Ngân
+Row 12: IVFMD.T2.12 || In hóa đơn cho BN || Tài liệu in ra || Tiếp Đón + Thu Ngân
+Row 13: IVFMD.T2.13 || Thu tiền BN || Thực hiện bằng tay || Tiếp Đón + Thu Ngân
+Row 14: IVFMD.T2.14 || Đưa BN liên hồng hóa đơn & Liên 2 STT của BS Tư Vấn || Thực hiện bằng tay || Tiếp Đón + Thu Ngân
+Row 15: IVFMD.T2.15 || Đưa HS cho NHS đem đến phòng BS TV || Thực hiện bằng tay || Tiếp Đón + Thu Ngân
+Row 16: IVFMD.T2.16 || BS xem KQ CLS và tư vấn || Thực hiện bằng tay || BS Tư vấn
+Row 17: IVFMD.T2.17 || Đủ tiêu chuẩn cho trứng || Quyết định ký duyệt || BS Tư vấn
+Row 18: IVFMD.T2.18 || Ngày khám vào N2/N3 VK || Quyết định ký duyệt || BS Tư vấn
+Row 19: IVFMD.T2.19 || Hẹn N2 VK quay lại || Thực hiện bằng tay || BS Tư vấn
+Row 20: IVFMD.T2.20 || Chỉ định tiêm thuốc kích thích buồng trứng (ghi trên giấy) || Thực hiện bằng tay || BS Tư vấn
+Row 21: IVFMD.T2.21 || Chỉ định XN tiền mê + Đo điện tâm đồ (Tick trên giấy) || Thực hiện bằng tay || BS Tư vấn
+Row 22: IVFMD.T2.22 || Chỉ định siêu âm nhũ || Thực hiện bằng tay || BS Tư vấn
+Row 23: IVFMD.T2.23 || Hẹn ngày khám tiền mê sau khi có KQ XN || Thực hiện bằng tay || BS Tư vấn
+Row 24: IVFMD.T2.24 || Gắn người cho với 2 VC hiếm muộn || Xử lý trên hệ thống || NHS
+Row 25: IVFMD.T2.25 || Nhập toa thuốc vào PM || Xử lý trên hệ thống || NHS
+Row 26: IVFMD.T2.26 || In toa thuốc cho BN || Tài liệu in ra || NHS
+Row 27: IVFMD.T2.27 || Hẹn ngày tái khám & Hướng dẫn các thủ tục HC cần thiết || Xử lý trên hệ thống || NHS
+Row 28: IVFMD.T2.28 || Đo điện tâm đồ (ECG) || Thực hiện bằng tay || Phòng Cấp Cứu
+Row 29: IVFMD.T2.29 || Phòng XN: Lấy máu để làm XN tiền mê || Thực hiện bằng tay || Xét nghiệm
+Row 30: IVFMD.T2.30 || SA nhũ || Thực hiện bằng tay || BP Siêu Âm của BV
+Row 31: IVFMD.T2.31 || In KQ SA cho BN || Tài liệu in ra || BP Siêu Âm của BV
+Row 32: IVFMD.T2.32 || Tạo hóa đơn theo toa thuốc của BS || Xử lý trên hệ thống || Nhà thuốc
+Row 33: IVFMD.T2.33 || In hóa đơn cho BN || Tài liệu in ra || Nhà thuốc
+Row 34: IVFMD.T2.34 || Thu tiền, phát thuốc, hướng dẫn cho BN || Thực hiện bằng tay || Nhà thuốc
+Row 35: IVFMD.T2.35 || Tiêm thuốc kích thích buồng trứng cho BN nếu có chỉ định || Thực hiện bằng tay || Phòng Tiêm Thuốc của BV
+
+--- TABLE 19 ---
+Row 0: Bước || Tên sự kiện || Kiểu || Bộ phận thực hiện || Mô tả
+Row 1: IVFMD.N1.01 || Nhận STT và biên lại thu tiền XN TDĐ từ BN || Thực hiện bằng tay || Nam Khoa
+Row 2: IVFMD.N1.02 || Phát lọ và hướng dẫn BN lấy mẫu || Thực hiện bằng tay || Nam Khoa
+Row 3: IVFMD.N1.03 || Nhận mẫu từ BN và Thực hiện XN TDĐ || Thực hiện bằng tay || Nam Khoa
+Row 4: IVFMD.N1.04 || Nhập kết quả XN vào phần mềm || Xử lý trên hệ thống || Nam Khoa
+Row 5: IVFMD.N1.05 || In KQ XN cho BN || Tài liệu in ra || Nam Khoa
+
+--- TABLE 20 ---
+Row 0: Bước || Tên sự kiện || Kiểu || Bộ phận thực hiện || Mô tả
+Row 1: IVFMD.N2.01 || Nhận mẫu TT từ BN IUI || Thực hiện bằng tay || Nam khoa || Tham khảo thêm tài liệu: Quy trình giao và nhận mẫu tinh dịch (IUI, ICSI, IVM, NHTT, TDĐ, TTT)
+Row 2: IVFMD.N2.02 || Gửi mẫu cho BP Nam Khoa || Thực hiện bằng tay || Nam khoa
+Row 3: IVFMD.N2.03 || Nhận mẫu từ NHS || Thực hiện bằng tay || Nam khoa
+Row 4: IVFMD.N2.04 || Lọc rửa tinh trùng || Thực hiện bằng tay || Nam khoa
+Row 5: IVFMD.N2.05 || Nhập kết quả lọc rửa vào phần mềm || Xử lý trên hệ thống || Nam khoa
+Row 6: IVFMD.N2.06 || Gửi mẫu sau lọc rửa cho NHS || Thực hiện bằng tay || Nam khoa
+Row 7: IVFMD.N2.07 || Gửi mẫu cho BP Nam Khoa || Thực hiện bằng tay || Nam khoa
+
+--- TABLE 21 ---
+Row 0: Bước || Tên sự kiện || Kiểu || Bộ phận thực hiện || Mô tả
+Row 1: IVFMD.N3.01 || Nhận mẫu TT từ BN IUI || Thực hiện bằng tay || Nam khoa || Tham khảo thêm tài liệu: Quy trình giao và nhận mẫu tinh dịch (IUI, ICSI, IVM, NHTT, TDĐ, TTT)
+Row 2: IVFMD.N3.02 || Gửi mẫu cho BP Nam Khoa || Thực hiện bằng tay || Nam khoa
+Row 3: IVFMD.N3.03 || Nhận mẫu từ NHS || Thực hiện bằng tay || Nam khoa
+Row 4: IVFMD.N3.04 || Lọc rửa tinh trùng || Thực hiện bằng tay || Nam khoa
+Row 5: IVFMD.N3.05 || Thực hiện ICSI/IVM || Thực hiện bằng tay || Nam khoa
+
+--- TABLE 22 ---
+Row 0: Bước || Tên sự kiện || Kiểu || Bộ phận thực hiện || Mô tả
+Row 1: IVFMD.N4.01 || BN/Người vận động đến gặp BS tư vấn || Thực hiện bằng tay || BS Tư Vấn
+Row 2: IVFMD.N4.02 || BS tư vấn BN xin tinh trùng || Thực hiện bằng tay || BS Tư Vấn
+Row 3: IVFMD.N4.03 || BS tư vấn người hiến & viết giấy giới thiệu NHTT || Thực hiện bằng tay || BS Tư Vấn
+Row 4: IVFMD.N4.04 || Nhận giấy giới thiệu NHTT từ NVĐ/NH || Thực hiện bằng tay || Tiếp Đón + Thu Ngân của BV
+Row 5: IVFMD.N4.05 || Tạo hóa đơn thu tiền XN máu và TDĐ cho người hiến || Xử lý trên hệ thống || Tiếp Đón + Thu Ngân của BV || XN máu: | HIV, HBsAg, BW, Gs+RH, Anti HCV và Công thức máu
+Row 6: IVFMD.N4.06 || Cấp phát STT XN máu và TDĐ || Xử lý trên hệ thống khác || Tiếp Đón + Thu Ngân của BV
+Row 7: IVFMD.N4.07 || In hóa đơn cho BN || Tài liệu in ra || Tiếp Đón + Thu Ngân của BV
+Row 8: IVFMD.N4.08 || Thu tiền BN || Thực hiện bằng tay || Tiếp Đón + Thu Ngân của BV
+Row 9: IVFMD.N4.09 || Đưa BN liên hồng hóa đơn & STT XN || Thực hiện bằng tay || Tiếp Đón + Thu Ngân của BV
+Row 10: IVFMD.N4.10 || Kiểm tra trên phần mềm xem NH có từng hiến TT hay chưa || Xử lý trên hệ thống || Nam Khoa
+Row 11: IVFMD.N4.11 || Chưa từng hiến || Quyết định ký duyệt || Nam Khoa
+Row 12: IVFMD.N4.12 || Chụp hình bằng camera và đưa vào phần mềm || Xử lý trên hệ thống || Nam Khoa
+Row 13: IVFMD.N4.13 || Lấy dấu vân tay và đưa vào phần mềm || Xử lý trên hệ thống || Nam Khoa
+Row 14: IVFMD.N4.14 || Gửi lọ mẫu cho NH để lấy TT || Thực hiện bằng tay || Nam Khoa
+Row 15: IVFMD.N4.15 || Nhận lọ mẫu và thực hiện XN TDĐ || Thực hiện bằng tay || Nam Khoa
+Row 16: IVFMD.N4.16 || Nhập KQ XN vào phần mềm || Xử lý trên hệ thống || Nam Khoa
+Row 17: IVFMD.N4.17 || In KQ XN || Tài liệu in ra || Nam Khoa
+Row 18: IVFMD.N4.18 || Kiểm tra hình ảnh và dấu vân tay của người hiến || Xử lý trên hệ thống || Xét nghiệm
+Row 19: IVFMD.N4.19 || Khớp hình ảnh và dấu vân tay || Quyết định ký duyệt || Xét nghiệm
+Row 20: IVFMD.N4.20 || Lấy mẫu máu để làm XN || Xét nghiệm
+Row 21: IVFMD.N4.21 || Thực hiện XN || Xử lý trên hệ thống khác || Xét nghiệm
+Row 22: IVFMD.N4.22 || Báo XN HIV cho BP Nam Khoa sau 15 phút || Thực hiện bằng tay || Xét nghiệm
+Row 23: IVFMD.N4.23 || Chuyển tất cả XN còn lại cho BP Nam Khoa sau 2 giờ || Thực hiện bằng tay || Xét nghiệm
+Row 24: IVFMD.N4.24 || Nhận KQ XN từ BP XN || Thực hiện bằng tay || Nam Khoa
+Row 25: IVFMD.N4.25 || Đủ tiêu chuẩn nhận vào NHTT || Quyết định ký duyệt || Nam Khoa
+Row 26: IVFMD.N4.26 || Kết luận đủ vào phiếu TDĐ và Viết phiếu hẹn và hướng dẫn NH lên IVF để làm thủ tục hiến mẫu || Thực hiện bằng tay || Nam Khoa
+Row 27: IVFMD.N4.27 || Tư vấn tìm NH khác, trả XN TDĐ và XN máu cho NVĐ/NH || Thực hiện bằng tay || Nam Khoa
+
+--- TABLE 23 ---
+Row 0: Bước || Tên sự kiện || Kiểu || Bộ phận thực hiện || Mô tả
+Row 1: IVFMD.N5.01 || NH đem phiếu hẹn hiến mẫu đến NHS || Thực hiện bằng tay || NHS Hành Chánh || Tham khảo thêm tài liệu: Quy trình giao và nhận mẫu tinh dịch (IUI, ICSI, IVM, NHTT, TDĐ, TTT)
+Row 2: IVFMD.N5.02 || Kiểm tra phiếu hẹn, KL của Nam Khoa, kiểm tra KQ XN TDĐ và XN Máu || Thực hiện bằng tay || NHS Hành Chánh
+Row 3: IVFMD.N5.03 || Kiểm tra hình ảnh và dấu vân tay của người hiến || Xử lý trên hệ thống || NHS Hành Chánh
+Row 4: IVFMD.N5.04 || Làm hồ sơ NHTT || Xử lý trên hệ thống || NHS Hành Chánh
+Row 5: IVFMD.N5.05 || Tư vấn quy trình NHTT và hướng dẫn NVĐ và NH làm cam kết tham gia NHTT || Thực hiện bằng tay || NHS Hành Chánh
+Row 6: IVFMD.N5.06 || Hướng dẫn NH lấy mẫu tinh dịch || Thực hiện bằng tay || NHS Hành Chánh
+Row 7: IVFMD.N5.07 || Sau khi NH lấy mẫu, NHS viết phiếu hẹn cho NH, NH ra về || Thực hiện bằng tay || NHS Hành Chánh
+Row 8: IVFMD.N5.08 || NHS giao mẫu cho BP LABO || Thực hiện bằng tay || NHS Hành Chánh
+Row 9: IVFMD.N5.09 || Lọc rửa và đánh giá mẫu tinh dịch || Thực hiện bằng tay || LABO
+Row 10: IVFMD.N5.10 || Đủ chuẩn để trữ || Quyết định ký duyệt || LABO
+Row 11: IVFMD.N5.11 || Hủy mẫu và thông báo cho NHS || Thực hiện bằng tay || LABO
+Row 12: IVFMD.N5.12 || Trữ lạnh || Thực hiện bằng tay || LABO
+Row 13: IVFMD.N5.13 || Nhập thông tin mẫu vào NHTT trên phần mềm || Xử lý trên hệ thống || LABO
+Row 14: IVFMD.N5.14 || Chuyển HS cho NHS || Thực hiện bằng tay || LABO
+Row 15: IVFMD.N5.15 || Nhận HS/KQ từ BP LABO || Thực hiện bằng tay || NHS Hành Chánh
+Row 16: IVFMD.N5.16 || Thông báo KQ cho NVĐ || Thực hiện bằng tay || NHS Hành Chánh
+Row 17: IVFMD.N5.17 || Hẹn lấy mẫu lần 2 hoặc lấy lại nếu lần này chưa đủ chuẩn || Thực hiện bằng tay || NHS Hành Chánh
+
+--- TABLE 24 ---
+Row 0: Bước || Tên sự kiện || Kiểu || Bộ phận thực hiện || Mô tả
+Row 1: IVFMD.N6.01 || NH, NHS, NV LABO thực hiện như quy trình lấy mẫu lần 1 || Thực hiện bằng tay || NHS Hành Chánh
+Row 2: IVFMD.N6.02 || Sau khi NV LABO trữ lạnh mẫu tinh dịch thứ 2, NHS viết phiếu hẹn NH đến XN HIV lần 2 sau 3 tháng || Thực hiện bằng tay || NHS Hành Chánh
+Row 3: IVFMD.N6.03 || Kiểm tra phiếu hẹn, BN có đúng hẹn lấy máu chưa || Thực hiện bằng tay || NHS
+Row 4: IVFMD.N6.04 || Kiểm tra hình ảnh và dấu vân tay của người hiến || Xử lý trên hệ thống || NHS
+Row 5: IVFMD.N6.05 || Chỉ định XN HIV và đưa cho Thu Ngân || Thực hiện bằng tay || NHS
+Row 6: IVFMD.N6.06 || Tạo hóa đơn thu tiền XN HIV || Xử lý trên hệ thống || Tiếp Đón + Thu Ngân của IVF
+Row 7: IVFMD.N6.07 || In hóa đơn cho BN || Tài liệu in ra || Tiếp Đón + Thu Ngân của IVF
+Row 8: IVFMD.N6.08 || Thu tiền BN || Thực hiện bằng tay || Tiếp Đón + Thu Ngân của IVF
+Row 9: IVFMD.N6.09 || Đưa BN liên hồng hóa đơn || Thực hiện bằng tay || Tiếp Đón + Thu Ngân của IVF
+Row 10: IVFMD.N6.10 || Đưa chỉ định và biên lại cho NHS, Ghi NOTE trên phếu chỉ định là BN NHTT để BP XN biết || Thực hiện bằng tay || Tiếp Đón + Thu Ngân của IVF
+Row 11: IVFMD.N6.11 || Kiểm tra hình ảnh và dấu vân tay của người hiến || Xử lý trên hệ thống || NHS
+Row 12: IVFMD.N6.12 || Lấy mẫu máu để làm XN tại IVFMD || NHS
+Row 13: IVFMD.N6.13 || Thực hiện XN || Xử lý trên hệ thống khác || NHS
+Row 14: IVFMD.N6.14 || In KQ XN || Tài liệu in ra || NHS
+Row 15: IVFMD.N6.15 || Gửi KQ XN cho NHS || Thực hiện bằng tay || NHS
+Row 16: IVFMD.N6.16 || Nhận và xem KQ XN || Thực hiện bằng tay || NHS Hành Chánh
+Row 17: IVFMD.N6.17 || HIV Âm tính/Dương tính || Quyết định ký duyệt || NHS Hành Chánh
+Row 18: IVFMD.N6.18 || Thông báo cho BS tư vấn || Thực hiện bằng tay || NHS Hành Chánh
+Row 19: IVFMD.N6.19 || Báo BP LABO hủy mẫu khi có chỉ định của BS || Thực hiện bằng tay || NHS Hành Chánh
+Row 20: IVFMD.N6.20 || Hủy mẫu tinh dịch || Thực hiện bằng tay || LABO
+Row 21: IVFMD.N6.21 || Ghi KQ vào HS NHTT || Thực hiện bằng tay || NHS Hành Chánh
+Row 22: IVFMD.N6.22 || Chuyển HS cho BP LABO cấp mã NHTT || Thực hiện bằng tay || NHS Hành Chánh
+Row 23: IVFMD.N6.23 || Cấp phát mã NHTT || Xử lý trên hệ thống || LABO
+Row 24: IVFMD.N6.24 || Cấp phiếu NHTT cho NVĐ và hướng dẫn NVĐ gặp BS tiến hành điều trị vào N2 VK || Thực hiện bằng tay || NHS Hành Chánh
+
+--- TABLE 25 ---
+Row 0: Bước || Tên sự kiện || Kiểu || Bộ phận thực hiện || Mô tả
+Row 1: IVFMD.N7.01 || Vào ngày thủ thuật (Chọc hút/IUI), BN sẽ xuất trình phiếu NHTT đã được cấp || Thực hiện bằng tay || NHS Hành Chánh
+Row 2: IVFMD.N7.02 || Hướng dẫn NVĐ đóng tiền sử dụng mẫu TT || Thực hiện bằng tay || NHS Hành Chánh
+Row 3: IVFMD.N7.03 || Tạo hóa đơn thu tiền sử dụng mẫu TT || Xử lý trên hệ thống || Tiếp Đón + Thu Ngân
+Row 4: IVFMD.N7.04 || In hóa đơn cho BN || Tài liệu in ra || Tiếp Đón + Thu Ngân
+Row 5: IVFMD.N7.05 || Thu tiền BN || Thực hiện bằng tay || Tiếp Đón + Thu Ngân
+Row 6: IVFMD.N7.06 || Đưa BN liên hồng hóa đơn || Thực hiện bằng tay || Tiếp Đón + Thu Ngân
+Row 7: IVFMD.N7.07 || Chuyển phiếu NHTT cho BP LABO || Thực hiện bằng tay || NHS Hành Chánh
+Row 8: IVFMD.N7.08 || NV labo căn cứ vào mã NHTT để hoán đổi mẫu từ NHTT || Thực hiện bằng tay || LABO
+Row 9: IVFMD.N7.09 || NV labo lấy mẫu tinh trùng từ NHTT sau khi hoán đổi mẫu để sử dụng cho NVĐ || Thực hiện bằng tay || LABO
+Row 10: IVFMD.N7.10 || NV labo nhập các thông tin người nhận mẫu tinh trùng từ NHTT || Xử lý trên hệ thống || LABO
+Row 11: IVFMD.N7.11 || NV labo lấy mẫu tinh trùng từ NHTT sau khi hoán đổi mẫu để sử dụng cho NVĐ || Thực hiện bằng tay || LABO
+Row 12: IVFMD.N7.12 || NV labo ghi vào phiếu NHTT thời điểm sử dụng mẫu và số mẫu còn lại vào phiếu trữ NHTT, trả phiếu lại cho NHS || Thực hiện bằng tay || LABO
+Row 13: IVFMD.N7.13 || NV labo tiến hành xử lý mẫu tùy theo yêu cầu điều trị (IUI hoặc ICSI) theo quy trình xử lý mẫu || Thực hiện bằng tay || LABO
+Row 14: IVFMD.N7.14 || Mẫu của NH sẽ được hủy trong TH:  | - Người vợ của cặp vợ chồng nhận mẫu tinh trùng này có thai, sinh bé được một năm và bé phát triển bình thƣờng. | - Một năm kể từ lúc mẫu tinh trùng gần nhất được sử dụng || Thực hiện bằng tay || LABO
+Row 15: IVFMD.N7.15 || NHS tiếp tục theo dõi kết quả sau điều trị để báo NV labo tiếp tục lƣu giữ hay hủy mẫu còn lại || Thực hiện bằng tay || NHS Hành Chánh
+
+--- TABLE 26 ---
+Row 0: Bước || Tên sự kiện || Kiểu || Bộ phận thực hiện || Mô tả
+Row 1: IVFMD.D1.01 || Lấy thuốc cho BN || Thực hiện bằng tay || KTV Gây mê
+Row 2: IVFMD.D1.02 || Ghi sổ bàn giao thuốc || Thực hiện bằng tay || KTV Gây mê
+Row 3: IVFMD.D1.03 || Kiểm tra số lượng thuốc 2 lần / ngày vào buổi sáng và chiều || Thực hiện bằng tay || NHS
+Row 4: IVFMD.D1.04 || Nhập PM: Phiếu bù tủ trực || Xử lý trên hệ thống || NHS
+Row 5: IVFMD.D1.05 || Hoàn tất phiếu và chuyển cho Khoa Dược || Xử lý trên hệ thống || NHS
+Row 6: IVFMD.D1.06 || Duyệt phiếu mà NSH đã tạo || Xử lý trên hệ thống || Khoa Dược
+Row 7: IVFMD.D1.07 || In phiếu và trình ký phiếu || Tài liệu in ra || NHS
+Row 8: IVFMD.D1.08 || Lãnh thuốc || Thực hiện bằng tay || NHS
+Row 9: IVFMD.D1.09 || Phát thuốc cho NHS || Thực hiện bằng tay || Khoa Dược
+
+--- TABLE 27 ---
+Row 0: Bước || Tên sự kiện || Kiểu || Bộ phận thực hiện || Mô tả
+Row 1: IVFMD.D2.01 || Lấy VTTH và sử dụng cho BN || Thực hiện bằng tay || NHS
+Row 2: IVFMD.D2.02 || Kiểm kho sau mỗi 3-5 ngày || Thực hiện bằng tay || NHS
+Row 3: IVFMD.D2.03 || Nhập PM: Lập phiếu hao phí || Xử lý trên hệ thống || NHS
+Row 4: IVFMD.D2.04 || Hoàn tất phiếu và chuyển cho Khoa Dược || Xử lý trên hệ thống || NHS
+Row 5: IVFMD.D2.05 || Duyệt phiếu mà NSH đã tạo || Xử lý trên hệ thống || Khoa dược
+Row 6: IVFMD.D2.06 || In phiếu và trình ký phiếu || Tài liệu in ra || NHS
+Row 7: IVFMD.D2.07 || Lãnh VT || Thực hiện bằng tay || NHS
+Row 8: IVFMD.D2.08 || Phát VT cho NHS || Thực hiện bằng tay || Khoa dược
+
+--- TABLE 28 ---
+Row 0: Bước || Tên sự kiện || Kiểu || Bộ phận thực hiện || Mô tả
+Row 1: IVFMD.D3.01 || NHS đặt hàng cho BP Mua hàng qua email || Thực hiện bằng tay || NHS
+Row 2: IVFMD.D3.02 || Nhận yêu cầu mua hàng của NHS qua email || Thực hiện bằng tay || Mua hàng
+Row 3: IVFMD.D3.03 || Mua hàng từ NCC || Thực hiện bằng tay || Mua hàng
+Row 4: IVFMD.D3.04 || Phát VT cho NHS || Thực hiện bằng tay || Mua hàng
+Row 5: IVFMD.D3.05 || Lãnh VT và nhập vào phần mềm || Xử lý trên hệ thống || NHS
+Row 6: IVFMD.D3.06 || Lấy và sử dụng cho BN || Thực hiện bằng tay || NHS
+Row 7: IVFMD.D3.07 || Xuất kho khi sử dụng hết lô || Xử lý trên hệ thống || NHS
+
+--- TABLE 29 ---
+Row 0: PK Ngọc Lan || IVFMD
+Row 1: - BP Tiếp Đón và Thu Ngân là riêng biệt || - BP Tiếp đón và Thu ngân là 1: Tiếp đón kiêm luôn thu ngân
+Row 2: - Cáp phát nhiều STT cùng lúc: STT Thu Ngân, STT BS Tư Vấn, STT Siêu Âm, STT Xét Nghiệm || - Cấp phát STT SA trước, sau khi có KQ SA mới phát STT tư vấn sau.
+Row 3: - Phải gửi mẫu  máu đi XN || - Gửi xuống Khoa XN của BV Mỹ Đức
+Row 4: - Không thu tiền phí tiêm thuốc || - Thu tiền phí khám tiêm thuốc & Thu tiền và tiêm thuốc thuộc BV không thuộc IVFMD
+Row 5: - BN được khám tiền mê vào ngày sau khi có KQ XN, không đợi đến ngày Tái Khám KTBT || - BN được khám tiền mê vào ngày tái khám lần đầu KTBT
+Row 6: - Phải gửi BN đi thực hiện TTTON (Gửi IVFMD, IVFAS, IVF Vạn Hạnh) || - Thực hiện TTTON
+Row 7: - Có người phất STT đầu tiên (Cô Bảng) || - Không có người phát STT đầu tiên (BN tự lấy)
+Row 8: - Chỉ thu tiền mặt (không thu qua thẻ hoặc chuyển khoản) || - Có thu qua thẻ (cà thẻ tại quầy), và chuyển khoản (kế toán kiểm tra tài khoản và viết mail thông báo cho Thu Ngân IVF)
+
+--- TABLE 30 ---
+Row 0: STT || Đề xuất cải tiến || Ghi chú
+Row 1: 01 || BS chỉ định trên phần mềm thay cho HS giấy
+Row 2: 02 || BS ra toa thuốc trên phần mềm thay cho HS giấy
+Row 3: 03 || BS ghi nhận kết quả siêu âm nang noãn (trong chu kỳ theo dõi KTBT) trên phần mềm thay cho HS giấy
+Row 4: 04 || BS ghi nhận kết quả siêu âm NCTC (trong chu kỳ theo dõi CBNMTC chuyển phôi trữ) trên phần mềm thay cho HS giấy
+Row 5: 05 || Labo theo dõi phôi realtime trên phần mềm thay cho việc ghi giấy như hiện tại và chỉ ghi giấy sau cuối mỗi giai đoạn chứ không realtime.
+Row 6: 06
+Row 7: 07
+Row 8: 08
+Row 9: 09
