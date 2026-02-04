@@ -56,6 +56,30 @@ export const routes: Routes = [
                 path: 'queue/:departmentCode',
                 loadComponent: () => import('./features/queue/queue-display/queue-display.component').then(m => m.QueueDisplayComponent)
             },
+            {
+                path: 'reception',
+                loadComponent: () => import('./features/reception/reception-dashboard/reception-dashboard.component').then(m => m.ReceptionDashboardComponent)
+            },
+            {
+                path: 'andrology',
+                loadComponent: () => import('./features/andrology/andrology-dashboard/andrology-dashboard.component').then(m => m.AndrologyDashboardComponent)
+            },
+            {
+                path: 'sperm-bank',
+                loadComponent: () => import('./features/sperm-bank/sperm-bank-dashboard/sperm-bank-dashboard.component').then(m => m.SpermBankDashboardComponent)
+            },
+            {
+                path: 'lab',
+                loadComponent: () => import('./features/lab/lab-dashboard/lab-dashboard.component').then(m => m.LabDashboardComponent)
+            },
+            {
+                path: 'pharmacy',
+                loadComponent: () => import('./features/pharmacy/pharmacy-dashboard/pharmacy-dashboard.component').then(m => m.PharmacyDashboardComponent)
+            },
+            {
+                path: 'reports',
+                loadComponent: () => import('./features/reports/reports-dashboard/reports-dashboard.component').then(m => m.ReportsDashboardComponent)
+            },
             { path: '', redirectTo: 'dashboard', pathMatch: 'full' }
         ]
     },

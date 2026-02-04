@@ -19,26 +19,35 @@ import { AuthService } from '../../core/services/auth.service';
           <a routerLink="/dashboard" routerLinkActive="active" class="nav-item">
             <span class="icon">📊</span> Dashboard
           </a>
+          <a routerLink="/reception" routerLinkActive="active" class="nav-item">
+            <span class="icon">🏥</span> Tiếp đón
+          </a>
           <a routerLink="/patients" routerLinkActive="active" class="nav-item">
             <span class="icon">👥</span> Bệnh nhân
           </a>
           <a routerLink="/couples" routerLinkActive="active" class="nav-item">
             <span class="icon">💑</span> Cặp đôi
           </a>
-          <a routerLink="/queue/REC" routerLinkActive="active" class="nav-item">
-            <span class="icon">🎫</span> Tiếp đón
-          </a>
           <a routerLink="/queue/US" routerLinkActive="active" class="nav-item">
             <span class="icon">🔬</span> Siêu âm
           </a>
-          <a routerLink="/queue/LAB" routerLinkActive="active" class="nav-item">
-            <span class="icon">🧪</span> Xét nghiệm
+          <a routerLink="/lab" routerLinkActive="active" class="nav-item">
+            <span class="icon">🧫</span> Phòng Lab
           </a>
-          <a routerLink="/queue/AND" routerLinkActive="active" class="nav-item">
+          <a routerLink="/andrology" routerLinkActive="active" class="nav-item">
             <span class="icon">🔬</span> Nam khoa
+          </a>
+          <a routerLink="/sperm-bank" routerLinkActive="active" class="nav-item">
+            <span class="icon">🏦</span> NHTT
+          </a>
+          <a routerLink="/pharmacy" routerLinkActive="active" class="nav-item">
+            <span class="icon">💊</span> Nhà thuốc
           </a>
           <a routerLink="/billing" routerLinkActive="active" class="nav-item">
             <span class="icon">💰</span> Hoá đơn
+          </a>
+          <a routerLink="/reports" routerLinkActive="active" class="nav-item">
+            <span class="icon">📈</span> Báo cáo
           </a>
         </nav>
 

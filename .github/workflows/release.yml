@@ -1,0 +1,85 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Build Backend
+        run: dotnet publish src/IVF.API -c Release -o ./publish/api
+
+      - name: Build Frontend
+        run: |
+          cd ivf-client
+          npm ci
+          npm run build -- --configuration production
+
+      - name: Create Release Archive
+        run: |
+          cd publish
+          zip -r ../ivf-api-${{ github.ref_name }}.zip api/
+          cd ../ivf-client/dist
+          zip -r ../../ivf-client-${{ github.ref_name }}.zip .
+
+      - name: Generate Changelog
+        id: changelog
+        uses: mikepenz/release-changelog-builder-action@v4
+        with:
+          configuration: |
+            {
+              "categories": [
+                { "title": "🚀 Features", "labels": ["feature", "enhancement"] },
+                { "title": "🐛 Bug Fixes", "labels": ["bug", "fix"] },
+                { "title": "📚 Documentation", "labels": ["documentation"] }
+              ]
+            }
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: IVF System ${{ github.ref_name }}
+          body: |
+            ## IVF System Release ${{ github.ref_name }}
+            
+            ${{ steps.changelog.outputs.changelog }}
+            
+            ### 📦 Artifacts
+            - **ivf-api**: .NET 10 backend API
+            - **ivf-client**: Angular 21 frontend
+            
+            ### 🚀 Quick Start
+            ```bash
+            docker-compose up -d
+            ```
+          files: |
+            ivf-api-${{ github.ref_name }}.zip
+            ivf-client-${{ github.ref_name }}.zip
+          draft: false
+          prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') }}
