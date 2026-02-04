@@ -1,0 +1,42 @@
+<div class="cycle-form">
+    <header class="page-header">
+        <a (click)="goBack()" class="back-link">
+            <span>←</span> Quay lại
+        </a>
+        <h1>Tạo chu kỳ mới</h1>
+    </header>
+
+    <form (ngSubmit)="submit()" class="card form-card">
+        <div class="form-group">
+            <label class="form-label">Phương pháp điều trị *</label>
+            <div class="method-grid">
+                @for (method of methods; track method.value) {
+                <label class="method-option" [class.selected]="formData.method === method.value">
+                    <input type="radio" [(ngModel)]="formData.method" [value]="method.value" name="method" />
+                    <span class="method-icon">{{ method.icon }}</span>
+                    <span class="method-name">{{ method.label }}</span>
+                    <span class="method-desc">{{ method.desc }}</span>
+                </label>
+                }
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Ngày bắt đầu *</label>
+            <input type="date" class="form-control" [(ngModel)]="formData.startDate" name="startDate" required />
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Ghi chú</label>
+            <textarea class="form-control" [(ngModel)]="formData.notes" name="notes" rows="4"
+                placeholder="Ghi chú về chu kỳ điều trị..."></textarea>
+        </div>
+
+        <div class="form-actions">
+            <button type="button" class="btn btn-secondary" (click)="goBack()">Huỷ</button>
+            <button type="submit" class="btn btn-primary" [disabled]="saving() || !formData.method">
+                {{ saving() ? 'Đang tạo...' : 'Tạo chu kỳ' }}
+            </button>
+        </div>
+    </form>
+</div>

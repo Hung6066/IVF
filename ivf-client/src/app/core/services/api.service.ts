@@ -108,6 +108,14 @@ export class ApiService {
         return this.http.get<Embryo[]>(`${this.baseUrl}/embryos/cycle/${cycleId}`);
     }
 
+    getActiveEmbryos(): Observable<Embryo[]> {
+        return this.http.get<Embryo[]>(`${this.baseUrl}/embryos/active`);
+    }
+
+    getCryoStats(): Observable<any[]> {
+        return this.http.get<any[]>(`${this.baseUrl}/embryos/cryo-stats`);
+    }
+
     createEmbryo(data: Partial<Embryo>): Observable<Embryo> {
         return this.http.post<Embryo>(`${this.baseUrl}/embryos`, data);
     }

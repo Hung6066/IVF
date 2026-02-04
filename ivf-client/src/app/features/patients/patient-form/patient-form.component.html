@@ -1,0 +1,80 @@
+<div class="patient-form">
+    <header class="page-header">
+        <a routerLink="/patients" class="back-link">
+            <span>←</span> Danh sách bệnh nhân
+        </a>
+        <h1>Thêm bệnh nhân mới</h1>
+    </header>
+
+    <form (ngSubmit)="submit()" class="card form-card">
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label">Họ và tên *</label>
+                <input type="text" class="form-control" [(ngModel)]="formData.fullName" name="fullName" required
+                    placeholder="Nhập họ tên đầy đủ" />
+            </div>
+            <div class="form-group">
+                <label class="form-label">Mã bệnh nhân</label>
+                <input type="text" class="form-control" [(ngModel)]="formData.patientCode" name="patientCode"
+                    placeholder="Tự động tạo nếu để trống" />
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label">Ngày sinh *</label>
+                <input type="date" class="form-control" [(ngModel)]="formData.dateOfBirth" name="dateOfBirth"
+                    required />
+            </div>
+            <div class="form-group">
+                <label class="form-label">Giới tính *</label>
+                <select class="form-control" [(ngModel)]="formData.gender" name="gender" required>
+                    <option value="Female">Nữ</option>
+                    <option value="Male">Nam</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label">Loại bệnh nhân *</label>
+                <select class="form-control" [(ngModel)]="formData.patientType" name="patientType" required>
+                    <option value="Infertility">Hiếm muộn</option>
+                    <option value="EggDonor">Người cho trứng</option>
+                    <option value="SpermDonor">Người cho tinh trùng</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">CCCD/CMND</label>
+                <input type="text" class="form-control" [(ngModel)]="formData.identityNumber" name="identityNumber"
+                    placeholder="Số giấy tờ tùy thân" />
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label">Số điện thoại</label>
+                <input type="tel" class="form-control" [(ngModel)]="formData.phone" name="phone"
+                    placeholder="0901234567" />
+            </div>
+            <div class="form-group">
+                <label class="form-label">Email</label>
+                <input type="email" class="form-control" [(ngModel)]="formData.email" name="email"
+                    placeholder="example@email.com" />
+            </div>
+        </div>
+
+        <div class="form-group full-width">
+            <label class="form-label">Địa chỉ</label>
+            <input type="text" class="form-control" [(ngModel)]="formData.address" name="address"
+                placeholder="Địa chỉ liên hệ" />
+        </div>
+
+        <div class="form-actions">
+            <button type="button" class="btn btn-secondary" routerLink="/patients">Huỷ</button>
+            <button type="submit" class="btn btn-primary" [disabled]="saving()">
+                {{ saving() ? 'Đang lưu...' : 'Lưu bệnh nhân' }}
+            </button>
+        </div>
+    </form>
+</div>

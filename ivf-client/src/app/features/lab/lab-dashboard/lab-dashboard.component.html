@@ -1,0 +1,139 @@
+<div class="lab-dashboard page-container">
+    <header class="page-header">
+        <h1>🧫 Phòng Lab - LABO</h1>
+        <div class="tabs-container">
+            <button class="tab-btn" [class.active]="activeTab === 'queue'" (click)="setActiveTab('queue')">
+                🎫 Hàng đợi
+            </button>
+            <button class="tab-btn" [class.active]="activeTab === 'embryos'" (click)="setActiveTab('embryos')">
+                🔬 Phôi đang nuôi
+            </button>
+            <button class="tab-btn" [class.active]="activeTab === 'schedule'" (click)="setActiveTab('schedule')">
+                📅 Lịch thủ thuật
+            </button>
+            <button class="tab-btn" [class.active]="activeTab === 'cryo'" (click)="setActiveTab('cryo')">
+                ❄️ Kho đông lạnh
+            </button>
+            <button class="tab-btn" [class.active]="activeTab === 'report'" (click)="setActiveTab('report')">
+                📊 Báo cáo phôi
+            </button>
+        </div>
+    </header>
+
+    <div class="date-nav">
+        <button (click)="changeDay(-1)">◀</button>
+        <span class="current-date">{{ currentDate | date:'EEEE, dd/MM/yyyy' }}</span>
+        <button (click)="changeDay(1)">▶</button>
+        <button class="btn-today" (click)="goToday()">Hôm nay</button>
+    </div>
+
+    <div class="stats-row">
+        <div class="stat-card">
+            <span class="icon">🥚</span>
+            <div>
+                <span class="value">{{ stats().eggRetrievalCount }}</span>
+                <span class="label">Chọc hút</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <span class="icon">🔬</span>
+            <div>
+                <span class="value">{{ stats().cultureCount }}</span>
+                <span class="label">Đang nuôi</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <span class="icon">💉</span>
+            <div>
+                <span class="value">{{ stats().transferCount }}</span>
+                <span class="label">Chuyển phôi</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <span class="icon">❄️</span>
+            <div>
+                <span class="value">{{ stats().freezeCount }}</span>
+                <span class="label">Trữ phôi</span>
+            </div>
+        </div>
+    </div>
+
+    @if (activeTab === 'queue') {
+    <app-lab-queue [queue]="queue()" (callPatient)="onCallPatient($event)" (startProcedure)="onStartProcedure($event)">
+    </app-lab-queue>
+    }
+
+    @if (activeTab === 'embryos') {
+    <app-lab-embryos [embryos]="embryos()" [currentDate]="currentDate" (selectEmbryo)="onSelectEmbryo($event)">
+    </app-lab-embryos>
+    }
+
+    @if (activeTab === 'schedule') {
+    <app-lab-schedule [schedule]="schedule()" [currentDate]="currentDate" (toggleStatus)="onToggleSchedule($event)">
+    </app-lab-schedule>
+    }
+
+    @if (activeTab === 'cryo') {
+    <app-lab-cryo [locations]="cryoLocations()" [stats]="stats()" (addLocation)="onAddCryoLocation($event)">
+    </app-lab-cryo>
+    }
+
+    @if (activeTab === 'report') {
+    <section class="content-section card">
+        <div class="section-header">
+            <h2>Báo cáo phôi theo ngày</h2>
+            <div class="report-actions">
+                <button class="btn btn-secondary" (click)="exportExcel()">📄 Xuất Excel</button>
+                <button class="btn btn-secondary" (click)="printReport()">🖨️ In báo cáo</button>
+            </div>
+        </div>
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Mã CK</th>
+                        <th>Bệnh nhân</th>
+                        <th>Ngày chọc</th>
+                        <th>Số trứng</th>
+                        <th>MII</th>
+                        <th>2PN</th>
+                        <th>D3</th>
+                        <th>D5/D6</th>
+                        <th>Chuyển</th>
+                        <th>Trữ</th>
+                        <th>Kết quả</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="code">CK-001</td>
+                        <td>Nguyễn T.H</td>
+                        <td>28/01</td>
+                        <td>15</td>
+                        <td>12</td>
+                        <td>10</td>
+                        <td>8</td>
+                        <td>6 (4AA, 4BA, 3AB...)</td>
+                        <td>2</td>
+                        <td>4</td>
+                        <td><span class="badge badge-success">Hoàn thành</span></td>
+                    </tr>
+                    <tr>
+                        <td class="code">CK-002</td>
+                        <td>Trần M.L</td>
+                        <td>29/01</td>
+                        <td>8</td>
+                        <td>6</td>
+                        <td>5</td>
+                        <td>4</td>
+                        <td>—</td>
+                        <td>—</td>
+                        <td>—</td>
+                        <td><span class="badge badge-info">D3</span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+    }
+</div>

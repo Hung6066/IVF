@@ -1,0 +1,109 @@
+<div class="couple-form">
+    <header class="page-header">
+        <a routerLink="/couples" class="back-link">
+            <span>←</span> Danh sách cặp đôi
+        </a>
+        <h1>Tạo cặp đôi mới</h1>
+    </header>
+
+    <form (ngSubmit)="submit()" class="card form-card">
+        <div class="partner-section">
+            <h2 class="section-title">👩 Thông tin vợ</h2>
+
+            <div class="search-box">
+                <div class="input-wrapper">
+                    <input type="text" class="form-control" [(ngModel)]="wifeSearch" name="wifeSearch"
+                        placeholder="Tìm bệnh nhân nữ (mã BN hoặc tên)..." (input)="searchWife()"
+                        [disabled]="!!selectedWife()" />
+                    @if (!selectedWife()) {
+                    <span class="search-icon">🔍</span>
+                    }
+                </div>
+
+                @if (wifeResults().length > 0) {
+                <div class="search-results">
+                    @for (p of wifeResults(); track p.id) {
+                    <div class="result-item" (click)="selectWife(p)">
+                        <span class="code">{{ p.patientCode }}</span>
+                        <span class="name">{{ p.fullName }}</span>
+                    </div>
+                    }
+                </div>
+                }
+            </div>
+
+            @if (selectedWife()) {
+            <div class="selected-patient wife">
+                <div class="avatar">👩</div>
+                <div class="info">
+                    <strong>{{ selectedWife()?.fullName }}</strong>
+                    <span class="code">{{ selectedWife()?.patientCode }}</span>
+                </div>
+                <button type="button" class="btn-icon-clear" (click)="clearWife()" title="Xóa">✕</button>
+            </div>
+            }
+        </div>
+
+        <div class="partner-section">
+            <h2 class="section-title">👨 Thông tin chồng</h2>
+
+            <div class="search-box">
+                <div class="input-wrapper">
+                    <input type="text" class="form-control" [(ngModel)]="husbandSearch" name="husbandSearch"
+                        placeholder="Tìm bệnh nhân nam (mã BN hoặc tên)..." (input)="searchHusband()"
+                        [disabled]="!!selectedHusband()" />
+                    @if (!selectedHusband()) {
+                    <span class="search-icon">🔍</span>
+                    }
+                </div>
+
+                @if (husbandResults().length > 0) {
+                <div class="search-results">
+                    @for (p of husbandResults(); track p.id) {
+                    <div class="result-item" (click)="selectHusband(p)">
+                        <span class="code">{{ p.patientCode }}</span>
+                        <span class="name">{{ p.fullName }}</span>
+                    </div>
+                    }
+                </div>
+                }
+            </div>
+
+            @if (selectedHusband()) {
+            <div class="selected-patient husband">
+                <div class="avatar">👨</div>
+                <div class="info">
+                    <strong>{{ selectedHusband()?.fullName }}</strong>
+                    <span class="code">{{ selectedHusband()?.patientCode }}</span>
+                </div>
+                <button type="button" class="btn-icon-clear" (click)="clearHusband()" title="Xóa">✕</button>
+            </div>
+            }
+        </div>
+
+        <div class="details-section">
+            <h2 class="section-title">💍 Thông tin hôn nhân</h2>
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Ngày kết hôn</label>
+                    <input type="date" class="form-control" [(ngModel)]="formData.marriageDate" name="marriageDate" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Số năm hiếm muộn</label>
+                    <div class="input-suffix-group">
+                        <input type="number" class="form-control" [(ngModel)]="formData.infertilityYears"
+                            name="infertilityYears" min="0" />
+                        <span class="suffix">năm</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="button" class="btn btn-secondary" routerLink="/couples">Huỷ</button>
+            <button type="submit" class="btn btn-primary" [disabled]="saving() || !canSubmit()">
+                {{ saving() ? 'Đang lưu...' : 'Tạo cặp đôi' }}
+            </button>
+        </div>
+    </form>
+</div>

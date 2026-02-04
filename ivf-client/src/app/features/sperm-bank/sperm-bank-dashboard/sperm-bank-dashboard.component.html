@@ -1,0 +1,274 @@
+<div class="dashboard-layout">
+    <header class="page-header">
+        <div class="header-title">
+            <h1>🏦 Ngân hàng tinh trùng</h1>
+        </div>
+        <div class="tabs-container">
+            <button class="tab-btn" [class.active]="activeTab === 'donors'" (click)="activeTab = 'donors'">👤 Người
+                hiến</button>
+            <button class="tab-btn" [class.active]="activeTab === 'samples'" (click)="activeTab = 'samples'">🧪 Mẫu lưu
+                trữ</button>
+            <button class="tab-btn" [class.active]="activeTab === 'matching'" (click)="activeTab = 'matching'">🔗 Ghép
+                đôi</button>
+        </div>
+    </header>
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-icon info">👥</div>
+            <div class="stat-content">
+                <span class="value">{{ totalDonors() }}</span>
+                <span class="label">Người hiến</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon primary">🧊</div>
+            <div class="stat-content">
+                <span class="value">{{ totalSamples() }}</span>
+                <span class="label">Mẫu đông lạnh</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon success">✅</div>
+            <div class="stat-content">
+                <span class="value">{{ availableSamples() }}</span>
+                <span class="label">Sẵn sàng</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon warning">⏳</div>
+            <div class="stat-content">
+                <span class="value">{{ quarantineSamples() }}</span>
+                <span class="label">Cách ly</span>
+            </div>
+        </div>
+    </div>
+
+    @if (activeTab === 'donors') {
+    <section class="card">
+        <div class="section-header">
+            <h2>Người hiến tinh trùng</h2>
+            <button class="btn btn-primary" (click)="showNewDonor = true">➕ Đăng ký mới</button>
+        </div>
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Mã</th>
+                        <th>Nhóm máu</th>
+                        <th>Tuổi</th>
+                        <th>Số mẫu</th>
+                        <th>Trạng thái</th>
+                        <th class="text-right">Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (d of donors(); track d.id) {
+                    <tr>
+                        <td class="code-cell">{{ d.code }}</td>
+                        <td>{{ d.bloodType }}</td>
+                        <td>{{ d.age }}</td>
+                        <td>{{ d.samples }}</td>
+                        <td><span class="status-badge" [class]="d.status">{{ d.status }}</span></td>
+                        <td class="actions-cell">
+                            <button class="btn-icon" (click)="viewDonor(d)">📋</button>
+                            <button class="btn-icon" (click)="editDonor(d)">✏️</button>
+                        </td>
+                    </tr>
+                    } @empty {
+                    <tr>
+                        <td colspan="6" class="empty-state">Không có dữ liệu</td>
+                    </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </section>
+    }
+
+    @if (activeTab === 'samples') {
+    <section class="card">
+        <div class="section-header">
+            <h2>Kho mẫu</h2>
+            <button class="btn btn-primary" (click)="showNewSample = true">➕ Thêm mẫu</button>
+        </div>
+        <div class="sample-grid">
+            @for (s of samples(); track s.id) {
+            <div class="sample-card" [class]="s.status">
+                <div class="header">
+                    {{ s.code }}
+                    <div class="actions">
+                        <button class="btn-sm" (click)="editSample(s)">✏️</button>
+                        <button class="btn-sm" (click)="deleteSample(s)">🗑️</button>
+                    </div>
+                </div>
+                <div class="info">
+                    {{ s.donor }} • {{ s.vials }} vial
+                </div>
+            </div>
+            } @empty {
+            <div class="empty-state">Không có mẫu</div>
+            }
+        </div>
+    </section>
+    }
+
+    @if (activeTab === 'matching') {
+    <section class="card">
+        <div class="section-header">
+            <h2>Ghép đôi</h2>
+            <button class="btn btn-primary" (click)="showNewMatch = true">➕ Ghép đôi mới</button>
+        </div>
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Người nhận</th>
+                        <th>Người hiến</th>
+                        <th>Ngày</th>
+                        <th>Trạng thái</th>
+                        <th class="text-right">Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (m of matches(); track m.id) {
+                    <tr>
+                        <td>{{ m.recipient }}</td>
+                        <td class="code-cell">{{ m.donor }}</td>
+                        <td>{{ m.date }}</td>
+                        <td><span class="status-badge">{{ m.status }}</span></td>
+                        <td class="actions-cell">
+                            <button class="btn-icon" (click)="viewMatch(m)">👁️</button>
+                            <button class="btn-icon" (click)="editMatch(m)">✏️</button>
+                        </td>
+                    </tr>
+                    } @empty {
+                    <tr>
+                        <td colspan="5" class="empty-state">Không có</td>
+                    </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </section>
+    }
+
+    @if (showNewDonor) {
+    <div class="modal-overlay" (click)="showNewDonor = false">
+        <div class="modal-content" (click)="$event.stopPropagation()">
+            <h3>➕ Đăng ký người hiến mới</h3>
+            <form (ngSubmit)="submitDonor()">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Nhóm máu *</label>
+                        <select class="form-control" [(ngModel)]="newDonor.bloodType" name="blood" required>
+                            <option value="">Chọn...</option>
+                            <option value="A+">A+</option>
+                            <option value="A-">A-</option>
+                            <option value="B+">B+</option>
+                            <option value="B-">B-</option>
+                            <option value="O+">O+</option>
+                            <option value="O-">O-</option>
+                            <option value="AB+">AB+</option>
+                            <option value="AB-">AB-</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Tuổi *</label>
+                        <input class="form-control" type="number" [(ngModel)]="newDonor.age" name="age" required
+                            min="18" max="45" />
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Chiều cao (cm)</label>
+                    <input class="form-control" type="number" [(ngModel)]="newDonor.height" name="height" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Trình độ học vấn</label>
+                    <input class="form-control" type="text" [(ngModel)]="newDonor.education" name="edu" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Ghi chú</label>
+                    <textarea class="form-control" [(ngModel)]="newDonor.notes" name="notes"></textarea>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" (click)="showNewDonor = false">Huỷ</button>
+                    <button type="submit" class="btn btn-primary">Đăng ký</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    }
+
+    @if (showNewSample) {
+    <div class="modal-overlay" (click)="showNewSample = false">
+        <div class="modal-content" (click)="$event.stopPropagation()">
+            <h3>➕ Thêm mẫu lưu trữ</h3>
+            <form (ngSubmit)="submitSample()">
+                <div class="form-group">
+                    <label class="form-label">Mã người hiến *</label>
+                    <select class="form-control" [(ngModel)]="newSample.donor" name="donor" required>
+                        @for (d of donors(); track d.id) {
+                        <option [value]="d.code">{{ d.code }} - {{ d.bloodType }}</option>
+                        }
+                    </select>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Số lị (vials) *</label>
+                        <input class="form-control" type="number" [(ngModel)]="newSample.vials" name="vials" required
+                            min="1" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Trạng thái</label>
+                        <select class="form-control" [(ngModel)]="newSample.status" name="status">
+                            <option value="Quarantine">Cách ly</option>
+                            <option value="Available">Sẵn sàng</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Vị trí lưu trữ</label>
+                    <input class="form-control" type="text" [(ngModel)]="newSample.location" name="loc"
+                        placeholder="Bình - Canister - Vị trí" />
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" (click)="showNewSample = false">Huỷ</button>
+                    <button type="submit" class="btn btn-primary">Lưu mẫu</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    }
+
+    @if (showNewMatch) {
+    <div class="modal-overlay" (click)="showNewMatch = false">
+        <div class="modal-content" (click)="$event.stopPropagation()">
+            <h3>➕ Ghép đôi mới</h3>
+            <form (ngSubmit)="submitMatch()">
+                <div class="form-group">
+                    <label class="form-label">Người nhận (bệnh nhân) *</label>
+                    <input class="form-control" type="text" [(ngModel)]="newMatch.recipient" name="recipient"
+                        placeholder="Tên hoặc mã BN..." required />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Mã người hiến *</label>
+                    <select class="form-control" [(ngModel)]="newMatch.donor" name="donor" required>
+                        @for (d of donors(); track d.id) {
+                        <option [value]="d.code">{{ d.code }} - {{ d.bloodType }}</option>
+                        }
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Ghi chú</label>
+                    <textarea class="form-control" [(ngModel)]="newMatch.notes" name="notes"></textarea>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" (click)="showNewMatch = false">Huỷ</button>
+                    <button type="submit" class="btn btn-primary">Xác nhận ghép</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    }
+</div>

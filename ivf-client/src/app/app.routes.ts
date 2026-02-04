@@ -57,6 +57,18 @@ export const routes: Routes = [
                 loadComponent: () => import('./features/queue/queue-display/queue-display.component').then(m => m.QueueDisplayComponent)
             },
             {
+                path: 'ultrasound',
+                loadComponent: () => import('./features/ultrasounds/ultrasound-dashboard/ultrasound-dashboard.component').then(m => m.UltrasoundDashboardComponent)
+            },
+            {
+                path: 'consultation',
+                loadComponent: () => import('./features/consultation/consultation-dashboard/consultation-dashboard.component').then(m => m.ConsultationDashboardComponent)
+            },
+            {
+                path: 'injection',
+                loadComponent: () => import('./features/injection/injection-dashboard/injection-dashboard.component').then(m => m.InjectionDashboardComponent)
+            },
+            {
                 path: 'reception',
                 loadComponent: () => import('./features/reception/reception-dashboard/reception-dashboard.component').then(m => m.ReceptionDashboardComponent)
             },

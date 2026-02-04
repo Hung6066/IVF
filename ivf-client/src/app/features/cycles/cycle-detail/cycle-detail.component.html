@@ -1,0 +1,82 @@
+<div class="cycle-detail">
+    <header class="page-header">
+        <div class="header-info">
+            <a routerLink="/couples" class="back-link">← Quay lại</a>
+            <h1>Chu kỳ {{ cycle()?.cycleCode }}</h1>
+            <div class="cycle-meta">
+                <span class="badge method">{{ getMethodName(cycle()?.method) }}</span>
+                <span class="badge phase">{{ getPhaseName(cycle()?.phase) }}</span>
+                <span class="badge outcome" [class]="(cycle()?.outcome || '').toLowerCase()">
+                    {{ getOutcomeName(cycle()?.outcome) }}
+                </span>
+            </div>
+        </div>
+    </header>
+
+    <div class="content-grid">
+        <!-- Timeline -->
+        <section class="timeline-section card">
+            <h2>Tiến trình điều trị</h2>
+            <div class="phase-timeline">
+                @for (phase of phases; track phase.key; let i = $index) {
+                <div class="phase-item" [class.active]="isActivePhase(phase.key)"
+                    [class.completed]="isCompletedPhase(phase.key, i)">
+                    <div class="phase-dot"></div>
+                    <span class="phase-label">{{ phase.name }}</span>
+                </div>
+                }
+            </div>
+            @if (cycle()?.outcome === 'Ongoing') {
+            <button class="btn btn-primary btn-advance" (click)="advancePhase()">⏭️ Chuyển giai đoạn tiếp</button>
+            }
+        </section>
+
+        <!-- Ultrasounds -->
+        <section class="ultrasound-section card">
+            <h2>Siêu âm ({{ ultrasounds().length }})</h2>
+            <div class="ultrasound-list">
+                @for (us of ultrasounds(); track us.id) {
+                <div class="ultrasound-card">
+                    <div class="us-header">
+                        <span class="us-date">{{ formatDate(us.examDate) }}</span>
+                        <span class="us-day">Ngày {{ us.dayOfCycle || '?' }}</span>
+                    </div>
+                    <div class="us-stats">
+                        <div class="stat">
+                            <span class="value">{{ us.leftOvaryCount || 0 }}</span>
+                            <span class="label">Trái</span>
+                        </div>
+                        <div class="stat">
+                            <span class="value">{{ us.rightOvaryCount || 0 }}</span>
+                            <span class="label">Phải</span>
+                        </div>
+                        <div class="stat">
+                            <span class="value">{{ us.endometriumThickness || 0 }}mm</span>
+                            <span class="label">NMTC</span>
+                        </div>
+                    </div>
+                </div>
+                } @empty {
+                <p class="empty-state-text">Chưa có siêu âm</p>
+                }
+            </div>
+        </section>
+
+        <!-- Embryos -->
+        <section class="embryo-section card">
+            <h2>Phôi ({{ embryos().length }})</h2>
+            <div class="embryo-grid">
+                @for (embryo of embryos(); track embryo.id) {
+                <div class="embryo-card" [class]="(embryo.status || '').toLowerCase()">
+                    <div class="embryo-number">#{{ embryo.embryoNumber }}</div>
+                    <div class="embryo-grade">{{ embryo.grade || '?' }}</div>
+                    <div class="embryo-day">{{ embryo.day }}</div>
+                    <div class="embryo-status">{{ getEmbryoStatus(embryo.status) }}</div>
+                </div>
+                } @empty {
+                <p class="empty-state-text">Chưa có phôi</p>
+                }
+            </div>
+        </section>
+    </div>
+</div>

@@ -1,0 +1,120 @@
+<div class="reports-dashboard">
+    <header class="page-header">
+        <h1>📊 Báo cáo & Thống kê</h1>
+        <div class="date-range">
+            <div class="input-group">
+                <input type="date" class="form-control" [(ngModel)]="startDate" />
+                <span class="range-separator">→</span>
+                <input type="date" class="form-control" [(ngModel)]="endDate" />
+            </div>
+            <button class="btn btn-primary" (click)="loadReports()">
+                <span>Lọc</span>
+            </button>
+        </div>
+    </header>
+
+    <div class="kpi-grid">
+        <div class="kpi-card success">
+            <div class="kpi-value">{{ kpis()?.successRate }}%</div>
+            <div class="kpi-label">Tỷ lệ thành công IVF</div>
+            <div class="kpi-trend up">↑ {{ kpis()?.successRateTrend }}% so với tháng trước</div>
+        </div>
+        <div class="kpi-card cycles">
+            <div class="kpi-value">{{ kpis()?.totalCycles }}</div>
+            <div class="kpi-label">Tổng chu kỳ điều trị</div>
+            <div class="kpi-sub">IVF: {{ kpis()?.ivfCycles }} | IUI: {{ kpis()?.iuiCycles }}</div>
+        </div>
+        <div class="kpi-card revenue">
+            <div class="kpi-value">{{ formatCurrency(kpis()?.totalRevenue || 0) }}</div>
+            <div class="kpi-label">Doanh thu</div>
+            <div class="kpi-trend up">↑ {{ kpis()?.revenueTrend }}% so với tháng trước</div>
+        </div>
+        <div class="kpi-card patients">
+            <div class="kpi-value">{{ kpis()?.newPatients }}</div>
+            <div class="kpi-label">Bệnh nhân mới</div>
+            <div class="kpi-sub">Tổng: {{ kpis()?.totalPatients }}</div>
+        </div>
+    </div>
+
+    <div class="charts-grid">
+        <section class="card chart-card">
+            <h2 class="card-title">Phân bố phương pháp điều trị</h2>
+            <div class="pie-chart-mock">
+                <div class="pie-segment icsi" style="--percent: 45">ICSI 45%</div>
+                <div class="pie-segment iui" style="--percent: 30">IUI 30%</div>
+                <div class="pie-segment ivm" style="--percent: 15">IVM 15%</div>
+                <div class="pie-segment qhtn" style="--percent: 10">QHTN 10%</div>
+            </div>
+        </section>
+
+        <section class="card chart-card">
+            <h2 class="card-title">Kết quả chu kỳ theo tháng</h2>
+            <div class="bar-chart">
+                @for (month of monthlyData(); track month.name) {
+                <div class="bar-group">
+                    <div class="bar success" [style.height.%]="month.success * 2"
+                        [title]="'Thành công: ' + month.success"></div>
+                    <div class="bar failed" [style.height.%]="month.failed * 2" [title]="'Thất bại: ' + month.failed">
+                    </div>
+                    <div class="bar-label">{{ month.name }}</div>
+                </div>
+                }
+            </div>
+            <div class="chart-legend">
+                <span class="legend-item success">● Thành công</span>
+                <span class="legend-item failed">● Thất bại</span>
+            </div>
+        </section>
+    </div>
+
+    <div class="tables-grid">
+        <section class="card table-card">
+            <h2 class="card-title">Top 10 bác sĩ theo chu kỳ</h2>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Bác sĩ</th>
+                        <th>Chu kỳ</th>
+                        <th>Thành công</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (doc of topDoctors(); track doc.name) {
+                    <tr>
+                        <td>{{ doc.name }}</td>
+                        <td>{{ doc.cycles }}</td>
+                        <td><span class="pct">{{ doc.successRate }}%</span></td>
+                    </tr>
+                    }
+                </tbody>
+            </table>
+        </section>
+
+        <section class="card table-card">
+            <h2 class="card-title">Tình trạng kho đông lạnh</h2>
+            <div class="cryo-stats">
+                <div class="cryo-item">
+                    <span class="cryo-icon">🧫</span>
+                    <div class="cryo-info">
+                        <span class="cryo-value">{{ cryo()?.embryos }}</span>
+                        <span class="cryo-label">Phôi đông lạnh</span>
+                    </div>
+                </div>
+                <div class="cryo-item">
+                    <span class="cryo-icon">🥚</span>
+                    <div class="cryo-info">
+                        <span class="cryo-value">{{ cryo()?.eggs }}</span>
+                        <span class="cryo-label">Trứng đông lạnh</span>
+                    </div>
+                </div>
+                <div class="cryo-item">
+                    <span class="cryo-icon">🧪</span>
+                    <div class="cryo-info">
+                        <span class="cryo-value">{{ cryo()?.sperm }}</span>
+                        <span class="cryo-label">Tinh trùng đông lạnh</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+</div>

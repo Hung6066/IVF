@@ -295,6 +295,12 @@ var embryosApi = app.MapGroup("/api/embryos").WithTags("Embryos").RequireAuthori
 embryosApi.MapGet("/cycle/{cycleId:guid}", async (Guid cycleId, IMediator m) =>
     Results.Ok(await m.Send(new GetEmbryosByCycleQuery(cycleId))));
 
+embryosApi.MapGet("/active", async (IMediator m) =>
+    Results.Ok(await m.Send(new GetActiveEmbryosQuery())));
+
+embryosApi.MapGet("/cryo-stats", async (IMediator m) =>
+    Results.Ok(await m.Send(new GetCryoStorageStatsQuery())));
+
 embryosApi.MapPost("/", async (CreateEmbryoCommand cmd, IMediator m) =>
 {
     var r = await m.Send(cmd);

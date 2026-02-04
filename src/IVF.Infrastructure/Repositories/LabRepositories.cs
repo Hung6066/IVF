@@ -1,5 +1,6 @@
 using IVF.Application.Common.Interfaces;
 using IVF.Domain.Entities;
+using IVF.Domain.Enums;
 using IVF.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -67,6 +68,14 @@ public class EmbryoRepository : IEmbryoRepository
             .MaxAsync(e => (int?)e.EmbryoNumber, ct) ?? 0;
         return max + 1;
     }
+
+    public async Task<IReadOnlyList<Embryo>> GetActiveAsync(CancellationToken ct = default)
+        => await _context.Embryos
+            .Include(e => e.Cycle).ThenInclude(c => c.Couple).ThenInclude(cp => cp.Wife)
+            .Where(e => e.Status == EmbryoStatus.Developing)
+            .OrderBy(e => e.CycleId)
+            .ThenBy(e => e.EmbryoNumber)
+            .ToListAsync(ct);
 }
 
 public class CryoLocationRepository : ICryoLocationRepository
@@ -96,5 +105,23 @@ public class CryoLocationRepository : ICryoLocationRepository
     {
         _context.CryoLocations.Update(location);
         return Task.CompletedTask;
+    }
+
+    public async Task<IReadOnlyList<CryoStatsDto>> GetStorageStatsAsync(CancellationToken ct = default)
+    {
+        var stats = await _context.CryoLocations
+            .GroupBy(c => c.Tank)
+            .Select(g => new
+            {
+                Tank = g.Key,
+                CanisterCount = g.Select(x => x.Canister).Distinct().Count(),
+                CaneCount = g.Select(x => x.Cane).Distinct().Count(),
+                GobletCount = g.Select(x => x.Goblet).Distinct().Count(),
+                Available = g.Count(x => !x.IsOccupied),
+                Used = g.Count(x => x.IsOccupied)
+            })
+            .ToListAsync(ct);
+
+        return stats.Select(s => new CryoStatsDto(s.Tank, s.CanisterCount, s.CaneCount, s.GobletCount, s.Available, s.Used)).ToList();
     }
 }

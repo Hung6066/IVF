@@ -1,0 +1,212 @@
+<div class="dashboard-layout">
+    <header class="page-header">
+        <div class="header-title">
+            <h1>🔬 Phòng Siêu âm</h1>
+            <span class="subtitle">Quản lý hàng đợi và kết quả siêu âm</span>
+        </div>
+        <div class="header-actions">
+            <button class="btn btn-primary" (click)="showNewExam = true">
+                <span class="icon">➕</span> Kết quả mới
+            </button>
+        </div>
+    </header>
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-icon waiting">⏳</div>
+            <div class="stat-content">
+                <span class="value">{{ queueCount() }}</span>
+                <span class="label">Đang chờ</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon completed">✅</div>
+            <div class="stat-content">
+                <span class="value">{{ completedCount() }}</span>
+                <span class="label">Đã khám hôm nay</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon warning">⚠️</div>
+            <div class="stat-content">
+                <span class="value">{{ abnornalCount() }}</span>
+                <span class="label">Bất thường</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="tabs-container">
+        <button class="tab-btn" [class.active]="activeTab === 'queue'" (click)="activeTab = 'queue'">Hàng đợi</button>
+        <button class="tab-btn" [class.active]="activeTab === 'exams'" (click)="activeTab = 'exams'">Kết quả
+            khám</button>
+    </div>
+
+    @if (activeTab === 'queue') {
+    <section class="content-section card">
+        <div class="section-header">
+            <h2>Danh sách chờ <span class="count-badge">{{ queueCount() }}</span></h2>
+        </div>
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th width="80">STT</th>
+                        <th>Họ tên</th>
+                        <th>Mã BN</th>
+                        <th>Giờ lấy số</th>
+                        <th>Trạng thái</th>
+                        <th width="200" class="text-right">Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (q of queue(); track q.id) {
+                    <tr [class.active-row]="q.status === 'Called'">
+                        <td class="stt-cell">{{ q.number }}</td>
+                        <td class="name-cell">{{ q.patientName }}</td>
+                        <td class="code-cell">{{ q.patientCode }}</td>
+                        <td>{{ formatTime(q.issueTime) }}</td>
+                        <td>
+                            <span class="status-badge" [ngClass]="{
+                    'pending': q.status === 'Waiting',
+                    'called': q.status === 'Called',
+                    'processing': q.status === 'InService'
+                  }">
+                                {{ q.status === 'Waiting' ? 'Đang chờ' :
+                                q.status === 'Called' ? 'Đang gọi' :
+                                q.status === 'InService' ? 'Đang khám' : q.status }}
+                            </span>
+                        </td>
+                        <td class="actions-cell">
+                            <button class="btn btn-sm btn-info" (click)="callPatient(q)">
+                                📢 Gọi
+                            </button>
+                            <button class="btn btn-sm btn-success" (click)="startExam(q)">
+                                👨‍⚕️ Khám
+                            </button>
+                        </td>
+                    </tr>
+                    } @empty {
+                    <tr>
+                        <td colspan="6" class="empty-state">
+                            <div class="empty-content">
+                                <span class="empty-icon">📭</span>
+                                <p>Không có bệnh nhân chờ</p>
+                            </div>
+                        </td>
+                    </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </section>
+    }
+
+    @if (activeTab === 'exams') {
+    <section class="content-section card">
+        <div class="section-header">
+            <h2>Kết quả siêu âm gần đây</h2>
+        </div>
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Mã phiếu</th>
+                        <th>Bệnh nhân</th>
+                        <th>Loại siêu âm</th>
+                        <th>Kết luận</th>
+                        <th>Bác sĩ</th>
+                        <th width="80"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (ex of recentExams(); track ex.id) {
+                    <tr>
+                        <td class="code-cell">{{ ex.code }}</td>
+                        <td class="name-cell">{{ ex.patientName }}</td>
+                        <td>{{ ex.type }}</td>
+                        <td class="text-truncate" style="max-width: 300px;">{{ ex.conclusion }}</td>
+                        <td>{{ ex.doctor }}</td>
+                        <td class="actions-cell">
+                            <button class="btn-icon" (click)="viewExam(ex)" title="Xem chi tiết">
+                                👁️
+                            </button>
+                        </td>
+                    </tr>
+                    } @empty {
+                    <tr>
+                        <td colspan="6" class="empty-state">Chưa có kết quả</td>
+                    </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </section>
+    }
+
+    @if (showNewExam) {
+    <div class="modal-overlay" (click)="showNewExam = false">
+        <div class="modal-content" (click)="$event.stopPropagation()">
+            <header class="modal-header">
+                <h3>📝 Nhập kết quả siêu âm</h3>
+                <button class="close-btn" (click)="showNewExam = false">×</button>
+            </header>
+
+            <form (ngSubmit)="submitExam()" class="modal-body">
+                <div class="form-group full-width">
+                    <label>Bệnh nhân <span class="required">*</span></label>
+                    <input type="text" [(ngModel)]="newExam.patient" name="patient" required
+                        placeholder="Tìm kiếm bệnh nhân..." class="form-control" [readonly]="!!currentTicketId" />
+                </div>
+
+                <div class="form-group full-width">
+                    <label>Loại siêu âm</label>
+                    <select [(ngModel)]="newExam.type" name="type" class="form-control">
+                        <option value="2D TC-PP">2D Tử cung - Phần phụ</option>
+                        <option value="Canh noãn">Canh noãn</option>
+                        <option value="Doppler">Doppler màu</option>
+                    </select>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Tử cung</label>
+                        <input type="text" [(ngModel)]="newExam.uterus" name="uterus"
+                            placeholder="Tư thế, kích thước..." class="form-control" />
+                    </div>
+                    <div class="form-group">
+                        <label>Nội mạc (mm)</label>
+                        <input type="number" [(ngModel)]="newExam.endometrium" name="endo" step="0.1"
+                            class="form-control" />
+                    </div>
+                </div>
+
+                <fieldset class="form-group fieldset">
+                    <legend>Buồng trứng (Số lượng nang)</legend>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Phải (MP)</label>
+                            <input type="text" [(ngModel)]="newExam.rightOvary" name="ro"
+                                placeholder="VD: 3 nang (10,12,14mm)" class="form-control" />
+                        </div>
+                        <div class="form-group">
+                            <label>Trái (MT)</label>
+                            <input type="text" [(ngModel)]="newExam.leftOvary" name="lo" placeholder="VD: 5 nang nhỏ"
+                                class="form-control" />
+                        </div>
+                    </div>
+                </fieldset>
+
+                <div class="form-group full-width">
+                    <label>Kết luận</label>
+                    <textarea [(ngModel)]="newExam.conclusion" name="concl" rows="3" class="form-control"></textarea>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" (click)="showNewExam = false">Huỷ bỏ</button>
+                    <button type="submit" class="btn btn-primary">Lưu kết quả</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    }
+</div>

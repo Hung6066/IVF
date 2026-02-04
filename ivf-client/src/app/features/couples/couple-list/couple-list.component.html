@@ -1,0 +1,63 @@
+<div class="dashboard-layout">
+    <header class="page-header">
+        <div class="header-title">
+            <h1>Danh sách cặp đôi</h1>
+            <span class="subtitle">Quản lý hồ sơ các cặp vợ chồng</span>
+        </div>
+        <div class="header-actions">
+            <button class="btn btn-primary" routerLink="/couples/new">
+                <span class="icon">➕</span> Tạo cặp đôi
+            </button>
+        </div>
+    </header>
+
+    <div class="couples-grid">
+        @for (couple of couples(); track couple.id) {
+        <div class="couple-card">
+            <div class="couple-header">
+                <div class="partner wife">
+                    <div class="avatar">👩</div>
+                    <div class="info">
+                        <span class="name">{{ couple.wife?.fullName || 'Chưa có' }}</span>
+                        <span class="code">{{ couple.wife?.patientCode || '' }}</span>
+                    </div>
+                </div>
+                <div class="heart">❤️</div>
+                <div class="partner husband">
+                    <div class="avatar">👨</div>
+                    <div class="info">
+                        <span class="name">{{ couple.husband?.fullName || 'Chưa có' }}</span>
+                        <span class="code">{{ couple.husband?.patientCode || '' }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="couple-meta">
+                <div class="meta-item">
+                    <span class="label">Kết hôn:</span>
+                    <span class="value">{{ formatDate(couple.marriageDate) || '—' }}</span>
+                </div>
+                <div class="meta-item">
+                    <span class="label">Hiếm muộn:</span>
+                    <span class="value">{{ couple.infertilityYears || '?' }} năm</span>
+                </div>
+            </div>
+
+            <div class="couple-actions">
+                <a [routerLink]="['/couples', couple.id, 'cycles', 'new']" class="btn btn-sm btn-success">➕ Tạo chu
+                    kỳ</a>
+                <a [routerLink]="['/patients', getWifeId(couple)]" class="btn btn-sm btn-secondary">👁️ Vợ</a>
+                <a [routerLink]="['/patients', getHusbandId(couple)]" class="btn btn-sm btn-secondary">👁️ Chồng</a>
+            </div>
+        </div>
+        } @empty {
+        <div class="empty-state">
+            <div class="empty-content">
+                <span class="empty-icon">💑</span>
+                <p>Chưa có cặp đôi nào</p>
+                <button class="btn btn-primary" routerLink="/couples/new">Tạo cặp đôi mới</button>
+            </div>
+        </div>
+        }
+    </div>
+</div>

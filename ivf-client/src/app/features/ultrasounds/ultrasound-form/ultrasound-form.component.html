@@ -1,0 +1,74 @@
+<div class="ultrasound-form">
+    <header class="page-header">
+        <a (click)="goBack()" class="back-link">
+            <span>←</span> Quay lại
+        </a>
+        <h1>Ghi nhận siêu âm</h1>
+    </header>
+
+    <form (ngSubmit)="submit()" class="card form-card">
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label">Loại siêu âm</label>
+                <select class="form-control" [(ngModel)]="formData.ultrasoundType" name="type" required>
+                    <option value="NangNoan">Siêu âm nang noãn</option>
+                    <option value="PhụKhoa">Siêu âm phụ khoa</option>
+                    <option value="NMTC">Siêu âm NMTC</option>
+                    <option value="Thai">Siêu âm thai</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Ngày siêu âm</label>
+                <input type="date" class="form-control" [(ngModel)]="formData.examDate" name="examDate" required />
+            </div>
+        </div>
+
+        <h3 class="section-title">Buồng trứng</h3>
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label">Số nang bên trái</label>
+                <input type="number" class="form-control" [(ngModel)]="formData.leftOvaryCount" name="leftCount"
+                    min="0" />
+            </div>
+            <div class="form-group">
+                <label class="form-label">Số nang bên phải</label>
+                <input type="number" class="form-control" [(ngModel)]="formData.rightOvaryCount" name="rightCount"
+                    min="0" />
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label">Kích thước nang trái (mm)</label>
+                <input type="text" class="form-control" [(ngModel)]="formData.leftFollicles" name="leftFollicles"
+                    placeholder="18, 16, 14, 12" />
+            </div>
+            <div class="form-group">
+                <label class="form-label">Kích thước nang phải (mm)</label>
+                <input type="text" class="form-control" [(ngModel)]="formData.rightFollicles" name="rightFollicles"
+                    placeholder="17, 15, 13" />
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label">Độ dày NMTC (mm)</label>
+                <input type="number" class="form-control" [(ngModel)]="formData.endometriumThickness" name="endo"
+                    step="0.1" min="0" />
+            </div>
+            <div class="form-group"></div>
+        </div>
+
+        <div class="form-group full-width">
+            <label class="form-label">Ghi chú / Kết luận</label>
+            <textarea class="form-control" [(ngModel)]="formData.findings" name="findings" rows="4"></textarea>
+        </div>
+
+        <div class="form-actions">
+            <button type="button" class="btn btn-secondary" (click)="goBack()">Huỷ</button>
+            <button type="submit" class="btn btn-primary" [disabled]="saving()">
+                {{ saving() ? 'Đang lưu...' : 'Lưu siêu âm' }}
+            </button>
+        </div>
+    </form>
+</div>

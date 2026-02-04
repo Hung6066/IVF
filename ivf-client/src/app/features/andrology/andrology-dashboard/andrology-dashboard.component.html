@@ -1,0 +1,341 @@
+<div class="dashboard-layout">
+    <header class="page-header">
+        <div class="header-title">
+            <h1>🔬 Nam Khoa - Andrology</h1>
+        </div>
+        <div class="header-actions">
+            <!-- Add actions if needed -->
+        </div>
+    </header>
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-icon info">📊</div>
+            <div class="stat-content">
+                <span class="value">{{ todayAnalysis() }}</span>
+                <span class="label">XN hôm nay</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon success">🧪</div>
+            <div class="stat-content">
+                <span class="value">{{ todayWashing() }}</span>
+                <span class="label">Lọc rửa hôm nay</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon warning">⏳</div>
+            <div class="stat-content">
+                <span class="value">{{ pendingCount() }}</span>
+                <span class="label">Chờ kết quả</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon neutral">📈</div>
+            <div class="stat-content">
+                <span class="value">{{ avgConcentration() }}M</span>
+                <span class="label">Mật độ TB</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="tabs-container">
+        <button class="tab-btn" [class.active]="activeTab === 'queue'" (click)="activeTab = 'queue'">🎫 Hàng
+            đợi</button>
+        <button class="tab-btn" [class.active]="activeTab === 'analysis'" (click)="activeTab = 'analysis'">📊 Tinh dịch
+            đồ</button>
+        <button class="tab-btn" [class.active]="activeTab === 'washing'" (click)="activeTab = 'washing'">🧪 Lọc
+            rửa</button>
+        <button class="tab-btn" [class.active]="activeTab === 'statistics'" (click)="activeTab = 'statistics'">📈 Thống
+            kê</button>
+    </div>
+
+    @if (activeTab === 'queue') {
+    <section class="content-section card">
+        <div class="section-header">
+            <h2>Danh sách chờ <span class="count-badge">{{ queueCount() }}</span></h2>
+        </div>
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th width="80">STT</th>
+                        <th>Họ tên</th>
+                        <th>Mã BN</th>
+                        <th>Giờ lấy số</th>
+                        <th>Trạng thái</th>
+                        <th width="200" class="text-right">Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (q of queue(); track q.id) {
+                    <tr [class.active-row]="q.status === 'Called'">
+                        <td class="stt-cell">{{ q.number }}</td>
+                        <td class="name-cell">{{ q.patientName }}</td>
+                        <td class="code-cell">{{ q.patientCode }}</td>
+                        <td>{{ formatTime(q.issueTime) }}</td>
+                        <td>
+                            <span class="status-badge" [ngClass]="{
+                    'pending': q.status === 'Waiting',
+                    'called': q.status === 'Called',
+                    'processing': q.status === 'InService'
+                  }">
+                                {{ q.status === 'Waiting' ? 'Đang chờ' :
+                                q.status === 'Called' ? 'Đang gọi' :
+                                q.status === 'InService' ? 'Đang làm' : q.status }}
+                            </span>
+                        </td>
+                        <td class="actions-cell">
+                            <button class="btn btn-sm btn-info" (click)="callPatient(q)">📢 Gọi</button>
+                            <button class="btn btn-sm btn-primary" (click)="startExam(q)">🧪 Nhận mẫu</button>
+                        </td>
+                    </tr>
+                    } @empty {
+                    <tr>
+                        <td colspan="6" class="empty-state">Không có bệnh nhân chờ</td>
+                    </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </section>
+    }
+
+    @if (activeTab === 'analysis') {
+    <section class="content-section card">
+        <div class="section-header">
+            <h2>Danh sách xét nghiệm tinh dịch đồ</h2>
+            <button class="btn btn-primary" (click)="showNewAnalysis = true">➕ Xét nghiệm mới</button>
+        </div>
+
+        <div class="filter-bar">
+            <input type="date" [(ngModel)]="filterDate" class="form-control" />
+            <select [(ngModel)]="filterStatus" class="form-control">
+                <option value="">Tất cả trạng thái</option>
+                <option value="Pending">Chờ XN</option>
+                <option value="Processing">Đang XN</option>
+                <option value="Completed">Hoàn thành</option>
+            </select>
+            <input type="text" [(ngModel)]="searchTerm" placeholder="Tìm theo mã BN..." class="form-control" />
+        </div>
+
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Mã BN</th>
+                        <th>Họ tên</th>
+                        <th>Ngày XN</th>
+                        <th>Thể tích</th>
+                        <th>Mật độ</th>
+                        <th>Di động PR</th>
+                        <th>Di động NP</th>
+                        <th>Bất động</th>
+                        <th>Hình thái</th>
+                        <th>Sống</th>
+                        <th>Trạng thái</th>
+                        <th>Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (item of filteredAnalyses(); track item.id) {
+                    <tr>
+                        <td class="code-cell">{{ item.patientCode }}</td>
+                        <td class="name-cell">{{ item.patientName }}</td>
+                        <td>{{ formatDate(item.analysisDate) }}</td>
+                        <td>{{ item.volume ?? '—' }} ml</td>
+                        <td [class.text-danger]="(item.concentration ?? 0) < 15">{{ item.concentration ?? '—' }} M/ml
+                        </td>
+                        <td [class.text-danger]="(item.progressiveMotility ?? 0) < 32">{{ item.progressiveMotility ??
+                            '—' }}%</td>
+                        <td>{{ item.nonProgressiveMotility ?? '—' }}%</td>
+                        <td>{{ item.immotile ?? '—' }}%</td>
+                        <td [class.text-danger]="(item.morphology ?? 0) < 4">{{ item.morphology ?? '—' }}%</td>
+                        <td>{{ item.vitality ?? '—' }}%</td>
+                        <td>
+                            <span class="status-badge" [ngClass]="item.status.toLowerCase()">{{
+                                getStatusName(item.status) }}</span>
+                        </td>
+                        <td class="actions-cell">
+                            <button class="btn-icon" title="Sửa" (click)="editAnalysis(item)">✏️</button>
+                            <button class="btn-icon" title="In" (click)="printResult(item)">🖨️</button>
+                        </td>
+                    </tr>
+                    } @empty {
+                    <tr>
+                        <td colspan="12" class="empty-state">Không có dữ liệu</td>
+                    </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </section>
+    }
+
+    @if (activeTab === 'washing') {
+    <section class="content-section card">
+        <div class="section-header">
+            <h2>Danh sách lọc rửa tinh trùng</h2>
+            <button class="btn btn-primary" (click)="showNewWashing = true">➕ Lọc rửa mới</button>
+        </div>
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Mã chu kỳ</th>
+                        <th>Họ tên</th>
+                        <th>Phương pháp</th>
+                        <th>Mật độ trước</th>
+                        <th>Mật độ sau</th>
+                        <th>Di động sau</th>
+                        <th>Ngày lọc</th>
+                        <th>Trạng thái</th>
+                        <th>Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (item of washings(); track item.id) {
+                    <tr>
+                        <td class="code-cell">{{ item.cycleCode }}</td>
+                        <td class="name-cell">{{ item.patientName }}</td>
+                        <td>{{ item.method }}</td>
+                        <td>{{ item.prewashConc ?? '—' }} M/ml</td>
+                        <td>{{ item.postwashConc ?? '—' }} M/ml</td>
+                        <td>{{ item.postwashMotility ?? '—' }}%</td>
+                        <td>{{ formatDate(item.washDate) }}</td>
+                        <td><span class="status-badge" [ngClass]="item.status.toLowerCase()">{{
+                                getStatusName(item.status) }}</span></td>
+                        <td class="actions-cell">
+                            <button class="btn-icon" title="Sửa">✏️</button>
+                            <button class="btn-icon" title="In">🖨️</button>
+                        </td>
+                    </tr>
+                    } @empty {
+                    <tr>
+                        <td colspan="9" class="empty-state">Không có dữ liệu</td>
+                    </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </section>
+    }
+
+    @if (activeTab === 'statistics') {
+    <section class="content-section card">
+        <h2>Thống kê Nam khoa</h2>
+        <div class="stats-visuals-grid">
+            <div class="stat-box">
+                <h4>Phân loại mật độ tinh trùng</h4>
+                <div class="bar-chart">
+                    <div class="bar-item"><span class="bar-label">Normozoospermia</span>
+                        <div class="bar" style="width: 45%"></div><span>45%</span>
+                    </div>
+                    <div class="bar-item"><span class="bar-label">Oligozoospermia</span>
+                        <div class="bar warning" style="width: 25%"></div><span>25%</span>
+                    </div>
+                    <div class="bar-item"><span class="bar-label">Severe Oligo</span>
+                        <div class="bar danger" style="width: 15%"></div><span>15%</span>
+                    </div>
+                    <div class="bar-item"><span class="bar-label">Azoospermia</span>
+                        <div class="bar danger" style="width: 15%"></div><span>15%</span>
+                    </div>
+                </div>
+            </div>
+            <!-- Simplified stats for brevity -->
+        </div>
+    </section>
+    }
+
+    @if (showNewAnalysis) {
+    <div class="modal-overlay" (click)="showNewAnalysis = false">
+        <div class="modal-content large" (click)="$event.stopPropagation()">
+            <header class="modal-header">
+                <h3>Xét nghiệm tinh dịch đồ mới</h3>
+                <button class="close-btn" (click)="showNewAnalysis = false">×</button>
+            </header>
+            <form (ngSubmit)="submitAnalysis()" class="modal-body">
+                <div class="form-group">
+                    <label>Tìm bệnh nhân</label>
+                    <input type="text" [(ngModel)]="newAnalysis.patientSearch" name="search"
+                        placeholder="Mã BN hoặc tên..." class="form-control" />
+                </div>
+
+                <div class="form-section-title">Đại thể (Macroscopic)</div>
+                <div class="grid-4">
+                    <div class="form-group"><label>Thể tích (ml)</label><input type="number"
+                            [(ngModel)]="newAnalysis.volume" name="volume" step="0.1" class="form-control" /></div>
+                    <div class="form-group"><label>Màu sắc</label><input type="text"
+                            [(ngModel)]="newAnalysis.appearance" name="appearance" class="form-control" /></div>
+                    <div class="form-group"><label>Ly giải</label><input type="text"
+                            [(ngModel)]="newAnalysis.liquefaction" name="liquefaction" class="form-control" /></div>
+                    <div class="form-group"><label>pH</label><input type="number" [(ngModel)]="newAnalysis.ph" name="ph"
+                            step="0.1" class="form-control" /></div>
+                </div>
+
+                <div class="form-section-title">Vi thể (Microscopic)</div>
+                <div class="grid-2">
+                    <div class="form-group"><label>Mật độ (M/ml)</label><input type="number"
+                            [(ngModel)]="newAnalysis.concentration" name="concentration" step="0.1"
+                            class="form-control" /></div>
+                    <div class="form-group"><label>Tổng số (M)</label><input type="number"
+                            [(ngModel)]="newAnalysis.totalCount" name="totalCount" step="0.1" class="form-control" />
+                    </div>
+                </div>
+                <div class="grid-3">
+                    <div class="form-group"><label>Di động PR (%)</label><input type="number"
+                            [(ngModel)]="newAnalysis.progressiveMotility" name="pr" max="100" class="form-control" />
+                    </div>
+                    <div class="form-group"><label>Di động NP (%)</label><input type="number"
+                            [(ngModel)]="newAnalysis.nonProgressiveMotility" name="np" max="100" class="form-control" />
+                    </div>
+                    <div class="form-group"><label>Bất động (%)</label><input type="number"
+                            [(ngModel)]="newAnalysis.immotile" name="im" max="100" class="form-control" /></div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" (click)="showNewAnalysis = false">Huỷ</button>
+                    <button type="submit" class="btn btn-primary">Lưu kết quả</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    }
+
+    @if (showNewWashing) {
+    <div class="modal-overlay" (click)="showNewWashing = false">
+        <div class="modal-content" (click)="$event.stopPropagation()">
+            <header class="modal-header">
+                <h3>➕ Lọc rửa mới</h3>
+                <button class="close-btn" (click)="showNewWashing = false">×</button>
+            </header>
+            <form (ngSubmit)="submitWashing()" class="modal-body">
+                <div class="form-group"><label>Mã chu kỳ <span class="required">*</span></label><input type="text"
+                        [(ngModel)]="newWashing.cycleCode" name="cycle" required placeholder="CK-XXX"
+                        class="form-control" /></div>
+                <div class="form-group"><label>Tên bệnh nhân <span class="required">*</span></label><input type="text"
+                        [(ngModel)]="newWashing.patientName" name="patient" required class="form-control" /></div>
+                <div class="form-group"><label>Phương pháp</label><select [(ngModel)]="newWashing.method" name="method"
+                        class="form-control">
+                        <option value="Gradient">Gradient</option>
+                        <option value="Swim-up">Swim-up</option>
+                    </select></div>
+                <div class="grid-2">
+                    <div class="form-group"><label>Mật độ trước (M/ml)</label><input type="number"
+                            [(ngModel)]="newWashing.prewashConc" name="pre" step="0.1" class="form-control" /></div>
+                    <div class="form-group"><label>Mật độ sau (M/ml)</label><input type="number"
+                            [(ngModel)]="newWashing.postwashConc" name="post" step="0.1" class="form-control" /></div>
+                </div>
+                <div class="form-group"><label>Di động sau (%)</label><input type="number"
+                        [(ngModel)]="newWashing.postwashMotility" name="motility" max="100" class="form-control" />
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" (click)="showNewWashing = false">Huỷ</button>
+                    <button type="submit" class="btn btn-primary">Lưu kết quả</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    }
+</div>

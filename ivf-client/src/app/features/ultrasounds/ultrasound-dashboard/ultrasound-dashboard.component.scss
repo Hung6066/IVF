@@ -1,0 +1,149 @@
+.dashboard-layout {
+    padding: 1.5rem;
+    max-width: 1600px;
+    margin: 0 auto;
+}
+
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+
+    .header-title {
+        h1 {
+            font-size: 1.875rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin: 0 0 0.5rem 0;
+        }
+
+        .subtitle {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+    }
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.stat-card {
+    /* Rely on global .stat-card, just add specific overrides if needed */
+    transition: transform 0.2s ease;
+
+    .stat-icon {
+        &.waiting {
+            background: #FEF3C7;
+            color: #D97706;
+        }
+
+        &.completed {
+            background: #D1FAE5;
+            color: #059669;
+        }
+
+        &.warning {
+            background: #FEE2E2;
+            color: #DC2626;
+        }
+    }
+}
+
+// Global .tabs-container and .tab-btn should be used.
+// If not available, we assume they are in styles.scss. 
+// If specific overrides needed, add here.
+
+.code-cell {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    color: var(--text-primary);
+    background: #f8fafc;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    display: inline-block;
+}
+
+.status-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+
+    &.pending {
+        background: #FEF3C7;
+        color: #92400e;
+    }
+
+    &.called {
+        background: #DBEAFE;
+        color: #1E40AF;
+        animation: pulse 2s infinite;
+    }
+
+    &.processing {
+        background: #D1FAE5;
+        color: #065F46;
+    }
+}
+
+@keyframes pulse {
+    0% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.7;
+    }
+
+    100% {
+        opacity: 1;
+    }
+}
+
+.actions-cell {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+
+.fieldset {
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+
+    legend {
+        padding: 0 0.5rem;
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: var(--primary-color);
+    }
+}
+
+.empty-state {
+    padding: 3rem;
+    text-align: center;
+
+    .empty-content {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1rem;
+
+        .empty-icon {
+            font-size: 2.5rem;
+            opacity: 0.5;
+        }
+
+        p {
+            color: var(--text-secondary);
+            margin: 0;
+        }
+    }
+}

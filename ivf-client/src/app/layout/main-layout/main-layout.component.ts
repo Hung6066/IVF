@@ -29,6 +29,12 @@ import { AuthService } from '../../core/services/auth.service';
             <span class="icon">💑</span> Cặp đôi
           </a>
           <a routerLink="/queue/US" routerLinkActive="active" class="nav-item">
+            <span class="icon">🎫</span> Hàng đợi
+          </a>
+          <a routerLink="/consultation" routerLinkActive="active" class="nav-item">
+            <span class="icon">🗣️</span> Tư vấn
+          </a>
+          <a routerLink="/ultrasound" routerLinkActive="active" class="nav-item">
             <span class="icon">🔬</span> Siêu âm
           </a>
           <a routerLink="/lab" routerLinkActive="active" class="nav-item">
@@ -36,6 +42,9 @@ import { AuthService } from '../../core/services/auth.service';
           </a>
           <a routerLink="/andrology" routerLinkActive="active" class="nav-item">
             <span class="icon">🔬</span> Nam khoa
+          </a>
+          <a routerLink="/injection" routerLinkActive="active" class="nav-item">
+            <span class="icon">💉</span> Tiêm
           </a>
           <a routerLink="/sperm-bank" routerLinkActive="active" class="nav-item">
             <span class="icon">🏦</span> NHTT

@@ -1,0 +1,82 @@
+<div class="dashboard">
+    <header class="page-header">
+        <h1>Dashboard</h1>
+        <p>Tổng quan hoạt động hệ thống IVF</p>
+    </header>
+
+    <section class="stats-grid">
+        <div class="stat-card patients">
+            <div class="stat-icon">👥</div>
+            <div class="stat-content">
+                <span class="stat-value">{{ stats()?.totalPatients || 0 }}</span>
+                <span class="stat-label">Tổng bệnh nhân</span>
+            </div>
+        </div>
+
+        <div class="stat-card cycles">
+            <div class="stat-icon">🔄</div>
+            <div class="stat-content">
+                <span class="stat-value">{{ stats()?.activeCycles || 0 }}</span>
+                <span class="stat-label">Chu kỳ đang điều trị</span>
+            </div>
+        </div>
+
+        <div class="stat-card queue">
+            <div class="stat-icon">🎫</div>
+            <div class="stat-content">
+                <span class="stat-value">{{ stats()?.todayQueueCount || 0 }}</span>
+                <span class="stat-label">Số khám hôm nay</span>
+            </div>
+        </div>
+
+        <div class="stat-card revenue">
+            <div class="stat-icon">💰</div>
+            <div class="stat-content">
+                <span class="stat-value">{{ formatCurrency(stats()?.monthlyRevenue || 0) }}</span>
+                <span class="stat-label">Doanh thu tháng</span>
+            </div>
+        </div>
+    </section>
+
+    <section class="charts-grid">
+        <div class="chart-card">
+            <h3>Tỷ lệ thành công {{ successRates()?.year }}</h3>
+            <div class="success-chart">
+                <div class="success-rate">
+                    <div class="rate-circle" [style.--rate]="(successRates()?.successRate || 0) + '%'">
+                        <span class="rate-value">{{ successRates()?.successRate || 0 }}%</span>
+                    </div>
+                    <span class="rate-label">Tỷ lệ có thai</span>
+                </div>
+                <div class="success-breakdown">
+                    <div class="breakdown-item">
+                        <span class="dot pregnant"></span>
+                        <span>Có thai: {{ successRates()?.pregnancies || 0 }}</span>
+                    </div>
+                    <div class="breakdown-item">
+                        <span class="dot not-pregnant"></span>
+                        <span>Không thai: {{ successRates()?.notPregnant || 0 }}</span>
+                    </div>
+                    <div class="breakdown-item">
+                        <span class="dot cancelled"></span>
+                        <span>Huỷ: {{ successRates()?.cancelled || 0 }}</span>
+                    </div>
+                    <div class="breakdown-item">
+                        <span class="dot frozen"></span>
+                        <span>Trữ phôi: {{ successRates()?.frozenAll || 0 }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="chart-card">
+            <h3>Hướng dẫn nhanh</h3>
+            <div class="quick-actions">
+                <button class="action-btn" (click)="goToAddPatient()">➕ Thêm bệnh nhân mới</button>
+                <button class="action-btn" (click)="goToIssueQueue()">🎫 Phát số thứ tự</button>
+                <button class="action-btn" (click)="goToAppointments()">📋 Xem lịch hẹn</button>
+                <button class="action-btn" (click)="goToReports()">📊 Báo cáo chi tiết</button>
+            </div>
+        </div>
+    </section>
+</div>

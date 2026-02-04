@@ -1,0 +1,140 @@
+<div class="dashboard-layout">
+    <header class="page-header">
+        <div class="header-title">
+            <h1>🏥 Tiếp đón & Thu ngân</h1>
+        </div>
+        <div class="quick-actions">
+            <button class="btn btn-primary" routerLink="/patients/new">➕ BN Mới</button>
+            <button class="btn btn-secondary" routerLink="/couples/new">💑 Tạo cặp đôi</button>
+        </div>
+    </header>
+
+    <div class="search-section card">
+        <input type="text" class="search-input" [(ngModel)]="searchTerm"
+            placeholder="Tìm bệnh nhân (Mã BN, Tên, SĐT, CCCD)..." (keyup.enter)="searchPatient()" />
+        <button class="btn btn-primary" (click)="searchPatient()">🔍 Tìm</button>
+    </div>
+
+    @if (searchResults().length > 0) {
+    <section class="search-results card">
+        <h2>Kết quả tìm kiếm</h2>
+        <div class="result-list">
+            @for (patient of searchResults(); track patient.id) {
+            <div class="result-card" (click)="selectPatient(patient)">
+                <div class="patient-avatar">👤</div>
+                <div class="patient-info">
+                    <strong>{{ patient.fullName }}</strong>
+                    <span class="code">{{ patient.patientCode }}</span>
+                </div>
+                <div class="patient-meta">
+                    <span>📱 {{ patient.phone || 'N/A' }}</span>
+                    <span>🎂 {{ formatDate(patient.dateOfBirth) }}</span>
+                </div>
+                <button class="btn btn-sm btn-success" (click)="$event.stopPropagation(); checkinPatient(patient)">
+                    Đăng ký khám
+                </button>
+            </div>
+            }
+        </div>
+    </section>
+    }
+
+    <div class="dashboard-grid">
+        <section class="queue-section card">
+            <h2>🎫 Số đang chờ hôm nay</h2>
+            <div class="queue-numbers">
+                <a routerLink="/queue/TV" class="queue-item consultation">
+                    <span class="dept">Tư vấn</span>
+                    <span class="count">{{ queueTuVan() }}</span>
+                </a>
+                <a routerLink="/queue/US" class="queue-item ultrasound">
+                    <span class="dept">Siêu âm</span>
+                    <span class="count">{{ queueSieuAm() }}</span>
+                </a>
+                <a routerLink="/queue/TM" class="queue-item injection">
+                    <span class="dept">Tiêm</span>
+                    <span class="count">{{ queueTiem() }}</span>
+                </a>
+                <a routerLink="/queue/XN" class="queue-item lab">
+                    <span class="dept">Xét nghiệm</span>
+                    <span class="count">{{ queueXN() }}</span>
+                </a>
+            </div>
+        </section>
+
+        <section class="payment-section card">
+            <h2>💰 Thu ngân hôm nay</h2>
+            <div class="payment-stats">
+                <div class="payment-item">
+                    <span class="label">Tổng thu</span>
+                    <span class="value">{{ formatCurrency(totalPayment()) }}</span>
+                </div>
+                <div class="payment-item">
+                    <span class="label">Số phiếu</span>
+                    <span class="value">{{ paymentCount() }}</span>
+                </div>
+                <div class="payment-item">
+                    <span class="label">Chờ thanh toán</span>
+                    <span class="value pending">{{ pendingPayment() }}</span>
+                </div>
+            </div>
+        </section>
+
+        <section class="recent-checkins card">
+            <h2>📋 Đăng ký gần đây</h2>
+            <div class="checkin-list">
+                @for (checkin of recentCheckins(); track checkin.id) {
+                <div class="checkin-item">
+                    <span class="time">{{ formatTime(checkin.time) }}</span>
+                    <span class="name">{{ checkin.patientName }}</span>
+                    <span class="dept-tag">{{ checkin.department }}</span>
+                </div>
+                } @empty {
+                <div class="empty-state">Chưa có đăng ký</div>
+                }
+            </div>
+        </section>
+    </div>
+
+    @if (showCheckinModal) {
+    <div class="modal-overlay" (click)="showCheckinModal = false">
+        <div class="modal-content" (click)="$event.stopPropagation()">
+            <h3>📝 Đăng ký khám: {{ selectedPatient?.fullName }}</h3>
+            <form (ngSubmit)="submitCheckin()">
+                <div class="form-group">
+                    <label class="form-label">Dịch vụ / Phòng khám *</label>
+                    <select class="form-control" [(ngModel)]="checkinData.department" name="dept" required>
+                        <option value="TV">Tư vấn (TV)</option>
+                        <option value="US">Siêu âm (US)</option>
+                        <option value="TM">Tiêm (TM)</option>
+                        <option value="XN">Xét nghiệm (XN)</option>
+                        <option value="NAM">Nam khoa</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Bác sĩ chỉ định (tùy chọn)</label>
+                    <input class="form-control" type="text" [(ngModel)]="checkinData.doctor" name="doctor"
+                        placeholder="VD: BS. Giang" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Mức độ ưu tiên</label>
+                    <select class="form-control" [(ngModel)]="checkinData.priority" name="priority">
+                        <option value="Normal">Bình thường</option>
+                        <option value="High">Ưu tiên</option>
+                        <option value="VIP">VIP</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Ghi chú</label>
+                    <textarea class="form-control" [(ngModel)]="checkinData.notes" name="notes"
+                        placeholder="Lý do khám..."></textarea>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" (click)="showCheckinModal = false">Huỷ</button>
+                    <button type="submit" class="btn btn-primary">Cấp số & In phiếu</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    }
+</div>
