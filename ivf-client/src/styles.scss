@@ -311,12 +311,19 @@ h3 {
     font-size: 0.9rem;
     transition: all 0.2s;
     background: var(--bg-white);
+    box-sizing: border-box;
+    /* Critical for preventing overflow */
 
     &:focus {
         outline: none;
         border-color: var(--primary);
         box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
     }
+}
+
+textarea.form-control {
+    min-height: 100px;
+    resize: vertical;
 }
 
 .form-label {
@@ -341,12 +348,43 @@ h3 {
 }
 
 .modal-content {
-    background: var(--bg-white);
-    border-radius: var(--radius-xl);
+    background: white;
+    border-radius: 16px;
     padding: 2rem;
     width: 100%;
     max-width: 500px;
     box-shadow: var(--shadow-lg);
+
+    .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+
+        h3 {
+            margin: 0;
+            color: var(--text-primary);
+            font-size: 1.25rem;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            line-height: 1;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 0.25rem;
+            border-radius: 4px;
+            transition: all 0.2s;
+
+            &:hover {
+                background: var(--bg-light);
+                color: var(--danger);
+            }
+        }
+    }
+
     animation: slideUp 0.3s ease-out;
 }
 

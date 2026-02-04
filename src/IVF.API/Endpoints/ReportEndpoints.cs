@@ -19,7 +19,8 @@ public static class ReportEndpoints
             Results.Ok(await m.Send(new GetTreatmentMethodDistributionQuery(year))));
 
         group.MapGet("/revenue/monthly", async (IMediator m, int year) =>
-            Results.Ok(await m.Send(new GetMonthlyRevenueQuery(year))));
+            Results.Ok(await m.Send(new GetMonthlyRevenueQuery(year))))
+            .RequireAuthorization("AdminOnly");
 
         group.MapGet("/queue/stats", async (IMediator m, DateTime? date) =>
             Results.Ok(await m.Send(new GetQueueStatisticsQuery(date ?? DateTime.UtcNow))));
