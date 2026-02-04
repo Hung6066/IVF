@@ -9,7 +9,7 @@ import { ApiService, Appointment, AppointmentType, CreateAppointmentRequest } fr
     standalone: true,
     imports: [CommonModule, FormsModule, RouterLink],
     template: `
-    <div class="appointments-container">
+    <div class="dashboard-layout">
       <header class="page-header">
         <h1>📅 Lịch hẹn</h1>
         <button class="btn-primary" (click)="showCreateForm = true">+ Tạo lịch hẹn mới</button>

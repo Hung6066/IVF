@@ -1,5 +1,5 @@
-.appointments-container {
-    padding: 24px;
+.dashboard-layout {
+    padding: 1.5rem;
     max-width: 1400px;
     margin: 0 auto;
 }
@@ -8,90 +8,101 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 24px;
+    margin-bottom: 2rem;
 
     h1 {
-        font-size: 28px;
+        font-size: 1.875rem;
         font-weight: 700;
-        color: #f1f5f9;
+        color: var(--text-primary);
         margin: 0;
-    }
-}
-
-.btn-primary {
-    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-    color: white;
-    border: none;
-    padding: 12px 24px;
-    border-radius: 8px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s;
-
-    &:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
     }
 }
 
 .stats-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 16px;
-    margin-bottom: 32px;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
 }
 
 .stat-card {
-    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-    border: 1px solid #334155;
+    display: flex;
+    align-items: center;
+    padding: 1.5rem;
+    gap: 1.5rem;
+    background: white;
     border-radius: 12px;
-    padding: 20px;
-    text-align: center;
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--border-color);
 
-    .stat-value {
-        font-size: 36px;
-        font-weight: 700;
-        color: #60a5fa;
+    .stat-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        background: #dbeafe;
+        color: #1e40af;
     }
 
-    .stat-label {
-        font-size: 14px;
-        color: #94a3b8;
-        margin-top: 4px;
+    .stat-content {
+        display: flex;
+        flex-direction: column;
+
+        .value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .label {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
     }
 }
 
 .section {
-    margin-bottom: 32px;
+    margin-bottom: 2rem;
 
     h2 {
-        font-size: 20px;
+        font-size: 1.25rem;
         font-weight: 600;
-        color: #f1f5f9;
-        margin-bottom: 16px;
+        color: var(--text-primary);
+        margin: 0 0 1rem 0;
     }
+}
+
+.card {
+    background: white;
+    border-radius: 16px;
+    padding: 1.5rem;
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--border-color);
 }
 
 .appointments-list {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 0.75rem;
 }
 
 .appointment-card {
     display: grid;
-    grid-template-columns: 100px 1fr 120px 180px;
-    gap: 20px;
+    grid-template-columns: 100px 1fr 140px 180px;
+    gap: 1.5rem;
     align-items: center;
-    background: #1e293b;
-    border: 1px solid #334155;
+    background: white;
+    border: 1px solid var(--border-color);
     border-radius: 12px;
-    padding: 16px 20px;
+    padding: 1rem 1.5rem;
     transition: all 0.2s;
 
     &:hover {
-        border-color: #60a5fa;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        border-color: var(--primary);
+        box-shadow: var(--shadow-sm);
     }
 
     &.checkedin {
@@ -104,7 +115,7 @@
 
     &.completed {
         opacity: 0.7;
-        border-left: 4px solid #64748b;
+        border-left: 4px solid #94a3b8;
     }
 
     &.cancelled {
@@ -117,137 +128,153 @@
     text-align: center;
 
     .time {
-        font-size: 18px;
+        font-size: 1.125rem;
         font-weight: 600;
-        color: #f1f5f9;
+        color: var(--text-primary);
     }
 
     .date {
-        font-size: 14px;
-        color: #94a3b8;
+        font-size: 0.875rem;
+        color: var(--text-secondary);
     }
 
     .duration {
-        font-size: 12px;
-        color: #64748b;
+        font-size: 0.75rem;
+        color: var(--text-secondary);
     }
 }
 
 .appointment-info {
     .patient-name {
         font-weight: 600;
-        color: #f1f5f9;
-        margin-bottom: 4px;
+        color: var(--text-primary);
+        margin-bottom: 0.25rem;
     }
 
     .appointment-type {
-        font-size: 14px;
-        color: #94a3b8;
+        font-size: 0.875rem;
+        color: var(--text-secondary);
     }
 
     .room {
-        font-size: 12px;
-        color: #64748b;
-        margin-top: 4px;
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+        margin-top: 0.25rem;
     }
 }
 
 .status-badge {
     display: inline-block;
-    padding: 6px 12px;
-    border-radius: 20px;
-    font-size: 12px;
-    font-weight: 500;
+    padding: 0.25rem 0.75rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
 
     &.scheduled {
-        background: rgba(234, 179, 8, 0.2);
-        color: #fbbf24;
+        background: #fef3c7;
+        color: #92400e;
     }
 
     &.confirmed {
-        background: rgba(59, 130, 246, 0.2);
-        color: #60a5fa;
+        background: #dbeafe;
+        color: #1e40af;
     }
 
     &.checkedin {
-        background: rgba(34, 197, 94, 0.2);
-        color: #4ade80;
+        background: #d1fae5;
+        color: #065f46;
     }
 
     &.inprogress {
-        background: rgba(168, 85, 247, 0.2);
-        color: #c084fc;
+        background: #ede9fe;
+        color: #5b21b6;
     }
 
     &.completed {
-        background: rgba(100, 116, 139, 0.2);
-        color: #94a3b8;
+        background: #f1f5f9;
+        color: #475569;
     }
 
     &.cancelled {
-        background: rgba(239, 68, 68, 0.2);
-        color: #f87171;
+        background: #fee2e2;
+        color: #991b1b;
     }
 
     &.noshow {
-        background: rgba(239, 68, 68, 0.2);
-        color: #f87171;
+        background: #fee2e2;
+        color: #991b1b;
     }
 
     &.rescheduled {
-        background: rgba(20, 184, 166, 0.2);
-        color: #2dd4bf;
+        background: #ccfbf1;
+        color: #0f766e;
     }
 }
 
 .appointment-actions {
     display: flex;
-    gap: 8px;
+    gap: 0.5rem;
     justify-content: flex-end;
 }
 
 .btn-sm {
-    padding: 6px 12px;
+    padding: 0.5rem 1rem;
     border-radius: 6px;
-    font-size: 12px;
+    font-size: 0.75rem;
     font-weight: 500;
     border: none;
     cursor: pointer;
     transition: all 0.2s;
 
     &.btn-success {
-        background: rgba(34, 197, 94, 0.2);
-        color: #4ade80;
+        background: #d1fae5;
+        color: #065f46;
 
         &:hover {
-            background: rgba(34, 197, 94, 0.3);
+            background: #a7f3d0;
         }
     }
 
     &.btn-primary {
-        background: rgba(59, 130, 246, 0.2);
-        color: #60a5fa;
+        background: #dbeafe;
+        color: #1e40af;
 
         &:hover {
-            background: rgba(59, 130, 246, 0.3);
+            background: #bfdbfe;
         }
     }
 
     &.btn-danger {
-        background: rgba(239, 68, 68, 0.2);
-        color: #f87171;
+        background: #fee2e2;
+        color: #991b1b;
 
         &:hover {
-            background: rgba(239, 68, 68, 0.3);
+            background: #fecaca;
         }
+    }
+}
+
+.btn-primary {
+    background: var(--primary);
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+
+    &:hover {
+        background: var(--primary-dark);
+        transform: translateY(-1px);
     }
 }
 
 .empty-state {
     text-align: center;
-    padding: 40px;
-    color: #64748b;
-    background: #1e293b;
+    padding: 3rem;
+    color: var(--text-secondary);
+    background: #f8fafc;
     border-radius: 12px;
 }
 
@@ -255,7 +282,7 @@
 .modal-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.7);
+    background: rgba(0, 0, 0, 0.5);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -263,43 +290,46 @@
 }
 
 .modal {
-    background: #1e293b;
-    border: 1px solid #334155;
+    background: white;
+    border: 1px solid var(--border-color);
     border-radius: 16px;
-    padding: 24px;
+    padding: 1.5rem;
     width: 100%;
     max-width: 500px;
+    box-shadow: var(--shadow-lg);
 
     h2 {
-        margin: 0 0 24px;
-        color: #f1f5f9;
+        margin: 0 0 1.5rem;
+        color: var(--text-primary);
     }
 }
 
 .form-group {
-    margin-bottom: 16px;
+    margin-bottom: 1rem;
 
     label {
         display: block;
-        font-size: 14px;
-        color: #94a3b8;
-        margin-bottom: 8px;
+        font-size: 0.875rem;
+        color: var(--text-secondary);
+        margin-bottom: 0.5rem;
+        font-weight: 500;
     }
 
     input,
     select,
     textarea {
         width: 100%;
-        padding: 12px;
-        border: 1px solid #334155;
+        padding: 0.75rem;
+        border: 1px solid var(--border-color);
         border-radius: 8px;
-        background: #0f172a;
-        color: #f1f5f9;
-        font-size: 14px;
+        background: white;
+        color: var(--text-primary);
+        font-size: 0.875rem;
 
         &:focus {
             outline: none;
-            border-color: #60a5fa;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
         }
     }
 
@@ -311,20 +341,20 @@
 
 .form-actions {
     display: flex;
-    gap: 12px;
+    gap: 1rem;
     justify-content: flex-end;
-    margin-top: 24px;
+    margin-top: 1.5rem;
 }
 
 .btn-secondary {
-    background: #334155;
-    color: #f1f5f9;
-    border: none;
-    padding: 12px 24px;
+    background: #f1f5f9;
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    padding: 0.75rem 1.5rem;
     border-radius: 8px;
     cursor: pointer;
 
     &:hover {
-        background: #475569;
+        background: #e2e8f0;
     }
 }

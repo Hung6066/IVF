@@ -13,7 +13,7 @@ import { NotificationBellComponent } from '../../shared/components/notification-
       <aside class="sidebar">
         <div class="sidebar-header">
           <span class="logo">🏥</span>
-          <h2>IVF System</h2>
+          <h2 style="color: #ffffff;">IVF System</h2>
         </div>
 
         <nav class="sidebar-nav">
@@ -263,7 +263,7 @@ import { NotificationBellComponent } from '../../shared/components/notification-
       flex: 1;
       padding: 2rem;
       overflow-y: auto;
-      background: #0f172a;
+      background: #fffff;
     }
   `]
 })
