@@ -183,37 +183,43 @@
     @if (showCreateInvoice) {
     <div class="modal-overlay" (click)="showCreateInvoice = false">
         <div class="modal-content large-modal" (click)="$event.stopPropagation()">
-            <h3>➕ Tạo hoá đơn mới</h3>
+            <div class="modal-header">
+                <h3>➕ Tạo hoá đơn mới</h3>
+                <button class="close-btn" (click)="showCreateInvoice = false">×</button>
+            </div>
+
             <form (ngSubmit)="submitInvoice()">
-                <div class="form-group">
-                    <label class="form-label">Tìm bệnh nhân *</label>
-                    <app-patient-search [(ngModel)]="newInvoice.patientSearch" name="search" [required]="true"
-                        (patientSelected)="onPatientSelect($event)"></app-patient-search>
-                </div>
-
-                <div class="invoice-items-section">
-                    <h4>Dịch vụ</h4>
-                    @for (item of newInvoice.items; track $index) {
-                    <div class="item-row">
-                        <input class="form-control" type="text" [(ngModel)]="item.name" [name]="'name'+$index"
-                            placeholder="Tên dịch vụ" />
-                        <input class="form-control qty-input" type="number" [(ngModel)]="item.qty" [name]="'qty'+$index"
-                            placeholder="SL" />
-                        <input class="form-control" type="number" [(ngModel)]="item.price" [name]="'price'+$index"
-                            placeholder="Đơn giá" />
-                        <button type="button" class="btn-icon danger" (click)="removeItem($index)">✖</button>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label class="form-label">Tìm bệnh nhân *</label>
+                        <app-patient-search [(ngModel)]="newInvoice.patientSearch" name="search" [required]="true"
+                            (patientSelected)="onPatientSelect($event)"></app-patient-search>
                     </div>
-                    }
-                    <button type="button" class="btn btn-secondary full-width" (click)="addItem()">➕ Thêm dịch
-                        vụ</button>
+
+                    <div class="invoice-items-section">
+                        <h4>Dịch vụ</h4>
+                        @for (item of newInvoice.items; track $index) {
+                        <div class="item-row">
+                            <input class="form-control" type="text" [(ngModel)]="item.name" [name]="'name'+$index"
+                                placeholder="Tên dịch vụ" />
+                            <input class="form-control qty-input" type="number" [(ngModel)]="item.qty"
+                                [name]="'qty'+$index" placeholder="SL" />
+                            <input class="form-control" type="number" [(ngModel)]="item.price" [name]="'price'+$index"
+                                placeholder="Đơn giá" />
+                            <button type="button" class="btn-icon danger" (click)="removeItem($index)">✖</button>
+                        </div>
+                        }
+                        <button type="button" class="btn btn-secondary full-width" (click)="addItem()">➕ Thêm dịch
+                            vụ</button>
+                    </div>
+
+                    <div class="total-row">
+                        <span>Tổng cộng:</span>
+                        <span class="total-value">{{ formatCurrency(calcTotal()) }}</span>
+                    </div>
                 </div>
 
-                <div class="total-row">
-                    <span>Tổng cộng:</span>
-                    <span class="total-value">{{ formatCurrency(calcTotal()) }}</span>
-                </div>
-
-                <div class="modal-actions">
+                <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" (click)="showCreateInvoice = false">Huỷ</button>
                     <button type="submit" class="btn btn-primary">Tạo hoá đơn</button>
                 </div>

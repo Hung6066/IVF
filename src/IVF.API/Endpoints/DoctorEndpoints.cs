@@ -1,3 +1,4 @@
+using IVF.Application.Features.Doctors.Commands;
 using IVF.Application.Features.Users.Queries;
 using MediatR;
 
@@ -13,6 +14,12 @@ public static class DoctorEndpoints
         {
             var result = await m.Send(new SearchDoctorsQuery(q, page, pageSize));
             return Results.Ok(result);
+        });
+
+        group.MapPost("/", async (CreateDoctorCommand cmd, IMediator m) =>
+        {
+            var result = await m.Send(cmd);
+            return result.IsSuccess ? Results.Created($"/api/doctors/{result.Value}", result.Value) : Results.BadRequest(result.Error);
         });
     }
 }

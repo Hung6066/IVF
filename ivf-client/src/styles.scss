@@ -26,11 +26,19 @@
 }
 
 body {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-family: 'Inter', system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     color: var(--text-main);
     background-color: var(--bg-light);
     margin: 0;
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+input,
+button,
+textarea,
+select {
+    font-family: inherit;
 }
 
 /* Layout & Typography */
@@ -129,7 +137,11 @@ h3 {
 }
 
 /* Buttons */
-.btn {
+.btn,
+.btn-primary,
+.btn-secondary,
+.btn-danger,
+.btn-success {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -141,6 +153,8 @@ h3 {
     transition: all 0.2s;
     border: none;
     gap: 0.5rem;
+    text-decoration: none;
+    /* In case applied to links */
 
     &:disabled {
         opacity: 0.6;
@@ -303,7 +317,13 @@ h3 {
 }
 
 /* Forms */
-.form-control {
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-control,
+.modern-input,
+.modern-select {
     width: 100%;
     padding: 0.75rem 1rem;
     border: 1px solid var(--border-color);
@@ -311,8 +331,6 @@ h3 {
     font-size: 0.9rem;
     transition: all 0.2s;
     background: var(--bg-white);
-    box-sizing: border-box;
-    /* Critical for preventing overflow */
 
     &:focus {
         outline: none;
@@ -326,7 +344,8 @@ textarea.form-control {
     resize: vertical;
 }
 
-.form-label {
+.form-label,
+label {
     display: block;
     font-size: 0.875rem;
     font-weight: 500;
@@ -335,10 +354,11 @@ textarea.form-control {
 }
 
 /* Modal */
-.modal-overlay {
+.modal-overlay,
+.modal-backdrop {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.5);
+    background: rgba(15, 23, 42, 0.6);
     backdrop-filter: blur(4px);
     display: flex;
     align-items: center;
@@ -347,23 +367,30 @@ textarea.form-control {
     animation: fadeIn 0.2s ease-out;
 }
 
-.modal-content {
+.modal-content,
+.modal-card {
     background: white;
     border-radius: 16px;
-    padding: 2rem;
+    padding: 0;
     width: 100%;
-    max-width: 500px;
+    max-width: 550px;
     box-shadow: var(--shadow-lg);
+    animation: slideUp 0.3s ease-out;
+    border: 1px solid var(--border-color);
+    overflow: hidden;
 
     .modal-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 1.5rem;
+        padding: 1.5rem;
+        background: var(--bg-card);
+        border-bottom: 1px solid var(--border-color);
 
+        h2,
         h3 {
             margin: 0;
-            color: var(--text-primary);
+            color: var(--text-main);
             font-size: 1.25rem;
         }
 
@@ -385,7 +412,22 @@ textarea.form-control {
         }
     }
 
-    animation: slideUp 0.3s ease-out;
+    .modal-body,
+    form {
+        padding: 1.5rem;
+    }
+
+    .modal-footer,
+    .form-actions {
+        padding: 1.25rem 1.5rem;
+        background: var(--bg-card);
+        border-top: 1px solid var(--border-color);
+        display: flex;
+        justify-content: flex-end;
+        gap: 1rem;
+        margin: 0;
+        /* Override default if any */
+    }
 }
 
 @keyframes fadeIn {
@@ -411,6 +453,16 @@ textarea.form-control {
 }
 
 /* Grid Layouts */
+.form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+
+    .full-width {
+        grid-column: span 2;
+    }
+}
+
 .grid-4 {
     display: grid;
     grid-template-columns: repeat(4, 1fr);

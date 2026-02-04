@@ -9,6 +9,7 @@ public interface IDoctorRepository
     Task<IReadOnlyList<Doctor>> GetBySpecialtyAsync(string specialty, CancellationToken ct = default);
     Task<IReadOnlyList<Doctor>> GetAvailableAsync(CancellationToken ct = default);
     Task<IReadOnlyList<Doctor>> GetAllAsync(CancellationToken ct = default);
+    Task<IReadOnlyList<Doctor>> SearchAsync(string? search, int page, int pageSize, CancellationToken ct = default);
     Task<Doctor> AddAsync(Doctor doctor, CancellationToken ct = default);
     Task UpdateAsync(Doctor doctor, CancellationToken ct = default);
 }

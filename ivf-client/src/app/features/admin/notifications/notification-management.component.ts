@@ -127,41 +127,53 @@ import { ApiService, Notification, NotificationType, CreateNotificationRequest, 
       <!-- Create Notification Modal -->
       @if (showCreateModal) {
         <div class="modal-overlay" (click)="showCreateModal = false">
-          <div class="modal" (click)="$event.stopPropagation()">
-            <h2>Tạo thông báo mới</h2>
+          <div class="modal-content" (click)="$event.stopPropagation()">
+            <div class="modal-header">
+              <h2>Tạo thông báo mới</h2>
+              <button class="close-btn" (click)="showCreateModal = false">×</button>
+            </div>
+            
             <form (ngSubmit)="createNotification()">
-              <div class="form-group">
-                <label>User ID</label>
-                <input [(ngModel)]="newNotification.userId" name="userId" required placeholder="ID người nhận">
+              <div class="modal-body">
+                <div class="form-grid">
+                  <div class="form-group">
+                    <label>User ID</label>
+                    <input class="form-control" [(ngModel)]="newNotification.userId" name="userId" required placeholder="ID người nhận">
+                  </div>
+                  <div class="form-group">
+                    <label>Loại thông báo</label>
+                    <select class="form-control" [(ngModel)]="newNotification.type" name="type" required>
+                      <option value="Info">Thông tin</option>
+                      <option value="Success">Thành công</option>
+                      <option value="Warning">Cảnh báo</option>
+                      <option value="Error">Lỗi</option>
+                      <option value="AppointmentReminder">Nhắc lịch hẹn</option>
+                      <option value="QueueCalled">Gọi số</option>
+                      <option value="CycleUpdate">Cập nhật chu kỳ</option>
+                      <option value="PaymentDue">Thanh toán</option>
+                    </select>
+                  </div>
+                  
+                  <div class="form-group full-width">
+                    <label>Tiêu đề</label>
+                    <input class="form-control" [(ngModel)]="newNotification.title" name="title" required>
+                  </div>
+                  
+                  <div class="form-group full-width">
+                    <label>Nội dung</label>
+                    <textarea class="form-control" [(ngModel)]="newNotification.message" name="message" required rows="3"></textarea>
+                  </div>
+
+                  <div class="form-group full-width">
+                    <label>Link (tùy chọn)</label>
+                    <input class="form-control" [(ngModel)]="newNotification.actionUrl" name="actionUrl" placeholder="/path/to/page">
+                  </div>
+                </div>
               </div>
-              <div class="form-group">
-                <label>Tiêu đề</label>
-                <input [(ngModel)]="newNotification.title" name="title" required>
-              </div>
-              <div class="form-group">
-                <label>Nội dung</label>
-                <textarea [(ngModel)]="newNotification.message" name="message" required rows="3"></textarea>
-              </div>
-              <div class="form-group">
-                <label>Loại thông báo</label>
-                <select [(ngModel)]="newNotification.type" name="type" required>
-                  <option value="Info">Thông tin</option>
-                  <option value="Success">Thành công</option>
-                  <option value="Warning">Cảnh báo</option>
-                  <option value="Error">Lỗi</option>
-                  <option value="AppointmentReminder">Nhắc lịch hẹn</option>
-                  <option value="QueueCalled">Gọi số</option>
-                  <option value="CycleUpdate">Cập nhật chu kỳ</option>
-                  <option value="PaymentDue">Thanh toán</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label>Link (tùy chọn)</label>
-                <input [(ngModel)]="newNotification.actionUrl" name="actionUrl" placeholder="/path/to/page">
-              </div>
-              <div class="form-actions">
+
+              <div class="modal-footer">
                 <button type="button" class="btn-secondary" (click)="showCreateModal = false">Hủy</button>
-                <button type="submit" class="btn-primary">Tạo</button>
+                <button type="submit" class="btn-primary">Tạo thông báo</button>
               </div>
             </form>
           </div>
@@ -171,40 +183,52 @@ import { ApiService, Notification, NotificationType, CreateNotificationRequest, 
       <!-- Broadcast Notification Modal -->
       @if (showBroadcastModal) {
         <div class="modal-overlay" (click)="showBroadcastModal = false">
-          <div class="modal" (click)="$event.stopPropagation()">
-            <h2>📢 Phát thông báo đến tất cả</h2>
+          <div class="modal-content" (click)="$event.stopPropagation()">
+            <div class="modal-header">
+              <h2>📢 Phát thông báo</h2>
+              <button class="close-btn" (click)="showBroadcastModal = false">×</button>
+            </div>
+
             <form (ngSubmit)="broadcastNotification()">
-              <div class="form-group">
-                <label>Tiêu đề</label>
-                <input [(ngModel)]="broadcastData.title" name="title" required>
+              <div class="modal-body">
+                <div class="form-grid">
+                  <div class="form-group full-width">
+                    <label>Tiêu đề</label>
+                    <input class="form-control" [(ngModel)]="broadcastData.title" name="title" required>
+                  </div>
+                  
+                  <div class="form-group full-width">
+                    <label>Nội dung</label>
+                    <textarea class="form-control" [(ngModel)]="broadcastData.message" name="message" required rows="3"></textarea>
+                  </div>
+
+                  <div class="form-group">
+                    <label>Loại thông báo</label>
+                    <select class="form-control" [(ngModel)]="broadcastData.type" name="type" required>
+                      <option value="Info">Thông tin</option>
+                      <option value="Success">Thành công</option>
+                      <option value="Warning">Cảnh báo</option>
+                      <option value="Error">Lỗi</option>
+                    </select>
+                  </div>
+
+                  <div class="form-group">
+                    <label>Nhóm người nhận</label>
+                    <select class="form-control" [(ngModel)]="broadcastData.role" name="role">
+                      <option value="">Tất cả người dùng</option>
+                      <option value="Admin">Admin</option>
+                      <option value="Doctor">Bác sĩ</option>
+                      <option value="Nurse">Y tá</option>
+                      <option value="Receptionist">Lễ tân</option>
+                      <option value="LabTechnician">Kỹ thuật viên</option>
+                    </select>
+                  </div>
+                </div>
               </div>
-              <div class="form-group">
-                <label>Nội dung</label>
-                <textarea [(ngModel)]="broadcastData.message" name="message" required rows="3"></textarea>
-              </div>
-              <div class="form-group">
-                <label>Loại thông báo</label>
-                <select [(ngModel)]="broadcastData.type" name="type" required>
-                  <option value="Info">Thông tin</option>
-                  <option value="Success">Thành công</option>
-                  <option value="Warning">Cảnh báo</option>
-                  <option value="Error">Lỗi</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label>Role (tùy chọn)</label>
-                <select [(ngModel)]="broadcastData.role" name="role">
-                  <option value="">Tất cả người dùng</option>
-                  <option value="Admin">Admin</option>
-                  <option value="Doctor">Bác sĩ</option>
-                  <option value="Nurse">Y tá</option>
-                  <option value="Receptionist">Lễ tân</option>
-                  <option value="LabTechnician">Kỹ thuật viên</option>
-                </select>
-              </div>
-              <div class="form-actions">
+
+              <div class="modal-footer">
                 <button type="button" class="btn-secondary" (click)="showBroadcastModal = false">Hủy</button>
-                <button type="submit" class="btn-primary">Phát thông báo</button>
+                <button type="submit" class="btn-primary">Phát</button>
               </div>
             </form>
           </div>
@@ -514,36 +538,7 @@ import { ApiService, Notification, NotificationType, CreateNotificationRequest, 
       color: var(--text-secondary);
     }
 
-    .modal-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.5);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 1000;
-    }
 
-    .modal {
-      background: white;
-      border-radius: 16px;
-      padding: 1.5rem;
-      width: 100%;
-      max-width: 500px;
-      box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
-    }
-
-    .modal h2 {
-      margin: 0 0 1.5rem;
-      color: var(--text-primary);
-    }
-
-    .form-actions {
-      display: flex;
-      gap: 1rem;
-      justify-content: flex-end;
-      margin-top: 1.5rem;
-    }
 
     .toast {
       position: fixed;

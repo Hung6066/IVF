@@ -5,10 +5,10 @@ import { Router } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
 
 @Component({
-    selector: 'app-login',
-    standalone: true,
-    imports: [CommonModule, FormsModule],
-    template: `
+  selector: 'app-login',
+  standalone: true,
+  imports: [CommonModule, FormsModule],
+  template: `
     <div class="login-container">
       <div class="login-card">
         <div class="login-header">
@@ -63,7 +63,7 @@ import { AuthService } from '../../core/services/auth.service';
       </div>
     </div>
   `,
-    styles: [`
+  styles: [`
     .login-container {
       min-height: 100vh;
       display: flex;
@@ -71,31 +71,72 @@ import { AuthService } from '../../core/services/auth.service';
       justify-content: center;
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       padding: 1rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Abstract Background Shapes */
+    .login-container::before {
+        content: '';
+        position: absolute;
+        width: 300px;
+        height: 300px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 50%;
+        top: -50px;
+        left: -50px;
+        z-index: 0;
+    }
+    
+    .login-container::after {
+        content: '';
+        position: absolute;
+        width: 250px;
+        height: 250px;
+        background: rgba(255, 255, 255, 0.15);
+        border-radius: 50%;
+        bottom: -50px;
+        right: -50px;
+        z-index: 0;
     }
 
     .login-card {
-      background: white;
-      border-radius: 16px;
-      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-      padding: 2.5rem;
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-radius: 24px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+      padding: 3rem;
       width: 100%;
-      max-width: 400px;
+      max-width: 420px;
+      position: relative;
+      z-index: 1;
+      border: 1px solid rgba(255, 255, 255, 0.5);
+      animation: slideUp 0.5s ease-out;
+    }
+
+    @keyframes slideUp {
+        from { transform: translateY(20px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
     }
 
     .login-header {
       text-align: center;
-      margin-bottom: 2rem;
+      margin-bottom: 2.5rem;
     }
 
     .logo {
-      font-size: 3rem;
+      font-size: 3.5rem;
       margin-bottom: 0.5rem;
+      filter: drop-shadow(0 4px 6px rgba(0,0,0,0.1));
     }
 
     .login-header h1 {
       font-size: 1.5rem;
+      font-weight: 700;
       color: #1a1a2e;
       margin: 0 0 0.5rem;
+      letter-spacing: -0.5px;
     }
 
     .login-header p {
@@ -120,46 +161,46 @@ import { AuthService } from '../../core/services/auth.service';
       font-size: 0.875rem;
       font-weight: 500;
       color: #374151;
+      margin-left: 0.25rem;
     }
 
     .form-group input {
-      padding: 0.75rem 1rem;
-      border: 1px solid #d1d5db;
-      border-radius: 8px;
+      padding: 0.875rem 1rem;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
       font-size: 1rem;
-      transition: border-color 0.2s, box-shadow 0.2s;
+      transition: all 0.2s;
+      background: rgba(255, 255, 255, 0.8);
     }
 
     .form-group input:focus {
       outline: none;
       border-color: #667eea;
-      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
-    }
-
-    .form-group input:disabled {
-      background: #f3f4f6;
-      cursor: not-allowed;
+      box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.15);
+      background: white;
     }
 
     .btn-login {
-      padding: 0.875rem;
+      padding: 1rem;
+      margin-top: 1rem;
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: white;
       border: none;
-      border-radius: 8px;
+      border-radius: 12px;
       font-size: 1rem;
       font-weight: 600;
       cursor: pointer;
-      transition: transform 0.2s, box-shadow 0.2s;
+      transition: all 0.3s;
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 0.5rem;
+      box-shadow: 0 4px 6px -1px rgba(102, 126, 234, 0.4);
     }
 
     .btn-login:hover:not(:disabled) {
-      transform: translateY(-1px);
-      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+      transform: translateY(-2px);
+      box-shadow: 0 10px 15px -3px rgba(102, 126, 234, 0.5);
     }
 
     .btn-login:disabled {
@@ -168,8 +209,8 @@ import { AuthService } from '../../core/services/auth.service';
     }
 
     .spinner {
-      width: 16px;
-      height: 16px;
+      width: 20px;
+      height: 20px;
       border: 2px solid rgba(255, 255, 255, 0.3);
       border-top-color: white;
       border-radius: 50%;
@@ -185,12 +226,15 @@ import { AuthService } from '../../core/services/auth.service';
       border: 1px solid #fecaca;
       color: #dc2626;
       padding: 0.75rem 1rem;
-      border-radius: 8px;
+      border-radius: 12px;
       font-size: 0.875rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
     }
 
     .login-footer {
-      margin-top: 2rem;
+      margin-top: 2.5rem;
       text-align: center;
     }
 
@@ -202,30 +246,30 @@ import { AuthService } from '../../core/services/auth.service';
   `]
 })
 export class LoginComponent {
-    username = '';
-    password = '';
-    loading = signal(false);
-    error = signal<string | null>(null);
+  username = '';
+  password = '';
+  loading = signal(false);
+  error = signal<string | null>(null);
 
-    constructor(private authService: AuthService, private router: Router) { }
+  constructor(private authService: AuthService, private router: Router) { }
 
-    onSubmit(): void {
-        if (!this.username || !this.password) {
-            this.error.set('Vui lòng nhập đầy đủ thông tin');
-            return;
-        }
-
-        this.loading.set(true);
-        this.error.set(null);
-
-        this.authService.login({ username: this.username, password: this.password }).subscribe({
-            next: () => {
-                this.router.navigate(['/dashboard']);
-            },
-            error: (err) => {
-                this.loading.set(false);
-                this.error.set(err.status === 401 ? 'Sai tên đăng nhập hoặc mật khẩu' : 'Lỗi kết nối máy chủ');
-            }
-        });
+  onSubmit(): void {
+    if (!this.username || !this.password) {
+      this.error.set('Vui lòng nhập đầy đủ thông tin');
+      return;
     }
+
+    this.loading.set(true);
+    this.error.set(null);
+
+    this.authService.login({ username: this.username, password: this.password }).subscribe({
+      next: () => {
+        this.router.navigate(['/dashboard']);
+      },
+      error: (err) => {
+        this.loading.set(false);
+        this.error.set(err.status === 401 ? 'Sai tên đăng nhập hoặc mật khẩu' : 'Lỗi kết nối máy chủ');
+      }
+    });
+  }
 }

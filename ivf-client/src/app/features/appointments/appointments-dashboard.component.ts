@@ -109,54 +109,67 @@ import { DoctorSearchComponent } from '../../shared/components/doctor-search/doc
       <!-- Create Modal -->
       @if (showCreateForm) {
         <div class="modal-overlay" (click)="showCreateForm = false">
-          <div class="modal" (click)="$event.stopPropagation()">
-            <h2>Tạo lịch hẹn mới</h2>
+          <div class="modal-content" (click)="$event.stopPropagation()">
+            <div class="modal-header">
+              <h2>Tạo lịch hẹn mới</h2>
+              <button class="close-btn" (click)="showCreateForm = false">×</button>
+            </div>
+            
             <form (ngSubmit)="createAppointment()">
-              <div class="form-group">
-                <label>Bệnh nhân</label>
-                <app-patient-search 
-                  [(ngModel)]="newAppointment.patientId" 
-                  name="patientId" 
-                  [required]="true"
-                  (patientSelected)="onPatientSelected($event)">
-                </app-patient-search>
+              <div class="form-grid">
+                <div class="form-group full-width">
+                  <label>Bệnh nhân</label>
+                  <app-patient-search 
+                    [(ngModel)]="newAppointment.patientId" 
+                    name="patientId" 
+                    [required]="true"
+                    (patientSelected)="onPatientSelected($event)">
+                  </app-patient-search>
+                </div>
+
+                <div class="form-group">
+                  <label>Ngày giờ</label>
+                  <input class="form-control" type="datetime-local" [(ngModel)]="newAppointment.scheduledAt" name="scheduledAt" required>
+                </div>
+
+                <div class="form-group">
+                  <label>Loại lịch hẹn</label>
+                  <select class="form-control" [(ngModel)]="newAppointment.type" name="type" required>
+                    <option value="Consultation">Tư vấn</option>
+                    <option value="Ultrasound">Siêu âm</option>
+                    <option value="Injection">Tiêm</option>
+                    <option value="EggRetrieval">Chọc hút</option>
+                    <option value="EmbryoTransfer">Chuyển phôi</option>
+                    <option value="LabTest">Xét nghiệm</option>
+                    <option value="SemenCollection">Lấy tinh dịch</option>
+                    <option value="FollowUp">Tái khám</option>
+                  </select>
+                </div>
+
+                <div class="form-group full-width">
+                  <label>Bác sĩ (tùy chọn)</label>
+                  <app-doctor-search [(ngModel)]="newAppointment.doctorId" name="doctorId"></app-doctor-search>
+                </div>
+
+                <div class="form-group">
+                  <label>Thời lượng (phút)</label>
+                  <input class="form-control" type="number" [(ngModel)]="newAppointment.durationMinutes" name="duration" value="30">
+                </div>
+
+                <div class="form-group">
+                  <label>Phòng</label>
+                  <input class="form-control" [(ngModel)]="newAppointment.roomNumber" name="roomNumber">
+                </div>
+
+                <div class="form-group full-width">
+                  <label>Ghi chú</label>
+                  <textarea class="form-control" [(ngModel)]="newAppointment.notes" name="notes"></textarea>
+                </div>
               </div>
-              <div class="form-group">
-                <label>Ngày giờ</label>
-                <input type="datetime-local" [(ngModel)]="newAppointment.scheduledAt" name="scheduledAt" required>
-              </div>
-              <div class="form-group">
-                <label>Loại lịch hẹn</label>
-                <select [(ngModel)]="newAppointment.type" name="type" required>
-                  <option value="Consultation">Tư vấn</option>
-                  <option value="Ultrasound">Siêu âm</option>
-                  <option value="Injection">Tiêm</option>
-                  <option value="EggRetrieval">Chọc hút</option>
-                  <option value="EmbryoTransfer">Chuyển phôi</option>
-                  <option value="LabTest">Xét nghiệm</option>
-                  <option value="SemenCollection">Lấy tinh dịch</option>
-                  <option value="FollowUp">Tái khám</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label>Bác sĩ (tùy chọn)</label>
-                <app-doctor-search [(ngModel)]="newAppointment.doctorId" name="doctorId"></app-doctor-search>
-              </div>
-              <div class="form-group">
-                <label>Thời lượng (phút)</label>
-                <input type="number" [(ngModel)]="newAppointment.durationMinutes" name="duration" value="30">
-              </div>
-              <div class="form-group">
-                <label>Phòng</label>
-                <input [(ngModel)]="newAppointment.roomNumber" name="roomNumber">
-              </div>
-              <div class="form-group">
-                <label>Ghi chú</label>
-                <textarea [(ngModel)]="newAppointment.notes" name="notes"></textarea>
-              </div>
+
               <div class="form-actions">
                 <button type="button" class="btn-secondary" (click)="showCreateForm = false">Hủy</button>
-                <button type="submit" class="btn-primary">Tạo</button>
+                <button type="submit" class="btn-primary">Tạo lịch hẹn</button>
               </div>
             </form>
           </div>

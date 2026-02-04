@@ -169,43 +169,48 @@
     @if (showNewImport) {
     <div class="modal-overlay" (click)="showNewImport = false">
         <div class="modal-content large-modal" (click)="$event.stopPropagation()">
-            <h3>➕ Nhập kho mới</h3>
+            <div class="modal-header">
+                <h2>➕ Nhập kho mới</h2>
+                <button class="close-btn" (click)="showNewImport = false">×</button>
+            </div>
             <form (ngSubmit)="submitImport()">
-                <div class="form-row">
-                    <div class="form-group">
-                        <label class="form-label">Nhà cung cấp *</label>
-                        <input class="form-control" type="text" [(ngModel)]="newImport.supplier" name="supplier"
-                            required />
+                <div class="modal-body">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label class="form-label">Nhà cung cấp *</label>
+                            <input class="form-control" type="text" [(ngModel)]="newImport.supplier" name="supplier"
+                                required />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Ngày nhập</label>
+                            <input class="form-control" type="date" [(ngModel)]="newImport.date" name="date" />
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label class="form-label">Ngày nhập</label>
-                        <input class="form-control" type="date" [(ngModel)]="newImport.date" name="date" />
+
+                    <div class="inventory-list">
+                        <h4>Danh sách thuốc</h4>
+                        @for (item of newImport.items; track $index) {
+                        <div class="item-row">
+                            <input class="form-control" type="text" [(ngModel)]="item.name" [name]="'name'+$index"
+                                placeholder="Tên thuốc" />
+                            <input class="form-control qty-input" type="number" [(ngModel)]="item.qty"
+                                [name]="'qty'+$index" placeholder="SL" />
+                            <input class="form-control" type="number" [(ngModel)]="item.price" [name]="'price'+$index"
+                                placeholder="Đơn giá" />
+                            <button type="button" class="btn-icon danger" (click)="removeImportItem($index)">✖</button>
+                        </div>
+                        }
+                        <button type="button" class="btn btn-secondary full-width" (click)="addImportItem()">➕ Thêm
+                            thuốc</button>
+                    </div>
+
+                    <div class="total-row">
+                        <span>Tổng tiền:</span>
+                        <span class="total-value">{{ formatCurrency(calcImportTotal()) }}</span>
                     </div>
                 </div>
 
-                <div class="inventory-list">
-                    <h4>Danh sách thuốc</h4>
-                    @for (item of newImport.items; track $index) {
-                    <div class="item-row">
-                        <input class="form-control" type="text" [(ngModel)]="item.name" [name]="'name'+$index"
-                            placeholder="Tên thuốc" />
-                        <input class="form-control qty-input" type="number" [(ngModel)]="item.qty" [name]="'qty'+$index"
-                            placeholder="SL" />
-                        <input class="form-control" type="number" [(ngModel)]="item.price" [name]="'price'+$index"
-                            placeholder="Đơn giá" />
-                        <button type="button" class="btn-icon danger" (click)="removeImportItem($index)">✖</button>
-                    </div>
-                    }
-                    <button type="button" class="btn btn-secondary full-width" (click)="addImportItem()">➕ Thêm
-                        thuốc</button>
-                </div>
-
-                <div class="total-row">
-                    <span>Tổng tiền:</span>
-                    <span class="total-value">{{ formatCurrency(calcImportTotal()) }}</span>
-                </div>
-
-                <div class="modal-actions">
+                <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" (click)="showNewImport = false">Huỷ</button>
                     <button type="submit" class="btn btn-primary">Lưu phiếu nhập</button>
                 </div>

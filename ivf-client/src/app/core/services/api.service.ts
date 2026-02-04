@@ -45,6 +45,10 @@ export class ApiService {
         return this.http.get<any[]>(`${this.baseUrl}/doctors`, { params });
     }
 
+    createDoctor(data: { userId: string, specialty: string, licenseNumber?: string, roomNumber?: string, maxPatientsPerDay?: number }): Observable<any> {
+        return this.http.post(`${this.baseUrl}/doctors`, data);
+    }
+
     // ==================== USERS / ADMIN ====================
     getUsers(search?: string, role?: string, isActive?: boolean, page = 1, pageSize = 20): Observable<any> {
         let params = new HttpParams().set('page', page).set('pageSize', pageSize);

@@ -41,6 +41,23 @@ public class DoctorRepository : IDoctorRepository
             .ThenBy(d => d.User.FullName)
             .ToListAsync(ct);
 
+    public async Task<IReadOnlyList<Doctor>> SearchAsync(string? search, int page, int pageSize, CancellationToken ct = default)
+    {
+        var query = _context.Doctors.Include(d => d.User).AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.ToLower();
+            query = query.Where(d => d.User.FullName.ToLower().Contains(term));
+        }
+
+        return await query
+            .OrderBy(d => d.User.FullName)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(ct);
+    }
+
     public async Task<Doctor> AddAsync(Doctor doctor, CancellationToken ct = default)
     {
         await _context.Doctors.AddAsync(doctor, ct);

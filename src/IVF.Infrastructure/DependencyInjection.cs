@@ -50,6 +50,9 @@ public static class DependencyInjection
         services.AddScoped<IAuditLogRepository, AuditLogRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 
+        // Register Services
+        services.AddScoped<INotificationService, Services.NotificationService>();
+
         return services;
     }
 }

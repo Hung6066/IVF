@@ -42,7 +42,7 @@ public static class AppointmentEndpoints
             Results.Ok(await repo.GetByDoctorAsync(doctorId, date ?? DateTime.UtcNow.Date)));
 
         // Create appointment
-        group.MapPost("/", async (CreateAppointmentRequest req, IAppointmentRepository repo, IUnitOfWork uow) =>
+        group.MapPost("/", async (CreateAppointmentRequest req, IAppointmentRepository repo, IUnitOfWork uow, IDoctorRepository docRepo, INotificationService notifService) =>
         {
             if (req.DoctorId.HasValue)
             {
@@ -63,8 +63,20 @@ public static class AppointmentEndpoints
 
             await repo.AddAsync(apt);
             await uow.SaveChangesAsync();
+            
+            // Send Notification to Doctor
+            if (req.DoctorId.HasValue)
+            {
+                var doctor = await docRepo.GetByIdAsync(req.DoctorId.Value);
+                if (doctor != null)
+                {
+                    await notifService.SendAppointmentReminderAsync(doctor.UserId, apt.Id, req.ScheduledAt);
+                }
+            }
+
             return Results.Created($"/api/appointments/{apt.Id}", apt);
         });
+
 
         // Confirm appointment
         group.MapPost("/{id:guid}/confirm", async (Guid id, IAppointmentRepository repo, IUnitOfWork uow) =>

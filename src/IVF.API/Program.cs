@@ -20,6 +20,7 @@ builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(options =>
 {
     options.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+    options.SerializerOptions.Converters.Add(new IVF.API.Converters.UtcDateTimeConverter());
 });
 
 // JWT Authentication
@@ -39,6 +40,21 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidAudience = jwtSettings["Audience"],
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey)),
             ClockSkew = TimeSpan.Zero
+        };
+
+        // Support SignalR authentication via query string token
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                var accessToken = context.Request.Query["access_token"];
+                var path = context.HttpContext.Request.Path;
+                if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs"))
+                {
+                    context.Token = accessToken;
+                }
+                return Task.CompletedTask;
+            }
         };
     });
 
@@ -139,8 +155,9 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.UseRateLimiter(); // Enable Rate Limiting
 
-// SignalR Hub
+// SignalR Hubs
 app.MapHub<IVF.API.Hubs.QueueHub>("/hubs/queue");
+app.MapHub<IVF.API.Hubs.NotificationHub>("/hubs/notifications");
 
 // Register Endpoints
 app.MapAuthEndpoints();

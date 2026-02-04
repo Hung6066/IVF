@@ -1,13 +1,15 @@
-import { Component } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule } from '@angular/router';
+import { RouterModule, Router } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
+import { SignalRService } from '../../core/services/signalr.service';
 import { NotificationBellComponent } from '../../shared/components/notification-bell/notification-bell.component';
+import { ToastNotificationComponent } from '../../shared/components/toast-notification/toast-notification.component';
 
 @Component({
   selector: 'app-main-layout',
   standalone: true,
-  imports: [CommonModule, RouterModule, NotificationBellComponent],
+  imports: [CommonModule, RouterModule, NotificationBellComponent, ToastNotificationComponent],
   template: `
     <div class="layout">
       <aside class="sidebar">
@@ -104,6 +106,16 @@ import { NotificationBellComponent } from '../../shared/components/notification-
           <router-outlet></router-outlet>
         </main>
       </div>
+
+      <!-- Toast Notifications -->
+      <app-toast-notification
+        [show]="showToast"
+        [title]="toastTitle"
+        [message]="toastMessage"
+        [type]="toastType"
+        (dismissed)="dismissToast()"
+        (clicked)="handleToastClick()"
+      ></app-toast-notification>
     </div>
   `,
   styles: [`
@@ -278,8 +290,73 @@ import { NotificationBellComponent } from '../../shared/components/notification-
     }
   `]
 })
-export class MainLayoutComponent {
-  constructor(public authService: AuthService) { }
+export class MainLayoutComponent implements OnInit, OnDestroy {
+  showToast = false;
+  toastTitle = '';
+  toastMessage = '';
+  toastType = '';
+  private currentNotification: any = null;
+
+  constructor(
+    public authService: AuthService,
+    private signalRService: SignalRService,
+    private router: Router
+  ) { }
+
+  async ngOnInit() {
+    const token = localStorage.getItem('token');
+    if (token) {
+      await this.initializeSignalR(token);
+    }
+  }
+
+  async ngOnDestroy() {
+    await this.signalRService.stopConnections();
+  }
+
+  private async initializeSignalR(token: string) {
+    try {
+      await this.signalRService.startNotificationConnection(token);
+      await this.signalRService.startQueueConnection(token);
+
+      this.signalRService.notification$.subscribe(notification => {
+        if (notification) {
+          this.displayToast(notification);
+        }
+      });
+    } catch (error) {
+      console.error('SignalR initialization error:', error);
+    }
+  }
+
+  private displayToast(notification: any) {
+    this.currentNotification = notification;
+    this.toastTitle = notification.title;
+    this.toastMessage = notification.message;
+    this.toastType = notification.type;
+    this.showToast = true;
+    setTimeout(() => this.dismissToast(), 5000);
+  }
+
+  dismissToast() {
+    this.showToast = false;
+  }
+
+  handleToastClick() {
+    if (this.currentNotification?.entityType) {
+      const routes: Record<string, string> = {
+        'Appointment': '/appointments',
+        'Invoice': '/billing',
+        'TreatmentCycle': '/couples',
+        'QueueTicket': '/queue/US'
+      };
+      const route = routes[this.currentNotification.entityType];
+      if (route) {
+        this.router.navigate([route]);
+        this.dismissToast();
+      }
+    }
+  }
 
   getUserInitials(): string {
     const name = this.authService.user()?.fullName || '';

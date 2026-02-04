@@ -26,21 +26,12 @@ public static class AuditEndpoints
             string? entityType,
             string? action,
             Guid? userId,
-            string? from = null,
-            string? to = null,
+            DateTime? from,
+            DateTime? to,
             int page = 1,
             int pageSize = 50) =>
         {
-            DateTime? fromDate = null;
-            DateTime? toDate = null;
-
-            if (!string.IsNullOrEmpty(from) && DateTime.TryParse(from, out var f))
-                fromDate = DateTime.SpecifyKind(f, DateTimeKind.Utc);
-            
-            if (!string.IsNullOrEmpty(to) && DateTime.TryParse(to, out var t))
-                toDate = DateTime.SpecifyKind(t, DateTimeKind.Utc);
-
-            var logs = await repo.SearchAsync(entityType, action, userId, fromDate, toDate, page, pageSize);
+            var logs = await repo.SearchAsync(entityType, action, userId, from, to, page, pageSize);
             return Results.Ok(logs);
         });
     }

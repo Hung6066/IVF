@@ -10,16 +10,16 @@ public record DoctorDto(Guid Id, string FullName, string? Department, string? Ph
 
 public class SearchDoctorsQueryHandler : IRequestHandler<SearchDoctorsQuery, List<DoctorDto>>
 {
-    private readonly IUserRepository _repo;
+    private readonly IDoctorRepository _repo;
 
-    public SearchDoctorsQueryHandler(IUserRepository repo)
+    public SearchDoctorsQueryHandler(IDoctorRepository repo)
     {
         _repo = repo;
     }
 
     public async Task<List<DoctorDto>> Handle(SearchDoctorsQuery request, CancellationToken cancellationToken)
     {
-        var users = await _repo.GetUsersByRoleAsync("Doctor", request.Search, request.Page, request.PageSize, cancellationToken);
-        return users.Select(u => new DoctorDto(u.Id, u.FullName, u.Department, null)).ToList(); // User entity might not have Phone exposed easily? I saw Patient has phone. User?
+        var doctors = await _repo.SearchAsync(request.Search, request.Page, request.PageSize, cancellationToken);
+        return doctors.Select(d => new DoctorDto(d.Id, d.User.FullName, d.Specialty, null)).ToList();
     }
 }

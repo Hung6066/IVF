@@ -27,11 +27,15 @@ public class AppointmentRepository : IAppointmentRepository
             .ToListAsync(ct);
 
     public async Task<IReadOnlyList<Appointment>> GetByDoctorAsync(Guid doctorId, DateTime date, CancellationToken ct = default)
-        => await _context.Appointments
+    {
+        // Use range to capture full day based on client provided date (which implies start of their day)
+        var nextDay = date.AddDays(1);
+        return await _context.Appointments
             .Include(a => a.Patient)
-            .Where(a => a.DoctorId == doctorId && a.ScheduledAt.Date == date.Date)
+            .Where(a => a.DoctorId == doctorId && a.ScheduledAt >= date && a.ScheduledAt < nextDay)
             .OrderBy(a => a.ScheduledAt)
             .ToListAsync(ct);
+    }
 
     public async Task<IReadOnlyList<Appointment>> GetByDateRangeAsync(DateTime start, DateTime end, CancellationToken ct = default)
         => await _context.Appointments

@@ -156,42 +156,49 @@
     @if (showNewDonor) {
     <div class="modal-overlay" (click)="showNewDonor = false">
         <div class="modal-content" (click)="$event.stopPropagation()">
-            <h3>➕ Đăng ký người hiến mới</h3>
+            <div class="modal-header">
+                <h2>➕ Đăng ký người hiến mới</h2>
+                <button class="close-btn" (click)="showNewDonor = false">×</button>
+            </div>
             <form (ngSubmit)="submitDonor()">
-                <div class="form-row">
-                    <div class="form-group">
-                        <label class="form-label">Nhóm máu *</label>
-                        <select class="form-control" [(ngModel)]="newDonor.bloodType" name="blood" required>
-                            <option value="">Chọn...</option>
-                            <option value="A+">A+</option>
-                            <option value="A-">A-</option>
-                            <option value="B+">B+</option>
-                            <option value="B-">B-</option>
-                            <option value="O+">O+</option>
-                            <option value="O-">O-</option>
-                            <option value="AB+">AB+</option>
-                            <option value="AB-">AB-</option>
-                        </select>
+                <div class="modal-body">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label class="form-label">Nhóm máu *</label>
+                            <select class="form-control" [(ngModel)]="newDonor.bloodType" name="blood" required>
+                                <option value="">Chọn...</option>
+                                <option value="A+">A+</option>
+                                <option value="A-">A-</option>
+                                <option value="B+">B+</option>
+                                <option value="B-">B-</option>
+                                <option value="O+">O+</option>
+                                <option value="O-">O-</option>
+                                <option value="AB+">AB+</option>
+                                <option value="AB-">AB-</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Tuổi *</label>
+                            <input class="form-control" type="number" [(ngModel)]="newDonor.age" name="age" required
+                                min="18" max="45" />
+                        </div>
+                    </div>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label class="form-label">Chiều cao (cm)</label>
+                            <input class="form-control" type="number" [(ngModel)]="newDonor.height" name="height" />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Trình độ học vấn</label>
+                            <input class="form-control" type="text" [(ngModel)]="newDonor.education" name="edu" />
+                        </div>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Tuổi *</label>
-                        <input class="form-control" type="number" [(ngModel)]="newDonor.age" name="age" required
-                            min="18" max="45" />
+                        <label class="form-label">Ghi chú</label>
+                        <textarea class="form-control" [(ngModel)]="newDonor.notes" name="notes"></textarea>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label class="form-label">Chiều cao (cm)</label>
-                    <input class="form-control" type="number" [(ngModel)]="newDonor.height" name="height" />
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Trình độ học vấn</label>
-                    <input class="form-control" type="text" [(ngModel)]="newDonor.education" name="edu" />
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Ghi chú</label>
-                    <textarea class="form-control" [(ngModel)]="newDonor.notes" name="notes"></textarea>
-                </div>
-                <div class="modal-actions">
+                <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" (click)="showNewDonor = false">Huỷ</button>
                     <button type="submit" class="btn btn-primary">Đăng ký</button>
                 </div>
@@ -203,36 +210,41 @@
     @if (showNewSample) {
     <div class="modal-overlay" (click)="showNewSample = false">
         <div class="modal-content" (click)="$event.stopPropagation()">
-            <h3>➕ Thêm mẫu lưu trữ</h3>
+            <div class="modal-header">
+                <h2>➕ Thêm mẫu lưu trữ</h2>
+                <button class="close-btn" (click)="showNewSample = false">×</button>
+            </div>
             <form (ngSubmit)="submitSample()">
-                <div class="form-group">
-                    <label class="form-label">Mã người hiến *</label>
-                    <select class="form-control" [(ngModel)]="newSample.donor" name="donor" required>
-                        @for (d of donors(); track d.id) {
-                        <option [value]="d.code">{{ d.code }} - {{ d.bloodType }}</option>
-                        }
-                    </select>
-                </div>
-                <div class="form-row">
+                <div class="modal-body">
                     <div class="form-group">
-                        <label class="form-label">Số lị (vials) *</label>
-                        <input class="form-control" type="number" [(ngModel)]="newSample.vials" name="vials" required
-                            min="1" />
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Trạng thái</label>
-                        <select class="form-control" [(ngModel)]="newSample.status" name="status">
-                            <option value="Quarantine">Cách ly</option>
-                            <option value="Available">Sẵn sàng</option>
+                        <label class="form-label">Mã người hiến *</label>
+                        <select class="form-control" [(ngModel)]="newSample.donor" name="donor" required>
+                            @for (d of donors(); track d.id) {
+                            <option [value]="d.code">{{ d.code }} - {{ d.bloodType }}</option>
+                            }
                         </select>
                     </div>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label class="form-label">Số lị (vials) *</label>
+                            <input class="form-control" type="number" [(ngModel)]="newSample.vials" name="vials"
+                                required min="1" />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Trạng thái</label>
+                            <select class="form-control" [(ngModel)]="newSample.status" name="status">
+                                <option value="Quarantine">Cách ly</option>
+                                <option value="Available">Sẵn sàng</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Vị trí lưu trữ</label>
+                        <input class="form-control" type="text" [(ngModel)]="newSample.location" name="loc"
+                            placeholder="Bình - Canister - Vị trí" />
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label class="form-label">Vị trí lưu trữ</label>
-                    <input class="form-control" type="text" [(ngModel)]="newSample.location" name="loc"
-                        placeholder="Bình - Canister - Vị trí" />
-                </div>
-                <div class="modal-actions">
+                <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" (click)="showNewSample = false">Huỷ</button>
                     <button type="submit" class="btn btn-primary">Lưu mẫu</button>
                 </div>
@@ -244,26 +256,31 @@
     @if (showNewMatch) {
     <div class="modal-overlay" (click)="showNewMatch = false">
         <div class="modal-content" (click)="$event.stopPropagation()">
-            <h3>➕ Ghép đôi mới</h3>
+            <div class="modal-header">
+                <h2>➕ Ghép đôi mới</h2>
+                <button class="close-btn" (click)="showNewMatch = false">×</button>
+            </div>
             <form (ngSubmit)="submitMatch()">
-                <div class="form-group">
-                    <label class="form-label">Người nhận (bệnh nhân) *</label>
-                    <input class="form-control" type="text" [(ngModel)]="newMatch.recipient" name="recipient"
-                        placeholder="Tên hoặc mã BN..." required />
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label class="form-label">Người nhận (bệnh nhân) *</label>
+                        <input class="form-control" type="text" [(ngModel)]="newMatch.recipient" name="recipient"
+                            placeholder="Tên hoặc mã BN..." required />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Mã người hiến *</label>
+                        <select class="form-control" [(ngModel)]="newMatch.donor" name="donor" required>
+                            @for (d of donors(); track d.id) {
+                            <option [value]="d.code">{{ d.code }} - {{ d.bloodType }}</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Ghi chú</label>
+                        <textarea class="form-control" [(ngModel)]="newMatch.notes" name="notes"></textarea>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label class="form-label">Mã người hiến *</label>
-                    <select class="form-control" [(ngModel)]="newMatch.donor" name="donor" required>
-                        @for (d of donors(); track d.id) {
-                        <option [value]="d.code">{{ d.code }} - {{ d.bloodType }}</option>
-                        }
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Ghi chú</label>
-                    <textarea class="form-control" [(ngModel)]="newMatch.notes" name="notes"></textarea>
-                </div>
-                <div class="modal-actions">
+                <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" (click)="showNewMatch = false">Huỷ</button>
                     <button type="submit" class="btn btn-primary">Xác nhận ghép</button>
                 </div>
