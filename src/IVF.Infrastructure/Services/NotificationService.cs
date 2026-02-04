@@ -1,6 +1,5 @@
 using IVF.Application.Common.Interfaces;
 using IVF.Domain.Entities;
-using Microsoft.AspNetCore.SignalR;
 
 namespace IVF.Infrastructure.Services;
 
@@ -8,13 +7,11 @@ public class NotificationService : INotificationService
 {
     private readonly INotificationRepository _notificationRepo;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly IHubContext<Hub> _hubContext;
 
-    public NotificationService(INotificationRepository notificationRepo, IUnitOfWork unitOfWork, IHubContext<Hub> hubContext = null!)
+    public NotificationService(INotificationRepository notificationRepo, IUnitOfWork unitOfWork)
     {
         _notificationRepo = notificationRepo;
         _unitOfWork = unitOfWork;
-        _hubContext = hubContext;
     }
 
     public async Task SendAppointmentReminderAsync(Guid doctorUserId, Guid appointmentId, DateTime scheduledAt, CancellationToken ct = default)
@@ -30,12 +27,6 @@ public class NotificationService : INotificationService
 
         await _notificationRepo.AddAsync(notification, ct);
         await _unitOfWork.SaveChangesAsync(ct);
-        
-        // Broadcast via SignalR if available
-        if (_hubContext != null)
-        {
-            await _hubContext.Clients.User(doctorUserId.ToString()).SendAsync("ReceiveNotification", notification, ct);
-        }
     }
 
     public async Task SendQueueCalledAsync(Guid patientUserId, string ticketNumber, string departmentName, string? roomNumber = null, CancellationToken ct = default)
@@ -52,9 +43,6 @@ public class NotificationService : INotificationService
 
         await _notificationRepo.AddAsync(notification, ct);
         await _unitOfWork.SaveChangesAsync(ct);
-        
-        // Broadcast via SignalR
-        await _hubContext.Clients.User(patientUserId.ToString()).SendAsync("ReceiveNotification", notification, ct);
     }
 
     public async Task SendCycleUpdateAsync(Guid patientUserId, Guid cycleId, string status, string? message = null, CancellationToken ct = default)
@@ -71,9 +59,6 @@ public class NotificationService : INotificationService
 
         await _notificationRepo.AddAsync(notification, ct);
         await _unitOfWork.SaveChangesAsync(ct);
-        
-        // Broadcast via SignalR
-        await _hubContext.Clients.User(patientUserId.ToString()).SendAsync("ReceiveNotification", notification, ct);
     }
 
     public async Task SendPaymentDueAsync(Guid patientUserId, Guid invoiceId, decimal amount, DateTime dueDate, CancellationToken ct = default)
@@ -89,9 +74,6 @@ public class NotificationService : INotificationService
 
         await _notificationRepo.AddAsync(notification, ct);
         await _unitOfWork.SaveChangesAsync(ct);
-        
-        // Broadcast via SignalR
-        await _hubContext.Clients.User(patientUserId.ToString()).SendAsync("ReceiveNotification", notification, ct);
     }
 
     public async Task SendInvoiceIssuedAsync(Guid patientUserId, Guid invoiceId, decimal totalAmount, CancellationToken ct = default)
@@ -107,9 +89,6 @@ public class NotificationService : INotificationService
 
         await _notificationRepo.AddAsync(notification, ct);
         await _unitOfWork.SaveChangesAsync(ct);
-        
-        // Broadcast via SignalR
-        await _hubContext.Clients.User(patientUserId.ToString()).SendAsync("ReceiveNotification", notification, ct);
     }
 
     public async Task SendNotificationAsync(Guid userId, string title, string message, NotificationType type, string? entityType = null, Guid? entityId = null, CancellationToken ct = default)
@@ -125,10 +104,5 @@ public class NotificationService : INotificationService
 
         await _notificationRepo.AddAsync(notification, ct);
         await _unitOfWork.SaveChangesAsync(ct);
-        
-        if (_hubContext != null)
-        {
-            await _hubContext.Clients.User(userId.ToString()).SendAsync("ReceiveNotification", notification, ct);
-        }
     }
 }
