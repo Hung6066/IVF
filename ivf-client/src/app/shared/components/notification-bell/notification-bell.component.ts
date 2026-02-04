@@ -30,7 +30,7 @@ import { takeUntil, switchMap } from 'rxjs/operators';
           </div>
           
           <div class="notification-list">
-            @for (notification of notifications(); track notification.id) {
+            @for (notification of notifications().slice(0, 10); track notification.id) {
               <div class="notification-item" [class.unread]="!notification.isRead" (click)="markAsRead(notification)">
                 <div class="notification-icon" [class]="notification.type.toLowerCase()">
                   @switch (notification.type) {
@@ -51,6 +51,10 @@ import { takeUntil, switchMap } from 'rxjs/operators';
             } @empty {
               <div class="empty-state">Không có thông báo</div>
             }
+          </div>
+          
+          <div class="dropdown-footer">
+            <a href="/admin/notifications" class="view-all" (click)="closeDropdown()">Xem tất cả thông báo →</a>
           </div>
         </div>
       }
@@ -197,6 +201,23 @@ import { takeUntil, switchMap } from 'rxjs/operators';
       text-align: center;
       color: #64748b;
     }
+    
+    .dropdown-footer {
+      padding: 12px 16px;
+      border-top: 1px solid #334155;
+      text-align: center;
+    }
+    
+    .view-all {
+      color: #60a5fa;
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 500;
+    }
+    
+    .view-all:hover {
+      text-decoration: underline;
+    }
   `]
 })
 export class NotificationBellComponent implements OnInit, OnDestroy {
@@ -259,6 +280,10 @@ export class NotificationBellComponent implements OnInit, OnDestroy {
             this.notifications.update(list => list.map(n => ({ ...n, isRead: true })));
             this.unreadCount.set(0);
         });
+    }
+
+    closeDropdown() {
+        this.isOpen.set(false);
     }
 
     formatTime(dateStr: string): string {

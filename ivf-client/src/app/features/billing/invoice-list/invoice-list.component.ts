@@ -3,11 +3,12 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { BillingService, Invoice, Payment, RevenueChartData } from '../billing.service';
+import { PatientSearchComponent } from '../../../shared/components/patient-search/patient-search.component';
 
 @Component({
   selector: 'app-invoice-list',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule],
+  imports: [CommonModule, FormsModule, RouterModule, PatientSearchComponent],
   templateUrl: './invoice-list.component.html',
   styleUrls: ['./invoice-list.component.scss']
 })
@@ -31,7 +32,7 @@ export class InvoiceListComponent implements OnInit {
   searchTerm = '';
 
   showCreateInvoice = false;
-  newInvoice: any = { patientSearch: '', items: [{ name: '', qty: 1, price: 0 }] };
+  newInvoice: any = { patientSearch: '', patientName: '', items: [{ name: '', qty: 1, price: 0 }] };
 
   ngOnInit(): void {
     this.refreshData();
@@ -86,7 +87,7 @@ export class InvoiceListComponent implements OnInit {
     const newInv: Invoice = {
       id: newCode,
       code: newCode,
-      patient: this.newInvoice.patientSearch,
+      patient: this.newInvoice.patientName || this.newInvoice.patientSearch, // Use name if available
       date: new Date().toLocaleDateString('vi-VN'),
       total: total,
       paid: 0,
@@ -96,6 +97,12 @@ export class InvoiceListComponent implements OnInit {
     this.invoices.update(list => [...list, newInv]);
 
     this.showCreateInvoice = false;
-    this.newInvoice = { patientSearch: '', items: [{ name: '', qty: 1, price: 0 }] };
+    this.newInvoice = { patientSearch: '', patientName: '', items: [{ name: '', qty: 1, price: 0 }] };
+  }
+
+  onPatientSelect(patient: any) {
+    if (patient) {
+      this.newInvoice.patientName = patient.fullName;
+    }
   }
 }

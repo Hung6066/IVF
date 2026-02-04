@@ -43,7 +43,7 @@ public class GetActiveEmbryosHandler : IRequestHandler<GetActiveEmbryosQuery, IR
             e.Cycle?.CycleCode ?? "",
             e.Cycle?.Couple?.Wife?.FullName ?? "",
             e.EmbryoNumber,
-            e.Grade.ToString(),
+            e.Grade?.ToString() ?? "",
             e.Day.ToString(),
             e.Status.ToString()
         )).ToList();

@@ -39,6 +39,37 @@ export class ApiService {
         return this.http.delete<void>(`${this.baseUrl}/patients/${id}`);
     }
 
+    searchDoctors(query?: string): Observable<any[]> {
+        let params = new HttpParams();
+        if (query) params = params.set('q', query);
+        return this.http.get<any[]>(`${this.baseUrl}/doctors`, { params });
+    }
+
+    // ==================== USERS / ADMIN ====================
+    getUsers(search?: string, role?: string, isActive?: boolean, page = 1, pageSize = 20): Observable<any> {
+        let params = new HttpParams().set('page', page).set('pageSize', pageSize);
+        if (search) params = params.set('q', search);
+        if (role) params = params.set('role', role);
+        if (isActive !== undefined) params = params.set('isActive', isActive);
+        return this.http.get(`${this.baseUrl}/users`, { params });
+    }
+
+    getRoles(): Observable<string[]> {
+        return this.http.get<string[]>(`${this.baseUrl}/users/roles`);
+    }
+
+    createUser(data: any): Observable<any> {
+        return this.http.post(`${this.baseUrl}/users`, data);
+    }
+
+    updateUser(id: string, data: any): Observable<void> {
+        return this.http.put<void>(`${this.baseUrl}/users/${id}`, data);
+    }
+
+    deleteUser(id: string): Observable<void> {
+        return this.http.delete<void>(`${this.baseUrl}/users/${id}`);
+    }
+
     // ==================== COUPLES ====================
     getCouple(id: string): Observable<Couple> {
         return this.http.get<Couple>(`${this.baseUrl}/couples/${id}`);
@@ -324,6 +355,7 @@ export interface Notification {
     readAt?: string;
     entityType?: string;
     entityId?: string;
+    actionUrl?: string; // Added actionUrl
     createdAt: string;
 }
 
@@ -336,10 +368,12 @@ export interface CreateNotificationRequest {
     type: NotificationType;
     entityType?: string;
     entityId?: string;
+    actionUrl?: string; // Added actionUrl
 }
 
 export interface BroadcastNotificationRequest {
-    userIds: string[];
+    userIds?: string[];
+    role?: string;
     title: string;
     message: string;
     type: NotificationType;

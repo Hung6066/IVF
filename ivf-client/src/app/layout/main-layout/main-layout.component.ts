@@ -62,8 +62,19 @@ import { NotificationBellComponent } from '../../shared/components/notification-
           <a routerLink="/reports" routerLinkActive="active" class="nav-item">
             <span class="icon">📈</span> Báo cáo
           </a>
+          
+          <div style="margin-top: 16px; padding: 0 16px; font-size: 0.75rem; color: #94a3b8; font-weight: 600; text-transform: uppercase; margin-bottom: 8px;">
+            Quản trị
+          </div>
+
+          <a routerLink="/admin/users" routerLinkActive="active" class="nav-item">
+            <span class="icon">👥</span> Người dùng
+          </a>
           <a routerLink="/admin/audit-logs" routerLinkActive="active" class="nav-item">
             <span class="icon">📋</span> Nhật ký
+          </a>
+          <a routerLink="/admin/notifications" routerLinkActive="active" class="nav-item">
+            <span class="icon">🔔</span> Thông báo
           </a>
         </nav>
 
@@ -293,7 +304,9 @@ export class MainLayoutComponent {
       '/billing': 'Hoá đơn',
       '/appointments': 'Lịch hẹn',
       '/reports': 'Báo cáo',
-      '/admin/audit-logs': 'Nhật ký hoạt động'
+      '/admin/audit-logs': 'Nhật ký hoạt động',
+      '/admin/notifications': 'Quản lý thông báo',
+      '/admin/users': 'Quản lý người dùng'
     };
 
     for (const [key, value] of Object.entries(titles)) {

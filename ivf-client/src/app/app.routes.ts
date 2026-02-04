@@ -100,6 +100,14 @@ export const routes: Routes = [
                 path: 'admin/audit-logs',
                 loadComponent: () => import('./features/admin/audit-logs/audit-logs.component').then(m => m.AuditLogsComponent)
             },
+            {
+                path: 'admin/notifications',
+                loadComponent: () => import('./features/admin/notifications/notification-management.component').then(m => m.NotificationManagementComponent)
+            },
+            {
+                path: 'admin/users',
+                loadComponent: () => import('./features/admin/users/user-management.component').then(m => m.UserManagementComponent)
+            },
             { path: '', redirectTo: 'dashboard', pathMatch: 'full' }
         ]
     },

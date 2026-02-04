@@ -4,11 +4,12 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
 import { ApiService } from '../../../core/services/api.service';
 import { Patient } from '../../../core/models/api.models';
+import { PatientSearchComponent } from '../../../shared/components/patient-search/patient-search.component';
 
 @Component({
   selector: 'app-couple-form',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule],
+  imports: [CommonModule, FormsModule, RouterModule, PatientSearchComponent],
   templateUrl: './couple-form.component.html',
   styleUrls: ['./couple-form.component.scss']
 })
@@ -16,11 +17,8 @@ export class CoupleFormComponent {
   saving = signal(false);
   selectedWife = signal<Patient | null>(null);
   selectedHusband = signal<Patient | null>(null);
-  wifeResults = signal<Patient[]>([]);
-  husbandResults = signal<Patient[]>([]);
-
-  wifeSearch = '';
-  husbandSearch = '';
+  wifeId = '';
+  husbandId = '';
 
   formData = {
     marriageDate: '',
@@ -28,46 +26,6 @@ export class CoupleFormComponent {
   };
 
   constructor(private api: ApiService, private router: Router) { }
-
-  searchWife(): void {
-    if (this.wifeSearch.length < 2) {
-      this.wifeResults.set([]);
-      return;
-    }
-    this.api.searchPatients(this.wifeSearch).subscribe(res => {
-      this.wifeResults.set(res.items.filter(p => p.gender === 'Female'));
-    });
-  }
-
-  searchHusband(): void {
-    if (this.husbandSearch.length < 2) {
-      this.husbandResults.set([]);
-      return;
-    }
-    this.api.searchPatients(this.husbandSearch).subscribe(res => {
-      this.husbandResults.set(res.items.filter(p => p.gender === 'Male'));
-    });
-  }
-
-  selectWife(patient: Patient): void {
-    this.selectedWife.set(patient);
-    this.wifeSearch = '';
-    this.wifeResults.set([]);
-  }
-
-  selectHusband(patient: Patient): void {
-    this.selectedHusband.set(patient);
-    this.husbandSearch = '';
-    this.husbandResults.set([]);
-  }
-
-  clearWife(): void {
-    this.selectedWife.set(null);
-  }
-
-  clearHusband(): void {
-    this.selectedHusband.set(null);
-  }
 
   canSubmit(): boolean {
     return !!this.selectedWife() && !!this.selectedHusband();

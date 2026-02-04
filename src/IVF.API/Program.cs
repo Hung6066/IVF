@@ -157,6 +157,8 @@ app.MapReportEndpoints();
 app.MapAppointmentEndpoints();
 app.MapNotificationEndpoints();
 app.MapAuditEndpoints();
+app.MapDoctorEndpoints();
+app.MapUserEndpoints();
 
 // Auto-migrate and seed in dev
 if (app.Environment.IsDevelopment())

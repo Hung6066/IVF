@@ -11,74 +11,22 @@
             <h2 class="section-title">👩 Thông tin vợ</h2>
 
             <div class="search-box">
-                <div class="input-wrapper">
-                    <input type="text" class="form-control" [(ngModel)]="wifeSearch" name="wifeSearch"
-                        placeholder="Tìm bệnh nhân nữ (mã BN hoặc tên)..." (input)="searchWife()"
-                        [disabled]="!!selectedWife()" />
-                    @if (!selectedWife()) {
-                    <span class="search-icon">🔍</span>
-                    }
-                </div>
-
-                @if (wifeResults().length > 0) {
-                <div class="search-results">
-                    @for (p of wifeResults(); track p.id) {
-                    <div class="result-item" (click)="selectWife(p)">
-                        <span class="code">{{ p.patientCode }}</span>
-                        <span class="name">{{ p.fullName }}</span>
-                    </div>
-                    }
-                </div>
-                }
+                <app-patient-search [(ngModel)]="wifeId" name="wifeId"
+                    placeholder="Tìm bệnh nhân nữ (mã BN hoặc tên)..." genderFilter="Female"
+                    (patientSelected)="selectedWife.set($event)">
+                </app-patient-search>
             </div>
-
-            @if (selectedWife()) {
-            <div class="selected-patient wife">
-                <div class="avatar">👩</div>
-                <div class="info">
-                    <strong>{{ selectedWife()?.fullName }}</strong>
-                    <span class="code">{{ selectedWife()?.patientCode }}</span>
-                </div>
-                <button type="button" class="btn-icon-clear" (click)="clearWife()" title="Xóa">✕</button>
-            </div>
-            }
         </div>
 
         <div class="partner-section">
             <h2 class="section-title">👨 Thông tin chồng</h2>
 
             <div class="search-box">
-                <div class="input-wrapper">
-                    <input type="text" class="form-control" [(ngModel)]="husbandSearch" name="husbandSearch"
-                        placeholder="Tìm bệnh nhân nam (mã BN hoặc tên)..." (input)="searchHusband()"
-                        [disabled]="!!selectedHusband()" />
-                    @if (!selectedHusband()) {
-                    <span class="search-icon">🔍</span>
-                    }
-                </div>
-
-                @if (husbandResults().length > 0) {
-                <div class="search-results">
-                    @for (p of husbandResults(); track p.id) {
-                    <div class="result-item" (click)="selectHusband(p)">
-                        <span class="code">{{ p.patientCode }}</span>
-                        <span class="name">{{ p.fullName }}</span>
-                    </div>
-                    }
-                </div>
-                }
+                <app-patient-search [(ngModel)]="husbandId" name="husbandId"
+                    placeholder="Tìm bệnh nhân nam (mã BN hoặc tên)..." genderFilter="Male"
+                    (patientSelected)="selectedHusband.set($event)">
+                </app-patient-search>
             </div>
-
-            @if (selectedHusband()) {
-            <div class="selected-patient husband">
-                <div class="avatar">👨</div>
-                <div class="info">
-                    <strong>{{ selectedHusband()?.fullName }}</strong>
-                    <span class="code">{{ selectedHusband()?.patientCode }}</span>
-                </div>
-                <button type="button" class="btn-icon-clear" (click)="clearHusband()" title="Xóa">✕</button>
-            </div>
-            }
         </div>
 
         <div class="details-section">

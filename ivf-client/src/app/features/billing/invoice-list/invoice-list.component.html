@@ -187,8 +187,8 @@
             <form (ngSubmit)="submitInvoice()">
                 <div class="form-group">
                     <label class="form-label">Tìm bệnh nhân *</label>
-                    <input class="form-control" type="text" [(ngModel)]="newInvoice.patientSearch" name="search"
-                        placeholder="Mã BN hoặc tên..." required />
+                    <app-patient-search [(ngModel)]="newInvoice.patientSearch" name="search" [required]="true"
+                        (patientSelected)="onPatientSelect($event)"></app-patient-search>
                 </div>
 
                 <div class="invoice-items-section">

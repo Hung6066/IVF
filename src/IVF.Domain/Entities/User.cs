@@ -58,6 +58,14 @@ public class User : BaseEntity
         SetUpdated();
     }
 
+    public void UpdateInfo(string fullName, string role, string? department)
+    {
+        FullName = fullName;
+        Role = role;
+        Department = department;
+        SetUpdated();
+    }
+
     public void UpdatePassword(string passwordHash)
     {
         PasswordHash = passwordHash;

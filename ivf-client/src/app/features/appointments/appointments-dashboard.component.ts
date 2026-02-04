@@ -3,11 +3,15 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { ApiService, Appointment, AppointmentType, CreateAppointmentRequest } from '../../core/services/api.service';
+import { Patient } from '../../core/models/api.models';
+import { PatientSearchComponent } from '../../shared/components/patient-search/patient-search.component';
+
+import { DoctorSearchComponent } from '../../shared/components/doctor-search/doctor-search.component';
 
 @Component({
     selector: 'app-appointments-dashboard',
     standalone: true,
-    imports: [CommonModule, FormsModule, RouterLink],
+    imports: [CommonModule, FormsModule, RouterLink, PatientSearchComponent, DoctorSearchComponent],
     template: `
     <div class="dashboard-layout">
       <header class="page-header">
@@ -109,8 +113,13 @@ import { ApiService, Appointment, AppointmentType, CreateAppointmentRequest } fr
             <h2>Tạo lịch hẹn mới</h2>
             <form (ngSubmit)="createAppointment()">
               <div class="form-group">
-                <label>Bệnh nhân ID</label>
-                <input [(ngModel)]="newAppointment.patientId" name="patientId" required>
+                <label>Bệnh nhân</label>
+                <app-patient-search 
+                  [(ngModel)]="newAppointment.patientId" 
+                  name="patientId" 
+                  [required]="true"
+                  (patientSelected)="onPatientSelected($event)">
+                </app-patient-search>
               </div>
               <div class="form-group">
                 <label>Ngày giờ</label>
@@ -128,6 +137,10 @@ import { ApiService, Appointment, AppointmentType, CreateAppointmentRequest } fr
                   <option value="SemenCollection">Lấy tinh dịch</option>
                   <option value="FollowUp">Tái khám</option>
                 </select>
+              </div>
+              <div class="form-group">
+                <label>Bác sĩ (tùy chọn)</label>
+                <app-doctor-search [(ngModel)]="newAppointment.doctorId" name="doctorId"></app-doctor-search>
               </div>
               <div class="form-group">
                 <label>Thời lượng (phút)</label>
@@ -246,5 +259,9 @@ export class AppointmentsDashboardComponent implements OnInit {
             'Rescheduled': 'Đã đổi lịch'
         };
         return labels[status] || status;
+    }
+
+    onPatientSelected(patient: Patient | null) {
+        // Optional: Do something with selected patient
     }
 }
