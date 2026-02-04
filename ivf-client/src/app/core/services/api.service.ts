@@ -44,6 +44,10 @@ export class ApiService {
         return this.http.get<Couple>(`${this.baseUrl}/couples/${id}`);
     }
 
+    getCoupleByPatient(patientId: string): Observable<Couple> {
+        return this.http.get<Couple>(`${this.baseUrl}/couples/patient/${patientId}`);
+    }
+
     createCouple(data: { wifeId: string; husbandId: string; marriageDate?: string; infertilityYears?: number }): Observable<Couple> {
         return this.http.post<Couple>(`${this.baseUrl}/couples`, data);
     }
@@ -61,7 +65,7 @@ export class ApiService {
         return this.http.get<TreatmentCycle[]>(`${this.baseUrl}/cycles/couple/${coupleId}`);
     }
 
-    createCycle(data: { coupleId: string; method: string; notes?: string }): Observable<TreatmentCycle> {
+    createCycle(data: { coupleId: string; method: string; startDate: string; notes?: string }): Observable<TreatmentCycle> {
         return this.http.post<TreatmentCycle>(`${this.baseUrl}/cycles`, data);
     }
 

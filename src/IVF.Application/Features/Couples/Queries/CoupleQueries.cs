@@ -7,6 +7,7 @@ namespace IVF.Application.Features.Couples.Queries;
 
 // ==================== Query Records ====================
 public record GetCoupleByIdQuery(Guid Id) : IRequest<Result<CoupleDto>>;
+public record GetCoupleByPatientIdQuery(Guid PatientId) : IRequest<Result<CoupleDto>>;
 
 public record GetAllCouplesQuery() : IRequest<IEnumerable<CoupleDto>>;
 
@@ -74,5 +75,28 @@ public class GetAllCouplesHandler(ICoupleRepository repo, IPatientRepository pat
         }
 
         return result;
+    }
+}
+
+public class GetCoupleByPatientIdHandler(ICoupleRepository repo, IPatientRepository patientRepo) 
+    : IRequestHandler<GetCoupleByPatientIdQuery, Result<CoupleDto>>
+{
+    public async Task<Result<CoupleDto>> Handle(GetCoupleByPatientIdQuery request, CancellationToken ct)
+    {
+        var couple = await repo.GetByPatientIdAsync(request.PatientId, ct);
+        if (couple == null)
+            return Result<CoupleDto>.Failure("Couple not found for this patient");
+
+        var wife = await patientRepo.GetByIdAsync(couple.WifeId, ct);
+        var husband = await patientRepo.GetByIdAsync(couple.HusbandId, ct);
+
+        return Result<CoupleDto>.Success(new CoupleDto(
+            couple.Id,
+            new PatientDto(wife!.Id, wife.PatientCode, wife.FullName),
+            new PatientDto(husband!.Id, husband.PatientCode, husband.FullName),
+            couple.MarriageDate,
+            couple.InfertilityYears,
+            couple.SpermDonorId
+        ));
     }
 }

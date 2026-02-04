@@ -20,6 +20,12 @@ public static class CoupleEndpoints
             return r.IsSuccess ? Results.Ok(r.Value) : Results.NotFound(r.Error);
         });
 
+        group.MapGet("/patient/{patientId:guid}", async (Guid patientId, IMediator m) =>
+        {
+            var r = await m.Send(new GetCoupleByPatientIdQuery(patientId));
+            return r.IsSuccess ? Results.Ok(r.Value) : Results.NotFound(r.Error);
+        });
+
         group.MapPost("/", async (CreateCoupleCommand cmd, IMediator m) =>
         {
             var r = await m.Send(cmd);

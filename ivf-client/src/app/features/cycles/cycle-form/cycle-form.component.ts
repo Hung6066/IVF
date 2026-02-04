@@ -47,6 +47,7 @@ export class CycleFormComponent implements OnInit {
     this.api.createCycle({
       coupleId: this.coupleId,
       method: this.formData.method,
+      startDate: this.formData.startDate,
       notes: this.formData.notes || undefined
     }).subscribe({
       next: (cycle) => {
