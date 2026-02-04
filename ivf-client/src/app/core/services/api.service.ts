@@ -170,4 +170,203 @@ export class ApiService {
             params: new HttpParams().set('year', year)
         });
     }
+
+    // ==================== APPOINTMENTS ====================
+    getTodayAppointments(): Observable<Appointment[]> {
+        return this.http.get<Appointment[]>(`${this.baseUrl}/appointments/today`);
+    }
+
+    getAppointments(start?: Date, end?: Date): Observable<Appointment[]> {
+        let params = new HttpParams();
+        if (start) params = params.set('start', start.toISOString());
+        if (end) params = params.set('end', end.toISOString());
+        return this.http.get<Appointment[]>(`${this.baseUrl}/appointments`, { params });
+    }
+
+    getUpcomingAppointments(doctorId?: string, days = 7): Observable<Appointment[]> {
+        let params = new HttpParams().set('days', days);
+        if (doctorId) params = params.set('doctorId', doctorId);
+        return this.http.get<Appointment[]>(`${this.baseUrl}/appointments/upcoming`, { params });
+    }
+
+    getAppointment(id: string): Observable<Appointment> {
+        return this.http.get<Appointment>(`${this.baseUrl}/appointments/${id}`);
+    }
+
+    getPatientAppointments(patientId: string): Observable<Appointment[]> {
+        return this.http.get<Appointment[]>(`${this.baseUrl}/appointments/patient/${patientId}`);
+    }
+
+    getDoctorAppointments(doctorId: string, date?: Date): Observable<Appointment[]> {
+        let params = new HttpParams();
+        if (date) params = params.set('date', date.toISOString());
+        return this.http.get<Appointment[]>(`${this.baseUrl}/appointments/doctor/${doctorId}`, { params });
+    }
+
+    createAppointment(data: CreateAppointmentRequest): Observable<Appointment> {
+        return this.http.post<Appointment>(`${this.baseUrl}/appointments`, data);
+    }
+
+    confirmAppointment(id: string): Observable<Appointment> {
+        return this.http.post<Appointment>(`${this.baseUrl}/appointments/${id}/confirm`, {});
+    }
+
+    checkInAppointment(id: string): Observable<Appointment> {
+        return this.http.post<Appointment>(`${this.baseUrl}/appointments/${id}/checkin`, {});
+    }
+
+    completeAppointment(id: string): Observable<Appointment> {
+        return this.http.post<Appointment>(`${this.baseUrl}/appointments/${id}/complete`, {});
+    }
+
+    cancelAppointment(id: string, reason?: string): Observable<void> {
+        return this.http.post<void>(`${this.baseUrl}/appointments/${id}/cancel`, { reason });
+    }
+
+    rescheduleAppointment(id: string, newDateTime: Date): Observable<Appointment> {
+        return this.http.post<Appointment>(`${this.baseUrl}/appointments/${id}/reschedule`, { newDateTime: newDateTime.toISOString() });
+    }
+
+    // ==================== NOTIFICATIONS ====================
+    getNotifications(unreadOnly = false): Observable<Notification[]> {
+        return this.http.get<Notification[]>(`${this.baseUrl}/notifications`, {
+            params: new HttpParams().set('unreadOnly', unreadOnly)
+        });
+    }
+
+    getUnreadCount(): Observable<{ count: number }> {
+        return this.http.get<{ count: number }>(`${this.baseUrl}/notifications/unread-count`);
+    }
+
+    markNotificationAsRead(id: string): Observable<Notification> {
+        return this.http.post<Notification>(`${this.baseUrl}/notifications/${id}/read`, {});
+    }
+
+    markAllNotificationsAsRead(): Observable<void> {
+        return this.http.post<void>(`${this.baseUrl}/notifications/read-all`, {});
+    }
+
+    createNotification(data: CreateNotificationRequest): Observable<Notification> {
+        return this.http.post<Notification>(`${this.baseUrl}/notifications`, data);
+    }
+
+    broadcastNotification(data: BroadcastNotificationRequest): Observable<{ sent: number }> {
+        return this.http.post<{ sent: number }>(`${this.baseUrl}/notifications/broadcast`, data);
+    }
+
+    // ==================== AUDIT LOGS ====================
+    getRecentAuditLogs(take = 100): Observable<AuditLog[]> {
+        return this.http.get<AuditLog[]>(`${this.baseUrl}/audit/recent`, {
+            params: new HttpParams().set('take', take)
+        });
+    }
+
+    getEntityAuditLogs(entityType: string, entityId: string): Observable<AuditLog[]> {
+        return this.http.get<AuditLog[]>(`${this.baseUrl}/audit/entity/${entityType}/${entityId}`);
+    }
+
+    getUserAuditLogs(userId: string, take = 100): Observable<AuditLog[]> {
+        return this.http.get<AuditLog[]>(`${this.baseUrl}/audit/user/${userId}`, {
+            params: new HttpParams().set('take', take)
+        });
+    }
+
+    searchAuditLogs(params: AuditSearchParams): Observable<AuditLog[]> {
+        let httpParams = new HttpParams();
+        if (params.entityType) httpParams = httpParams.set('entityType', params.entityType);
+        if (params.action) httpParams = httpParams.set('action', params.action);
+        if (params.userId) httpParams = httpParams.set('userId', params.userId);
+        if (params.from) httpParams = httpParams.set('from', params.from.toISOString());
+        if (params.to) httpParams = httpParams.set('to', params.to.toISOString());
+        httpParams = httpParams.set('page', params.page || 1).set('pageSize', params.pageSize || 50);
+        return this.http.get<AuditLog[]>(`${this.baseUrl}/audit/search`, { params: httpParams });
+    }
 }
+
+// ==================== INTERFACES ====================
+export interface Appointment {
+    id: string;
+    patientId: string;
+    cycleId?: string;
+    doctorId?: string;
+    scheduledAt: string;
+    durationMinutes: number;
+    type: AppointmentType;
+    status: AppointmentStatus;
+    notes?: string;
+    roomNumber?: string;
+    patient?: Patient;
+    doctor?: any;
+    createdAt: string;
+}
+
+export type AppointmentType = 'Consultation' | 'Ultrasound' | 'Injection' | 'EggRetrieval' | 'EmbryoTransfer' | 'LabTest' | 'SemenCollection' | 'FollowUp' | 'Other';
+export type AppointmentStatus = 'Scheduled' | 'Confirmed' | 'CheckedIn' | 'InProgress' | 'Completed' | 'Cancelled' | 'NoShow' | 'Rescheduled';
+
+export interface CreateAppointmentRequest {
+    patientId: string;
+    scheduledAt: string;
+    type: AppointmentType;
+    cycleId?: string;
+    doctorId?: string;
+    durationMinutes?: number;
+    notes?: string;
+    roomNumber?: string;
+}
+
+export interface Notification {
+    id: string;
+    userId: string;
+    title: string;
+    message: string;
+    type: NotificationType;
+    isRead: boolean;
+    readAt?: string;
+    entityType?: string;
+    entityId?: string;
+    createdAt: string;
+}
+
+export type NotificationType = 'Info' | 'Success' | 'Warning' | 'Error' | 'AppointmentReminder' | 'QueueCalled' | 'CycleUpdate' | 'PaymentDue';
+
+export interface CreateNotificationRequest {
+    userId: string;
+    title: string;
+    message: string;
+    type: NotificationType;
+    entityType?: string;
+    entityId?: string;
+}
+
+export interface BroadcastNotificationRequest {
+    userIds: string[];
+    title: string;
+    message: string;
+    type: NotificationType;
+}
+
+export interface AuditLog {
+    id: string;
+    userId?: string;
+    username?: string;
+    entityType: string;
+    entityId: string;
+    action: 'Create' | 'Update' | 'Delete';
+    oldValues?: string;
+    newValues?: string;
+    changedColumns?: string;
+    ipAddress?: string;
+    userAgent?: string;
+    createdAt: string;
+}
+
+export interface AuditSearchParams {
+    entityType?: string;
+    action?: string;
+    userId?: string;
+    from?: Date;
+    to?: Date;
+    page?: number;
+    pageSize?: number;
+}
+

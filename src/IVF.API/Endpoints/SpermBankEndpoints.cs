@@ -9,7 +9,7 @@ public static class SpermBankEndpoints
 {
     public static void MapSpermBankEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/spermbank").WithTags("SpermBank").RequireAuthorization();
+        var group = app.MapGroup("/api/spermbank").WithTags("SpermBank").RequireAuthorization("LabAccess");
 
         group.MapGet("/donors", async (IMediator m, string? q, int page = 1, int pageSize = 20) =>
             Results.Ok(await m.Send(new SearchDonorsQuery(q, page, pageSize))));

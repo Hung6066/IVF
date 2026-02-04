@@ -9,7 +9,7 @@ public static class UltrasoundEndpoints
 {
     public static void MapUltrasoundEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/ultrasounds").WithTags("Ultrasounds").RequireAuthorization();
+        var group = app.MapGroup("/api/ultrasounds").WithTags("Ultrasounds").RequireAuthorization("DoctorOrAdmin");
 
         group.MapGet("/cycle/{cycleId:guid}", async (Guid cycleId, IMediator m) =>
             Results.Ok(await m.Send(new GetUltrasoundsByCycleQuery(cycleId))));

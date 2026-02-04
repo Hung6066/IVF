@@ -92,6 +92,14 @@ export const routes: Routes = [
                 path: 'reports',
                 loadComponent: () => import('./features/reports/reports-dashboard/reports-dashboard.component').then(m => m.ReportsDashboardComponent)
             },
+            {
+                path: 'appointments',
+                loadComponent: () => import('./features/appointments/appointments-dashboard.component').then(m => m.AppointmentsDashboardComponent)
+            },
+            {
+                path: 'admin/audit-logs',
+                loadComponent: () => import('./features/admin/audit-logs/audit-logs.component').then(m => m.AuditLogsComponent)
+            },
             { path: '', redirectTo: 'dashboard', pathMatch: 'full' }
         ]
     },

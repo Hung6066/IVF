@@ -9,7 +9,7 @@ public static class EmbryoEndpoints
 {
     public static void MapEmbryoEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/embryos").WithTags("Embryos").RequireAuthorization();
+        var group = app.MapGroup("/api/embryos").WithTags("Embryos").RequireAuthorization("EmbryologyAccess");
 
         group.MapGet("/cycle/{cycleId:guid}", async (Guid cycleId, IMediator m) =>
             Results.Ok(await m.Send(new GetEmbryosByCycleQuery(cycleId))));

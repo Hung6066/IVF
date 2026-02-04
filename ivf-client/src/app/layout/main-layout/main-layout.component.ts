@@ -2,11 +2,12 @@ import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
+import { NotificationBellComponent } from '../../shared/components/notification-bell/notification-bell.component';
 
 @Component({
   selector: 'app-main-layout',
   standalone: true,
-  imports: [CommonModule, RouterModule],
+  imports: [CommonModule, RouterModule, NotificationBellComponent],
   template: `
     <div class="layout">
       <aside class="sidebar">
@@ -55,8 +56,14 @@ import { AuthService } from '../../core/services/auth.service';
           <a routerLink="/billing" routerLinkActive="active" class="nav-item">
             <span class="icon">💰</span> Hoá đơn
           </a>
+          <a routerLink="/appointments" routerLinkActive="active" class="nav-item">
+            <span class="icon">📅</span> Lịch hẹn
+          </a>
           <a routerLink="/reports" routerLinkActive="active" class="nav-item">
             <span class="icon">📈</span> Báo cáo
+          </a>
+          <a routerLink="/admin/audit-logs" routerLinkActive="active" class="nav-item">
+            <span class="icon">📋</span> Nhật ký
           </a>
         </nav>
 
@@ -72,9 +79,20 @@ import { AuthService } from '../../core/services/auth.service';
         </div>
       </aside>
 
-      <main class="main-content">
-        <router-outlet></router-outlet>
-      </main>
+      <div class="main-wrapper">
+        <header class="top-header">
+          <div class="header-left">
+            <h1 class="page-title">{{ getPageTitle() }}</h1>
+          </div>
+          <div class="header-right">
+            <app-notification-bell></app-notification-bell>
+            <div class="user-avatar">{{ getUserInitials() }}</div>
+          </div>
+        </header>
+        <main class="main-content">
+          <router-outlet></router-outlet>
+        </main>
+      </div>
     </div>
   `,
   styles: [`
@@ -195,11 +213,57 @@ import { AuthService } from '../../core/services/auth.service';
       background: rgba(255,255,255,0.2);
     }
 
-    .main-content {
+    .main-wrapper {
       flex: 1;
       margin-left: 260px;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    .top-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 2rem;
+      background: #1e293b;
+      border-bottom: 1px solid #334155;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+
+    .header-left .page-title {
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: #f1f5f9;
+      margin: 0;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .user-avatar {
+      width: 36px;
+      height: 36px;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      font-size: 0.75rem;
+      color: white;
+    }
+
+    .main-content {
+      flex: 1;
       padding: 2rem;
       overflow-y: auto;
+      background: #0f172a;
     }
   `]
 })
@@ -211,7 +275,35 @@ export class MainLayoutComponent {
     return name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
   }
 
+  getPageTitle(): string {
+    const path = window.location.pathname;
+    const titles: Record<string, string> = {
+      '/dashboard': 'Dashboard',
+      '/reception': 'Tiếp đón',
+      '/patients': 'Bệnh nhân',
+      '/couples': 'Cặp đôi',
+      '/queue': 'Hàng đợi',
+      '/consultation': 'Tư vấn',
+      '/ultrasound': 'Siêu âm',
+      '/lab': 'Phòng Lab',
+      '/andrology': 'Nam khoa',
+      '/injection': 'Tiêm',
+      '/sperm-bank': 'Ngân hàng tinh trùng',
+      '/pharmacy': 'Nhà thuốc',
+      '/billing': 'Hoá đơn',
+      '/appointments': 'Lịch hẹn',
+      '/reports': 'Báo cáo',
+      '/admin/audit-logs': 'Nhật ký hoạt động'
+    };
+
+    for (const [key, value] of Object.entries(titles)) {
+      if (path.startsWith(key)) return value;
+    }
+    return 'IVF System';
+  }
+
   logout(): void {
     this.authService.logout();
   }
 }
+

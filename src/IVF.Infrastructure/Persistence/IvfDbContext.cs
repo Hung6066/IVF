@@ -24,6 +24,11 @@ public class IvfDbContext : DbContext
     public DbSet<InvoiceItem> InvoiceItems => Set<InvoiceItem>();
     public DbSet<Payment> Payments => Set<Payment>();
     public DbSet<Prescription> Prescriptions => Set<Prescription>();
+    public DbSet<Doctor> Doctors => Set<Doctor>();
+    public DbSet<UserPermission> UserPermissions => Set<UserPermission>();
+    public DbSet<Appointment> Appointments => Set<Appointment>();
+    public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

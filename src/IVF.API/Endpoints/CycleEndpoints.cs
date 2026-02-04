@@ -9,7 +9,7 @@ public static class CycleEndpoints
 {
     public static void MapCycleEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/cycles").WithTags("Cycles").RequireAuthorization();
+        var group = app.MapGroup("/api/cycles").WithTags("Cycles").RequireAuthorization("DoctorOrAdmin");
 
         group.MapGet("/{id:guid}", async (Guid id, IMediator m) =>
         {

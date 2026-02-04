@@ -10,7 +10,7 @@ public static class BillingEndpoints
 {
     public static void MapBillingEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/billing").WithTags("Billing").RequireAuthorization();
+        var group = app.MapGroup("/api/billing").WithTags("Billing").RequireAuthorization("BillingAccess");
 
         group.MapGet("/invoices", async (IMediator m, string? q, int page = 1, int pageSize = 20) =>
             Results.Ok(await m.Send(new SearchInvoicesQuery(q, page, pageSize))));

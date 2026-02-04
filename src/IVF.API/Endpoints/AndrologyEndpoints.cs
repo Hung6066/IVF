@@ -9,7 +9,7 @@ public static class AndrologyEndpoints
 {
     public static void MapAndrologyEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/andrology").WithTags("Andrology").RequireAuthorization();
+        var group = app.MapGroup("/api/andrology").WithTags("Andrology").RequireAuthorization("AndrologyAccess");
 
         group.MapGet("/patient/{patientId:guid}", async (Guid patientId, IMediator m) =>
             Results.Ok(await m.Send(new GetAnalysesByPatientQuery(patientId))));

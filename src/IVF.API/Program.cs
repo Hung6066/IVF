@@ -44,8 +44,26 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 builder.Services.AddAuthorization(options =>
 {
+    // Admin policies
     options.AddPolicy("AdminOnly", policy => policy.RequireRole("Admin"));
-    options.AddPolicy("MedicalStaff", policy => policy.RequireRole("Admin", "Doctor", "Nurse", "LabTech"));
+    
+    // Medical staff policies
+    options.AddPolicy("MedicalStaff", policy => policy.RequireRole("Admin", "Doctor", "Nurse", "LabTech", "Embryologist"));
+    options.AddPolicy("DoctorOrAdmin", policy => policy.RequireRole("Admin", "Doctor", "Director"));
+    
+    // Department-specific policies
+    options.AddPolicy("LabAccess", policy => policy.RequireRole("Admin", "LabTech", "Doctor", "Embryologist"));
+    options.AddPolicy("EmbryologyAccess", policy => policy.RequireRole("Admin", "Embryologist", "Doctor"));
+    options.AddPolicy("AndrologyAccess", policy => policy.RequireRole("Admin", "LabTech", "Doctor"));
+    
+    // Billing policies
+    options.AddPolicy("BillingAccess", policy => policy.RequireRole("Admin", "Cashier", "Director", "Receptionist"));
+    
+    // Queue management policies
+    options.AddPolicy("QueueManagement", policy => policy.RequireRole("Admin", "Receptionist", "Nurse"));
+    
+    // Reports policies
+    options.AddPolicy("ReportsAccess", policy => policy.RequireRole("Admin", "Director", "Doctor"));
 });
 
 // Rate Limiting
@@ -136,6 +154,9 @@ app.MapAndrologyEndpoints();
 app.MapSpermBankEndpoints();
 app.MapBillingEndpoints();
 app.MapReportEndpoints();
+app.MapAppointmentEndpoints();
+app.MapNotificationEndpoints();
+app.MapAuditEndpoints();
 
 // Auto-migrate and seed in dev
 if (app.Environment.IsDevelopment())

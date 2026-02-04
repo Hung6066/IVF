@@ -13,15 +13,22 @@ public static class DependencyInjection
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        // Add DbContext
-        services.AddDbContext<IvfDbContext>(options =>
+        // Register AuditInterceptor
+        services.AddScoped<AuditInterceptor>();
+
+        // Add DbContext with AuditInterceptor
+        services.AddDbContext<IvfDbContext>((sp, options) =>
+        {
+            var auditInterceptor = sp.GetRequiredService<AuditInterceptor>();
             options.UseNpgsql(
                 configuration.GetConnectionString("DefaultConnection"),
                 npgsqlOptions =>
                 {
                     npgsqlOptions.MigrationsAssembly(typeof(IvfDbContext).Assembly.FullName);
                     npgsqlOptions.EnableRetryOnFailure(3);
-                }));
+                })
+                .AddInterceptors(auditInterceptor);
+        });
 
         // Register Repositories
         services.AddScoped<IPatientRepository, PatientRepository>();
@@ -37,8 +44,13 @@ public static class DependencyInjection
         services.AddScoped<ISpermSampleRepository, SpermSampleRepository>();
         services.AddScoped<IInvoiceRepository, InvoiceRepository>();
         services.AddScoped<IPaymentRepository, PaymentRepository>();
+        services.AddScoped<IDoctorRepository, DoctorRepository>();
+        services.AddScoped<IAppointmentRepository, AppointmentRepository>();
+        services.AddScoped<INotificationRepository, NotificationRepository>();
+        services.AddScoped<IAuditLogRepository, AuditLogRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 
         return services;
     }
 }
+

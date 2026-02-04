@@ -7,7 +7,7 @@ public static class ReportEndpoints
 {
     public static void MapReportEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/reports").WithTags("Reports").RequireAuthorization();
+        var group = app.MapGroup("/api/reports").WithTags("Reports").RequireAuthorization("ReportsAccess");
 
         group.MapGet("/dashboard", async (IMediator m) =>
             Results.Ok(await m.Send(new GetDashboardStatsQuery())));

@@ -10,7 +10,7 @@ public static class QueueEndpoints
 {
     public static void MapQueueEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/queue").WithTags("Queue").RequireAuthorization();
+        var group = app.MapGroup("/api/queue").WithTags("Queue").RequireAuthorization("QueueManagement");
 
         group.MapGet("/{departmentCode}", async (string departmentCode, IMediator m) =>
             Results.Ok(await m.Send(new GetQueueByDepartmentQuery(departmentCode))));

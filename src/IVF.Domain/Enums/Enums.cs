@@ -125,3 +125,29 @@ public enum AnalysisType
     PreWash,
     PostWash
 }
+
+public enum AppointmentType
+{
+    Consultation,       // Tư vấn
+    Ultrasound,         // Siêu âm
+    Injection,          // Tiêm
+    EggRetrieval,       // Chọc hút
+    EmbryoTransfer,     // Chuyển phôi
+    LabTest,            // Xét nghiệm
+    SemenCollection,    // Lấy tinh dịch
+    FollowUp,           // Tái khám
+    Other
+}
+
+public enum AppointmentStatus
+{
+    Scheduled,
+    Confirmed,
+    CheckedIn,
+    InProgress,
+    Completed,
+    Cancelled,
+    NoShow,
+    Rescheduled
+}
+
