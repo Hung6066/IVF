@@ -1,0 +1,51 @@
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:16-alpine
+    container_name: ivf-db
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=ivf_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - ivf-network
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # IVF API
+  api:
+    build:
+      context: .
+      dockerfile: src/IVF.API/Dockerfile
+    container_name: ivf-api
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_HTTP_PORTS=8080
+      - ConnectionStrings__DefaultConnection=Host=db;Database=ivf_db;Username=postgres;Password=postgres
+      - JwtSettings__Secret=SuperSecretKeyForDevelopmentOnly123!@#
+      - JwtSettings__Issuer=IVF_System
+      - JwtSettings__Audience=IVF_Users
+    ports:
+      - "5000:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - ivf-network
+    restart: on-failure
+
+volumes:
+  postgres_data:
+
+
+networks:
+  ivf-network:
+    driver: bridge

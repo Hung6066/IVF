@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/IVF.API/IVF.API.csproj" />
+    <Project Path="src/IVF.Application/IVF.Application.csproj" />
+    <Project Path="src/IVF.Domain/IVF.Domain.csproj" />
+    <Project Path="src/IVF.Infrastructure/IVF.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/IVF.Tests/IVF.Tests.csproj" />
+  </Folder>
+</Solution>
