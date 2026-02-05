@@ -121,7 +121,7 @@ public class QueueTicketTests
     public void Create_ShouldInitializeWithWaitingStatus()
     {
         // Arrange & Act
-        var ticket = QueueTicket.Create("TD-001", QueueType.Reception, Guid.NewGuid(), "TD-01");
+        var ticket = QueueTicket.Create("TD-001", QueueType.Reception, TicketPriority.Normal, Guid.NewGuid(), "TD-01");
 
         // Assert
         ticket.Status.Should().Be(TicketStatus.Waiting);
@@ -132,7 +132,7 @@ public class QueueTicketTests
     public void Call_ShouldUpdateStatusAndSetCalledTime()
     {
         // Arrange
-        var ticket = QueueTicket.Create("TD-001", QueueType.Reception, Guid.NewGuid(), "TD-01");
+        var ticket = QueueTicket.Create("TD-001", QueueType.Reception, TicketPriority.Normal, Guid.NewGuid(), "TD-01");
         var userId = Guid.NewGuid();
 
         // Act
@@ -148,7 +148,7 @@ public class QueueTicketTests
     public void Complete_ShouldSetCompletedStatus()
     {
         // Arrange
-        var ticket = QueueTicket.Create("TD-001", QueueType.Reception, Guid.NewGuid(), "TD-01");
+        var ticket = QueueTicket.Create("TD-001", QueueType.Reception, TicketPriority.Normal, Guid.NewGuid(), "TD-01");
         ticket.Call(Guid.NewGuid());
 
         // Act

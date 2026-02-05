@@ -164,6 +164,7 @@ app.MapAuthEndpoints();
 app.MapPatientEndpoints();
 app.MapCoupleEndpoints();
 app.MapCycleEndpoints();
+app.MapCyclePhaseEndpoints();
 app.MapQueueEndpoints();
 app.MapUltrasoundEndpoints();
 app.MapEmbryoEndpoints();

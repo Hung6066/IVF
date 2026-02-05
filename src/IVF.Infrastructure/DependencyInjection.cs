@@ -50,6 +50,7 @@ public static class DependencyInjection
         services.AddScoped<IAuditLogRepository, AuditLogRepository>();
         services.AddScoped<IUserPermissionRepository, UserPermissionRepository>();
         services.AddScoped<IServiceCatalogRepository, ServiceCatalogRepository>();
+        services.AddScoped<ICyclePhaseDataRepository, CyclePhaseDataRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 
         // Register Services

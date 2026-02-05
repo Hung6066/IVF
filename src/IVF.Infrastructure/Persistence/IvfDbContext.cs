@@ -31,6 +31,17 @@ public class IvfDbContext : DbContext
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<ServiceCatalog> ServiceCatalogs => Set<ServiceCatalog>();
 
+    // Treatment Cycle Phase Data
+    public DbSet<TreatmentIndication> TreatmentIndications => Set<TreatmentIndication>();
+    public DbSet<StimulationData> StimulationData => Set<StimulationData>();
+    public DbSet<CultureData> CultureData => Set<CultureData>();
+    public DbSet<TransferData> TransferData => Set<TransferData>();
+    public DbSet<LutealPhaseData> LutealPhaseData => Set<LutealPhaseData>();
+    public DbSet<PregnancyData> PregnancyData => Set<PregnancyData>();
+    public DbSet<BirthData> BirthData => Set<BirthData>();
+    public DbSet<AdverseEventData> AdverseEventData => Set<AdverseEventData>();
+
+
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
