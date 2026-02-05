@@ -1,0 +1,287 @@
+<div class="page-container">
+    <header class="page-header">
+        <div class="header-content">
+            <h1>👥 Quản lý nhân sự</h1>
+            <p class="text-muted">Quản lý tài khoản, phân quyền và trạng thái hoạt động</p>
+        </div>
+        <button class="btn-primary" (click)="openModal()">
+            <span class="icon">+</span> Thêm tài khoản
+        </button>
+    </header>
+
+    <!-- Filters -->
+    <div class="filters-card">
+        <div class="filter-group">
+            <span class="search-icon">🔍</span>
+            <input type="text" [(ngModel)]="search" (keyup.enter)="loadUsers()"
+                placeholder="Tìm kiếm theo tên, username..." class="search-input">
+        </div>
+
+        <select [(ngModel)]="roleFilter" (change)="loadUsers()" class="filter-select">
+            <option value="">Tất cả vai trò</option>
+            @for (role of roles(); track role) {
+            <option [value]="role">{{ role }}</option>
+            }
+        </select>
+
+        <select [(ngModel)]="statusFilter" (change)="loadUsers()" class="filter-select">
+            <option [ngValue]="undefined">Tất cả trạng thái</option>
+            <option [ngValue]="true">🟢 Hoạt động</option>
+            <option [ngValue]="false">🔴 Đã khóa</option>
+        </select>
+
+        <button class="btn-secondary" (click)="loadUsers()">Áp dụng</button>
+    </div>
+
+    <!-- Table -->
+    <div class="table-container">
+        <table class="premium-table">
+            <thead>
+                <tr>
+                    <th width="30%">Nhân viên</th>
+                    <th>Username</th>
+                    <th>Vai trò</th>
+                    <th>Khoa/Phòng</th>
+                    <th>Trạng thái</th>
+                    <th class="text-end">Thao tác</th>
+                </tr>
+            </thead>
+            <tbody>
+                @for (user of users(); track user.id) {
+                <tr class="hover-row">
+                    <td>
+                        <div class="user-cell">
+                            <div class="avatar" [style.background-color]="getAvatarColor(user.fullName)">
+                                {{ getInitials(user.fullName) }}
+                            </div>
+                            <div class="user-info">
+                                <div class="fullname">{{ user.fullName }}</div>
+                                <div class="email-muted">ID: {{ user.id.substring(0, 8) }}...</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td><span class="username-tag">@ {{ user.username }}</span></td>
+                    <td>
+                        <span class="role-badge" [class]="getRoleClass(user.role)">
+                            {{ user.role }}
+                        </span>
+                    </td>
+                    <td>{{ user.department || '—' }}</td>
+                    <td>
+                        <span class="status-indicator" [class.active]="user.isActive">
+                            <span class="dot"></span>
+                            {{ user.isActive ? 'Active' : 'Inactive' }}
+                        </span>
+                    </td>
+                    <td class="text-end">
+                        <div class="action-buttons">
+                            <!-- Add Doctor Info Button -->
+                            @if (user.role === 'Doctor') {
+                            <button class="btn-icon doctor" (click)="openDoctorModal(user)"
+                                title="Cập nhật thông tin bác sĩ">
+                                🩺
+                            </button>
+                            }
+                            <button class="btn-icon permissions" (click)="openPermissionsModal(user)"
+                                title="Phân quyền">
+                                🔐
+                            </button>
+                            <button class="btn-icon edit" (click)="openModal(user)" title="Chỉnh sửa">
+                                ✏️
+                            </button>
+                            <button class="btn-icon delete" [class.restore]="!user.isActive" (click)="deleteUser(user)"
+                                [title]="user.isActive ? 'Khóa tài khoản' : 'Khôi phục tài khoản'">
+                                {{ user.isActive ? '🔒' : '🔓' }}
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                } @empty {
+                <tr>
+                    <td colspan="6" class="empty-state">
+                        <div class="empty-content">
+                            <div class="empty-icon">👥</div>
+                            <h3>Không tìm thấy dữ liệu</h3>
+                            <p>Thử thay đổi bộ lọc hoặc tìm kiếm từ khóa khác</p>
+                        </div>
+                    </td>
+                </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    <div class="pagination-footer">
+        <span class="text-muted">Hiển thị {{ users().length }} kết quả</span>
+        <div class="pagination-buttons">
+            <button class="btn-page" [disabled]="page === 1" (click)="changePage(-1)">← Trước</button>
+            <span class="page-number">{{ page }}</span>
+            <button class="btn-page" [disabled]="users().length < pageSize" (click)="changePage(1)">Sau →</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal -->
+@if (showModal) {
+<div class="modal-backdrop" (click)="closeModal()">
+    <div class="modal-card" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+            <h2>{{ editingUser ? 'Cập nhật thông tin' : 'Thêm nhân sự mới' }}</h2>
+            <button class="close-btn" (click)="closeModal()">×</button>
+        </div>
+
+        <form (ngSubmit)="saveUser()" class="modal-body">
+            <div class="form-grid">
+                <div class="form-group full-width">
+                    <label>Họ và tên <span class="required">*</span></label>
+                    <input class="modern-input" [(ngModel)]="formData.fullName" name="fullName"
+                        placeholder="Nhập họ tên đầy đủ" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Tên đăng nhập <span class="required">*</span></label>
+                    <input class="modern-input" [(ngModel)]="formData.username" name="username"
+                        [disabled]="!!editingUser" placeholder="VD: nguyenvana" required>
+                </div>
+
+                @if (editingUser) {
+                <div class="form-check full-width">
+                    <label class="checkbox-label">
+                        <input type="checkbox" [(ngModel)]="changePassword" name="changePass">
+                        <span>Đổi mật khẩu mới</span>
+                    </label>
+                </div>
+                }
+
+                <div class="form-group" [class.disabled-field]="editingUser && !changePassword">
+                    <label>Mật khẩu {{ editingUser ? '' : '*' }}</label>
+                    <input class="modern-input" type="password" [(ngModel)]="formData.password" name="password"
+                        [required]="!editingUser || changePassword" [disabled]="editingUser && !changePassword"
+                        [placeholder]="editingUser ? (changePassword ? 'Nhập mật khẩu mới' : 'Không thay đổi') : 'Nhập mật khẩu'">
+                </div>
+
+                <div class="form-group">
+                    <label>Vai trò <span class="required">*</span></label>
+                    <select class="modern-select" [(ngModel)]="formData.role" name="role" required>
+                        @for (role of roles(); track role) {
+                        <option [value]="role">{{ role }}</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Khoa / Phòng ban</label>
+                    <input class="modern-input" [(ngModel)]="formData.department" name="department"
+                        placeholder="VD: Khoa Hiếm Muộn">
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn-ghost" (click)="closeModal()">Hủy bỏ</button>
+                <button type="submit" class="btn-primary" [disabled]="loading()">
+                    {{ loading() ? 'Đang lưu...' : 'Lưu thay đổi' }}
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+}
+
+<!-- Doctor Info Modal -->
+@if (showDoctorModal) {
+<div class="modal-backdrop" (click)="closeDoctorModal()">
+    <div class="modal-card" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+            <h2>🩺 Cập nhật thông tin bác sĩ</h2>
+            <button class="close-btn" (click)="closeDoctorModal()">×</button>
+        </div>
+
+        <div class="modal-body">
+            <p class="text-muted mb-4">Cập nhật thông tin chuyên môn cho tài khoản <strong>{{
+                    selectedDoctorUser?.fullName }}</strong></p>
+
+            <form (ngSubmit)="saveDoctorProfile()">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Chuyên khoa <span class="required">*</span></label>
+                        <select class="modern-select" [(ngModel)]="doctorFormData.specialty" name="specialty" required>
+                            <option value="IVF">IVF (Hiếm muộn)</option>
+                            <option value="Andrology">Nam khoa</option>
+                            <option value="Gynecology">Phụ sản</option>
+                            <option value="Embryology">Phôi học</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Số chứng chỉ hành nghề</label>
+                        <input class="modern-input" [(ngModel)]="doctorFormData.licenseNumber" name="license"
+                            placeholder="VD: 00123/BYT-CCHN">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Phòng khám mặc định</label>
+                        <input class="modern-input" [(ngModel)]="doctorFormData.roomNumber" name="room"
+                            placeholder="VD: P.201">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Số ca tối đa/ngày</label>
+                        <input class="modern-input" type="number" [(ngModel)]="doctorFormData.maxPatientsPerDay"
+                            name="maxPatients" min="1">
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn-ghost" (click)="closeDoctorModal()">Hủy bỏ</button>
+                    <button type="submit" class="btn-primary" [disabled]="loading()">
+                        {{ loading() ? 'Đang lưu...' : 'Lưu thông tin' }}
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+}
+
+<!-- Permissions Modal -->
+@if (showPermissionsModal) {
+<div class="modal-backdrop" (click)="closePermissionsModal()">
+    <div class="modal-card permissions-modal" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+            <h2>🔐 Phân quyền cho {{ selectedPermissionUser?.fullName }}</h2>
+            <button class="close-btn" (click)="closePermissionsModal()">×</button>
+        </div>
+
+        <div class="modal-body permissions-body">
+            <div class="permission-groups">
+                @for (group of permissionGroups; track group.name) {
+                <div class="permission-group">
+                    <h4 class="group-title">{{ group.name }}</h4>
+                    <div class="permission-grid">
+                        @for (perm of group.permissions; track perm) {
+                        <label class="permission-checkbox">
+                            <input type="checkbox" [checked]="userPermissions.includes(perm)"
+                                (change)="togglePermission(perm)">
+                            <span class="checkmark"></span>
+                            <span class="perm-label">{{ formatPermission(perm) }}</span>
+                        </label>
+                        }
+                    </div>
+                </div>
+                }
+            </div>
+        </div>
+
+        <div class="modal-footer">
+            <div class="perm-count">{{ userPermissions.length }} quyền đã chọn</div>
+            <div class="footer-buttons">
+                <button type="button" class="btn-ghost" (click)="closePermissionsModal()">Hủy bỏ</button>
+                <button type="button" class="btn-primary" [disabled]="loading()" (click)="savePermissions()">
+                    {{ loading() ? 'Đang lưu...' : 'Lưu phân quyền' }}
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+}

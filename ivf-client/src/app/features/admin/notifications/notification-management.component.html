@@ -1,0 +1,239 @@
+<div class="dashboard-layout">
+    <header class="page-header">
+        <div class="header-title">
+            <h1>🔔 Quản lý thông báo</h1>
+        </div>
+        <div class="header-actions">
+            <button class="btn-primary" (click)="showCreateModal = true">+ Tạo thông báo</button>
+            <button class="btn-secondary" (click)="showBroadcastModal = true">📢 Phát thông báo</button>
+        </div>
+    </header>
+
+    <!-- Stats -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-icon info">🔔</div>
+            <div class="stat-content">
+                <div class="value">{{ notifications().length }}</div>
+                <div class="label">Tổng thông báo</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon warning">📨</div>
+            <div class="stat-content">
+                <div class="value">{{ unreadCount() }}</div>
+                <div class="label">Chưa đọc</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon success">✓</div>
+            <div class="stat-content">
+                <div class="value">{{ notifications().length - unreadCount() }}</div>
+                <div class="label">Đã đọc</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card filter-card">
+        <div class="filter-row">
+            <div class="form-group">
+                <label>Loại thông báo</label>
+                <select [(ngModel)]="filterType" (change)="applyFilters()">
+                    <option value="">Tất cả</option>
+                    <option value="Info">Thông tin</option>
+                    <option value="Success">Thành công</option>
+                    <option value="Warning">Cảnh báo</option>
+                    <option value="Error">Lỗi</option>
+                    <option value="AppointmentReminder">Nhắc lịch hẹn</option>
+                    <option value="QueueCalled">Gọi số</option>
+                    <option value="CycleUpdate">Cập nhật chu kỳ</option>
+                    <option value="PaymentDue">Thanh toán</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Trạng thái</label>
+                <select [(ngModel)]="filterRead" (change)="applyFilters()">
+                    <option value="">Tất cả</option>
+                    <option value="unread">Chưa đọc</option>
+                    <option value="read">Đã đọc</option>
+                </select>
+            </div>
+            <div class="form-group search-group">
+                <label>Tìm kiếm</label>
+                <input type="text" [(ngModel)]="searchTerm" (input)="applyFilters()"
+                    placeholder="Tiêu đề hoặc nội dung...">
+            </div>
+        </div>
+    </div>
+
+    <!-- Notifications List -->
+    <div class="card">
+        <div class="section-header">
+            <h2>Danh sách thông báo</h2>
+            @if (selectedIds().length > 0) {
+            <button class="btn-danger-outline" (click)="markSelectedAsRead()">
+                Đánh dấu đã đọc ({{ selectedIds().length }})
+            </button>
+            }
+        </div>
+
+        <div class="notification-table">
+            @for (notification of filteredNotifications(); track notification.id) {
+            <div class="notification-row" [class.unread]="!notification.isRead">
+                <div class="notification-checkbox">
+                    <input type="checkbox" [checked]="selectedIds().includes(notification.id)"
+                        (change)="toggleSelect(notification.id)">
+                </div>
+                <div class="notification-icon" [class]="notification.type.toLowerCase()">
+                    {{ getTypeIcon(notification.type) }}
+                </div>
+                <div class="notification-content">
+                    <div class="notification-header">
+                        <span class="notification-title">{{ notification.title }}</span>
+                        <span class="notification-type" [class]="notification.type.toLowerCase()">
+                            {{ getTypeLabel(notification.type) }}
+                        </span>
+                    </div>
+                    <div class="notification-message">{{ notification.message }}</div>
+                    <div class="notification-meta">
+                        <span class="notification-time">{{ formatTime(notification.createdAt) }}</span>
+                        @if (notification.entityType) {
+                        <span class="notification-entity">{{ notification.entityType }}</span>
+                        }
+                    </div>
+                </div>
+                <div class="notification-actions">
+                    @if (!notification.isRead) {
+                    <button class="btn-icon" title="Đánh dấu đã đọc" (click)="markAsRead(notification)">✓</button>
+                    }
+                </div>
+            </div>
+            } @empty {
+            <div class="empty-state">Không có thông báo nào</div>
+            }
+        </div>
+    </div>
+
+    <!-- Create Notification Modal -->
+    @if (showCreateModal) {
+    <div class="modal-overlay" (click)="showCreateModal = false">
+        <div class="modal-content" (click)="$event.stopPropagation()">
+            <div class="modal-header">
+                <h2>Tạo thông báo mới</h2>
+                <button class="close-btn" (click)="showCreateModal = false">×</button>
+            </div>
+
+            <form (ngSubmit)="createNotification()">
+                <div class="modal-body">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>User ID</label>
+                            <input class="form-control" [(ngModel)]="newNotification.userId" name="userId" required
+                                placeholder="ID người nhận">
+                        </div>
+                        <div class="form-group">
+                            <label>Loại thông báo</label>
+                            <select class="form-control" [(ngModel)]="newNotification.type" name="type" required>
+                                <option value="Info">Thông tin</option>
+                                <option value="Success">Thành công</option>
+                                <option value="Warning">Cảnh báo</option>
+                                <option value="Error">Lỗi</option>
+                                <option value="AppointmentReminder">Nhắc lịch hẹn</option>
+                                <option value="QueueCalled">Gọi số</option>
+                                <option value="CycleUpdate">Cập nhật chu kỳ</option>
+                                <option value="PaymentDue">Thanh toán</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group full-width">
+                            <label>Tiêu đề</label>
+                            <input class="form-control" [(ngModel)]="newNotification.title" name="title" required>
+                        </div>
+
+                        <div class="form-group full-width">
+                            <label>Nội dung</label>
+                            <textarea class="form-control" [(ngModel)]="newNotification.message" name="message" required
+                                rows="3"></textarea>
+                        </div>
+
+                        <div class="form-group full-width">
+                            <label>Link (tùy chọn)</label>
+                            <input class="form-control" [(ngModel)]="newNotification.actionUrl" name="actionUrl"
+                                placeholder="/path/to/page">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn-secondary" (click)="showCreateModal = false">Hủy</button>
+                    <button type="submit" class="btn-primary">Tạo thông báo</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    }
+
+    <!-- Broadcast Notification Modal -->
+    @if (showBroadcastModal) {
+    <div class="modal-overlay" (click)="showBroadcastModal = false">
+        <div class="modal-content" (click)="$event.stopPropagation()">
+            <div class="modal-header">
+                <h2>📢 Phát thông báo</h2>
+                <button class="close-btn" (click)="showBroadcastModal = false">×</button>
+            </div>
+
+            <form (ngSubmit)="broadcastNotification()">
+                <div class="modal-body">
+                    <div class="form-grid">
+                        <div class="form-group full-width">
+                            <label>Tiêu đề</label>
+                            <input class="form-control" [(ngModel)]="broadcastData.title" name="title" required>
+                        </div>
+
+                        <div class="form-group full-width">
+                            <label>Nội dung</label>
+                            <textarea class="form-control" [(ngModel)]="broadcastData.message" name="message" required
+                                rows="3"></textarea>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Loại thông báo</label>
+                            <select class="form-control" [(ngModel)]="broadcastData.type" name="type" required>
+                                <option value="Info">Thông tin</option>
+                                <option value="Success">Thành công</option>
+                                <option value="Warning">Cảnh báo</option>
+                                <option value="Error">Lỗi</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Nhóm người nhận</label>
+                            <select class="form-control" [(ngModel)]="broadcastData.role" name="role">
+                                <option value="">Tất cả người dùng</option>
+                                <option value="Admin">Admin</option>
+                                <option value="Doctor">Bác sĩ</option>
+                                <option value="Nurse">Y tá</option>
+                                <option value="Receptionist">Lễ tân</option>
+                                <option value="LabTechnician">Kỹ thuật viên</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn-secondary" (click)="showBroadcastModal = false">Hủy</button>
+                    <button type="submit" class="btn-primary">Phát</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    }
+
+    <!-- Success Toast -->
+    @if (toastMessage()) {
+    <div class="toast" [class]="toastType()">
+        {{ toastMessage() }}
+    </div>
+    }
+</div>

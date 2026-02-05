@@ -1,0 +1,100 @@
+<div class="dashboard-layout">
+    <header class="page-header">
+        <div class="header-title">
+            <h1>📋 Nhật ký hoạt động</h1>
+        </div>
+    </header>
+
+    <!-- Filters -->
+    <div class="card filter-card">
+        <div class="filter-row">
+            <div class="form-group">
+                <label>Loại entity</label>
+                <select [(ngModel)]="filters.entityType" (change)="search()">
+                    <option value="">Tất cả</option>
+                    <option value="Patient">Bệnh nhân</option>
+                    <option value="Couple">Cặp vợ chồng</option>
+                    <option value="TreatmentCycle">Chu kỳ điều trị</option>
+                    <option value="Appointment">Lịch hẹn</option>
+                    <option value="Invoice">Hóa đơn</option>
+                    <option value="User">Người dùng</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Hành động</label>
+                <select [(ngModel)]="filters.action" (change)="search()">
+                    <option value="">Tất cả</option>
+                    <option value="Create">Tạo mới</option>
+                    <option value="Update">Cập nhật</option>
+                    <option value="Delete">Xóa</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Từ ngày</label>
+                <input type="date" [(ngModel)]="fromDate" (change)="search()">
+            </div>
+            <div class="form-group">
+                <label>Đến ngày</label>
+                <input type="date" [(ngModel)]="toDate" (change)="search()">
+            </div>
+            <button class="btn-primary" (click)="search()">Tìm kiếm</button>
+        </div>
+    </div>
+
+    <!-- Logs Table -->
+    <div class="card">
+        <div class="section-header">
+            <h2>Danh sách nhật ký</h2>
+        </div>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Thời gian</th>
+                    <th>Người dùng</th>
+                    <th>Hành động</th>
+                    <th>Đối tượng</th>
+                    <th>Thay đổi</th>
+                    <th>IP</th>
+                </tr>
+            </thead>
+            <tbody>
+                @for (log of logs(); track log.id) {
+                <tr>
+                    <td class="time-cell">{{ formatDateTime(log.createdAt) }}</td>
+                    <td>{{ log.username || 'System' }}</td>
+                    <td>
+                        <span class="status-badge" [class]="log.action.toLowerCase()">{{ getActionLabel(log.action)
+                            }}</span>
+                    </td>
+                    <td>
+                        <div class="entity-type">{{ log.entityType }}</div>
+                        <div class="entity-id">{{ log.entityId.substring(0, 8) }}...</div>
+                    </td>
+                    <td class="changes-cell">
+                        @if (log.changedColumns) {
+                        <span class="changed-columns">{{ log.changedColumns }}</span>
+                        } @else if (log.action === 'Create') {
+                        <span class="new-record">Bản ghi mới</span>
+                        } @else if (log.action === 'Delete') {
+                        <span class="deleted-record">Đã xóa</span>
+                        }
+                    </td>
+                    <td class="ip-cell">{{ log.ipAddress || '-' }}</td>
+                </tr>
+                } @empty {
+                <tr>
+                    <td colspan="6" class="empty-state">Không có dữ liệu</td>
+                </tr>
+                }
+            </tbody>
+        </table>
+
+        <!-- Pagination -->
+        <div class="pagination">
+            <button class="btn-secondary" [disabled]="filters.page === 1" (click)="prevPage()">← Trước</button>
+            <span>Trang {{ filters.page }}</span>
+            <button class="btn-secondary" [disabled]="logs().length < filters.pageSize!" (click)="nextPage()">Sau
+                →</button>
+        </div>
+    </div>
+</div>

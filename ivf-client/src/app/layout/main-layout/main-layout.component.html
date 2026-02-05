@@ -1,0 +1,105 @@
+<div class="layout">
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <span class="logo">🏥</span>
+            <h2 style="color: #ffffff;">IVF System</h2>
+        </div>
+
+        <nav class="sidebar-nav">
+            <a routerLink="/dashboard" routerLinkActive="active" class="nav-item">
+                <span class="icon">📊</span> Dashboard
+            </a>
+            <a *ngIf="canView('ViewPatients')" routerLink="/reception" routerLinkActive="active" class="nav-item">
+                <span class="icon">🏥</span> Tiếp đón
+            </a>
+            <a *ngIf="canView('ViewPatients')" routerLink="/patients" routerLinkActive="active" class="nav-item">
+                <span class="icon">👥</span> Bệnh nhân
+            </a>
+            <a *ngIf="canView('ViewCouples')" routerLink="/couples" routerLinkActive="active" class="nav-item">
+                <span class="icon">💑</span> Cặp đôi
+            </a>
+            <a *ngIf="canView('ViewQueue')" routerLink="/queue/all" routerLinkActive="active" class="nav-item">
+                <span class="icon">🎫</span> Hàng đợi
+            </a>
+            <a *ngIf="canView('ViewCycles')" routerLink="/consultation" routerLinkActive="active" class="nav-item">
+                <span class="icon">🗣️</span> Tư vấn
+            </a>
+            <a *ngIf="canView('ViewUltrasounds')" routerLink="/ultrasound" routerLinkActive="active" class="nav-item">
+                <span class="icon">🔬</span> Siêu âm
+            </a>
+            <a *ngIf="canView('ViewLabResults')" routerLink="/lab" routerLinkActive="active" class="nav-item">
+                <span class="icon">🧫</span> Phòng Lab
+            </a>
+            <a *ngIf="canView('ViewAndrology')" routerLink="/andrology" routerLinkActive="active" class="nav-item">
+                <span class="icon">🔬</span> Nam khoa
+            </a>
+            <a *ngIf="canView('ViewCycles')" routerLink="/injection" routerLinkActive="active" class="nav-item">
+                <span class="icon">💉</span> Tiêm
+            </a>
+            <a *ngIf="canView('ViewSpermBank')" routerLink="/sperm-bank" routerLinkActive="active" class="nav-item">
+                <span class="icon">🏦</span> NHTT
+            </a>
+            <a *ngIf="canView('ViewPrescriptions')" routerLink="/pharmacy" routerLinkActive="active" class="nav-item">
+                <span class="icon">💊</span> Nhà thuốc
+            </a>
+            <a *ngIf="canView('ViewBilling')" routerLink="/billing" routerLinkActive="active" class="nav-item">
+                <span class="icon">💰</span> Hoá đơn
+            </a>
+            <a *ngIf="canView('ViewSchedule')" routerLink="/appointments" routerLinkActive="active" class="nav-item">
+                <span class="icon">📅</span> Lịch hẹn
+            </a>
+            <a *ngIf="canView('ViewReports')" routerLink="/reports" routerLinkActive="active" class="nav-item">
+                <span class="icon">📈</span> Báo cáo
+            </a>
+
+            <div *ngIf="isAdmin()"
+                style="margin-top: 16px; padding: 0 16px; font-size: 0.75rem; color: #94a3b8; font-weight: 600; text-transform: uppercase; margin-bottom: 8px;">
+                Quản trị
+            </div>
+
+            <a *ngIf="canView('ManageUsers')" routerLink="/admin/users" routerLinkActive="active" class="nav-item">
+                <span class="icon">👥</span> Người dùng
+            </a>
+            <a *ngIf="isAdmin()" routerLink="/admin/services" routerLinkActive="active" class="nav-item">
+                <span class="icon">📋</span> Danh mục DV
+            </a>
+            <a *ngIf="canView('ViewAuditLog')" routerLink="/admin/audit-logs" routerLinkActive="active"
+                class="nav-item">
+                <span class="icon">📝</span> Nhật ký
+            </a>
+            <a *ngIf="isAdmin()" routerLink="/admin/notifications" routerLinkActive="active" class="nav-item">
+                <span class="icon">🔔</span> Thông báo
+            </a>
+        </nav>
+
+        <div class="sidebar-footer">
+            <div class="user-info">
+                <span class="avatar">{{ getUserInitials() }}</span>
+                <div class="user-details">
+                    <strong>{{ authService.user()?.fullName }}</strong>
+                    <small>{{ authService.user()?.role }}</small>
+                </div>
+            </div>
+            <button class="btn-logout" (click)="logout()">🚪 Đăng xuất</button>
+        </div>
+    </aside>
+
+    <div class="main-wrapper">
+        <header class="top-header">
+            <div class="header-left">
+                <h1 class="page-title">{{ getPageTitle() }}</h1>
+            </div>
+            <div class="header-right">
+                <app-notification-bell></app-notification-bell>
+                <div class="user-avatar">{{ getUserInitials() }}</div>
+            </div>
+        </header>
+        <main class="main-content">
+            <router-outlet></router-outlet>
+        </main>
+    </div>
+
+    <!-- Toast Notifications -->
+    <app-toast-notification [show]="showToast" [title]="toastTitle" [message]="toastMessage" [type]="toastType"
+        (dismissed)="dismissToast()" (clicked)="handleToastClick()"></app-toast-notification>
+</div>

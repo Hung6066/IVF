@@ -1,0 +1,166 @@
+<div class="page-container">
+    <header class="page-header">
+        <div class="header-content">
+            <h1>📋 Danh mục dịch vụ</h1>
+            <p class="text-muted">Quản lý các dịch vụ, giá cả và danh mục</p>
+        </div>
+        <button class="btn-primary" (click)="openModal()">
+            <span class="icon">+</span> Thêm dịch vụ
+        </button>
+    </header>
+
+    <!-- Filters -->
+    <div class="filters-card">
+        <div class="filter-group">
+            <span class="search-icon">🔍</span>
+            <input type="text" [(ngModel)]="search" (keyup.enter)="loadServices()" placeholder="Tìm kiếm dịch vụ..."
+                class="search-input">
+        </div>
+
+        <select [(ngModel)]="categoryFilter" (change)="loadServices()" class="filter-select">
+            <option value="">Tất cả danh mục</option>
+            <option value="KhamBenh">Khám bệnh</option>
+            <option value="XetNghiem">Xét nghiệm</option>
+            <option value="SieuAm">Siêu âm</option>
+            <option value="ThuThuat">Thủ thuật</option>
+            <option value="Thuoc">Thuốc</option>
+            <option value="VatTu">Vật tư</option>
+        </select>
+
+        <button class="btn-secondary" (click)="loadServices()">Áp dụng</button>
+    </div>
+
+    <!-- Table -->
+    <div class="table-container">
+        <table class="premium-table">
+            <thead>
+                <tr>
+                    <th>Mã DV</th>
+                    <th>Tên dịch vụ</th>
+                    <th>Danh mục</th>
+                    <th class="text-end">Đơn giá</th>
+                    <th class="text-center">Trạng thái</th>
+                    <th class="text-end">Thao tác</th>
+                </tr>
+            </thead>
+            <tbody>
+                @for (service of services(); track service.id) {
+                <tr class="hover-row">
+                    <td><span class="code-tag">{{ service.code }}</span></td>
+                    <td>
+                        <div class="service-name">{{ service.name }}</div>
+                        <div class="service-desc" *ngIf="service.description">{{ service.description }}</div>
+                    </td>
+                    <td>
+                        <span class="category-badge">{{ service.category }}</span>
+                    </td>
+                    <td class="text-end font-weight-bold">{{ formatPrice(service.unitPrice) }}</td>
+                    <td class="text-center">
+                        <label class="switch">
+                            <input type="checkbox" [checked]="service.isActive" (change)="toggleStatus(service)">
+                            <span class="slider round"></span>
+                        </label>
+                    </td>
+                    <td class="text-end">
+                        <div class="action-buttons">
+                            <button class="btn-icon edit" (click)="openModal(service)" title="Chỉnh sửa">
+                                ✏️
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                } @empty {
+                <tr>
+                    <td colspan="6" class="empty-state">
+                        <div class="empty-content">
+                            <div class="empty-icon">📋</div>
+                            <h3>Không tìm thấy dữ liệu</h3>
+                        </div>
+                    </td>
+                </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    <div class="pagination-footer">
+        <span class="text-muted">Hiển thị {{ services().length }} kết quả</span>
+        <div class="pagination-buttons">
+            <button class="btn-page" [disabled]="page === 1" (click)="changePage(-1)">← Trước</button>
+            <span class="page-number">{{ page }}</span>
+            <button class="btn-page" [disabled]="services().length < pageSize" (click)="changePage(1)">Sau →</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal -->
+@if (showModal) {
+<div class="modal-backdrop" (click)="closeModal()">
+    <div class="modal-card" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+            <h2>{{ editingService ? 'Cập nhật dịch vụ' : 'Thêm dịch vụ mới' }}</h2>
+            <button class="close-btn" (click)="closeModal()">×</button>
+        </div>
+
+        <form (ngSubmit)="saveService()" class="modal-body">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Mã dịch vụ <span class="required">*</span></label>
+                    <input class="modern-input" [(ngModel)]="formData.code" name="code" required
+                        placeholder="VD: DV001">
+                </div>
+
+                <div class="form-group">
+                    <label>Danh mục <span class="required">*</span></label>
+                    <select class="modern-select" [(ngModel)]="formData.category" name="category" required>
+                        <option value="KhamBenh">Khám bệnh</option>
+                        <option value="XetNghiem">Xét nghiệm</option>
+                        <option value="SieuAm">Siêu âm</option>
+                        <option value="ThuThuat">Thủ thuật</option>
+                        <option value="Thuoc">Thuốc</option>
+                        <option value="VatTu">Vật tư</option>
+                    </select>
+                </div>
+
+                <div class="form-group full-width">
+                    <label>Tên dịch vụ <span class="required">*</span></label>
+                    <input class="modern-input" [(ngModel)]="formData.name" name="name" required
+                        placeholder="Nhập tên dịch vụ">
+                </div>
+
+                <div class="form-group">
+                    <label>Đơn giá (VNĐ) <span class="required">*</span></label>
+                    <input class="modern-input" type="number" [(ngModel)]="formData.unitPrice" name="price" required
+                        min="0">
+                </div>
+
+                <div class="form-group">
+                    <label>Đơn vị tính</label>
+                    <input class="modern-input" [(ngModel)]="formData.unit" name="unit" placeholder="Lần, Viên, Hộp...">
+                </div>
+
+                <div class="form-group full-width">
+                    <label>Mô tả</label>
+                    <textarea class="modern-input" [(ngModel)]="formData.description" name="description"
+                        rows="3"></textarea>
+                </div>
+
+                <div class="form-group full-width">
+                    <label class="checkbox-label">
+                        <input type="checkbox" [(ngModel)]="formData.isActive" name="isActive">
+                        <span>Đang hoạt động</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn-ghost" (click)="closeModal()">Hủy bỏ</button>
+                <button type="submit" class="btn-primary" [disabled]="loading()">
+                    {{ loading() ? 'Đang lưu...' : 'Lưu thông tin' }}
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+}
