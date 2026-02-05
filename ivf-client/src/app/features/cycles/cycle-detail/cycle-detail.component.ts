@@ -5,6 +5,7 @@ import { CycleService } from '../../../core/services/cycle.service';
 import { UltrasoundService } from '../../../core/services/ultrasound.service';
 import { EmbryoService } from '../../../core/services/embryo.service';
 import { TreatmentCycle, Embryo, Ultrasound } from '../../../core/models/api.models';
+import { GlobalNotificationService } from '../../../core/services/global-notification.service';
 import { IndicationTabComponent } from './tabs/indication-tab.component';
 import { StimulationTabComponent } from './tabs/stimulation-tab.component';
 import { CultureTabComponent } from './tabs/culture-tab.component';
@@ -37,13 +38,13 @@ export class CycleDetailComponent implements OnInit {
     private cycleService = inject(CycleService);
     private ultrasoundService = inject(UltrasoundService);
     private embryoService = inject(EmbryoService);
+    private notificationService = inject(GlobalNotificationService);
 
     cycle = signal<TreatmentCycle | null>(null);
     ultrasounds = signal<Ultrasound[]>([]);
     embryos = signal<Embryo[]>([]);
     cycleId = signal<string>('');
     activeTab = signal<string>('indication');
-    toastMessage = signal<string>('');
 
     phases = [
         { key: 'Consultation', name: 'Tư vấn' },
@@ -89,12 +90,7 @@ export class CycleDetailComponent implements OnInit {
     }
 
     onTabSaved(): void {
-        this.showToast('Đã lưu thành công!');
-    }
-
-    showToast(message: string): void {
-        this.toastMessage.set(message);
-        setTimeout(() => this.toastMessage.set(''), 3000);
+        this.notificationService.success('Thành công', 'Đã lưu thành công!');
     }
 
     getMethodName(method?: string): string {

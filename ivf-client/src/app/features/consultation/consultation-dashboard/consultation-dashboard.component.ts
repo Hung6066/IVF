@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { ConsultationService } from './consultation.service';
 import { QueueTicket } from '../../../core/models/api.models';
+import { GlobalNotificationService } from '../../../core/services/global-notification.service';
 
 @Component({
   selector: 'app-consultation-dashboard',
@@ -14,6 +15,7 @@ import { QueueTicket } from '../../../core/models/api.models';
 })
 export class ConsultationDashboardComponent implements OnInit {
   private service = inject(ConsultationService);
+  private notificationService = inject(GlobalNotificationService);
 
   activeTab = 'queue';
   queue = signal<QueueTicket[]>([]);
@@ -44,9 +46,9 @@ export class ConsultationDashboardComponent implements OnInit {
     this.service.callPatient(q.id).subscribe({
       next: () => {
         this.refreshQueue();
-        alert(`Đang gọi mời ${q.patientName}`);
+        this.notificationService.info('Đang gọi', `Đang gọi mời ${q.patientName}`);
       },
-      error: err => alert('Lỗi: ' + err.message)
+      error: err => this.notificationService.error('Lỗi', 'Lỗi: ' + err.message)
     });
   }
 
@@ -59,7 +61,7 @@ export class ConsultationDashboardComponent implements OnInit {
   submitConsult() {
     if (!this.currentTicketId) return;
     this.service.completeTicket(this.currentTicketId).subscribe(() => {
-      alert('Đã hoàn thành tư vấn!');
+      this.notificationService.success('Thành công', 'Đã hoàn thành tư vấn!');
       this.showForm = false;
       this.consultNotes = '';
       this.currentTicketId = null;

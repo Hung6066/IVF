@@ -7,6 +7,8 @@ import { Patient } from '../../../core/models/api.models';
 import { CatalogService } from '../../../core/services/catalog.service';
 import { Observable, forkJoin } from 'rxjs';
 
+import { GlobalNotificationService } from '../../../core/services/global-notification.service';
+
 @Component({
   selector: 'app-reception-dashboard',
   standalone: true,
@@ -18,6 +20,7 @@ export class ReceptionDashboardComponent implements OnInit {
   private service = inject(ReceptionService);
   private router = inject(Router);
   private catalogService = inject(CatalogService);
+  private notificationService = inject(GlobalNotificationService);
 
   services = signal<any[]>([]);
 
@@ -171,12 +174,12 @@ export class ReceptionDashboardComponent implements OnInit {
     if (requests.length > 0) {
       forkJoin(requests).subscribe({
         next: (results) => {
-          alert(`Đã phát ${results.length} phiếu khám thành công!`);
+          this.notificationService.success('Thành công', `Đã phát ${results.length} phiếu khám thành công!`);
           this.showCheckinModal = false;
           this.refreshQueue();
         },
         error: (err) => {
-          alert('Có lỗi xảy ra: ' + (err.error || err.message));
+          this.notificationService.error('Lỗi', 'Có lỗi xảy ra: ' + (err.error || err.message));
         }
       });
     }

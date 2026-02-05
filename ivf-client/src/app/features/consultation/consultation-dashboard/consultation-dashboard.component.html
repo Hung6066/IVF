@@ -87,19 +87,25 @@
     @if (showForm) {
     <div class="modal-overlay" (click)="showForm = false">
         <div class="modal-content" (click)="$event.stopPropagation()">
-            <h3>📝 Ghi nhận tư vấn</h3>
-            <div class="patient-info">
-                <strong>BN: </strong> {{ currentPatientName }}
+            <div class="modal-header">
+                <h3>📝 Ghi nhận tư vấn</h3>
+                <button class="close-btn" (click)="showForm = false">&times;</button>
             </div>
 
             <form (ngSubmit)="submitConsult()">
-                <div class="form-group">
-                    <label class="form-label">Ghi chú tư vấn</label>
-                    <textarea class="form-control" [(ngModel)]="consultNotes" name="notes" rows="5"
-                        placeholder="Nội dung tư vấn..."></textarea>
+                <div class="modal-body">
+                    <div class="patient-info-summary">
+                        <strong>BN: </strong> {{ currentPatientName }}
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Ghi chú tư vấn</label>
+                        <textarea class="form-control" [(ngModel)]="consultNotes" name="notes" rows="5"
+                            placeholder="Nội dung tư vấn..."></textarea>
+                    </div>
                 </div>
 
-                <div class="modal-actions">
+                <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" (click)="showForm = false">Huỷ</button>
                     <button type="submit" class="btn btn-primary">Hoàn thành & Lưu</button>
                 </div>

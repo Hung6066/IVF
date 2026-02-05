@@ -4,12 +4,12 @@ import { RouterModule, Router } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
 import { SignalRService } from '../../core/services/signalr.service';
 import { NotificationBellComponent } from '../../shared/components/notification-bell/notification-bell.component';
-import { ToastNotificationComponent } from '../../shared/components/toast-notification/toast-notification.component';
+import { GlobalToastComponent } from '../../shared/components/global-toast/global-toast.component';
 
 @Component({
   selector: 'app-main-layout',
   standalone: true,
-  imports: [CommonModule, RouterModule, NotificationBellComponent, ToastNotificationComponent],
+  imports: [CommonModule, RouterModule, NotificationBellComponent, GlobalToastComponent],
   templateUrl: './main-layout.component.html',
   styleUrls: ['./main-layout.component.scss']
 })

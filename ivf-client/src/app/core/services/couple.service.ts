@@ -14,7 +14,7 @@ export class CoupleService {
     }
 
     getCoupleByPatient(patientId: string): Observable<Couple> {
-        return this.http.get<Couple>(`${this.baseUrl}/couples/by-patient/${patientId}`);
+        return this.http.get<Couple>(`${this.baseUrl}/couples/patient/${patientId}`);
     }
 
     createCouple(couple: any): Observable<string> {

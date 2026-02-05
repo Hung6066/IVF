@@ -2,6 +2,7 @@ import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { NotificationService } from '../../../core/services/notification.service';
+import { GlobalNotificationService } from '../../../core/services/global-notification.service';
 import { Notification, NotificationType, CreateNotificationRequest, BroadcastNotificationRequest } from '../../../core/models/api.models';
 
 @Component({
@@ -32,10 +33,10 @@ export class NotificationManagementComponent implements OnInit {
     type: 'Info'
   };
 
-  toastMessage = signal('');
-  toastType = signal('success');
-
-  constructor(private notificationService: NotificationService) { }
+  constructor(
+    private notificationService: NotificationService,
+    private globalNotificationService: GlobalNotificationService
+  ) { }
 
   ngOnInit() {
     this.loadNotifications();
@@ -106,10 +107,10 @@ export class NotificationManagementComponent implements OnInit {
         next: () => {
           this.showCreateModal = false;
           this.newNotification = { type: 'Info' };
-          this.showToast('Đã tạo thông báo thành công', 'success');
+          this.globalNotificationService.success('Thành công', 'Đã tạo thông báo thành công');
           this.loadNotifications();
         },
-        error: () => this.showToast('Lỗi khi tạo thông báo', 'error')
+        error: () => this.globalNotificationService.error('Lỗi', 'Lỗi khi tạo thông báo')
       });
     }
   }
@@ -120,18 +121,12 @@ export class NotificationManagementComponent implements OnInit {
         next: (res) => {
           this.showBroadcastModal = false;
           this.broadcastData = { type: 'Info' };
-          this.showToast(`Đã gửi thông báo đến ${res.sent} người dùng`, 'success');
+          this.globalNotificationService.success('Thành công', `Đã gửi thông báo đến ${res.sent} người dùng`);
           this.loadNotifications();
         },
-        error: () => this.showToast('Lỗi khi phát thông báo', 'error')
+        error: () => this.globalNotificationService.error('Lỗi', 'Lỗi khi phát thông báo')
       });
     }
-  }
-
-  showToast(message: string, type: 'success' | 'error') {
-    this.toastMessage.set(message);
-    this.toastType.set(type);
-    setTimeout(() => this.toastMessage.set(''), 3000);
   }
 
   formatTime(dateStr: string): string {
