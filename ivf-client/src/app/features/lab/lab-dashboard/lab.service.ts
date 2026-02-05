@@ -1,5 +1,6 @@
 import { Injectable, signal } from '@angular/core';
-import { ApiService } from '../../../core/services/api.service';
+import { QueueService } from '../../../core/services/queue.service';
+import { EmbryoService } from '../../../core/services/embryo.service';
 import { Observable, of } from 'rxjs';
 import { map, delay } from 'rxjs/operators';
 import { EmbryoCard, ScheduleItem, CryoLocation, QueueItem, LabStats } from './lab-dashboard.models';
@@ -8,10 +9,10 @@ import { EmbryoCard, ScheduleItem, CryoLocation, QueueItem, LabStats } from './l
     providedIn: 'root'
 })
 export class LabService {
-    constructor(private api: ApiService) { }
+    constructor(private queueService: QueueService, private embryoService: EmbryoService) { }
 
     getQueue(): Observable<QueueItem[]> {
-        return this.api.getQueueByDept('LAB').pipe(
+        return this.queueService.getQueueByDept('LAB').pipe(
             map((data: any[]) => data.map((item, index) => ({
                 id: item.id || String(index),
                 number: item.ticketNumber,
@@ -24,11 +25,11 @@ export class LabService {
     }
 
     callPatient(id: string): Observable<any> {
-        return this.api.callTicket(id);
+        return this.queueService.callTicket(id);
     }
 
     getEmbryos(): Observable<EmbryoCard[]> {
-        return this.api.getActiveEmbryos().pipe(
+        return this.embryoService.getActiveEmbryos().pipe(
             map((data: any[]) => data.map(e => ({
                 id: e.id,
                 cycleCode: e.cycleCode,
@@ -54,7 +55,7 @@ export class LabService {
     }
 
     getCryoLocations(): Observable<CryoLocation[]> {
-        return this.api.getCryoStats().pipe(
+        return this.embryoService.getCryoStats().pipe(
             map((data: any[]) => data.map(s => ({
                 tank: s.tank,
                 canister: s.canisterCount,

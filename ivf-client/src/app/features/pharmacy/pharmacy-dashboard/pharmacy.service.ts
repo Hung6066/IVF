@@ -1,5 +1,4 @@
 import { Injectable, signal } from '@angular/core';
-import { ApiService } from '../../../core/services/api.service';
 import { Observable, of } from 'rxjs';
 
 // Define local interfaces for Mock data since real API might not exist yet for Inventory
@@ -53,7 +52,7 @@ export class PharmacyService {
         { id: '1', code: 'NK-001', date: '01/02/2024', supplier: 'Dược phẩm ABC', items: 15, total: 125000000, status: 'Hoàn thành' }
     ];
 
-    constructor(private api: ApiService) { }
+    constructor() { }
 
     getDrugs(): Observable<Drug[]> {
         return of(this.drugs);

@@ -1,5 +1,5 @@
 import { Injectable, signal } from '@angular/core';
-import { ApiService } from '../../../core/services/api.service';
+import { QueueService } from '../../../core/services/queue.service';
 import { Observable, of } from 'rxjs';
 import { map, catchError } from 'rxjs/operators';
 
@@ -43,10 +43,10 @@ export interface SpermWashing {
     providedIn: 'root'
 })
 export class AndrologyService {
-    constructor(private api: ApiService) { }
+    constructor(private queueService: QueueService) { }
 
     getQueue(): Observable<AndrologyQueueItem[]> {
-        return this.api.getQueueByDept('NAM').pipe(
+        return this.queueService.getQueueByDept('NAM').pipe(
             map((data: any[]) => data.map((item, index) => ({
                 id: item.id || String(index),
                 number: item.ticketNumber,
@@ -60,7 +60,7 @@ export class AndrologyService {
     }
 
     callPatient(id: string): Observable<any> {
-        return this.api.callTicket(id);
+        return this.queueService.callTicket(id);
     }
 
     // Mock API calls for Andrology specific data until real endpoints exist

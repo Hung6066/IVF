@@ -2,7 +2,7 @@ import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
-import { ApiService } from '../../../core/services/api.service';
+import { CycleService } from '../../../core/services/cycle.service';
 
 @Component({
   selector: 'app-cycle-form',
@@ -31,7 +31,7 @@ export class CycleFormComponent implements OnInit {
   constructor(
     private route: ActivatedRoute,
     private router: Router,
-    private api: ApiService
+    private cycleService: CycleService
   ) { }
 
   ngOnInit(): void {
@@ -44,15 +44,15 @@ export class CycleFormComponent implements OnInit {
     if (!this.formData.method || !this.coupleId) return;
 
     this.saving.set(true);
-    this.api.createCycle({
+    this.cycleService.createCycle({
       coupleId: this.coupleId,
-      method: this.formData.method,
+      method: this.formData.method as any,
       startDate: this.formData.startDate,
       notes: this.formData.notes || undefined
     }).subscribe({
-      next: (cycle) => {
+      next: (id) => { // createCycle returns string (id) in CycleService? Let's check. Yes, verify createCycle signature.
         this.saving.set(false);
-        this.router.navigate(['/cycles', cycle.id]);
+        this.router.navigate(['/cycles', id]);
       },
       error: () => this.saving.set(false)
     });

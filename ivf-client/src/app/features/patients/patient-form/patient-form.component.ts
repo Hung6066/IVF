@@ -2,7 +2,7 @@ import { Component, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
-import { ApiService } from '../../../core/services/api.service';
+import { PatientService } from '../../../core/services/patient.service';
 
 @Component({
   selector: 'app-patient-form',
@@ -26,7 +26,7 @@ export class PatientFormComponent {
     address: ''
   };
 
-  constructor(private api: ApiService, private router: Router) { }
+  constructor(private patientService: PatientService, private router: Router) { }
 
   submit(): void {
     if (!this.formData.fullName || !this.formData.dateOfBirth) {
@@ -34,7 +34,7 @@ export class PatientFormComponent {
     }
 
     this.saving.set(true);
-    this.api.createPatient(this.formData as any).subscribe({
+    this.patientService.createPatient(this.formData as any).subscribe({
       next: (patient) => {
         this.saving.set(false);
         this.router.navigate(['/patients', patient.id]);

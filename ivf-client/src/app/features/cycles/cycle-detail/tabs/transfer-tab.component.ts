@@ -1,7 +1,7 @@
 import { Component, Input, Output, EventEmitter, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
-import { ApiService } from '../../../../core/services/api.service';
+import { CycleService } from '../../../../core/services/cycle.service';
 
 @Component({
     selector: 'app-transfer-tab',
@@ -62,7 +62,7 @@ export class TransferTabComponent implements OnInit {
     @Output() saved = new EventEmitter<void>();
 
     private fb = inject(FormBuilder);
-    private api = inject(ApiService);
+    private cycleService = inject(CycleService);
     form!: FormGroup;
     loading = false;
 
@@ -77,7 +77,7 @@ export class TransferTabComponent implements OnInit {
     }
 
     loadData(): void {
-        this.api.getCycleTransfer(this.cycleId).subscribe({
+        this.cycleService.getCycleTransfer(this.cycleId).subscribe({
             next: (data) => {
                 if (data) {
                     this.form.patchValue({
@@ -95,7 +95,7 @@ export class TransferTabComponent implements OnInit {
     onSubmit(): void {
         if (this.loading) return;
         this.loading = true;
-        this.api.updateCycleTransfer(this.cycleId, this.form.value).subscribe({
+        this.cycleService.updateCycleTransfer(this.cycleId, this.form.value).subscribe({
             next: () => { this.loading = false; this.saved.emit(); },
             error: () => { this.loading = false; }
         });

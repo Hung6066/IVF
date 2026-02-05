@@ -1,7 +1,8 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ApiService, AuditLog, AuditSearchParams } from '../../../core/services/api.service';
+import { AuditService } from '../../../core/services/audit.service';
+import { AuditLog, AuditSearchParams } from '../../../core/models/api.models';
 
 @Component({
   selector: 'app-audit-logs',
@@ -337,14 +338,14 @@ export class AuditLogsComponent implements OnInit {
   fromDate = '';
   toDate = '';
 
-  constructor(private api: ApiService) { }
+  constructor(private auditService: AuditService) { }
 
   ngOnInit() {
     this.loadLogs();
   }
 
   loadLogs() {
-    this.api.getRecentAuditLogs(100).subscribe((logs: AuditLog[]) => {
+    this.auditService.getRecentAuditLogs(100).subscribe((logs: AuditLog[]) => {
       this.logs.set(logs);
     });
   }
@@ -355,7 +356,7 @@ export class AuditLogsComponent implements OnInit {
       from: this.fromDate ? new Date(this.fromDate) : undefined,
       to: this.toDate ? new Date(this.toDate) : undefined
     };
-    this.api.searchAuditLogs(params).subscribe((logs: AuditLog[]) => {
+    this.auditService.searchAuditLogs(params).subscribe((logs: AuditLog[]) => {
       this.logs.set(logs);
     });
   }

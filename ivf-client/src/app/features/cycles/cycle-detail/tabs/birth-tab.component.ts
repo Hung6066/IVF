@@ -1,13 +1,13 @@
 import { Component, Input, Output, EventEmitter, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
-import { ApiService } from '../../../../core/services/api.service';
+import { CycleService } from '../../../../core/services/cycle.service';
 
 @Component({
-    selector: 'app-birth-tab',
-    standalone: true,
-    imports: [CommonModule, ReactiveFormsModule],
-    template: `
+  selector: 'app-birth-tab',
+  standalone: true,
+  imports: [CommonModule, ReactiveFormsModule],
+  template: `
     <form [formGroup]="form" (ngSubmit)="onSubmit()" class="phase-form">
       <div class="form-section">
         <h3>Thông tin sinh</h3>
@@ -65,7 +65,7 @@ import { ApiService } from '../../../../core/services/api.service';
       </div>
     </form>
   `,
-    styles: [`
+  styles: [`
     .phase-form { padding: 1rem; }
     .form-section { margin-bottom: 1.5rem; padding: 1rem; background: var(--surface-elevated); border-radius: 8px; }
     .form-section h3 { margin: 0 0 1rem; font-size: 1rem; }
@@ -83,54 +83,54 @@ import { ApiService } from '../../../../core/services/api.service';
   `]
 })
 export class BirthTabComponent implements OnInit {
-    @Input() cycleId!: string;
-    @Output() saved = new EventEmitter<void>();
+  @Input() cycleId!: string;
+  @Output() saved = new EventEmitter<void>();
 
-    private fb = inject(FormBuilder);
-    private api = inject(ApiService);
-    form!: FormGroup;
-    loading = false;
+  private fb = inject(FormBuilder);
+  private cycleService = inject(CycleService);
+  form!: FormGroup;
+  loading = false;
 
-    ngOnInit(): void {
-        this.form = this.fb.group({
-            deliveryDate: [''],
-            gestationalWeeks: [null],
-            deliveryMethod: [''],
-            liveBirths: [0],
-            stillbirths: [0],
-            babyGenders: [''],
-            birthWeights: [''],
-            complications: ['']
-        });
-        this.loadData();
-    }
+  ngOnInit(): void {
+    this.form = this.fb.group({
+      deliveryDate: [''],
+      gestationalWeeks: [null],
+      deliveryMethod: [''],
+      liveBirths: [0],
+      stillbirths: [0],
+      babyGenders: [''],
+      birthWeights: [''],
+      complications: ['']
+    });
+    this.loadData();
+  }
 
-    loadData(): void {
-        this.api.getCycleBirth(this.cycleId).subscribe({
-            next: (data) => {
-                if (data) {
-                    this.form.patchValue({
-                        deliveryDate: data.deliveryDate?.split('T')[0] || '',
-                        gestationalWeeks: data.gestationalWeeks,
-                        deliveryMethod: data.deliveryMethod || '',
-                        liveBirths: data.liveBirths,
-                        stillbirths: data.stillbirths,
-                        babyGenders: data.babyGenders || '',
-                        birthWeights: data.birthWeights || '',
-                        complications: data.complications || ''
-                    });
-                }
-            },
-            error: () => { }
-        });
-    }
+  loadData(): void {
+    this.cycleService.getCycleBirth(this.cycleId).subscribe({
+      next: (data) => {
+        if (data) {
+          this.form.patchValue({
+            deliveryDate: data.deliveryDate?.split('T')[0] || '',
+            gestationalWeeks: data.gestationalWeeks,
+            deliveryMethod: data.deliveryMethod || '',
+            liveBirths: data.liveBirths,
+            stillbirths: data.stillbirths,
+            babyGenders: data.babyGenders || '',
+            birthWeights: data.birthWeights || '',
+            complications: data.complications || ''
+          });
+        }
+      },
+      error: () => { }
+    });
+  }
 
-    onSubmit(): void {
-        if (this.loading) return;
-        this.loading = true;
-        this.api.updateCycleBirth(this.cycleId, this.form.value).subscribe({
-            next: () => { this.loading = false; this.saved.emit(); },
-            error: () => { this.loading = false; }
-        });
-    }
+  onSubmit(): void {
+    if (this.loading) return;
+    this.loading = true;
+    this.cycleService.updateCycleBirth(this.cycleId, this.form.value).subscribe({
+      next: () => { this.loading = false; this.saved.emit(); },
+      error: () => { this.loading = false; }
+    });
+  }
 }

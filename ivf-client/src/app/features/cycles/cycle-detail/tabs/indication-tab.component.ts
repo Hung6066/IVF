@@ -1,7 +1,7 @@
 import { Component, Input, Output, EventEmitter, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
-import { ApiService } from '../../../../core/services/api.service';
+import { CycleService } from '../../../../core/services/cycle.service';
 import { TreatmentIndication } from '../../../../core/models/api.models';
 
 @Component({
@@ -144,7 +144,7 @@ export class IndicationTabComponent implements OnInit {
     @Output() saved = new EventEmitter<void>();
 
     private fb = inject(FormBuilder);
-    private api = inject(ApiService);
+    private cycleService = inject(CycleService);
 
     form!: FormGroup;
     loading = false;
@@ -175,7 +175,7 @@ export class IndicationTabComponent implements OnInit {
     }
 
     loadData(): void {
-        this.api.getCycleIndication(this.cycleId).subscribe({
+        this.cycleService.getCycleIndication(this.cycleId).subscribe({
             next: (data) => {
                 if (data) {
                     this.form.patchValue({
@@ -209,7 +209,7 @@ export class IndicationTabComponent implements OnInit {
         this.loading = true;
 
         const formVal = this.form.value;
-        this.api.updateCycleIndication(this.cycleId, {
+        this.cycleService.updateCycleIndication(this.cycleId, {
             ...formVal,
             lastMenstruation: formVal.lastMenstruation || undefined
         }).subscribe({

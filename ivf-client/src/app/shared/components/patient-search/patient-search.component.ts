@@ -1,16 +1,16 @@
 import { Component, EventEmitter, Input, OnInit, Output, signal, OnChanges, SimpleChanges, forwardRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, NG_VALUE_ACCESSOR, ControlValueAccessor } from '@angular/forms';
-import { ApiService } from '../../../core/services/api.service';
+import { PatientService } from '../../../core/services/patient.service';
 import { Patient } from '../../../core/models/api.models';
 import { Subject } from 'rxjs';
 import { debounceTime, distinctUntilChanged, switchMap, tap } from 'rxjs/operators';
 
 @Component({
-    selector: 'app-patient-search',
-    standalone: true,
-    imports: [CommonModule, FormsModule],
-    template: `
+  selector: 'app-patient-search',
+  standalone: true,
+  imports: [CommonModule, FormsModule],
+  template: `
     <div class="patient-search-container">
       <div class="search-input-wrapper">
         <input 
@@ -55,7 +55,7 @@ import { debounceTime, distinctUntilChanged, switchMap, tap } from 'rxjs/operato
       }
     </div>
   `,
-    styles: [`
+  styles: [`
     .patient-search-container {
       position: relative;
       width: 100%;
@@ -186,119 +186,119 @@ import { debounceTime, distinctUntilChanged, switchMap, tap } from 'rxjs/operato
       to { transform: rotate(360deg); }
     }
   `],
-    providers: [
-        {
-            provide: NG_VALUE_ACCESSOR,
-            useExisting: forwardRef(() => PatientSearchComponent),
-            multi: true
-        }
-    ]
+  providers: [
+    {
+      provide: NG_VALUE_ACCESSOR,
+      useExisting: forwardRef(() => PatientSearchComponent),
+      multi: true
+    }
+  ]
 })
 export class PatientSearchComponent implements OnInit, ControlValueAccessor {
-    @Input() placeholder = 'Tìm kiếm theo tên / mã / SĐT...';
-    @Input() invalid = false;
-    @Input() genderFilter: 'Male' | 'Female' | null = null;
+  @Input() placeholder = 'Tìm kiếm theo tên / mã / SĐT...';
+  @Input() invalid = false;
+  @Input() genderFilter: 'Male' | 'Female' | null = null;
 
-    @Output() patientSelected = new EventEmitter<Patient | null>();
+  @Output() patientSelected = new EventEmitter<Patient | null>();
 
-    searchTerm = '';
-    results = signal<Patient[]>([]);
-    isLoading = signal(false);
-    showDropdown = false;
-    selectedPatient = signal<Patient | null>(null);
+  searchTerm = '';
+  results = signal<Patient[]>([]);
+  isLoading = signal(false);
+  showDropdown = false;
+  selectedPatient = signal<Patient | null>(null);
 
-    private searchSubject = new Subject<string>();
+  private searchSubject = new Subject<string>();
 
-    // ControlValueAccessor callbacks
-    onChange: any = () => { };
-    onTouched: any = () => { };
+  // ControlValueAccessor callbacks
+  onChange: any = () => { };
+  onTouched: any = () => { };
 
-    get isInvalid() {
-        return this.invalid;
-    }
+  get isInvalid() {
+    return this.invalid;
+  }
 
-    constructor(private api: ApiService) { }
+  constructor(private patientService: PatientService) { }
 
-    ngOnInit() {
-        this.searchSubject.pipe(
-            debounceTime(300),
-            distinctUntilChanged(),
-            tap(() => this.isLoading.set(true)),
-            switchMap(term => {
-                if (!term || term.length < 2) {
-                    this.isLoading.set(false);
-                    return [];
-                }
-                return this.api.searchPatients(term);
-            })
-        ).subscribe({
-            next: (response: any) => { // Type assertion as searchPatients might return wrapper
-                this.isLoading.set(false);
-                // Handle both paginated response and array if needed, assuming current API returns wrapper
-                let items = response.items || [];
-                if (this.genderFilter) {
-                    items = items.filter((p: Patient) => p.gender === this.genderFilter);
-                }
-                this.results.set(items);
-                this.showDropdown = true;
-            },
-            error: () => this.isLoading.set(false)
-        });
-    }
-
-    onSearch(event: Event) {
-        const term = (event.target as HTMLInputElement).value;
-        this.searchTerm = term;
-        this.searchSubject.next(term);
-        this.showDropdown = true;
-    }
-
-    selectPatient(patient: Patient) {
-        this.selectedPatient.set(patient);
-        this.searchTerm = `${patient.fullName}`;
-        this.showDropdown = false;
-        this.results.set([]);
-
-        // Emit value
-        this.onChange(patient.id);
-        this.patientSelected.emit(patient);
-    }
-
-    clearSelection() {
-        this.selectedPatient.set(null);
-        this.searchTerm = '';
-        this.onChange(null);
-        this.patientSelected.emit(null);
-    }
-
-    // Value Accessor Standard Methods
-    writeValue(obj: any): void {
-        if (obj) {
-            // If we have an ID, we might need to fetch the patient name if not already loaded
-            this.api.getPatient(obj).subscribe(p => {
-                this.selectedPatient.set(p);
-                this.searchTerm = p.fullName;
-            });
-        } else {
-            this.selectedPatient.set(null);
-            this.searchTerm = '';
+  ngOnInit() {
+    this.searchSubject.pipe(
+      debounceTime(300),
+      distinctUntilChanged(),
+      tap(() => this.isLoading.set(true)),
+      switchMap(term => {
+        if (!term || term.length < 2) {
+          this.isLoading.set(false);
+          return [];
         }
-    }
+        return this.patientService.searchPatients(term);
+      })
+    ).subscribe({
+      next: (response: any) => { // Type assertion as searchPatients might return wrapper
+        this.isLoading.set(false);
+        // Handle both paginated response and array if needed, assuming current API returns wrapper
+        let items = response.items || [];
+        if (this.genderFilter) {
+          items = items.filter((p: Patient) => p.gender === this.genderFilter);
+        }
+        this.results.set(items);
+        this.showDropdown = true;
+      },
+      error: () => this.isLoading.set(false)
+    });
+  }
 
-    registerOnChange(fn: any): void {
-        this.onChange = fn;
-    }
+  onSearch(event: Event) {
+    const term = (event.target as HTMLInputElement).value;
+    this.searchTerm = term;
+    this.searchSubject.next(term);
+    this.showDropdown = true;
+  }
 
-    registerOnTouched(fn: any): void {
-        this.onTouched = fn;
-    }
+  selectPatient(patient: Patient) {
+    this.selectedPatient.set(patient);
+    this.searchTerm = `${patient.fullName}`;
+    this.showDropdown = false;
+    this.results.set([]);
 
-    setDisabledState?(isDisabled: boolean): void {
-        // Implement if needed
-    }
+    // Emit value
+    this.onChange(patient.id);
+    this.patientSelected.emit(patient);
+  }
 
-    formatDate(dateStr: string): string {
-        if (!dateStr) return '';
-        return new Date(dateStr).toLocaleDateString('vi-VN');
+  clearSelection() {
+    this.selectedPatient.set(null);
+    this.searchTerm = '';
+    this.onChange(null);
+    this.patientSelected.emit(null);
+  }
+
+  // Value Accessor Standard Methods
+  writeValue(obj: any): void {
+    if (obj) {
+      // If we have an ID, we might need to fetch the patient name if not already loaded
+      this.patientService.getPatient(obj).subscribe(p => {
+        this.selectedPatient.set(p);
+        this.searchTerm = p.fullName;
+      });
+    } else {
+      this.selectedPatient.set(null);
+      this.searchTerm = '';
     }
+  }
+
+  registerOnChange(fn: any): void {
+    this.onChange = fn;
+  }
+
+  registerOnTouched(fn: any): void {
+    this.onTouched = fn;
+  }
+
+  setDisabledState?(isDisabled: boolean): void {
+    // Implement if needed
+  }
+
+  formatDate(dateStr: string): string {
+    if (!dateStr) return '';
+    return new Date(dateStr).toLocaleDateString('vi-VN');
+  }
 }

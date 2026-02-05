@@ -2,7 +2,7 @@ import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
-import { ApiService } from '../../../core/services/api.service';
+import { CoupleService } from '../../../core/services/couple.service';
 import { Couple } from '../../../core/models/api.models';
 
 @Component({
@@ -15,10 +15,10 @@ import { Couple } from '../../../core/models/api.models';
 export class CoupleListComponent implements OnInit {
     couples = signal<Couple[]>([]);
 
-    constructor(private api: ApiService) { }
+    constructor(private coupleService: CoupleService) { }
 
     ngOnInit(): void {
-        this.api.getCouples().subscribe(c => this.couples.set(c));
+        this.coupleService.getCouples().subscribe(c => this.couples.set(c));
     }
 
     formatDate(date?: string): string {

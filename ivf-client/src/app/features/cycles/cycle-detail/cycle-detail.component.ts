@@ -1,8 +1,9 @@
 import { Component, OnInit, signal, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterModule } from '@angular/router';
-import { CycleService } from './cycle.service';
-import { ApiService } from '../../../core/services/api.service';
+import { CycleService } from '../../../core/services/cycle.service';
+import { UltrasoundService } from '../../../core/services/ultrasound.service';
+import { EmbryoService } from '../../../core/services/embryo.service';
 import { TreatmentCycle, Embryo, Ultrasound } from '../../../core/models/api.models';
 import { IndicationTabComponent } from './tabs/indication-tab.component';
 import { StimulationTabComponent } from './tabs/stimulation-tab.component';
@@ -33,8 +34,9 @@ interface Tab {
 })
 export class CycleDetailComponent implements OnInit {
     private route = inject(ActivatedRoute);
-    private service = inject(CycleService);
-    private api = inject(ApiService);
+    private cycleService = inject(CycleService);
+    private ultrasoundService = inject(UltrasoundService);
+    private embryoService = inject(EmbryoService);
 
     cycle = signal<TreatmentCycle | null>(null);
     ultrasounds = signal<Ultrasound[]>([]);
@@ -77,9 +79,9 @@ export class CycleDetailComponent implements OnInit {
     }
 
     loadData(id: string) {
-        this.service.getCycle(id).subscribe(c => this.cycle.set(c));
-        this.service.getUltrasounds(id).subscribe(u => this.ultrasounds.set(u));
-        this.service.getEmbryos(id).subscribe(e => this.embryos.set(e));
+        this.cycleService.getCycle(id).subscribe((c: TreatmentCycle) => this.cycle.set(c));
+        this.ultrasoundService.getUltrasoundsByCycle(id).subscribe((u: Ultrasound[]) => this.ultrasounds.set(u));
+        this.embryoService.getEmbryosByCycle(id).subscribe((e: Embryo[]) => this.embryos.set(e));
     }
 
     selectTab(tabKey: string): void {
@@ -139,7 +141,7 @@ export class CycleDetailComponent implements OnInit {
         const currentIndex = this.phases.findIndex(p => p.key === c.phase);
         if (currentIndex < this.phases.length - 1) {
             const nextPhase = this.phases[currentIndex + 1].key;
-            this.service.advancePhase(c.id, nextPhase).subscribe(updatedCycle => {
+            this.cycleService.advanceCyclePhase(c.id, nextPhase).subscribe((updatedCycle: TreatmentCycle) => {
                 this.cycle.set(updatedCycle);
             });
         }

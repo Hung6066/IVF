@@ -1,7 +1,7 @@
 import { Component, Input, Output, EventEmitter, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
-import { ApiService } from '../../../../core/services/api.service';
+import { CycleService } from '../../../../core/services/cycle.service';
 
 @Component({
     selector: 'app-pregnancy-tab',
@@ -84,7 +84,7 @@ export class PregnancyTabComponent implements OnInit {
     @Output() saved = new EventEmitter<void>();
 
     private fb = inject(FormBuilder);
-    private api = inject(ApiService);
+    private cycleService = inject(CycleService);
     form!: FormGroup;
     loading = false;
 
@@ -102,7 +102,7 @@ export class PregnancyTabComponent implements OnInit {
     }
 
     loadData(): void {
-        this.api.getCyclePregnancy(this.cycleId).subscribe({
+        this.cycleService.getCyclePregnancy(this.cycleId).subscribe({
             next: (data) => {
                 if (data) {
                     this.form.patchValue({
@@ -123,7 +123,7 @@ export class PregnancyTabComponent implements OnInit {
     onSubmit(): void {
         if (this.loading) return;
         this.loading = true;
-        this.api.updateCyclePregnancy(this.cycleId, this.form.value).subscribe({
+        this.cycleService.updateCyclePregnancy(this.cycleId, this.form.value).subscribe({
             next: () => { this.loading = false; this.saved.emit(); },
             error: () => { this.loading = false; }
         });

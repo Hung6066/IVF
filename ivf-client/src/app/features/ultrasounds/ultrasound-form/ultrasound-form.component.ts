@@ -2,7 +2,7 @@ import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
-import { ApiService } from '../../../core/services/api.service';
+import { UltrasoundService } from '../../../core/services/ultrasound.service';
 
 @Component({
   selector: 'app-ultrasound-form',
@@ -29,7 +29,7 @@ export class UltrasoundFormComponent implements OnInit {
   constructor(
     private route: ActivatedRoute,
     private router: Router,
-    private api: ApiService
+    private ultrasoundService: UltrasoundService
   ) { }
 
   ngOnInit(): void {
@@ -40,7 +40,7 @@ export class UltrasoundFormComponent implements OnInit {
 
   submit(): void {
     this.saving.set(true);
-    this.api.createUltrasound({
+    this.ultrasoundService.createUltrasound({
       cycleId: this.cycleId,
       ...this.formData
     } as any).subscribe({

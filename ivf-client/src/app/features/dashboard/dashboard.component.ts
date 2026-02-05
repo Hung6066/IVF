@@ -1,7 +1,7 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
-import { ApiService } from '../../core/services/api.service';
+import { ReportService } from '../../core/services/report.service';
 import { DashboardStats, CycleSuccessRates } from '../../core/models/api.models';
 
 @Component({
@@ -15,11 +15,11 @@ export class DashboardComponent implements OnInit {
   stats = signal<DashboardStats | null>(null);
   successRates = signal<CycleSuccessRates | null>(null);
 
-  constructor(private api: ApiService, private router: Router) { }
+  constructor(private reportService: ReportService, private router: Router) { }
 
   ngOnInit(): void {
-    this.api.getDashboardStats().subscribe(data => this.stats.set(data));
-    this.api.getCycleSuccessRates().subscribe(data => this.successRates.set(data));
+    this.reportService.getDashboardStats().subscribe(data => this.stats.set(data));
+    this.reportService.getCycleSuccessRates().subscribe(data => this.successRates.set(data));
   }
 
   formatCurrency(value: number): string {

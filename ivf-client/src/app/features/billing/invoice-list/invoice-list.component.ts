@@ -4,7 +4,8 @@ import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { BillingService, Invoice, Payment, RevenueChartData } from '../billing.service';
 import { PatientSearchComponent } from '../../../shared/components/patient-search/patient-search.component';
-import { ApiService } from '../../../core/services/api.service';
+import { CatalogService } from '../../../core/services/catalog.service';
+import { QueueService } from '../../../core/services/queue.service';
 
 @Component({
   selector: 'app-invoice-list',
@@ -15,7 +16,8 @@ import { ApiService } from '../../../core/services/api.service';
 })
 export class InvoiceListComponent implements OnInit {
   private service = inject(BillingService);
-  private api = inject(ApiService);
+  private catalogService = inject(CatalogService);
+  private queueService = inject(QueueService);
 
   services = signal<any[]>([]);
 
@@ -44,7 +46,7 @@ export class InvoiceListComponent implements OnInit {
   }
 
   loadServices() {
-    this.api.getServices(undefined, undefined, 1, 200).subscribe({
+    this.catalogService.getServices(undefined, undefined, 1, 200).subscribe({
       next: (res) => this.services.set(res.items.filter((s: any) => s.isActive)),
       error: () => { }
     });
@@ -129,7 +131,7 @@ export class InvoiceListComponent implements OnInit {
       this.newInvoice.patientId = patient.id;
 
       // Check for pending service indications
-      this.api.getPatientPendingTicket(patient.id).subscribe({
+      this.queueService.getPatientPendingTicket(patient.id).subscribe({
         next: (ticket: any) => {
           if (ticket && ticket.serviceIds && ticket.serviceIds.length > 0) {
             const indicatedItems: any[] = [];

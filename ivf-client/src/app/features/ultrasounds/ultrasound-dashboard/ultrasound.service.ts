@@ -1,5 +1,7 @@
 import { Injectable, signal } from '@angular/core';
-import { ApiService } from '../../../core/services/api.service';
+import { QueueService } from '../../../core/services/queue.service';
+import { UltrasoundService as CoreUltrasoundService } from '../../../core/services/ultrasound.service';
+import { CoupleService } from '../../../core/services/couple.service';
 import { Observable, of } from 'rxjs';
 import { map, catchError } from 'rxjs/operators';
 
@@ -26,10 +28,14 @@ export interface UltrasoundExam {
     providedIn: 'root'
 })
 export class UltrasoundService {
-    constructor(private api: ApiService) { }
+    constructor(
+        private queueService: QueueService,
+        private ultrasoundService: CoreUltrasoundService,
+        private coupleService: CoupleService
+    ) { }
 
     getQueue(): Observable<UltrasoundQueueItem[]> {
-        return this.api.getQueueByDept('US').pipe(
+        return this.queueService.getQueueByDept('US').pipe(
             map((data: any[]) => data.map((item, index) => ({
                 id: item.id || String(index + 1),
                 number: item.ticketNumber || (index + 101),
@@ -44,21 +50,21 @@ export class UltrasoundService {
     }
 
     callPatient(id: string): Observable<any> {
-        return this.api.callTicket(id);
+        return this.queueService.callTicket(id);
     }
 
     completeTicket(id: string): Observable<void> {
-        return this.api.completeTicket(id);
+        return this.queueService.completeTicket(id);
     }
 
     submitExamResult(data: any): Observable<any> {
-        return this.api.createUltrasound(data);
+        return this.ultrasoundService.createUltrasound(data);
     }
 
     // Helper to find active cycle (logic moved from component)
     findActiveCycle(patientId: string, patientName: string): Observable<any | null> {
         // Logic requires chaining observables, so we return observable of found cycle or null
-        return this.api.getCouples().pipe(
+        return this.coupleService.getCouples().pipe(
             map(couples => {
                 const couple = couples.find(c => c.wife.id === patientId || c.husband.id === patientId || c.wife.fullName === patientName);
                 return couple ? couple : null;

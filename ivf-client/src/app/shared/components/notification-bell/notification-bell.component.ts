@@ -1,14 +1,15 @@
 import { Component, OnInit, OnDestroy, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ApiService, Notification } from '../../../core/services/api.service';
+import { NotificationService } from '../../../core/services/notification.service';
+import { Notification } from '../../../core/models/api.models';
 import { interval, Subject } from 'rxjs';
 import { takeUntil, switchMap } from 'rxjs/operators';
 
 @Component({
-    selector: 'app-notification-bell',
-    standalone: true,
-    imports: [CommonModule],
-    template: `
+  selector: 'app-notification-bell',
+  standalone: true,
+  imports: [CommonModule],
+  template: `
     <div class="notification-bell" (click)="toggleDropdown()">
       <div class="bell-icon">
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -60,7 +61,7 @@ import { takeUntil, switchMap } from 'rxjs/operators';
       }
     </div>
   `,
-    styles: [`
+  styles: [`
     .notification-bell {
       position: relative;
       cursor: pointer;
@@ -221,83 +222,83 @@ import { takeUntil, switchMap } from 'rxjs/operators';
   `]
 })
 export class NotificationBellComponent implements OnInit, OnDestroy {
-    private destroy$ = new Subject<void>();
+  private destroy$ = new Subject<void>();
 
-    notifications = signal<Notification[]>([]);
-    unreadCount = signal(0);
-    isOpen = signal(false);
+  notifications = signal<Notification[]>([]);
+  unreadCount = signal(0);
+  isOpen = signal(false);
 
-    constructor(private api: ApiService) { }
+  constructor(private notificationService: NotificationService) { }
 
-    ngOnInit() {
-        this.loadNotifications();
-        this.loadUnreadCount();
+  ngOnInit() {
+    this.loadNotifications();
+    this.loadUnreadCount();
 
-        // Poll for new notifications every 30 seconds
-        interval(30000).pipe(
-            takeUntil(this.destroy$),
-            switchMap(() => this.api.getUnreadCount())
-        ).subscribe(res => this.unreadCount.set(res.count));
+    // Poll for new notifications every 30 seconds
+    interval(30000).pipe(
+      takeUntil(this.destroy$),
+      switchMap(() => this.notificationService.getUnreadCount())
+    ).subscribe(res => this.unreadCount.set(res.count));
+  }
+
+  ngOnDestroy() {
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
+
+  loadNotifications() {
+    this.notificationService.getNotifications().subscribe(notifications => {
+      this.notifications.set(notifications);
+    });
+  }
+
+  loadUnreadCount() {
+    this.notificationService.getUnreadCount().subscribe(res => {
+      this.unreadCount.set(res.count);
+    });
+  }
+
+  toggleDropdown() {
+    this.isOpen.update(v => !v);
+    if (this.isOpen()) {
+      this.loadNotifications();
     }
+  }
 
-    ngOnDestroy() {
-        this.destroy$.next();
-        this.destroy$.complete();
+  markAsRead(notification: Notification) {
+    if (!notification.isRead) {
+      this.notificationService.markNotificationAsRead(notification.id).subscribe(() => {
+        this.notifications.update(list =>
+          list.map(n => n.id === notification.id ? { ...n, isRead: true } : n)
+        );
+        this.unreadCount.update(c => Math.max(0, c - 1));
+      });
     }
+  }
 
-    loadNotifications() {
-        this.api.getNotifications().subscribe(notifications => {
-            this.notifications.set(notifications);
-        });
-    }
+  markAllAsRead() {
+    this.notificationService.markAllNotificationsAsRead().subscribe(() => {
+      this.notifications.update(list => list.map(n => ({ ...n, isRead: true })));
+      this.unreadCount.set(0);
+    });
+  }
 
-    loadUnreadCount() {
-        this.api.getUnreadCount().subscribe(res => {
-            this.unreadCount.set(res.count);
-        });
-    }
+  closeDropdown() {
+    this.isOpen.set(false);
+  }
 
-    toggleDropdown() {
-        this.isOpen.update(v => !v);
-        if (this.isOpen()) {
-            this.loadNotifications();
-        }
-    }
+  formatTime(dateStr: string): string {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
 
-    markAsRead(notification: Notification) {
-        if (!notification.isRead) {
-            this.api.markNotificationAsRead(notification.id).subscribe(() => {
-                this.notifications.update(list =>
-                    list.map(n => n.id === notification.id ? { ...n, isRead: true } : n)
-                );
-                this.unreadCount.update(c => Math.max(0, c - 1));
-            });
-        }
-    }
-
-    markAllAsRead() {
-        this.api.markAllNotificationsAsRead().subscribe(() => {
-            this.notifications.update(list => list.map(n => ({ ...n, isRead: true })));
-            this.unreadCount.set(0);
-        });
-    }
-
-    closeDropdown() {
-        this.isOpen.set(false);
-    }
-
-    formatTime(dateStr: string): string {
-        const date = new Date(dateStr);
-        const now = new Date();
-        const diff = now.getTime() - date.getTime();
-        const minutes = Math.floor(diff / 60000);
-        const hours = Math.floor(minutes / 60);
-        const days = Math.floor(hours / 24);
-
-        if (minutes < 1) return 'Vừa xong';
-        if (minutes < 60) return `${minutes} phút trước`;
-        if (hours < 24) return `${hours} giờ trước`;
-        if (days < 7) return `${days} ngày trước`;
-        return date.toLocaleDateString('vi-VN');
-    }
+    if (minutes < 1) return 'Vừa xong';
+    if (minutes < 60) return `${minutes} phút trước`;
+    if (hours < 24) return `${hours} giờ trước`;
+    if (days < 7) return `${days} ngày trước`;
+    return date.toLocaleDateString('vi-VN');
+  }
 }

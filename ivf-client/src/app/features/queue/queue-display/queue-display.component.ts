@@ -1,7 +1,7 @@
 import { Component, OnInit, signal, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute } from '@angular/router';
-import { ApiService } from '../../../core/services/api.service';
+import { QueueService } from '../../../core/services/queue.service';
 import { QueueTicket } from '../../../core/models/api.models';
 
 @Component({
@@ -21,7 +21,7 @@ export class QueueDisplayComponent implements OnInit, OnDestroy {
 
   private refreshInterval?: ReturnType<typeof setInterval>;
 
-  constructor(private route: ActivatedRoute, private api: ApiService) { }
+  constructor(private route: ActivatedRoute, private queueService: QueueService) { }
 
   ngOnInit(): void {
     this.route.params.subscribe(params => {
@@ -38,7 +38,7 @@ export class QueueDisplayComponent implements OnInit, OnDestroy {
 
   loadQueue(): void {
     if (!this.departmentCode) return;
-    this.api.getQueueByDept(this.departmentCode).subscribe(tickets => {
+    this.queueService.getQueueByDept(this.departmentCode).subscribe(tickets => {
       this.tickets.set(tickets);
 
       const active = tickets.filter(t => t.status === 'Called' || t.status === 'InService');
@@ -54,15 +54,15 @@ export class QueueDisplayComponent implements OnInit, OnDestroy {
   }
 
   callTicket(id: string): void {
-    this.api.callTicket(id).subscribe(() => this.loadQueue());
+    this.queueService.callTicket(id).subscribe(() => this.loadQueue());
   }
 
   completeTicket(id: string): void {
-    this.api.completeTicket(id).subscribe(() => this.loadQueue());
+    this.queueService.completeTicket(id).subscribe(() => this.loadQueue());
   }
 
   skipTicket(id: string): void {
-    this.api.skipTicket(id).subscribe(() => this.loadQueue());
+    this.queueService.skipTicket(id).subscribe(() => this.loadQueue());
   }
 
   getDepartmentName(code: string): string {

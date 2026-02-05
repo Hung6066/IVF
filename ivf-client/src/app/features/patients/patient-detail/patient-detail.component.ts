@@ -1,7 +1,9 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, signal, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterModule, Router } from '@angular/router';
-import { ApiService } from '../../../core/services/api.service';
+import { PatientService } from '../../../core/services/patient.service';
+import { CoupleService } from '../../../core/services/couple.service';
+import { CycleService } from '../../../core/services/cycle.service';
 import { Patient, Couple, TreatmentCycle } from '../../../core/models/api.models';
 
 @Component({
@@ -17,7 +19,11 @@ export class PatientDetailComponent implements OnInit {
   cycles = signal<TreatmentCycle[]>([]);
   private patientId = '';
 
-  constructor(private route: ActivatedRoute, private api: ApiService, private router: Router) { }
+  private route = inject(ActivatedRoute);
+  private router = inject(Router);
+  private patientService = inject(PatientService);
+  private coupleService = inject(CoupleService);
+  private cycleService = inject(CycleService);
 
   ngOnInit(): void {
     this.route.params.subscribe(params => {
@@ -27,7 +33,7 @@ export class PatientDetailComponent implements OnInit {
   }
 
   loadPatient(): void {
-    this.api.getPatient(this.patientId).subscribe({
+    this.patientService.getPatient(this.patientId).subscribe({
       next: (p) => {
         this.patient.set(p);
         this.loadCoupleAndCycles(p.id);
@@ -37,7 +43,7 @@ export class PatientDetailComponent implements OnInit {
   }
 
   loadCoupleAndCycles(patientId: string): void {
-    this.api.getCoupleByPatient(patientId).subscribe({
+    this.coupleService.getCoupleByPatient(patientId).subscribe({
       next: (c) => {
         this.couple.set(c);
         this.loadCycles(c.id);
@@ -47,7 +53,7 @@ export class PatientDetailComponent implements OnInit {
   }
 
   loadCycles(coupleId: string): void {
-    this.api.getCyclesByCouple(coupleId).subscribe({
+    this.cycleService.getCyclesByCouple(coupleId).subscribe({
       next: (cycles) => this.cycles.set(cycles),
       error: (err) => console.error('Error loading cycles', err)
     });

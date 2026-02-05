@@ -1,14 +1,14 @@
 import { Component, Input, Output, EventEmitter, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
-import { ApiService } from '../../../../core/services/api.service';
+import { CycleService } from '../../../../core/services/cycle.service';
 import { AdverseEventData } from '../../../../core/models/api.models';
 
 @Component({
-    selector: 'app-adverse-events-tab',
-    standalone: true,
-    imports: [CommonModule, ReactiveFormsModule],
-    template: `
+  selector: 'app-adverse-events-tab',
+  standalone: true,
+  imports: [CommonModule, ReactiveFormsModule],
+  template: `
     <div class="phase-form">
       <div class="form-section">
         <div class="section-header">
@@ -92,7 +92,7 @@ import { AdverseEventData } from '../../../../core/models/api.models';
       </div>
     </div>
   `,
-    styles: [`
+  styles: [`
     .phase-form { padding: 1rem; }
     .form-section { padding: 1rem; background: var(--surface-elevated); border-radius: 8px; }
     .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
@@ -124,66 +124,66 @@ import { AdverseEventData } from '../../../../core/models/api.models';
   `]
 })
 export class AdverseEventsTabComponent implements OnInit {
-    @Input() cycleId!: string;
-    @Output() saved = new EventEmitter<void>();
+  @Input() cycleId!: string;
+  @Output() saved = new EventEmitter<void>();
 
-    private fb = inject(FormBuilder);
-    private api = inject(ApiService);
+  private fb = inject(FormBuilder);
+  private cycleService = inject(CycleService);
 
-    form!: FormGroup;
-    events = signal<AdverseEventData[]>([]);
-    loading = false;
-    showForm = false;
+  form!: FormGroup;
+  events = signal<AdverseEventData[]>([]);
+  loading = false;
+  showForm = false;
 
-    ngOnInit(): void {
-        this.form = this.fb.group({
-            eventDate: [''],
-            eventType: [''],
-            severity: [''],
-            description: [''],
-            treatment: [''],
-            outcome: ['']
-        });
+  ngOnInit(): void {
+    this.form = this.fb.group({
+      eventDate: [''],
+      eventType: [''],
+      severity: [''],
+      description: [''],
+      treatment: [''],
+      outcome: ['']
+    });
+    this.loadData();
+  }
+
+  loadData(): void {
+    this.cycleService.getCycleAdverseEvents(this.cycleId).subscribe({
+      next: (data) => this.events.set(data || []),
+      error: () => { }
+    });
+  }
+
+  onSubmit(): void {
+    if (this.loading) return;
+    this.loading = true;
+    this.cycleService.createCycleAdverseEvent(this.cycleId, this.form.value).subscribe({
+      next: () => {
+        this.loading = false;
+        this.form.reset();
+        this.showForm = false;
         this.loadData();
-    }
+        this.saved.emit();
+      },
+      error: () => { this.loading = false; }
+    });
+  }
 
-    loadData(): void {
-        this.api.getCycleAdverseEvents(this.cycleId).subscribe({
-            next: (data) => this.events.set(data || []),
-            error: () => { }
-        });
-    }
+  getEventTypeName(type?: string): string {
+    const names: Record<string, string> = {
+      'OHSS': 'OHSS', 'Bleeding': 'Chảy máu', 'Infection': 'Nhiễm trùng',
+      'Ectopic': 'Thai ngoài TC', 'Miscarriage': 'Sảy thai', 'Other': 'Khác'
+    };
+    return names[type || ''] || type || '';
+  }
 
-    onSubmit(): void {
-        if (this.loading) return;
-        this.loading = true;
-        this.api.createCycleAdverseEvent(this.cycleId, this.form.value).subscribe({
-            next: () => {
-                this.loading = false;
-                this.form.reset();
-                this.showForm = false;
-                this.loadData();
-                this.saved.emit();
-            },
-            error: () => { this.loading = false; }
-        });
-    }
+  getSeverityName(severity?: string): string {
+    const names: Record<string, string> = { 'Mild': 'Nhẹ', 'Moderate': 'Trung bình', 'Severe': 'Nặng' };
+    return names[severity || ''] || severity || '';
+  }
 
-    getEventTypeName(type?: string): string {
-        const names: Record<string, string> = {
-            'OHSS': 'OHSS', 'Bleeding': 'Chảy máu', 'Infection': 'Nhiễm trùng',
-            'Ectopic': 'Thai ngoài TC', 'Miscarriage': 'Sảy thai', 'Other': 'Khác'
-        };
-        return names[type || ''] || type || '';
-    }
-
-    getSeverityName(severity?: string): string {
-        const names: Record<string, string> = { 'Mild': 'Nhẹ', 'Moderate': 'Trung bình', 'Severe': 'Nặng' };
-        return names[severity || ''] || severity || '';
-    }
-
-    formatDate(date?: string): string {
-        if (!date) return '';
-        return new Date(date).toLocaleDateString('vi-VN');
-    }
+  formatDate(date?: string): string {
+    if (!date) return '';
+    return new Date(date).toLocaleDateString('vi-VN');
+  }
 }

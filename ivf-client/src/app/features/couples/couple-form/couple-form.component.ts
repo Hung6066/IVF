@@ -2,7 +2,7 @@ import { Component, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
-import { ApiService } from '../../../core/services/api.service';
+import { CoupleService } from '../../../core/services/couple.service';
 import { Patient } from '../../../core/models/api.models';
 import { PatientSearchComponent } from '../../../shared/components/patient-search/patient-search.component';
 
@@ -25,7 +25,7 @@ export class CoupleFormComponent {
     infertilityYears: null as number | null
   };
 
-  constructor(private api: ApiService, private router: Router) { }
+  constructor(private coupleService: CoupleService, private router: Router) { }
 
   canSubmit(): boolean {
     return !!this.selectedWife() && !!this.selectedHusband();
@@ -35,7 +35,7 @@ export class CoupleFormComponent {
     if (!this.canSubmit()) return;
 
     this.saving.set(true);
-    this.api.createCouple({
+    this.coupleService.createCouple({
       wifeId: this.selectedWife()!.id,
       husbandId: this.selectedHusband()!.id,
       marriageDate: this.formData.marriageDate || undefined,

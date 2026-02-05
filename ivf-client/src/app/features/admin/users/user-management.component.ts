@@ -1,7 +1,7 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ApiService } from '../../../core/services/api.service';
+import { UserService } from '../../../core/services/user.service';
 
 @Component({
   selector: 'app-user-management',
@@ -448,7 +448,7 @@ export class UserManagementComponent implements OnInit {
     { name: '⚙️ Quản trị', permissions: ['ManageUsers', 'ManageRoles', 'ManageSystem', 'ViewAuditLog'] }
   ];
 
-  constructor(private api: ApiService) { }
+  constructor(private userService: UserService) { }
 
   ngOnInit() {
     this.loadRoles();
@@ -456,12 +456,12 @@ export class UserManagementComponent implements OnInit {
   }
 
   loadRoles() {
-    this.api.getRoles().subscribe(roles => this.roles.set(roles));
+    this.userService.getRoles().subscribe(roles => this.roles.set(roles));
   }
 
   loadUsers() {
     this.loading.set(true);
-    this.api.getUsers(this.search, this.roleFilter, this.statusFilter, this.page, this.pageSize)
+    this.userService.getUsers(this.search, this.roleFilter, this.statusFilter, this.page, this.pageSize)
       .subscribe({
         next: (res) => {
           this.users.set(res.items);
@@ -515,7 +515,7 @@ export class UserManagementComponent implements OnInit {
         updateData.password = this.formData.password;
       }
 
-      this.api.updateUser(this.editingUser.id, updateData).subscribe({
+      this.userService.updateUser(this.editingUser.id, updateData).subscribe({
         next: () => {
           this.loadUsers();
           this.closeModal();
@@ -530,7 +530,7 @@ export class UserManagementComponent implements OnInit {
         }
       });
     } else {
-      this.api.createUser(this.formData).subscribe({
+      this.userService.createUser(this.formData).subscribe({
         next: () => {
           this.loadUsers();
           this.closeModal();
@@ -544,7 +544,7 @@ export class UserManagementComponent implements OnInit {
   deleteUser(user: any) {
     if (confirm(`Bạn có chắc muốn ${user.isActive ? 'khóa' : 'khôi phục'} tài khoản ${user.username}?`)) {
       const updatedStatus = !user.isActive;
-      this.api.updateUser(user.id, { ...user, isActive: updatedStatus }).subscribe(() => {
+      this.userService.updateUser(user.id, { ...user, isActive: updatedStatus }).subscribe(() => {
         this.loadUsers();
       });
     }
@@ -575,7 +575,7 @@ export class UserManagementComponent implements OnInit {
       ...this.doctorFormData
     };
 
-    this.api.createDoctor(payload).subscribe({
+    this.userService.createDoctor(payload).subscribe({
       next: () => {
         alert('Đã cập nhật thông tin bác sĩ thành công!');
         this.closeDoctorModal();
@@ -595,7 +595,7 @@ export class UserManagementComponent implements OnInit {
     this.showPermissionsModal = true;
 
     // Load user's current permissions
-    this.api.getUserPermissions(user.id).subscribe({
+    this.userService.getUserPermissions(user.id).subscribe({
       next: (permissions) => {
         this.userPermissions = permissions || [];
       },
@@ -623,7 +623,7 @@ export class UserManagementComponent implements OnInit {
     if (!this.selectedPermissionUser) return;
 
     this.loading.set(true);
-    this.api.assignPermissions(this.selectedPermissionUser.id, this.userPermissions).subscribe({
+    this.userService.assignPermissions(this.selectedPermissionUser.id, this.userPermissions).subscribe({
       next: () => {
         alert(`Đã cập nhật ${this.userPermissions.length} quyền cho ${this.selectedPermissionUser.fullName}`);
         this.closePermissionsModal();

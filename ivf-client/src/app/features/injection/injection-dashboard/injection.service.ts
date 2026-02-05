@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { ApiService } from '../../../core/services/api.service';
+import { QueueService } from '../../../core/services/queue.service';
 import { Observable } from 'rxjs';
 import { QueueTicket } from '../../../core/models/api.models';
 
@@ -8,17 +8,17 @@ import { QueueTicket } from '../../../core/models/api.models';
 })
 export class InjectionService {
 
-    constructor(private api: ApiService) { }
+    constructor(private queueService: QueueService) { }
 
     getQueue(): Observable<QueueTicket[]> {
-        return this.api.getQueueByDept('TM'); // TM = Tiem
+        return this.queueService.getQueueByDept('TM'); // TM = Tiem
     }
 
     callPatient(ticketId: string): Observable<any> {
-        return this.api.callTicket(ticketId);
+        return this.queueService.callTicket(ticketId);
     }
 
     completeTicket(ticketId: string): Observable<any> {
-        return this.api.completeTicket(ticketId);
+        return this.queueService.completeTicket(ticketId);
     }
 }

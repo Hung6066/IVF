@@ -1,15 +1,15 @@
 import { Component, EventEmitter, Input, OnInit, Output, signal, forwardRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, NG_VALUE_ACCESSOR, ControlValueAccessor } from '@angular/forms';
-import { ApiService } from '../../../core/services/api.service';
+import { UserService } from '../../../core/services/user.service';
 import { Subject } from 'rxjs';
 import { debounceTime, distinctUntilChanged, switchMap, tap } from 'rxjs/operators';
 
 @Component({
-    selector: 'app-doctor-search',
-    standalone: true,
-    imports: [CommonModule, FormsModule],
-    template: `
+  selector: 'app-doctor-search',
+  standalone: true,
+  imports: [CommonModule, FormsModule],
+  template: `
     <div class="doctor-search-container">
       <div class="search-input-wrapper">
         <input 
@@ -53,7 +53,7 @@ import { debounceTime, distinctUntilChanged, switchMap, tap } from 'rxjs/operato
       }
     </div>
   `,
-    styles: [`
+  styles: [`
     .doctor-search-container { position: relative; width: 100%; }
     .search-input-wrapper { position: relative; display: flex; align-items: center; }
     .form-control { width: 100%; padding: 0.75rem; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.875rem; transition: all 0.2s; }
@@ -74,91 +74,91 @@ import { debounceTime, distinctUntilChanged, switchMap, tap } from 'rxjs/operato
     .backdrop { position: fixed; inset: 0; z-index: 999; cursor: default; }
     @keyframes spin { to { transform: rotate(360deg); } }
   `],
-    providers: [
-        {
-            provide: NG_VALUE_ACCESSOR,
-            useExisting: forwardRef(() => DoctorSearchComponent),
-            multi: true
-        }
-    ]
+  providers: [
+    {
+      provide: NG_VALUE_ACCESSOR,
+      useExisting: forwardRef(() => DoctorSearchComponent),
+      multi: true
+    }
+  ]
 })
 export class DoctorSearchComponent implements OnInit, ControlValueAccessor {
-    @Input() placeholder = 'Tìm kiếm bác sĩ...';
-    @Input() invalid = false;
+  @Input() placeholder = 'Tìm kiếm bác sĩ...';
+  @Input() invalid = false;
 
-    @Output() doctorSelected = new EventEmitter<any>();
+  @Output() doctorSelected = new EventEmitter<any>();
 
-    searchTerm = '';
-    results = signal<any[]>([]);
-    isLoading = signal(false);
-    showDropdown = false;
-    selectedDoctor = signal<any>(null);
+  searchTerm = '';
+  results = signal<any[]>([]);
+  isLoading = signal(false);
+  showDropdown = false;
+  selectedDoctor = signal<any>(null);
 
-    private searchSubject = new Subject<string>();
+  private searchSubject = new Subject<string>();
 
-    onChange: any = () => { };
-    onTouched: any = () => { };
+  onChange: any = () => { };
+  onTouched: any = () => { };
 
-    get isInvalid() { return this.invalid; }
+  get isInvalid() { return this.invalid; }
 
-    constructor(private api: ApiService) { }
+  constructor(private userService: UserService) { }
 
-    ngOnInit() {
-        this.searchSubject.pipe(
-            debounceTime(300),
-            distinctUntilChanged(),
-            tap(() => this.isLoading.set(true)),
-            switchMap(term => {
-                if (!term) {
-                    this.isLoading.set(false);
-                    return [];
-                }
-                return this.api.searchDoctors(term);
-            })
-        ).subscribe({
-            next: (data) => {
-                this.isLoading.set(false);
-                this.results.set(data || []);
-                this.showDropdown = true;
-            },
-            error: () => this.isLoading.set(false)
-        });
-    }
-
-    onSearch(event: Event) {
-        const term = (event.target as HTMLInputElement).value;
-        this.searchTerm = term;
-        this.searchSubject.next(term);
-        this.showDropdown = true;
-    }
-
-    selectDoctor(doctor: any) {
-        this.selectedDoctor.set(doctor);
-        this.searchTerm = doctor.fullName;
-        this.showDropdown = false;
-        this.results.set([]);
-
-        this.onChange(doctor.id);
-        this.doctorSelected.emit(doctor);
-    }
-
-    clearSelection() {
-        this.selectedDoctor.set(null);
-        this.searchTerm = '';
-        this.onChange(null);
-        this.doctorSelected.emit(null);
-    }
-
-    writeValue(obj: any): void {
-        // If we want to load initial value we need getDoctor endpoint or passed object
-        // For now simplistic clear
-        if (!obj) {
-            this.selectedDoctor.set(null);
-            this.searchTerm = '';
+  ngOnInit() {
+    this.searchSubject.pipe(
+      debounceTime(300),
+      distinctUntilChanged(),
+      tap(() => this.isLoading.set(true)),
+      switchMap(term => {
+        if (!term) {
+          this.isLoading.set(false);
+          return [];
         }
-    }
+        return this.userService.searchDoctors(term);
+      })
+    ).subscribe({
+      next: (data) => {
+        this.isLoading.set(false);
+        this.results.set(data || []);
+        this.showDropdown = true;
+      },
+      error: () => this.isLoading.set(false)
+    });
+  }
 
-    registerOnChange(fn: any): void { this.onChange = fn; }
-    registerOnTouched(fn: any): void { this.onTouched = fn; }
-    setDisabledState?(isDisabled: boolean): void { }
+  onSearch(event: Event) {
+    const term = (event.target as HTMLInputElement).value;
+    this.searchTerm = term;
+    this.searchSubject.next(term);
+    this.showDropdown = true;
+  }
+
+  selectDoctor(doctor: any) {
+    this.selectedDoctor.set(doctor);
+    this.searchTerm = doctor.fullName;
+    this.showDropdown = false;
+    this.results.set([]);
+
+    this.onChange(doctor.id);
+    this.doctorSelected.emit(doctor);
+  }
+
+  clearSelection() {
+    this.selectedDoctor.set(null);
+    this.searchTerm = '';
+    this.onChange(null);
+    this.doctorSelected.emit(null);
+  }
+
+  writeValue(obj: any): void {
+    // If we want to load initial value we need getDoctor endpoint or passed object
+    // For now simplistic clear
+    if (!obj) {
+      this.selectedDoctor.set(null);
+      this.searchTerm = '';
+    }
+  }
+
+  registerOnChange(fn: any): void { this.onChange = fn; }
+  registerOnTouched(fn: any): void { this.onTouched = fn; }
+  setDisabledState?(isDisabled: boolean): void { }
 }

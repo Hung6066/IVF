@@ -1,7 +1,7 @@
 import { Component, Input, Output, EventEmitter, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
-import { ApiService } from '../../../../core/services/api.service';
+import { CycleService } from '../../../../core/services/cycle.service';
 
 @Component({
     selector: 'app-luteal-tab',
@@ -60,7 +60,7 @@ export class LutealTabComponent implements OnInit {
     @Output() saved = new EventEmitter<void>();
 
     private fb = inject(FormBuilder);
-    private api = inject(ApiService);
+    private cycleService = inject(CycleService);
     form!: FormGroup;
     loading = false;
 
@@ -75,7 +75,7 @@ export class LutealTabComponent implements OnInit {
     }
 
     loadData(): void {
-        this.api.getCycleLutealPhase(this.cycleId).subscribe({
+        this.cycleService.getCycleLutealPhase(this.cycleId).subscribe({
             next: (data) => data && this.form.patchValue(data),
             error: () => { }
         });
@@ -84,7 +84,7 @@ export class LutealTabComponent implements OnInit {
     onSubmit(): void {
         if (this.loading) return;
         this.loading = true;
-        this.api.updateCycleLutealPhase(this.cycleId, this.form.value).subscribe({
+        this.cycleService.updateCycleLutealPhase(this.cycleId, this.form.value).subscribe({
             next: () => { this.loading = false; this.saved.emit(); },
             error: () => { this.loading = false; }
         });

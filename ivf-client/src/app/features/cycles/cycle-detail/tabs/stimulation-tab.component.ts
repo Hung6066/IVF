@@ -1,7 +1,7 @@
 import { Component, Input, Output, EventEmitter, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
-import { ApiService } from '../../../../core/services/api.service';
+import { CycleService } from '../../../../core/services/cycle.service';
 
 @Component({
     selector: 'app-stimulation-tab',
@@ -143,7 +143,7 @@ export class StimulationTabComponent implements OnInit {
     @Output() saved = new EventEmitter<void>();
 
     private fb = inject(FormBuilder);
-    private api = inject(ApiService);
+    private cycleService = inject(CycleService);
 
     form!: FormGroup;
     loading = false;
@@ -175,7 +175,7 @@ export class StimulationTabComponent implements OnInit {
     }
 
     loadData(): void {
-        this.api.getCycleStimulation(this.cycleId).subscribe({
+        this.cycleService.getCycleStimulation(this.cycleId).subscribe({
             next: (data) => this.patchForm(data),
             error: () => { }
         });
@@ -209,7 +209,7 @@ export class StimulationTabComponent implements OnInit {
     onSubmit(): void {
         if (this.loading) return;
         this.loading = true;
-        this.api.updateCycleStimulation(this.cycleId, this.form.value).subscribe({
+        this.cycleService.updateCycleStimulation(this.cycleId, this.form.value).subscribe({
             next: () => { this.loading = false; this.saved.emit(); },
             error: () => { this.loading = false; }
         });

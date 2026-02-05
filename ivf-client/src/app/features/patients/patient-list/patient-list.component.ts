@@ -2,7 +2,7 @@ import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
-import { ApiService } from '../../../core/services/api.service';
+import { PatientService } from '../../../core/services/patient.service';
 import { Patient } from '../../../core/models/api.models';
 
 @Component({
@@ -26,7 +26,7 @@ export class PatientListComponent implements OnInit {
 
   private searchTimeout?: ReturnType<typeof setTimeout>;
 
-  constructor(private api: ApiService, private router: Router, private route: ActivatedRoute) { }
+  constructor(private patientService: PatientService, private router: Router, private route: ActivatedRoute) { }
 
   ngOnInit(): void {
     this.loadPatients();
@@ -37,7 +37,7 @@ export class PatientListComponent implements OnInit {
 
   loadPatients(): void {
     this.loading.set(true);
-    this.api.searchPatients(this.searchQuery || undefined, this.page(), this.pageSize).subscribe({
+    this.patientService.searchPatients(this.searchQuery || undefined, this.page(), this.pageSize).subscribe({
       next: (res) => {
         this.patients.set(res.items);
         this.total.set(res.total);
@@ -84,7 +84,7 @@ export class PatientListComponent implements OnInit {
   }
 
   submitNewPatient(): void {
-    this.api.createPatient(this.newPatient).subscribe({
+    this.patientService.createPatient(this.newPatient).subscribe({
       next: () => {
         this.showAddModal = false;
         this.newPatient = { gender: 'Female', patientType: 'Infertility' };
@@ -99,7 +99,7 @@ export class PatientListComponent implements OnInit {
 
   submitEditPatient(): void {
     if (!this.editingPatient) return;
-    this.api.updatePatient(this.editingPatient.id, this.editingPatient).subscribe({
+    this.patientService.updatePatient(this.editingPatient.id, this.editingPatient).subscribe({
       next: () => {
         this.showEditModal = false;
         this.editingPatient = null;

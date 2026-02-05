@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterModule, Router } from '@angular/router';
 import { ReceptionService, CheckinRecord } from './reception.service';
 import { Patient } from '../../../core/models/api.models';
-import { ApiService } from '../../../core/services/api.service';
+import { CatalogService } from '../../../core/services/catalog.service';
 import { Observable, forkJoin } from 'rxjs';
 
 @Component({
@@ -17,7 +17,7 @@ import { Observable, forkJoin } from 'rxjs';
 export class ReceptionDashboardComponent implements OnInit {
   private service = inject(ReceptionService);
   private router = inject(Router);
-  private api = inject(ApiService);
+  private catalogService = inject(CatalogService);
 
   services = signal<any[]>([]);
 
@@ -50,7 +50,7 @@ export class ReceptionDashboardComponent implements OnInit {
   }
 
   loadServices() {
-    this.api.getServices(undefined, undefined, 1, 200).subscribe({
+    this.catalogService.getServices(undefined, undefined, 1, 200).subscribe({
       next: (res) => this.services.set(res.items.filter((s: any) => s.isActive)),
       error: () => { }
     });

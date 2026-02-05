@@ -1,7 +1,8 @@
 import { Injectable } from '@angular/core';
-import { ApiService } from '../../../core/services/api.service';
-import { Observable, of } from 'rxjs';
+import { PatientService } from '../../../core/services/patient.service';
+import { QueueService } from '../../../core/services/queue.service';
 import { Patient, TicketStatus } from '../../../core/models/api.models';
+import { Observable, of } from 'rxjs';
 
 export interface CheckinRecord {
     id: string;
@@ -20,17 +21,17 @@ export interface QueueStat {
 })
 export class ReceptionService {
 
-    constructor(private api: ApiService) { }
+    constructor(private patientService: PatientService, private queueService: QueueService) { }
 
     searchPatients(term: string): Observable<{ items: Patient[] }> {
-        return this.api.searchPatients(term);
+        return this.patientService.searchPatients(term);
     }
 
-    issueTicket(patientId: string, departmentCode: string, priority: string, notes: string, cycleId?: string, serviceIds?: string[]): Observable<any> {
-        return this.api.issueTicket(
+    issueTicket(patientId: string, departmentCode: string, priority: 'Normal' | 'VIP' | 'Emergency', notes: string, cycleId?: string, serviceIds?: string[]): Observable<any> {
+        return this.queueService.issueTicket(
             patientId,
             departmentCode,
-            priority as any,
+            priority,
             notes,
             cycleId,
             serviceIds

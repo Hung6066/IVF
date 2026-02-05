@@ -1,13 +1,13 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ApiService } from '../../../core/services/api.service';
+import { CatalogService } from '../../../core/services/catalog.service';
 
 @Component({
-    selector: 'app-service-catalog',
-    standalone: true,
-    imports: [CommonModule, FormsModule],
-    template: `
+  selector: 'app-service-catalog',
+  standalone: true,
+  imports: [CommonModule, FormsModule],
+  template: `
     <div class="page-container">
       <header class="page-header">
         <div class="header-info">
@@ -138,7 +138,7 @@ import { ApiService } from '../../../core/services/api.service';
       }
     </div>
   `,
-    styles: [`
+  styles: [`
     .page-container { padding: 24px; background: #f8fafc; min-height: 100vh; }
     .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
     .header-info h1 { margin: 0; font-size: 1.5rem; color: #1e293b; }
@@ -207,131 +207,131 @@ import { ApiService } from '../../../core/services/api.service';
   `]
 })
 export class ServiceCatalogComponent implements OnInit {
-    services = signal<any[]>([]);
-    categories = signal<{ name: string; value: number }[]>([]);
-    total = signal(0);
-    loading = signal(false);
+  services = signal<any[]>([]);
+  categories = signal<{ name: string; value: number }[]>([]);
+  total = signal(0);
+  loading = signal(false);
 
-    searchQuery = '';
-    categoryFilter = '';
-    page = 1;
-    pageSize = 20;
+  searchQuery = '';
+  categoryFilter = '';
+  page = 1;
+  pageSize = 20;
 
-    showModal = false;
-    editingService: any = null;
-    formData: any = { code: '', name: '', category: 'LabTest', unitPrice: 0, unit: 'lần', description: '' };
+  showModal = false;
+  editingService: any = null;
+  formData: any = { code: '', name: '', category: 'LabTest', unitPrice: 0, unit: 'lần', description: '' };
 
-    private searchTimeout?: ReturnType<typeof setTimeout>;
+  private searchTimeout?: ReturnType<typeof setTimeout>;
 
-    categoryLabels: Record<string, string> = {
-        'LabTest': '🧪 Xét nghiệm',
-        'Ultrasound': '📷 Siêu âm',
-        'Procedure': '💉 Thủ thuật',
-        'Medication': '💊 Thuốc',
-        'Consultation': '💬 Tư vấn',
-        'IVF': '🧬 IVF/ICSI',
-        'Andrology': '🔬 Nam khoa',
-        'SpermBank': '🏦 Ngân hàng tinh trùng',
-        'Other': '📦 Khác'
-    };
+  categoryLabels: Record<string, string> = {
+    'LabTest': '🧪 Xét nghiệm',
+    'Ultrasound': '📷 Siêu âm',
+    'Procedure': '💉 Thủ thuật',
+    'Medication': '💊 Thuốc',
+    'Consultation': '💬 Tư vấn',
+    'IVF': '🧬 IVF/ICSI',
+    'Andrology': '🔬 Nam khoa',
+    'SpermBank': '🏦 Ngân hàng tinh trùng',
+    'Other': '📦 Khác'
+  };
 
-    constructor(private api: ApiService) { }
+  constructor(private catalogService: CatalogService) { }
 
-    ngOnInit() {
-        this.loadCategories();
-        this.loadServices();
+  ngOnInit() {
+    this.loadCategories();
+    this.loadServices();
+  }
+
+  loadCategories() {
+    this.catalogService.getServiceCategories().subscribe({
+      next: (cats) => this.categories.set(cats),
+      error: () => { }
+    });
+  }
+
+  loadServices() {
+    this.loading.set(true);
+    this.catalogService.getServices(this.searchQuery || undefined, this.categoryFilter || undefined, this.page, this.pageSize).subscribe({
+      next: (res) => {
+        this.services.set(res.items);
+        this.total.set(res.total);
+        this.loading.set(false);
+      },
+      error: () => this.loading.set(false)
+    });
+  }
+
+  onSearch() {
+    clearTimeout(this.searchTimeout);
+    this.searchTimeout = setTimeout(() => {
+      this.page = 1;
+      this.loadServices();
+    }, 300);
+  }
+
+  changePage(delta: number) {
+    this.page += delta;
+    this.loadServices();
+  }
+
+  getCategoryLabel(cat: string): string {
+    return this.categoryLabels[cat] || cat;
+  }
+
+  formatPrice(price: number): string {
+    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price);
+  }
+
+  openModal(service?: any) {
+    this.editingService = service || null;
+    if (service) {
+      this.formData = { ...service };
+    } else {
+      this.formData = { code: '', name: '', category: 'LabTest', unitPrice: 0, unit: 'lần', description: '' };
     }
+    this.showModal = true;
+  }
 
-    loadCategories() {
-        this.api.getServiceCategories().subscribe({
-            next: (cats) => this.categories.set(cats),
-            error: () => { }
-        });
-    }
+  closeModal() {
+    this.showModal = false;
+    this.editingService = null;
+  }
 
-    loadServices() {
-        this.loading.set(true);
-        this.api.getServices(this.searchQuery || undefined, this.categoryFilter || undefined, this.page, this.pageSize).subscribe({
-            next: (res) => {
-                this.services.set(res.items);
-                this.total.set(res.total);
-                this.loading.set(false);
-            },
-            error: () => this.loading.set(false)
-        });
-    }
-
-    onSearch() {
-        clearTimeout(this.searchTimeout);
-        this.searchTimeout = setTimeout(() => {
-            this.page = 1;
-            this.loadServices();
-        }, 300);
-    }
-
-    changePage(delta: number) {
-        this.page += delta;
-        this.loadServices();
-    }
-
-    getCategoryLabel(cat: string): string {
-        return this.categoryLabels[cat] || cat;
-    }
-
-    formatPrice(price: number): string {
-        return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price);
-    }
-
-    openModal(service?: any) {
-        this.editingService = service || null;
-        if (service) {
-            this.formData = { ...service };
-        } else {
-            this.formData = { code: '', name: '', category: 'LabTest', unitPrice: 0, unit: 'lần', description: '' };
+  saveService() {
+    this.loading.set(true);
+    if (this.editingService) {
+      this.catalogService.updateService(this.editingService.id, this.formData).subscribe({
+        next: () => {
+          this.closeModal();
+          this.loadServices();
+          this.loading.set(false);
+        },
+        error: (err) => {
+          alert('Lỗi: ' + (err.error?.message || 'Không thể cập nhật'));
+          this.loading.set(false);
         }
-        this.showModal = true;
-    }
-
-    closeModal() {
-        this.showModal = false;
-        this.editingService = null;
-    }
-
-    saveService() {
-        this.loading.set(true);
-        if (this.editingService) {
-            this.api.updateService(this.editingService.id, this.formData).subscribe({
-                next: () => {
-                    this.closeModal();
-                    this.loadServices();
-                    this.loading.set(false);
-                },
-                error: (err) => {
-                    alert('Lỗi: ' + (err.error?.message || 'Không thể cập nhật'));
-                    this.loading.set(false);
-                }
-            });
-        } else {
-            this.api.createService(this.formData).subscribe({
-                next: () => {
-                    this.closeModal();
-                    this.loadServices();
-                    this.loading.set(false);
-                },
-                error: (err) => {
-                    alert('Lỗi: ' + (err.error?.message || 'Không thể tạo dịch vụ'));
-                    this.loading.set(false);
-                }
-            });
+      });
+    } else {
+      this.catalogService.createService(this.formData).subscribe({
+        next: () => {
+          this.closeModal();
+          this.loadServices();
+          this.loading.set(false);
+        },
+        error: (err) => {
+          alert('Lỗi: ' + (err.error?.message || 'Không thể tạo dịch vụ'));
+          this.loading.set(false);
         }
+      });
     }
+  }
 
-    toggleService(service: any) {
-        this.api.toggleService(service.id).subscribe({
-            next: (res) => {
-                service.isActive = res.isActive;
-            },
-            error: () => alert('Lỗi: Không thể thay đổi trạng thái')
-        });
-    }
+  toggleService(service: any) {
+    this.catalogService.toggleService(service.id).subscribe({
+      next: (res) => {
+        service.isActive = res.isActive;
+      },
+      error: () => alert('Lỗi: Không thể thay đổi trạng thái')
+    });
+  }
 }
