@@ -20,7 +20,9 @@ export class PatientListComponent implements OnInit {
   searchQuery = '';
   pageSize = 20;
   showAddModal = false;
+  showEditModal = false;
   newPatient: any = { gender: 'Female', patientType: 'Infertility' };
+  editingPatient: any = null;
 
   private searchTimeout?: ReturnType<typeof setTimeout>;
 
@@ -77,7 +79,8 @@ export class PatientListComponent implements OnInit {
   }
 
   editPatient(patient: Patient): void {
-    this.router.navigate(['/patients', patient.id, 'edit']);
+    this.editingPatient = { ...patient };
+    this.showEditModal = true;
   }
 
   submitNewPatient(): void {
@@ -90,6 +93,22 @@ export class PatientListComponent implements OnInit {
       error: (err) => {
         console.error('Failed to create patient', err);
         alert('Lỗi: ' + (err.error?.message || 'Không thể tạo bệnh nhân'));
+      }
+    });
+  }
+
+  submitEditPatient(): void {
+    if (!this.editingPatient) return;
+    this.api.updatePatient(this.editingPatient.id, this.editingPatient).subscribe({
+      next: () => {
+        this.showEditModal = false;
+        this.editingPatient = null;
+        this.loadPatients();
+        alert('Cập nhật bệnh nhân thành công!');
+      },
+      error: (err) => {
+        console.error('Failed to update patient', err);
+        alert('Lỗi: ' + (err.error?.message || 'Không thể cập nhật bệnh nhân'));
       }
     });
   }

@@ -1,5 +1,7 @@
+using IVF.Application.Common.Interfaces;
 using IVF.Application.Features.Users.Commands;
 using IVF.Application.Features.Users.Queries;
+using IVF.Domain.Entities;
 using IVF.Domain.Enums;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
@@ -26,6 +28,49 @@ public static class UserEndpoints
             return Results.Ok(roles);
         });
 
+        // Get All Available Permissions
+        group.MapGet("/permissions", () =>
+        {
+            var permissions = Enum.GetValues<Permission>()
+                .Select(p => new { name = p.ToString(), value = (int)p })
+                .ToList();
+            return Results.Ok(permissions);
+        });
+
+        // Get User Permissions
+        group.MapGet("/{id}/permissions", async (Guid id, IUserPermissionRepository repo) =>
+        {
+            var permissions = await repo.GetByUserIdAsync(id);
+            return Results.Ok(permissions.Select(p => p.Permission.ToString()));
+        });
+
+        // Assign Permissions to User
+        group.MapPost("/{id}/permissions", async (Guid id, [FromBody] AssignPermissionsRequest request, IUserPermissionRepository repo, IUnitOfWork uow) =>
+        {
+            // Remove existing permissions
+            await repo.DeleteAllByUserIdAsync(id);
+            
+            // Add new permissions
+            var permissions = request.Permissions
+                .Select(p => Enum.Parse<Permission>(p))
+                .Select(p => UserPermission.Create(id, p, request.GrantedBy))
+                .ToList();
+            
+            await repo.AddRangeAsync(permissions);
+            await uow.SaveChangesAsync();
+            
+            return Results.Ok(new { message = "Permissions updated", count = permissions.Count });
+        });
+
+        // Revoke Single Permission
+        group.MapDelete("/{id}/permissions/{permission}", async (Guid id, string permission, IUserPermissionRepository repo, IUnitOfWork uow) =>
+        {
+            var perm = Enum.Parse<Permission>(permission);
+            await repo.DeleteAsync(id, perm);
+            await uow.SaveChangesAsync();
+            return Results.NoContent();
+        });
+
         // Create User
         group.MapPost("/", async (IMediator m, [FromBody] CreateUserCommand command) =>
         {
@@ -49,3 +94,6 @@ public static class UserEndpoints
         });
     }
 }
+
+public record AssignPermissionsRequest(List<string> Permissions, Guid? GrantedBy);
+

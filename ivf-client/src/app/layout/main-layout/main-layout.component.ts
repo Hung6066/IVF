@@ -22,60 +22,63 @@ import { ToastNotificationComponent } from '../../shared/components/toast-notifi
           <a routerLink="/dashboard" routerLinkActive="active" class="nav-item">
             <span class="icon">📊</span> Dashboard
           </a>
-          <a routerLink="/reception" routerLinkActive="active" class="nav-item">
+          <a *ngIf="canView('ViewPatients')" routerLink="/reception" routerLinkActive="active" class="nav-item">
             <span class="icon">🏥</span> Tiếp đón
           </a>
-          <a routerLink="/patients" routerLinkActive="active" class="nav-item">
+          <a *ngIf="canView('ViewPatients')" routerLink="/patients" routerLinkActive="active" class="nav-item">
             <span class="icon">👥</span> Bệnh nhân
           </a>
-          <a routerLink="/couples" routerLinkActive="active" class="nav-item">
+          <a *ngIf="canView('ViewCouples')" routerLink="/couples" routerLinkActive="active" class="nav-item">
             <span class="icon">💑</span> Cặp đôi
           </a>
-          <a routerLink="/queue/US" routerLinkActive="active" class="nav-item">
+          <a *ngIf="canView('ViewQueue')" routerLink="/queue/US" routerLinkActive="active" class="nav-item">
             <span class="icon">🎫</span> Hàng đợi
           </a>
-          <a routerLink="/consultation" routerLinkActive="active" class="nav-item">
+          <a *ngIf="canView('ViewCycles')" routerLink="/consultation" routerLinkActive="active" class="nav-item">
             <span class="icon">🗣️</span> Tư vấn
           </a>
-          <a routerLink="/ultrasound" routerLinkActive="active" class="nav-item">
+          <a *ngIf="canView('ViewUltrasounds')" routerLink="/ultrasound" routerLinkActive="active" class="nav-item">
             <span class="icon">🔬</span> Siêu âm
           </a>
-          <a routerLink="/lab" routerLinkActive="active" class="nav-item">
+          <a *ngIf="canView('ViewLabResults')" routerLink="/lab" routerLinkActive="active" class="nav-item">
             <span class="icon">🧫</span> Phòng Lab
           </a>
-          <a routerLink="/andrology" routerLinkActive="active" class="nav-item">
+          <a *ngIf="canView('ViewAndrology')" routerLink="/andrology" routerLinkActive="active" class="nav-item">
             <span class="icon">🔬</span> Nam khoa
           </a>
-          <a routerLink="/injection" routerLinkActive="active" class="nav-item">
+          <a *ngIf="canView('ViewCycles')" routerLink="/injection" routerLinkActive="active" class="nav-item">
             <span class="icon">💉</span> Tiêm
           </a>
-          <a routerLink="/sperm-bank" routerLinkActive="active" class="nav-item">
+          <a *ngIf="canView('ViewSpermBank')" routerLink="/sperm-bank" routerLinkActive="active" class="nav-item">
             <span class="icon">🏦</span> NHTT
           </a>
-          <a routerLink="/pharmacy" routerLinkActive="active" class="nav-item">
+          <a *ngIf="canView('ViewPrescriptions')" routerLink="/pharmacy" routerLinkActive="active" class="nav-item">
             <span class="icon">💊</span> Nhà thuốc
           </a>
-          <a routerLink="/billing" routerLinkActive="active" class="nav-item">
+          <a *ngIf="canView('ViewBilling')" routerLink="/billing" routerLinkActive="active" class="nav-item">
             <span class="icon">💰</span> Hoá đơn
           </a>
-          <a routerLink="/appointments" routerLinkActive="active" class="nav-item">
+          <a *ngIf="canView('ViewSchedule')" routerLink="/appointments" routerLinkActive="active" class="nav-item">
             <span class="icon">📅</span> Lịch hẹn
           </a>
-          <a routerLink="/reports" routerLinkActive="active" class="nav-item">
+          <a *ngIf="canView('ViewReports')" routerLink="/reports" routerLinkActive="active" class="nav-item">
             <span class="icon">📈</span> Báo cáo
           </a>
           
-          <div style="margin-top: 16px; padding: 0 16px; font-size: 0.75rem; color: #94a3b8; font-weight: 600; text-transform: uppercase; margin-bottom: 8px;">
+          <div *ngIf="isAdmin()" style="margin-top: 16px; padding: 0 16px; font-size: 0.75rem; color: #94a3b8; font-weight: 600; text-transform: uppercase; margin-bottom: 8px;">
             Quản trị
           </div>
 
-          <a routerLink="/admin/users" routerLinkActive="active" class="nav-item">
+          <a *ngIf="canView('ManageUsers')" routerLink="/admin/users" routerLinkActive="active" class="nav-item">
             <span class="icon">👥</span> Người dùng
           </a>
-          <a routerLink="/admin/audit-logs" routerLinkActive="active" class="nav-item">
-            <span class="icon">📋</span> Nhật ký
+          <a *ngIf="isAdmin()" routerLink="/admin/services" routerLinkActive="active" class="nav-item">
+            <span class="icon">📋</span> Danh mục DV
           </a>
-          <a routerLink="/admin/notifications" routerLinkActive="active" class="nav-item">
+          <a *ngIf="canView('ViewAuditLog')" routerLink="/admin/audit-logs" routerLinkActive="active" class="nav-item">
+            <span class="icon">📝</span> Nhật ký
+          </a>
+          <a *ngIf="isAdmin()" routerLink="/admin/notifications" routerLinkActive="active" class="nav-item">
             <span class="icon">🔔</span> Thông báo
           </a>
         </nav>
@@ -394,6 +397,15 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
 
   logout(): void {
     this.authService.logout();
+  }
+
+  // Permission-based menu visibility
+  canView(permission: string): boolean {
+    return this.authService.hasPermission(permission);
+  }
+
+  isAdmin(): boolean {
+    return this.authService.hasRole('Admin');
   }
 }
 

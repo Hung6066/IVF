@@ -200,12 +200,18 @@
                         <h4>Dịch vụ</h4>
                         @for (item of newInvoice.items; track $index) {
                         <div class="item-row">
-                            <input class="form-control" type="text" [(ngModel)]="item.name" [name]="'name'+$index"
-                                placeholder="Tên dịch vụ" />
+                            <select class="form-control service-select" [ngModel]="item.serviceId"
+                                (ngModelChange)="onServiceSelect(item, $event)" [name]="'service'+$index">
+                                <option value="">-- Chọn dịch vụ --</option>
+                                @for (svc of services(); track svc.id) {
+                                <option [value]="svc.id">{{ svc.code }} - {{ svc.name }}</option>
+                                }
+                            </select>
                             <input class="form-control qty-input" type="number" [(ngModel)]="item.qty"
-                                [name]="'qty'+$index" placeholder="SL" />
-                            <input class="form-control" type="number" [(ngModel)]="item.price" [name]="'price'+$index"
-                                placeholder="Đơn giá" />
+                                [name]="'qty'+$index" placeholder="SL" min="1" />
+                            <input class="form-control price-input" type="number" [(ngModel)]="item.price"
+                                [name]="'price'+$index" placeholder="Đơn giá" />
+                            <span class="unit-label">{{ item.unit || 'lần' }}</span>
                             <button type="button" class="btn-icon danger" (click)="removeItem($index)">✖</button>
                         </div>
                         }

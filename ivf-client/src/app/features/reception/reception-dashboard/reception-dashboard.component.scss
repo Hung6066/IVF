@@ -274,3 +274,101 @@
     padding: 1rem;
     font-style: italic;
 }
+
+// Service selection in check-in modal
+.services-section {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px dashed #e2e8f0;
+}
+
+.services-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 0.5rem;
+    max-height: 250px;
+    overflow-y: auto;
+    padding: 0.5rem;
+    background: #f8fafc;
+    border-radius: 8px;
+    margin-top: 0.5rem;
+}
+
+.service-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+
+    &:hover {
+        border-color: #a5b4fc;
+        background: #f0f4ff;
+    }
+
+    &.selected {
+        border-color: #6366f1;
+        background: #eef2ff;
+    }
+
+    .service-check {
+        input {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+    }
+
+    .service-info {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+
+        .service-code {
+            font-family: monospace;
+            font-size: 0.7rem;
+            color: #6366f1;
+            font-weight: 600;
+        }
+
+        .service-name {
+            font-size: 0.85rem;
+            color: #1e293b;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+    }
+
+    .service-price {
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: #059669;
+        white-space: nowrap;
+    }
+}
+
+.services-total {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 0.75rem;
+    padding: 0.75rem;
+    background: linear-gradient(135deg, #e0e7ff, #f0f5ff);
+    border-radius: 8px;
+
+    span {
+        color: #4338ca;
+        font-size: 0.9rem;
+    }
+
+    strong {
+        font-size: 1.1rem;
+        color: #1e40af;
+    }
+}

@@ -74,6 +74,23 @@ export class ApiService {
         return this.http.delete<void>(`${this.baseUrl}/users/${id}`);
     }
 
+    // ==================== PERMISSIONS ====================
+    getAllPermissions(): Observable<{ name: string, value: number }[]> {
+        return this.http.get<{ name: string, value: number }[]>(`${this.baseUrl}/users/permissions`);
+    }
+
+    getUserPermissions(userId: string): Observable<string[]> {
+        return this.http.get<string[]>(`${this.baseUrl}/users/${userId}/permissions`);
+    }
+
+    assignPermissions(userId: string, permissions: string[], grantedBy?: string): Observable<any> {
+        return this.http.post(`${this.baseUrl}/users/${userId}/permissions`, { permissions, grantedBy });
+    }
+
+    revokePermission(userId: string, permission: string): Observable<void> {
+        return this.http.delete<void>(`${this.baseUrl}/users/${userId}/permissions/${permission}`);
+    }
+
     // ==================== COUPLES ====================
     getCouple(id: string): Observable<Couple> {
         return this.http.get<Couple>(`${this.baseUrl}/couples/${id}`);
@@ -188,6 +205,30 @@ export class ApiService {
 
     recordPayment(id: string, data: { amount: number; paymentMethod: string; transactionReference?: string }): Observable<any> {
         return this.http.post<any>(`${this.baseUrl}/billing/invoices/${id}/pay`, data);
+    }
+
+    // ==================== SERVICE CATALOG ====================
+    getServices(query?: string, category?: string, page = 1, pageSize = 50): Observable<any> {
+        let params = new HttpParams().set('page', page).set('pageSize', pageSize);
+        if (query) params = params.set('q', query);
+        if (category) params = params.set('category', category);
+        return this.http.get<any>(`${this.baseUrl}/services`, { params });
+    }
+
+    getServiceCategories(): Observable<{ name: string; value: number }[]> {
+        return this.http.get<{ name: string; value: number }[]>(`${this.baseUrl}/services/categories`);
+    }
+
+    createService(data: { code: string; name: string; category: string; unitPrice: number; unit?: string; description?: string }): Observable<any> {
+        return this.http.post(`${this.baseUrl}/services`, data);
+    }
+
+    updateService(id: string, data: { name: string; category: string; unitPrice: number; unit?: string; description?: string }): Observable<any> {
+        return this.http.put(`${this.baseUrl}/services/${id}`, data);
+    }
+
+    toggleService(id: string): Observable<{ isActive: boolean }> {
+        return this.http.patch<{ isActive: boolean }>(`${this.baseUrl}/services/${id}/toggle`, {});
     }
 
     // ==================== REPORTS ====================
@@ -408,3 +449,21 @@ export interface AuditSearchParams {
     pageSize?: number;
 }
 
+// ==================== SERVICE CATALOG ====================
+export interface ServiceItem {
+    id: string;
+    code: string;
+    name: string;
+    category: string;
+    unitPrice: number;
+    unit: string;
+    description?: string;
+    isActive: boolean;
+}
+
+export interface ServiceListResponse {
+    items: ServiceItem[];
+    total: number;
+    page: number;
+    pageSize: number;
+}

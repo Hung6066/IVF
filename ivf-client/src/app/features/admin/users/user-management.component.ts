@@ -90,6 +90,9 @@ import { ApiService } from '../../../core/services/api.service';
                         🩺
                       </button>
                     }
+                    <button class="btn-icon permissions" (click)="openPermissionsModal(user)" title="Phân quyền">
+                      🔐
+                    </button>
                     <button class="btn-icon edit" (click)="openModal(user)" title="Chỉnh sửa">
                       ✏️
                     </button>
@@ -147,11 +150,6 @@ import { ApiService } from '../../../core/services/api.service';
                 <input class="modern-input" [(ngModel)]="formData.username" name="username" [disabled]="!!editingUser" placeholder="VD: nguyenvana" required>
               </div>
 
-              <div class="form-group">
-                <label>Mật khẩu {{ editingUser ? '(Optional)' : '*' }}</label>
-                <input class="modern-input" type="password" [(ngModel)]="formData.password" name="password" [required]="!editingUser" [placeholder]="editingUser ? '••••••' : 'Nhập mật khẩu'">
-              </div>
-
               @if (editingUser) {
                 <div class="form-check full-width">
                   <label class="checkbox-label">
@@ -160,6 +158,14 @@ import { ApiService } from '../../../core/services/api.service';
                   </label>
                 </div>
               }
+
+              <div class="form-group" [class.disabled-field]="editingUser && !changePassword">
+                <label>Mật khẩu {{ editingUser ? '' : '*' }}</label>
+                <input class="modern-input" type="password" [(ngModel)]="formData.password" name="password" 
+                       [required]="!editingUser || changePassword" 
+                       [disabled]="editingUser && !changePassword"
+                       [placeholder]="editingUser ? (changePassword ? 'Nhập mật khẩu mới' : 'Không thay đổi') : 'Nhập mật khẩu'">
+              </div>
 
               <div class="form-group">
                 <label>Vai trò <span class="required">*</span></label>
@@ -234,6 +240,49 @@ import { ApiService } from '../../../core/services/api.service';
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- Permissions Modal -->
+    @if (showPermissionsModal) {
+      <div class="modal-backdrop" (click)="closePermissionsModal()">
+        <div class="modal-card permissions-modal" (click)="$event.stopPropagation()">
+          <div class="modal-header">
+            <h2>🔐 Phân quyền cho {{ selectedPermissionUser?.fullName }}</h2>
+            <button class="close-btn" (click)="closePermissionsModal()">×</button>
+          </div>
+          
+          <div class="modal-body permissions-body">
+            <div class="permission-groups">
+              @for (group of permissionGroups; track group.name) {
+                <div class="permission-group">
+                  <h4 class="group-title">{{ group.name }}</h4>
+                  <div class="permission-grid">
+                    @for (perm of group.permissions; track perm) {
+                      <label class="permission-checkbox">
+                        <input type="checkbox" 
+                               [checked]="userPermissions.includes(perm)"
+                               (change)="togglePermission(perm)">
+                        <span class="checkmark"></span>
+                        <span class="perm-label">{{ formatPermission(perm) }}</span>
+                      </label>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+
+          <div class="modal-footer">
+            <div class="perm-count">{{ userPermissions.length }} quyền đã chọn</div>
+            <div class="footer-buttons">
+              <button type="button" class="btn-ghost" (click)="closePermissionsModal()">Hủy bỏ</button>
+              <button type="button" class="btn-primary" [disabled]="loading()" (click)="savePermissions()">
+                {{ loading() ? 'Đang lưu...' : 'Lưu phân quyền' }}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -320,8 +369,25 @@ import { ApiService } from '../../../core/services/api.service';
     .modern-input, .modern-select { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem; transition: all 0.2s; }
     .modern-input:focus, .modern-select:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1); }
     .checkbox-label { display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; }
+    .disabled-field { opacity: 0.5; pointer-events: none; }
+    .disabled-field input { background: #f1f5f9; }
     .modal-footer { padding: 16px 24px; background: #f8fafc; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 12px; }
     .required { color: #ef4444; }
+
+    /* Permissions Modal */
+    .permissions-modal { max-width: 800px; }
+    .permissions-body { max-height: 60vh; overflow-y: auto; }
+    .permission-groups { display: flex; flex-direction: column; gap: 20px; }
+    .permission-group { background: #f8fafc; padding: 16px; border-radius: 12px; border: 1px solid var(--border); }
+    .group-title { margin: 0 0 12px 0; font-size: 0.9rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+    .permission-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
+    .permission-checkbox { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: white; border-radius: 8px; cursor: pointer; transition: all 0.15s; border: 1px solid transparent; }
+    .permission-checkbox:hover { border-color: var(--primary); background: #f8fafc; }
+    .permission-checkbox input { width: 16px; height: 16px; accent-color: var(--primary); }
+    .perm-label { font-size: 0.85rem; color: var(--text-dark); }
+    .perm-count { font-size: 0.9rem; color: var(--text-muted); }
+    .footer-buttons { display: flex; gap: 12px; }
+    .btn-icon.permissions:hover { background: #fef3c7; }
 
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
@@ -360,6 +426,27 @@ export class UserManagementComponent implements OnInit {
     roomNumber: '',
     maxPatientsPerDay: 20
   };
+
+  // Permissions Modal
+  showPermissionsModal = false;
+  selectedPermissionUser: any = null;
+  userPermissions: string[] = [];
+
+  permissionGroups = [
+    { name: '👥 Bệnh nhân', permissions: ['ViewPatients', 'ManagePatients'] },
+    { name: '💑 Cặp đôi & Chu kỳ', permissions: ['ViewCouples', 'ManageCouples', 'ViewCycles', 'ManageCycles'] },
+    { name: '🔬 Siêu âm', permissions: ['ViewUltrasounds', 'PerformUltrasound'] },
+    { name: '🧬 Phôi', permissions: ['ViewEmbryos', 'ManageEmbryos'] },
+    { name: '🧫 Lab', permissions: ['ViewLabResults', 'ManageLabResults'] },
+    { name: '🔬 Nam khoa', permissions: ['ViewAndrology', 'ManageAndrology'] },
+    { name: '🏦 Ngân hàng tinh trùng', permissions: ['ViewSpermBank', 'ManageSpermBank'] },
+    { name: '💰 Hoá đơn', permissions: ['ViewBilling', 'ManageBilling', 'CreateInvoice', 'ProcessPayment'] },
+    { name: '🎫 Hàng đợi', permissions: ['ViewQueue', 'ManageQueue', 'CallTicket'] },
+    { name: '💊 Đơn thuốc', permissions: ['ViewPrescriptions', 'CreatePrescription'] },
+    { name: '📅 Lịch hẹn', permissions: ['ViewSchedule', 'ManageSchedule', 'BookAppointment'] },
+    { name: '📊 Báo cáo', permissions: ['ViewReports', 'ViewAdminReports', 'ExportData'] },
+    { name: '⚙️ Quản trị', permissions: ['ManageUsers', 'ManageRoles', 'ManageSystem', 'ViewAuditLog'] }
+  ];
 
   constructor(private api: ApiService) { }
 
@@ -415,16 +502,32 @@ export class UserManagementComponent implements OnInit {
   saveUser() {
     this.loading.set(true);
     if (this.editingUser) {
-      const updateData = { ...this.formData };
-      if (!this.changePassword) delete updateData.password;
+      const updateData: any = {
+        id: this.editingUser.id,
+        fullName: this.formData.fullName,
+        role: this.formData.role,
+        department: this.formData.department,
+        isActive: this.formData.isActive
+      };
+
+      // Only include password if checkbox is checked AND password is not empty
+      if (this.changePassword && this.formData.password?.trim()) {
+        updateData.password = this.formData.password;
+      }
 
       this.api.updateUser(this.editingUser.id, updateData).subscribe({
         next: () => {
           this.loadUsers();
           this.closeModal();
           this.loading.set(false);
+          if (this.changePassword) {
+            alert('Đã cập nhật mật khẩu thành công!');
+          }
         },
-        error: () => this.loading.set(false)
+        error: (err) => {
+          this.loading.set(false);
+          alert('Lỗi cập nhật: ' + (err.error?.detail || err.message || 'Không xác định'));
+        }
       });
     } else {
       this.api.createUser(this.formData).subscribe({
@@ -483,6 +586,96 @@ export class UserManagementComponent implements OnInit {
         this.loading.set(false);
       }
     });
+  }
+
+  // --- Permissions Modal ---
+  openPermissionsModal(user: any) {
+    this.selectedPermissionUser = user;
+    this.userPermissions = [];
+    this.showPermissionsModal = true;
+
+    // Load user's current permissions
+    this.api.getUserPermissions(user.id).subscribe({
+      next: (permissions) => {
+        this.userPermissions = permissions || [];
+      },
+      error: () => {
+        this.userPermissions = [];
+      }
+    });
+  }
+
+  closePermissionsModal() {
+    this.showPermissionsModal = false;
+    this.selectedPermissionUser = null;
+    this.userPermissions = [];
+  }
+
+  togglePermission(permission: string) {
+    if (this.userPermissions.includes(permission)) {
+      this.userPermissions = this.userPermissions.filter(p => p !== permission);
+    } else {
+      this.userPermissions = [...this.userPermissions, permission];
+    }
+  }
+
+  savePermissions() {
+    if (!this.selectedPermissionUser) return;
+
+    this.loading.set(true);
+    this.api.assignPermissions(this.selectedPermissionUser.id, this.userPermissions).subscribe({
+      next: () => {
+        alert(`Đã cập nhật ${this.userPermissions.length} quyền cho ${this.selectedPermissionUser.fullName}`);
+        this.closePermissionsModal();
+        this.loading.set(false);
+      },
+      error: (err) => {
+        alert('Lỗi: ' + (err.error?.detail || 'Không thể cập nhật quyền'));
+        this.loading.set(false);
+      }
+    });
+  }
+
+  formatPermission(perm: string): string {
+    // Convert camelCase to readable: ViewPatients -> Xem bệnh nhân
+    const translations: Record<string, string> = {
+      'ViewPatients': 'Xem bệnh nhân',
+      'ManagePatients': 'Quản lý BN',
+      'ViewCouples': 'Xem cặp đôi',
+      'ManageCouples': 'Quản lý CĐ',
+      'ViewCycles': 'Xem chu kỳ',
+      'ManageCycles': 'Quản lý CK',
+      'ViewUltrasounds': 'Xem siêu âm',
+      'PerformUltrasound': 'Thực hiện SA',
+      'ViewEmbryos': 'Xem phôi',
+      'ManageEmbryos': 'Quản lý phôi',
+      'ViewLabResults': 'Xem xét nghiệm',
+      'ManageLabResults': 'Quản lý XN',
+      'ViewAndrology': 'Xem nam khoa',
+      'ManageAndrology': 'Quản lý NK',
+      'ViewSpermBank': 'Xem NHTT',
+      'ManageSpermBank': 'Quản lý NHTT',
+      'ViewBilling': 'Xem hoá đơn',
+      'ManageBilling': 'Quản lý HĐ',
+      'CreateInvoice': 'Tạo hoá đơn',
+      'ProcessPayment': 'Xử lý TT',
+      'ViewQueue': 'Xem hàng đợi',
+      'ManageQueue': 'Quản lý HĐ',
+      'CallTicket': 'Gọi bệnh nhân',
+      'ViewPrescriptions': 'Xem đơn thuốc',
+      'CreatePrescription': 'Tạo đơn thuốc',
+      'ViewSchedule': 'Xem lịch',
+      'ManageSchedule': 'Quản lý lịch',
+      'BookAppointment': 'Đặt lịch hẹn',
+      'ViewReports': 'Xem báo cáo',
+      'ViewAdminReports': 'BC quản trị',
+      'ExportData': 'Xuất dữ liệu',
+      'ManageUsers': 'Quản lý users',
+      'ManageRoles': 'Quản lý roles',
+      'ManageSystem': 'Quản lý HT',
+      'ViewAuditLog': 'Xem nhật ký'
+    };
+    return translations[perm] || perm;
   }
 
   // --- UI Helpers ---

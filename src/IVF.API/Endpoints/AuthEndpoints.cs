@@ -47,6 +47,15 @@ public static class AuthEndpoints
             var user = await userRepo.GetByIdAsync(Guid.Parse(userId));
             return user == null ? Results.NotFound() : Results.Ok(UserDto.FromEntity(user));
         }).RequireAuthorization();
+
+        // Get current user's permissions
+        group.MapGet("/me/permissions", async (ClaimsPrincipal principal, IUserPermissionRepository permRepo) =>
+        {
+            var userId = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId)) return Results.Unauthorized();
+            var permissions = await permRepo.GetByUserIdAsync(Guid.Parse(userId));
+            return Results.Ok(permissions.Select(p => p.Permission.ToString()));
+        }).RequireAuthorization();
     }
 
     private static string GenerateJwtToken(User user, IConfiguration config)

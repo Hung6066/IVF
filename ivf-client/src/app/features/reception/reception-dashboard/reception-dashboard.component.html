@@ -129,6 +129,33 @@
                     <textarea class="form-control" [(ngModel)]="checkinData.notes" name="notes"
                         placeholder="Lý do khám..."></textarea>
                 </div>
+
+                <div class="form-group services-section">
+                    <label class="form-label">📋 Chỉ định dịch vụ</label>
+                    <div class="services-grid">
+                        @for (svc of services(); track svc.id) {
+                        <div class="service-item" [class.selected]="isServiceSelected(svc.id)"
+                            (click)="toggleService(svc.id)">
+                            <div class="service-check">
+                                <input type="checkbox" [checked]="isServiceSelected(svc.id)"
+                                    (click)="$event.stopPropagation()" />
+                            </div>
+                            <div class="service-info">
+                                <span class="service-code">{{ svc.code }}</span>
+                                <span class="service-name">{{ svc.name }}</span>
+                            </div>
+                            <span class="service-price">{{ formatCurrency(svc.unitPrice) }}</span>
+                        </div>
+                        }
+                    </div>
+                    @if (checkinData.selectedServices.length > 0) {
+                    <div class="services-total">
+                        <span>Tổng {{ checkinData.selectedServices.length }} dịch vụ:</span>
+                        <strong>{{ formatCurrency(getSelectedServicesTotal()) }}</strong>
+                    </div>
+                    }
+                </div>
+
                 <div class="modal-actions">
                     <button type="button" class="btn btn-secondary" (click)="showCheckinModal = false">Huỷ</button>
                     <button type="submit" class="btn btn-primary">Cấp số & In phiếu</button>

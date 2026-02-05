@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { BillingService, Invoice, Payment, RevenueChartData } from '../billing.service';
 import { PatientSearchComponent } from '../../../shared/components/patient-search/patient-search.component';
+import { ApiService } from '../../../core/services/api.service';
 
 @Component({
   selector: 'app-invoice-list',
@@ -14,6 +15,9 @@ import { PatientSearchComponent } from '../../../shared/components/patient-searc
 })
 export class InvoiceListComponent implements OnInit {
   private service = inject(BillingService);
+  private api = inject(ApiService);
+
+  services = signal<any[]>([]);
 
   activeTab = 'invoices';
   invoices = signal<Invoice[]>([]);
@@ -32,10 +36,18 @@ export class InvoiceListComponent implements OnInit {
   searchTerm = '';
 
   showCreateInvoice = false;
-  newInvoice: any = { patientSearch: '', patientName: '', items: [{ name: '', qty: 1, price: 0 }] };
+  newInvoice: any = { patientSearch: '', patientName: '', patientId: '', items: [{ serviceId: '', code: '', name: '', qty: 1, price: 0, unit: '' }] };
 
   ngOnInit(): void {
     this.refreshData();
+    this.loadServices();
+  }
+
+  loadServices() {
+    this.api.getServices(undefined, undefined, 1, 200).subscribe({
+      next: (res) => this.services.set(res.items.filter((s: any) => s.isActive)),
+      error: () => { }
+    });
   }
 
   refreshData() {
@@ -77,9 +89,20 @@ export class InvoiceListComponent implements OnInit {
   payInvoice(inv: any): void { alert('Thu tiền cho: ' + inv.code + ' - Còn lại: ' + this.formatCurrency(inv.remaining)); }
   printInvoice(inv: any): void { window.print(); }
 
-  addItem(): void { this.newInvoice.items.push({ name: '', qty: 1, price: 0 }); }
+  addItem(): void { this.newInvoice.items.push({ serviceId: '', code: '', name: '', qty: 1, price: 0, unit: '' }); }
   removeItem(idx: number): void { this.newInvoice.items.splice(idx, 1); }
   calcTotal(): number { return this.newInvoice.items.reduce((sum: number, i: any) => sum + (i.qty * i.price), 0); }
+
+  onServiceSelect(item: any, serviceId: string) {
+    const svc = this.services().find(s => s.id === serviceId);
+    if (svc) {
+      item.serviceId = svc.id;
+      item.code = svc.code;
+      item.name = svc.name;
+      item.price = svc.unitPrice;
+      item.unit = svc.unit;
+    }
+  }
 
   submitInvoice(): void {
     const total = this.calcTotal();
@@ -97,7 +120,7 @@ export class InvoiceListComponent implements OnInit {
     this.invoices.update(list => [...list, newInv]);
 
     this.showCreateInvoice = false;
-    this.newInvoice = { patientSearch: '', patientName: '', items: [{ name: '', qty: 1, price: 0 }] };
+    this.newInvoice = { patientSearch: '', patientName: '', patientId: '', items: [{ serviceId: '', code: '', name: '', qty: 1, price: 0, unit: '' }] };
   }
 
   onPatientSelect(patient: any) {

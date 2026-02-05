@@ -48,6 +48,8 @@ public static class DependencyInjection
         services.AddScoped<IAppointmentRepository, AppointmentRepository>();
         services.AddScoped<INotificationRepository, NotificationRepository>();
         services.AddScoped<IAuditLogRepository, AuditLogRepository>();
+        services.AddScoped<IUserPermissionRepository, UserPermissionRepository>();
+        services.AddScoped<IServiceCatalogRepository, ServiceCatalogRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 
         // Register Services

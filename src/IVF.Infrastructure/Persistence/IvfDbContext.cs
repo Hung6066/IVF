@@ -29,6 +29,7 @@ public class IvfDbContext : DbContext
     public DbSet<Appointment> Appointments => Set<Appointment>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<ServiceCatalog> ServiceCatalogs => Set<ServiceCatalog>();
 
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterModule, Router } from '@angular/router';
 import { ReceptionService, CheckinRecord } from './reception.service';
 import { Patient } from '../../../core/models/api.models';
+import { ApiService } from '../../../core/services/api.service';
 
 @Component({
   selector: 'app-reception-dashboard',
@@ -15,6 +16,9 @@ import { Patient } from '../../../core/models/api.models';
 export class ReceptionDashboardComponent implements OnInit {
   private service = inject(ReceptionService);
   private router = inject(Router);
+  private api = inject(ApiService);
+
+  services = signal<any[]>([]);
 
   searchTerm = '';
   searchResults = signal<Patient[]>([]);
@@ -29,11 +33,18 @@ export class ReceptionDashboardComponent implements OnInit {
 
   showCheckinModal = false;
   selectedPatient: Patient | null = null;
-  checkinData = { department: 'TV', priority: 'Normal', doctor: '', notes: '' };
+  checkinData: any = { department: 'TV', priority: 'Normal', doctor: '', notes: '', selectedServices: [] };
 
   ngOnInit(): void {
     this.refreshQueue();
-    // Initial search or load
+    this.loadServices();
+  }
+
+  loadServices() {
+    this.api.getServices(undefined, undefined, 1, 200).subscribe({
+      next: (res) => this.services.set(res.items.filter((s: any) => s.isActive)),
+      error: () => { }
+    });
   }
 
   refreshQueue() {
@@ -52,8 +63,28 @@ export class ReceptionDashboardComponent implements OnInit {
 
   checkinPatient(patient: Patient): void {
     this.selectedPatient = patient;
-    this.checkinData = { department: 'TV', priority: 'Normal', doctor: '', notes: '' };
+    this.checkinData = { department: 'TV', priority: 'Normal', doctor: '', notes: '', selectedServices: [] };
     this.showCheckinModal = true;
+  }
+
+  toggleService(serviceId: string) {
+    const idx = this.checkinData.selectedServices.indexOf(serviceId);
+    if (idx >= 0) {
+      this.checkinData.selectedServices.splice(idx, 1);
+    } else {
+      this.checkinData.selectedServices.push(serviceId);
+    }
+  }
+
+  isServiceSelected(serviceId: string): boolean {
+    return this.checkinData.selectedServices.includes(serviceId);
+  }
+
+  getSelectedServicesTotal(): number {
+    return this.checkinData.selectedServices.reduce((sum: number, id: string) => {
+      const svc = this.services().find(s => s.id === id);
+      return sum + (svc?.unitPrice || 0);
+    }, 0);
   }
 
   submitCheckin(): void {

@@ -108,6 +108,10 @@ export const routes: Routes = [
                 path: 'admin/users',
                 loadComponent: () => import('./features/admin/users/user-management.component').then(m => m.UserManagementComponent)
             },
+            {
+                path: 'admin/services',
+                loadComponent: () => import('./features/admin/services/service-catalog.component').then(m => m.ServiceCatalogComponent)
+            },
             { path: '', redirectTo: 'dashboard', pathMatch: 'full' }
         ]
     },
