@@ -1,7 +1,7 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+
 import { AppointmentService } from '../../core/services/appointment.service';
 import { Appointment, AppointmentType, CreateAppointmentRequest, Patient } from '../../core/models/api.models';
 import { PatientSearchComponent } from '../../shared/components/patient-search/patient-search.component';
@@ -11,7 +11,7 @@ import { DoctorSearchComponent } from '../../shared/components/doctor-search/doc
 @Component({
   selector: 'app-appointments-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, PatientSearchComponent, DoctorSearchComponent],
+  imports: [CommonModule, FormsModule, PatientSearchComponent, DoctorSearchComponent],
   templateUrl: './appointments-dashboard.component.html',
   styleUrls: ['./appointments-dashboard.component.scss']
 })
