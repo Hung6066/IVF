@@ -39,5 +39,12 @@ public static class QueueEndpoints
             var r = await m.Send(new SkipTicketCommand(id));
             return r.IsSuccess ? Results.NoContent() : Results.NotFound(r.Error);
         });
+
+        // Get patient's today pending ticket with service indications
+        group.MapGet("/patient/{patientId:guid}/pending", async (Guid patientId, IMediator m) =>
+        {
+            var r = await m.Send(new GetPatientPendingTicketQuery(patientId));
+            return r.IsSuccess ? Results.Ok(r.Value) : Results.NotFound(r.Error);
+        });
     }
 }

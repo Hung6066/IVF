@@ -5,6 +5,7 @@ import { RouterModule, Router } from '@angular/router';
 import { ReceptionService, CheckinRecord } from './reception.service';
 import { Patient } from '../../../core/models/api.models';
 import { ApiService } from '../../../core/services/api.service';
+import { Observable, forkJoin } from 'rxjs';
 
 @Component({
   selector: 'app-reception-dashboard',
@@ -33,7 +34,15 @@ export class ReceptionDashboardComponent implements OnInit {
 
   showCheckinModal = false;
   selectedPatient: Patient | null = null;
-  checkinData: any = { department: 'TV', priority: 'Normal', doctor: '', notes: '', selectedServices: [] };
+  checkinData: any = { department: ['TV'], priority: 'Normal', doctor: '', notes: '', selectedServices: [] };
+
+  departments = [
+    { code: 'TV', name: 'Tư vấn (TV)' },
+    { code: 'US', name: 'Siêu âm (US)' },
+    { code: 'TM', name: 'Tiêm (TM)' },
+    { code: 'XN', name: 'Xét nghiệm (XN)' },
+    { code: 'NAM', name: 'Nam khoa' }
+  ];
 
   ngOnInit(): void {
     this.refreshQueue();
@@ -63,7 +72,7 @@ export class ReceptionDashboardComponent implements OnInit {
 
   checkinPatient(patient: Patient): void {
     this.selectedPatient = patient;
-    this.checkinData = { department: 'TV', priority: 'Normal', doctor: '', notes: '', selectedServices: [] };
+    this.checkinData = { department: ['TV'], priority: 'Normal', doctor: '', notes: '', selectedServices: [] };
     this.showCheckinModal = true;
   }
 
@@ -87,44 +96,90 @@ export class ReceptionDashboardComponent implements OnInit {
     }, 0);
   }
 
+  getDeptCode(category: any): string {
+    // Categories: 0:Lab, 1:US, 2:Proc, 3:Meds, 4:Cons, 5:IVF, 6:Andro, 7:Sperm, 8:Other
+    // Map string or int
+    const cat = String(category).toLowerCase();
+
+    if (cat === '0' || cat === 'labtest') return 'XN';
+    if (cat === '1' || cat === 'ultrasound') return 'US';
+    if (cat === '2' || cat === 'procedure') return 'TM'; // Procedure -> TM (Injection/Procedure)
+    if (cat === '3' || cat === 'medication') return 'NT';
+    if (cat === '4' || cat === 'consultation') return 'TV';
+    if (cat === '5' || cat === 'ivf') return 'TV'; // IVF -> TV
+    if (cat === '6' || cat === 'andrology') return 'NAM';
+    if (cat === '7' || cat === 'spermbank') return 'NAM';
+
+    const dept = Array.isArray(this.checkinData.department) ? this.checkinData.department[0] : this.checkinData.department;
+    return dept || 'TV'; // Fallback
+  }
+
+  toggleDept(code: string) {
+    if (!Array.isArray(this.checkinData.department)) {
+      this.checkinData.department = [this.checkinData.department || 'TV'];
+    }
+    const idx = this.checkinData.department.indexOf(code);
+    if (idx >= 0) {
+      this.checkinData.department.splice(idx, 1);
+    } else {
+      this.checkinData.department.push(code);
+    }
+  }
+
+  isDeptSelected(code: string): boolean {
+    if (!Array.isArray(this.checkinData.department)) return this.checkinData.department === code;
+    return this.checkinData.department.includes(code);
+  }
+
   submitCheckin(): void {
     if (!this.selectedPatient) return;
 
-    const departmentCode = this.checkinData.department;
-    this.service.issueTicket(
-      this.selectedPatient.id,
-      departmentCode,
-      this.checkinData.priority,
-      this.checkinData.notes
-    ).subscribe({
-      next: (ticket: any) => {
-        const deptMap: any = { 'TV': 'Tư vấn', 'US': 'Siêu âm', 'TM': 'Tiêm', 'XN': 'Xét nghiệm', 'NAM': 'Nam khoa' };
-        alert(`Đã cấp số ${ticket.ticketNumber} cho BN ${this.selectedPatient!.fullName}`);
+    const requests: Observable<any>[] = [];
+    const deptsToIssue = new Set<string>();
 
-        const newCheckin: CheckinRecord = {
-          id: ticket.id,
-          time: new Date().toISOString(),
-          patientName: this.selectedPatient!.fullName,
-          department: deptMap[departmentCode] || departmentCode
-        };
+    // Add manually selected departments
+    const manualArr = Array.isArray(this.checkinData.department) ? this.checkinData.department : [this.checkinData.department];
+    manualArr.forEach((d: string) => deptsToIssue.add(d));
 
-        this.recentCheckins.update(list => [newCheckin, ...list]);
+    const servicesByDept = new Map<string, string[]>();
 
-        // Optimistic update
-        if (departmentCode === 'TV') this.queueTuVan.update(v => v + 1);
-        if (departmentCode === 'US') this.queueSieuAm.update(v => v + 1);
-        if (departmentCode === 'TM') this.queueTiem.update(v => v + 1);
-        if (departmentCode === 'XN') this.queueXN.update(v => v + 1);
+    if (this.checkinData.selectedServices.length > 0) {
+      this.checkinData.selectedServices.forEach((id: string) => {
+        const svc = this.services().find(s => s.id === id);
+        if (svc) {
+          const dept = this.getDeptCode(svc.category);
+          deptsToIssue.add(dept);
+          if (!servicesByDept.has(dept)) servicesByDept.set(dept, []);
+          servicesByDept.get(dept)!.push(id);
+        }
+      });
+    }
 
-        this.showCheckinModal = false;
-        this.searchTerm = '';
-        this.searchResults.set([]);
-      },
-      error: (err) => {
-        console.error('Error issuing ticket:', err);
-        alert('Lỗi cấp số: ' + (err.error?.message || 'Có lỗi xảy ra'));
-      }
+    deptsToIssue.forEach(dept => {
+      const ids = servicesByDept.get(dept);
+      const req = this.service.issueTicket(
+        this.selectedPatient!.id,
+        dept,
+        this.checkinData.priority,
+        this.checkinData.notes,
+        undefined,
+        ids
+      );
+      requests.push(req);
     });
+
+    if (requests.length > 0) {
+      forkJoin(requests).subscribe({
+        next: (results) => {
+          alert(`Đã phát ${results.length} phiếu khám thành công!`);
+          this.showCheckinModal = false;
+          this.refreshQueue();
+        },
+        error: (err) => {
+          alert('Có lỗi xảy ra: ' + (err.error || err.message));
+        }
+      });
+    }
   }
 
   formatDate(date: string): string {

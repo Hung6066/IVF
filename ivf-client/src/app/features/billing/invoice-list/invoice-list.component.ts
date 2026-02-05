@@ -126,6 +126,36 @@ export class InvoiceListComponent implements OnInit {
   onPatientSelect(patient: any) {
     if (patient) {
       this.newInvoice.patientName = patient.fullName;
+      this.newInvoice.patientId = patient.id;
+
+      // Check for pending service indications
+      this.api.getPatientPendingTicket(patient.id).subscribe({
+        next: (ticket: any) => {
+          if (ticket && ticket.serviceIds && ticket.serviceIds.length > 0) {
+            const indicatedItems: any[] = [];
+
+            ticket.serviceIds.forEach((svcId: string) => {
+              const svc = this.services().find(s => s.id === svcId);
+              if (svc) {
+                indicatedItems.push({
+                  serviceId: svc.id,
+                  code: svc.code,
+                  name: svc.name,
+                  qty: 1,
+                  price: svc.unitPrice,
+                  unit: svc.unit
+                });
+              }
+            });
+
+            if (indicatedItems.length > 0) {
+              this.newInvoice.items = indicatedItems;
+              // alert('Đã tải ' + indicatedItems.length + ' chỉ định dịch vụ từ phiếu khám ' + ticket.ticketNumber);
+            }
+          }
+        },
+        error: () => { } // No pending ticket or error, just ignore
+      });
     }
   }
 }

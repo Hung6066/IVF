@@ -24,6 +24,26 @@ public class QueueTicketRepository : IQueueTicketRepository
             .ToListAsync(ct);
     }
 
+    public async Task<IReadOnlyList<QueueTicket>> GetByPatientTodayAsync(Guid patientId, CancellationToken ct = default)
+    {
+        var today = DateTime.UtcNow.Date;
+        return await _context.QueueTickets
+            .Where(q => q.PatientId == patientId && q.IssuedAt >= today)
+            .Include(q => q.Patient)
+            .OrderByDescending(q => q.IssuedAt)
+            .ToListAsync(ct);
+    }
+
+    public async Task<IReadOnlyList<QueueTicket>> GetAllTodayAsync(CancellationToken ct = default)
+    {
+        var today = DateTime.UtcNow.Date;
+        return await _context.QueueTickets
+            .Where(q => q.IssuedAt >= today)
+            .Include(q => q.Patient)
+            .OrderBy(q => q.IssuedAt)
+            .ToListAsync(ct);
+    }
+
     public async Task<QueueTicket> AddAsync(QueueTicket ticket, CancellationToken ct = default)
     {
         await _context.QueueTickets.AddAsync(ticket, ct);

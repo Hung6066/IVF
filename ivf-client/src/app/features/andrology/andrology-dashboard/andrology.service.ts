@@ -46,7 +46,7 @@ export class AndrologyService {
     constructor(private api: ApiService) { }
 
     getQueue(): Observable<AndrologyQueueItem[]> {
-        return this.api.getQueue('AND').pipe(
+        return this.api.getQueueByDept('NAM').pipe(
             map((data: any[]) => data.map((item, index) => ({
                 id: item.id || String(index),
                 number: item.ticketNumber,

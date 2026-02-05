@@ -26,13 +26,15 @@ export class ReceptionService {
         return this.api.searchPatients(term);
     }
 
-    issueTicket(patientId: string, departmentCode: string, priority: string, notes: string): Observable<any> {
-        return this.api.issueTicket({
+    issueTicket(patientId: string, departmentCode: string, priority: string, notes: string, cycleId?: string, serviceIds?: string[]): Observable<any> {
+        return this.api.issueTicket(
             patientId,
-            departmentCode
-            // priority and notes might need API support, currently API only takes patientId and departmentCode
-            // If API supports more, I would add them. Assuming current API spec.
-        });
+            departmentCode,
+            priority as any,
+            notes,
+            cycleId,
+            serviceIds
+        );
     }
 
     // Mock for now until API endpoint exists

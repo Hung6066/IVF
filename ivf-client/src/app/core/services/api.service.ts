@@ -130,24 +130,34 @@ export class ApiService {
     }
 
     // ==================== QUEUE ====================
-    getQueue(departmentCode: string): Observable<QueueTicket[]> {
-        return this.http.get<QueueTicket[]>(`${this.baseUrl}/queue/${departmentCode}`);
+    getQueueByDept(deptCode: string): Observable<any[]> {
+        return this.http.get<any[]>(`${this.baseUrl}/queue/${deptCode}`);
     }
 
-    issueTicket(data: { patientId: string; departmentCode: string }): Observable<QueueTicket> {
-        return this.http.post<QueueTicket>(`${this.baseUrl}/queue/issue`, data);
+    issueTicket(patientId: string, dept: string, type: 'Normal' | 'VIP' | 'Emergency' = 'Normal', notes?: string, cycleId?: string, serviceIds?: string[]): Observable<any> {
+        return this.http.post(`${this.baseUrl}/queue/issue`, {
+            patientId,
+            departmentCode: dept,
+            priority: type, // Changed from queueType to priority
+            cycleId,
+            serviceIds // Added serviceIds
+        });
     }
 
-    callTicket(id: string): Observable<QueueTicket> {
-        return this.http.post<QueueTicket>(`${this.baseUrl}/queue/${id}/call`, {});
+    callTicket(ticketId: string): Observable<any> {
+        return this.http.post(`${this.baseUrl}/queue/${ticketId}/call`, {});
     }
 
-    completeTicket(id: string): Observable<void> {
-        return this.http.post<void>(`${this.baseUrl}/queue/${id}/complete`, {});
+    completeTicket(ticketId: string): Observable<any> {
+        return this.http.post(`${this.baseUrl}/queue/${ticketId}/complete`, {});
     }
 
-    skipTicket(id: string): Observable<void> {
-        return this.http.post<void>(`${this.baseUrl}/queue/${id}/skip`, {});
+    skipTicket(ticketId: string): Observable<any> {
+        return this.http.post(`${this.baseUrl}/queue/${ticketId}/skip`, {});
+    }
+
+    getPatientPendingTicket(patientId: string): Observable<any> {
+        return this.http.get<any>(`${this.baseUrl}/queue/patient/${patientId}/pending`);
     }
 
     // ==================== ULTRASOUNDS ====================

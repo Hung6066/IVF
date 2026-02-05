@@ -31,7 +31,7 @@ import { ToastNotificationComponent } from '../../shared/components/toast-notifi
           <a *ngIf="canView('ViewCouples')" routerLink="/couples" routerLinkActive="active" class="nav-item">
             <span class="icon">💑</span> Cặp đôi
           </a>
-          <a *ngIf="canView('ViewQueue')" routerLink="/queue/US" routerLinkActive="active" class="nav-item">
+          <a *ngIf="canView('ViewQueue')" routerLink="/queue/all" routerLinkActive="active" class="nav-item">
             <span class="icon">🎫</span> Hàng đợi
           </a>
           <a *ngIf="canView('ViewCycles')" routerLink="/consultation" routerLinkActive="active" class="nav-item">

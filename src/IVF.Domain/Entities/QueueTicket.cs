@@ -7,6 +7,7 @@ public class QueueTicket : BaseEntity
 {
     public string TicketNumber { get; private set; } = string.Empty;
     public QueueType QueueType { get; private set; }
+    public TicketPriority Priority { get; private set; }
     public Guid PatientId { get; private set; }
     public Guid? CycleId { get; private set; }
     public string DepartmentCode { get; private set; } = string.Empty;
@@ -15,6 +16,9 @@ public class QueueTicket : BaseEntity
     public DateTime? CalledAt { get; private set; }
     public DateTime? CompletedAt { get; private set; }
     public Guid? CalledByUserId { get; private set; }
+    
+    // Service indications - JSON array of service IDs selected during check-in
+    public string? ServiceIndications { get; private set; }
 
     // Navigation properties
     public virtual Patient Patient { get; private set; } = null!;
@@ -26,17 +30,21 @@ public class QueueTicket : BaseEntity
     public static QueueTicket Create(
         string ticketNumber,
         QueueType queueType,
+        TicketPriority priority,
         Guid patientId,
         string departmentCode,
-        Guid? cycleId = null)
+        Guid? cycleId = null,
+        string? serviceIndications = null)
     {
         return new QueueTicket
         {
             TicketNumber = ticketNumber,
             QueueType = queueType,
+            Priority = priority,
             PatientId = patientId,
             DepartmentCode = departmentCode,
             CycleId = cycleId,
+            ServiceIndications = serviceIndications,
             Status = TicketStatus.Waiting,
             IssuedAt = DateTime.UtcNow
         };

@@ -11,7 +11,7 @@ export class InjectionService {
     constructor(private api: ApiService) { }
 
     getQueue(): Observable<QueueTicket[]> {
-        return this.api.getQueue('TM'); // TM = Tiem
+        return this.api.getQueueByDept('TM'); // TM = Tiem
     }
 
     callPatient(ticketId: string): Observable<any> {

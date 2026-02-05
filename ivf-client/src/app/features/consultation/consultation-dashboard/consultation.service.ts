@@ -11,7 +11,7 @@ export class ConsultationService {
     constructor(private api: ApiService) { }
 
     getQueue(): Observable<QueueTicket[]> {
-        return this.api.getQueue('TV'); // TV = Tu Van
+        return this.api.getQueueByDept('TV'); // TV = Tu Van
     }
 
     callPatient(ticketId: string): Observable<any> {

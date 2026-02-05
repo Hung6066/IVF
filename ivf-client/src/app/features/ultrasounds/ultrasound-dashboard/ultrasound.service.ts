@@ -29,7 +29,7 @@ export class UltrasoundService {
     constructor(private api: ApiService) { }
 
     getQueue(): Observable<UltrasoundQueueItem[]> {
-        return this.api.getQueue('US').pipe(
+        return this.api.getQueueByDept('US').pipe(
             map((data: any[]) => data.map((item, index) => ({
                 id: item.id || String(index + 1),
                 number: item.ticketNumber || (index + 101),

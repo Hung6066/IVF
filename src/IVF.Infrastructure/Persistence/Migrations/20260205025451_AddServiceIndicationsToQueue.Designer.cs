@@ -3,17 +3,20 @@ using System;
 using IVF.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
-namespace IVF.Infrastructure.Migrations
+namespace IVF.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(IvfDbContext))]
-    partial class IvfDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260205025451_AddServiceIndicationsToQueue")]
+    partial class AddServiceIndicationsToQueue
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -810,9 +813,6 @@ namespace IVF.Infrastructure.Migrations
 
                     b.Property<Guid>("PatientId")
                         .HasColumnType("uuid");
-
-                    b.Property<int>("Priority")
-                        .HasColumnType("integer");
 
                     b.Property<string>("QueueType")
                         .IsRequired()

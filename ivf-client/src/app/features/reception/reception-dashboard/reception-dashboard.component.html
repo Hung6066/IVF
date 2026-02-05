@@ -102,14 +102,16 @@
             <h3>📝 Đăng ký khám: {{ selectedPatient?.fullName }}</h3>
             <form (ngSubmit)="submitCheckin()">
                 <div class="form-group">
-                    <label class="form-label">Dịch vụ / Phòng khám *</label>
-                    <select class="form-control" [(ngModel)]="checkinData.department" name="dept" required>
-                        <option value="TV">Tư vấn (TV)</option>
-                        <option value="US">Siêu âm (US)</option>
-                        <option value="TM">Tiêm (TM)</option>
-                        <option value="XN">Xét nghiệm (XN)</option>
-                        <option value="NAM">Nam khoa</option>
-                    </select>
+                    <label class="form-label">Chọn Phòng khám (có thể chọn nhiều)</label>
+                    <div class="dept-checkboxes">
+                        @for (d of departments; track d.code) {
+                        <div class="dept-check-item" (click)="toggleDept(d.code)">
+                            <input type="checkbox" [checked]="isDeptSelected(d.code)" (change)="toggleDept(d.code)"
+                                (click)="$event.stopPropagation()">
+                            <span>{{ d.name }}</span>
+                        </div>
+                        }
+                    </div>
                 </div>
                 <div class="form-group">
                     <label class="form-label">Bác sĩ chỉ định (tùy chọn)</label>
@@ -120,8 +122,8 @@
                     <label class="form-label">Mức độ ưu tiên</label>
                     <select class="form-control" [(ngModel)]="checkinData.priority" name="priority">
                         <option value="Normal">Bình thường</option>
-                        <option value="High">Ưu tiên</option>
                         <option value="VIP">VIP</option>
+                        <option value="Emergency">Cấp cứu</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -138,7 +140,7 @@
                             (click)="toggleService(svc.id)">
                             <div class="service-check">
                                 <input type="checkbox" [checked]="isServiceSelected(svc.id)"
-                                    (click)="$event.stopPropagation()" />
+                                    (change)="toggleService(svc.id)" (click)="$event.stopPropagation()" />
                             </div>
                             <div class="service-info">
                                 <span class="service-code">{{ svc.code }}</span>

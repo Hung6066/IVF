@@ -141,9 +141,9 @@ public static class DatabaseSeeder
             Console.WriteLine("[Seeder] Treatment Cycles seeded.");
 
             // Seed Queue Tickets
-            var ticket1 = QueueTicket.Create("REC-001", QueueType.Reception, patient1.Id, "REC");
-            var ticket2 = QueueTicket.Create("REC-002", QueueType.Reception, patient3.Id, "REC");
-            var ticket3 = QueueTicket.Create("US-001", QueueType.Ultrasound, patient1.Id, "US", cycle1.Id);
+            var ticket1 = QueueTicket.Create("REC-001", QueueType.Reception, TicketPriority.Normal, patient1.Id, "REC");
+            var ticket2 = QueueTicket.Create("REC-002", QueueType.Reception, TicketPriority.Normal, patient3.Id, "REC");
+            var ticket3 = QueueTicket.Create("US-001", QueueType.Ultrasound, TicketPriority.Normal, patient1.Id, "US", cycle1.Id);
 
             context.QueueTickets.AddRange(ticket1, ticket2, ticket3);
 

@@ -20,7 +20,15 @@ public enum QueueType
     Ultrasound,     // Siêu âm
     LabTest,        // Xét nghiệm
     Andrology,      // Nam khoa
-    Pharmacy        // Nhà thuốc
+    Pharmacy,       // Nhà thuốc
+    Injection       // Tiêm
+}
+
+public enum TicketPriority
+{
+    Normal,
+    VIP,
+    Emergency
 }
 
 public enum TicketStatus

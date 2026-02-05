@@ -14,8 +14,10 @@ import { QueueTicket } from '../../../core/models/api.models';
 export class QueueDisplayComponent implements OnInit, OnDestroy {
   departmentCode = '';
   tickets = signal<QueueTicket[]>([]);
-  currentTicket = signal<QueueTicket | null>(null);
+  currentTickets = signal<QueueTicket[]>([]);
   waitingTickets = signal<QueueTicket[]>([]);
+
+  blinkEffect = false;
 
   private refreshInterval?: ReturnType<typeof setInterval>;
 
@@ -23,7 +25,7 @@ export class QueueDisplayComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.route.params.subscribe(params => {
-      this.departmentCode = params['departmentCode'];
+      this.departmentCode = params['departmentCode'] || 'ALL'; // Default to ALL if missing (though route usually requires it)
       this.loadQueue();
     });
     // Auto-refresh every 10 seconds
@@ -35,13 +37,19 @@ export class QueueDisplayComponent implements OnInit, OnDestroy {
   }
 
   loadQueue(): void {
-    this.api.getQueue(this.departmentCode).subscribe(tickets => {
+    if (!this.departmentCode) return;
+    this.api.getQueueByDept(this.departmentCode).subscribe(tickets => {
       this.tickets.set(tickets);
 
-      const current = tickets.find(t => t.status === 'InService' || t.status === 'Called');
-      this.currentTicket.set(current || null);
+      const active = tickets.filter(t => t.status === 'Called' || t.status === 'InService');
+      this.currentTickets.set(active);
 
       this.waitingTickets.set(tickets.filter(t => t.status === 'Waiting'));
+
+      if (active.length > 0 && active.some(t => t.status === 'Called')) {
+        this.blinkEffect = true;
+        setTimeout(() => this.blinkEffect = false, 3000);
+      }
     });
   }
 
@@ -49,28 +57,27 @@ export class QueueDisplayComponent implements OnInit, OnDestroy {
     this.api.callTicket(id).subscribe(() => this.loadQueue());
   }
 
-  completeTicket(): void {
-    const current = this.currentTicket();
-    if (current) {
-      this.api.completeTicket(current.id).subscribe(() => this.loadQueue());
-    }
+  completeTicket(id: string): void {
+    this.api.completeTicket(id).subscribe(() => this.loadQueue());
   }
 
-  skipTicket(): void {
-    const current = this.currentTicket();
-    if (current) {
-      this.api.skipTicket(current.id).subscribe(() => this.loadQueue());
-    }
+  skipTicket(id: string): void {
+    this.api.skipTicket(id).subscribe(() => this.loadQueue());
   }
 
   getDepartmentName(code: string): string {
+    if (code?.toUpperCase() === 'ALL') return 'Tất cả các hàng chờ';
     const names: Record<string, string> = {
       'REC': 'Tiếp đón',
       'US': 'Siêu âm',
       'LAB': 'Xét nghiệm',
       'AND': 'Nam khoa',
       'CON': 'Tư vấn',
-      'INJ': 'Tiêm'
+      'INJ': 'Tiêm',
+      'TV': 'Tư vấn',
+      'TM': 'Tiêm',
+      'XN': 'Xét nghiệm',
+      'NAM': 'Nam khoa'
     };
     return names[code] || code;
   }

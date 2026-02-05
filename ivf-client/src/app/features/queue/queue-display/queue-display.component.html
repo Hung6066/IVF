@@ -4,7 +4,7 @@
         <div class="header-actions">
             <div class="ticket-badge">
                 <span class="ticket-icon">🎫</span>
-                <span class="ticket-text">{{ tickets().length }} số chờ</span>
+                <span class="ticket-text">{{ waitingTickets().length }} số chờ</span>
             </div>
             <button class="btn btn-secondary btn-refresh" (click)="loadQueue()">
                 <span class="refresh-icon">🔄</span>
@@ -17,25 +17,30 @@
         <section class="queue-card current-section">
             <h2 class="section-title">Đang phục vụ</h2>
 
-            <div class="current-ticket-display" [class.active]="currentTicket()">
-                @if (currentTicket()) {
-                <span class="ticket-number">{{ currentTicket()!.ticketNumber }}</span>
-                <span class="patient-name">{{ currentTicket()!.patientName || 'Bệnh nhân' }}</span>
-                } @else {
-                <span class="no-ticket-message">Chưa có lượt gọi</span>
+            <div class="active-list">
+                @for (ticket of currentTickets(); track ticket.id) {
+                <div class="current-ticket-display active-item">
+                    <div class="ticket-header">
+                        <span class="dept-tag">{{ getDepartmentName(ticket.departmentCode) }}</span>
+                    </div>
+                    <span class="ticket-number">{{ ticket.ticketNumber }}</span>
+                    <span class="patient-name">{{ ticket.patientName || 'Bệnh nhân' }}</span>
+
+                    <div class="action-buttons">
+                        <button class="btn btn-success" (click)="completeTicket(ticket.id)">
+                            <span>✅ Hoàn thành</span>
+                        </button>
+                        <button class="btn btn-secondary" (click)="skipTicket(ticket.id)">
+                            <span>⏭️ Bỏ qua</span>
+                        </button>
+                    </div>
+                </div>
+                } @empty {
+                <div class="current-ticket-display">
+                    <span class="no-ticket-message">Chưa có lượt gọi</span>
+                </div>
                 }
             </div>
-
-            @if (currentTicket()) {
-            <div class="action-buttons">
-                <button class="btn btn-success" (click)="completeTicket()">
-                    <span>✅ Hoàn thành</span>
-                </button>
-                <button class="btn btn-secondary" (click)="skipTicket()">
-                    <span>⏭️ Bỏ qua</span>
-                </button>
-            </div>
-            }
         </section>
 
         <section class="queue-card waiting-section">
@@ -46,8 +51,11 @@
                 <div class="waiting-item" [class.next-up]="i === 0">
                     <div class="position-badge">{{ i + 1 }}</div>
                     <div class="ticket-info">
-                        <span class="ticket-num">{{ ticket.ticketNumber }}</span>
-                        <span class="ticket-time">{{ formatTime(ticket.issuedAt) }}</span>
+                        <span class="dept-badge-small">{{ getDepartmentName(ticket.departmentCode) }}</span>
+                        <div class="ticket-main">
+                            <span class="ticket-num">{{ ticket.ticketNumber }}</span>
+                            <span class="ticket-time">{{ formatTime(ticket.issuedAt) }}</span>
+                        </div>
                     </div>
                     @if (i === 0) {
                     <button class="btn btn-primary btn-call" (click)="callTicket(ticket.id)">

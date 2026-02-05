@@ -11,7 +11,7 @@ export class LabService {
     constructor(private api: ApiService) { }
 
     getQueue(): Observable<QueueItem[]> {
-        return this.api.getQueue('LAB').pipe(
+        return this.api.getQueueByDept('LAB').pipe(
             map((data: any[]) => data.map((item, index) => ({
                 id: item.id || String(index),
                 number: item.ticketNumber,
