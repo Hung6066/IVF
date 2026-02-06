@@ -5,6 +5,11 @@
             <span class="subtitle">Quản lý hồ sơ các cặp vợ chồng</span>
         </div>
         <div class="header-actions">
+            <div class="search-box">
+                <span class="search-icon">🔍</span>
+                <input type="text" [ngModel]="searchTerm()" (ngModelChange)="searchTerm.set($event)"
+                    placeholder="Tìm theo tên vợ/chồng hoặc mã BN..." />
+            </div>
             <button class="btn btn-primary" routerLink="/couples/new">
                 <span class="icon">➕</span> Tạo cặp đôi
             </button>
@@ -12,7 +17,7 @@
     </header>
 
     <div class="couples-grid">
-        @for (couple of couples(); track couple.id) {
+        @for (couple of filteredCouples(); track couple.id) {
         <div class="couple-card">
             <div class="couple-header">
                 <div class="partner wife">

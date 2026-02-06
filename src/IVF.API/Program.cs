@@ -184,6 +184,7 @@ app.MapDoctorEndpoints();
 app.MapUserEndpoints();
 app.MapServiceCatalogEndpoints();
 app.MapSeedEndpoints();
+app.MapLabEndpoints();
 
 // Auto-migrate and seed in dev
 if (app.Environment.IsDevelopment())

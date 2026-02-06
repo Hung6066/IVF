@@ -68,4 +68,54 @@ public class TreatmentCycleRepository : ITreatmentCycleRepository
             .ToListAsync(ct);
         return cycles.ToDictionary(x => x.Method, x => x.Count);
     }
+
+    public async Task<Dictionary<IVF.Domain.Enums.CyclePhase, int>> GetPhaseCountsAsync(CancellationToken ct = default)
+    {
+        return await _context.TreatmentCycles
+            .GroupBy(c => c.CurrentPhase)
+            .Select(g => new { Phase = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.Phase, x => x.Count, ct);
+    }
+
+    public async Task<List<LabScheduleDto>> GetLabScheduleAsync(DateTime date, CancellationToken ct = default)
+    {
+        var queryDate = date.Date;
+        var list = new List<LabScheduleDto>();
+
+        // Retrievals
+        var retrievals = await _context.StimulationData
+            .Include(s => s.Cycle).ThenInclude(c => c.Couple).ThenInclude(cp => cp.Wife)
+            .Where(s => s.AspirationDate.HasValue && s.AspirationDate.Value.Date == queryDate)
+            .ToListAsync(ct);
+
+        list.AddRange(retrievals.Select(r => new LabScheduleDto
+        {
+            Id = r.Id,
+            Time = r.AspirationDate!.Value, // Used to be ToLocalTime() but simplified to keeping it as stored for now
+            PatientName = r.Cycle.Couple?.Wife?.FullName ?? "Unknown",
+            CycleCode = r.Cycle.CycleCode,
+            Procedure = "Chọc hút",
+            Type = "retrieval",
+            Status = r.Cycle.CurrentPhase > IVF.Domain.Enums.CyclePhase.EggRetrieval ? "done" : "pending"
+        }));
+
+        // Transfers
+        var transfers = await _context.TransferData
+            .Include(t => t.Cycle).ThenInclude(c => c.Couple).ThenInclude(cp => cp.Wife)
+            .Where(t => t.TransferDate.HasValue && t.TransferDate.Value.Date == queryDate)
+            .ToListAsync(ct);
+
+        list.AddRange(transfers.Select(t => new LabScheduleDto
+        {
+            Id = t.Id,
+            Time = t.TransferDate!.Value,
+            PatientName = t.Cycle.Couple?.Wife?.FullName ?? "Unknown",
+            CycleCode = t.Cycle.CycleCode,
+            Procedure = "Chuyển phôi",
+            Type = "transfer",
+            Status = t.Cycle.CurrentPhase > IVF.Domain.Enums.CyclePhase.EmbryoTransfer ? "done" : "pending"
+        }));
+
+        return list.OrderBy(x => x.Time).ToList();
+    }
 }

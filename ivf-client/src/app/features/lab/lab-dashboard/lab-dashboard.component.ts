@@ -108,6 +108,15 @@ export class LabDashboardComponent implements OnInit {
     });
   }
 
+  onDeleteCryoLocation(tank: string) {
+    this.labService.deleteCryoLocation(tank).subscribe({
+      next: () => {
+        this.cryoLocations.update(list => list.filter(l => l.tank !== tank));
+      },
+      error: (err) => alert('Không thể xóa tủ: ' + (err.error?.detail || err.message))
+    });
+  }
+
   exportExcel() {
     alert('Đang xuất file Excel...');
   }

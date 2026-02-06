@@ -51,4 +51,16 @@ public class CryoLocationRepository : ICryoLocationRepository
 
         return stats.Select(s => new CryoStatsDto(s.Tank, s.CanisterCount, s.CaneCount, s.GobletCount, s.Available, s.Used)).ToList();
     }
+
+    public async Task<bool> TankExistsAsync(string tank, CancellationToken ct = default)
+    {
+        return await _context.CryoLocations.AnyAsync(c => c.Tank == tank, ct);
+    }
+
+    public async Task DeleteTankAsync(string tank, CancellationToken ct = default)
+    {
+        var locations = await _context.CryoLocations.Where(c => c.Tank == tank).ToListAsync(ct);
+        _context.CryoLocations.RemoveRange(locations);
+        await _context.SaveChangesAsync(ct);
+    }
 }

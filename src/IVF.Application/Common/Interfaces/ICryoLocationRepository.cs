@@ -9,6 +9,8 @@ public interface ICryoLocationRepository
     Task<CryoLocation> AddAsync(CryoLocation location, CancellationToken ct = default);
     Task<IReadOnlyList<CryoStatsDto>> GetStorageStatsAsync(CancellationToken ct = default);
     Task UpdateAsync(CryoLocation location, CancellationToken ct = default);
+    Task<bool> TankExistsAsync(string tank, CancellationToken ct = default);
+    Task DeleteTankAsync(string tank, CancellationToken ct = default);
 }
 
 public record CryoStatsDto(string Tank, int CanisterCount, int CaneCount, int GobletCount, int Available, int Used);

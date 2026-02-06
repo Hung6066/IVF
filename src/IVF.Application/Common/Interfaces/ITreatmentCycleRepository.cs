@@ -14,4 +14,18 @@ public interface ITreatmentCycleRepository
     Task<int> GetActiveCountAsync(CancellationToken ct = default);
     Task<Dictionary<string, int>> GetOutcomeStatsAsync(int year, CancellationToken ct = default);
     Task<Dictionary<string, int>> GetMethodDistributionAsync(int year, CancellationToken ct = default);
+    // Lab Dashboard
+    Task<Dictionary<IVF.Domain.Enums.CyclePhase, int>> GetPhaseCountsAsync(CancellationToken ct = default);
+    Task<List<LabScheduleDto>> GetLabScheduleAsync(DateTime date, CancellationToken ct = default);
+}
+
+public class LabScheduleDto
+{
+    public Guid Id { get; set; }
+    public DateTime Time { get; set; }
+    public string PatientName { get; set; } = string.Empty;
+    public string CycleCode { get; set; } = string.Empty;
+    public string Procedure { get; set; } = string.Empty;
+    public string Type { get; set; } = string.Empty;
+    public string Status { get; set; } = string.Empty;
 }

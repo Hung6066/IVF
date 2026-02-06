@@ -1,4 +1,4 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
@@ -14,6 +14,20 @@ import { Couple } from '../../../core/models/api.models';
 })
 export class CoupleListComponent implements OnInit {
     couples = signal<Couple[]>([]);
+    searchTerm = signal<string>('');
+
+    filteredCouples = computed(() => {
+        const term = this.searchTerm().toLowerCase().trim();
+        const list = this.couples();
+        if (!term) return list;
+
+        return list.filter(c =>
+            (c.wife?.fullName?.toLowerCase().includes(term) ?? false) ||
+            (c.wife?.patientCode?.toLowerCase().includes(term) ?? false) ||
+            (c.husband?.fullName?.toLowerCase().includes(term) ?? false) ||
+            (c.husband?.patientCode?.toLowerCase().includes(term) ?? false)
+        );
+    });
 
     constructor(private coupleService: CoupleService) { }
 

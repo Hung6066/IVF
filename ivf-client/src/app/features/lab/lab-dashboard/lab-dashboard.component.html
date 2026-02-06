@@ -74,7 +74,8 @@
     }
 
     @if (activeTab === 'cryo') {
-    <app-lab-cryo [locations]="cryoLocations()" [stats]="stats()" (addLocation)="onAddCryoLocation($event)">
+    <app-lab-cryo [locations]="cryoLocations()" [stats]="stats()" (addLocation)="onAddCryoLocation($event)"
+        (deleteLocation)="onDeleteCryoLocation($event)">
     </app-lab-cryo>
     }
 

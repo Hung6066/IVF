@@ -18,6 +18,7 @@ import { CryoLocation, LabStats } from '../lab-dashboard.models';
           <div class="cryo-tank">
             <div class="tank-header">
               <span class="tank-name">🧊 {{ loc.tank }}</span>
+              <button class="btn-delete-sm" (click)="onDelete(loc.tank)" title="Xóa tủ">🗑️</button>
               <span class="tank-capacity">{{ loc.used }}/{{ loc.available + loc.used }}</span>
             </div>
             <div class="tank-bar">
@@ -74,8 +75,10 @@ import { CryoLocation, LabStats } from '../lab-dashboard.models';
   styles: [`
     .cryo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
     .cryo-tank { background: var(--bg-card); padding: 1rem; border-radius: var(--radius-lg); }
-    .tank-header { display: flex; justify-content: space-between; margin-bottom: 0.5rem; }
-    .tank-name { font-weight: 600; }
+    .tank-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
+    .tank-name { font-weight: 600; flex: 1; }
+    .btn-delete-sm { border: none; background: transparent; cursor: pointer; color: #ef4444; font-size: 0.9rem; padding: 0 0.5rem; transition: color 0.2s; }
+    .btn-delete-sm:hover { color: #dc2626; }
     .tank-capacity { font-size: 0.8rem; color: var(--text-secondary); }
     .tank-bar { height: 8px; background: var(--border-color); border-radius: 4px; overflow: hidden; }
     .tank-fill { height: 100%; background: linear-gradient(90deg, var(--info), var(--primary)); }
@@ -92,6 +95,7 @@ export class LabCryoComponent {
   @Input() locations: CryoLocation[] = [];
   @Input() stats: LabStats = { eggRetrievalCount: 0, cultureCount: 0, transferCount: 0, freezeCount: 0, totalFrozenEmbryos: 0, totalFrozenEggs: 0, totalFrozenSperm: 0 };
   @Output() addLocation = new EventEmitter<CryoLocation>();
+  @Output() deleteLocation = new EventEmitter<string>();
 
   showModal = false;
   newCryo: any = { tank: '', canister: 0, cane: 0, goblet: 0, available: 50, used: 0 };
@@ -111,5 +115,11 @@ export class LabCryoComponent {
     });
     this.showModal = false;
     this.newCryo = { tank: '', canister: 0, cane: 0, goblet: 0, available: 50, used: 0 };
+  }
+
+  onDelete(tank: string) {
+    if (confirm(`Bạn có chắc muốn xóa tủ đông '${tank}' không?`)) {
+      this.deleteLocation.emit(tank);
+    }
   }
 }
