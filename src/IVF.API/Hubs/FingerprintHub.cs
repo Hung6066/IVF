@@ -1,3 +1,4 @@
+using IVF.Application.Common.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 
@@ -20,13 +21,13 @@ public class FingerprintHub : Hub
     private readonly ILogger<FingerprintHub> _logger;
     private readonly IConfiguration _configuration;
     private readonly MediatR.ISender _sender;
-    private readonly Services.BiometricMatcherService _matcher;
+    private readonly IBiometricMatcher _matcher;
 
     public FingerprintHub(
         ILogger<FingerprintHub> logger, 
         IConfiguration configuration, 
         MediatR.ISender sender,
-        Services.BiometricMatcherService matcher)
+        IBiometricMatcher matcher)
     {
         _logger = logger;
         _configuration = configuration;

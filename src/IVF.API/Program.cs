@@ -100,9 +100,20 @@ builder.Services.AddRateLimiter(options =>
 
 builder.Services.AddSignalR();
 builder.Services.AddSingleton<IVF.API.Hubs.IQueueNotifier, IVF.API.Hubs.QueueNotifier>();
-builder.Services.AddSingleton<IVF.API.Services.BiometricMatcherService>();
-builder.Services.AddHostedService(sp => sp.GetRequiredService<IVF.API.Services.BiometricMatcherService>());
-builder.Services.AddSingleton<IVF.Application.Common.Interfaces.IBiometricMatcher>(sp => sp.GetRequiredService<IVF.API.Services.BiometricMatcherService>());
+// Conditional Service Registration based on OS
+if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows))
+{
+    builder.Services.AddSingleton<IVF.API.Services.BiometricMatcherService>();
+    builder.Services.AddHostedService(sp => sp.GetRequiredService<IVF.API.Services.BiometricMatcherService>());
+    builder.Services.AddSingleton<IVF.Application.Common.Interfaces.IBiometricMatcher>(sp => sp.GetRequiredService<IVF.API.Services.BiometricMatcherService>());
+}
+else
+{
+    // Use Stub service on Mac/Linux to avoid loading Windows-only DLLs
+    builder.Services.AddSingleton<IVF.API.Services.StubBiometricMatcherService>();
+    builder.Services.AddHostedService(sp => sp.GetRequiredService<IVF.API.Services.StubBiometricMatcherService>());
+    builder.Services.AddSingleton<IVF.Application.Common.Interfaces.IBiometricMatcher>(sp => sp.GetRequiredService<IVF.API.Services.StubBiometricMatcherService>());
+}
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
