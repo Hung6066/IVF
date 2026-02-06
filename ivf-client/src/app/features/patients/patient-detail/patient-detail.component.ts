@@ -17,7 +17,7 @@ export class PatientDetailComponent implements OnInit {
   patient = signal<Patient | null>(null);
   couple = signal<Couple | null>(null);
   cycles = signal<TreatmentCycle[]>([]);
-  private patientId = '';
+  patientId = '';
 
   private route = inject(ActivatedRoute);
   private router = inject(Router);

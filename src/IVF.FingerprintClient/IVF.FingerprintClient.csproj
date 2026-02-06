@@ -1,0 +1,65 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <ApplicationIcon>finger.ico</ApplicationIcon>
+    <AssemblyName>IVF.FingerprintClient</AssemblyName>
+    <RootNamespace>IVF.FingerprintClient</RootNamespace>
+    <Version>1.0.0</Version>
+    <Company>IVF Clinic</Company>
+    <Product>IVF Fingerprint Client</Product>
+    <Description>Fingerprint capture client for IVF system using DigitalPersona SDK</Description>
+    
+    <!-- Disable hardware-enforced stack protection for COM interop compatibility -->
+    <HardenedStackProtection>false</HardenedStackProtection>
+    <UseSpecialUserModeApc>true</UseSpecialUserModeApc>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="10.0.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="finger.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <!-- DigitalPersona SDK References -->
+  <ItemGroup>
+    <Reference Include="DPFPCtlXTypeLibNET">
+      <HintPath>Libs\DPFPCtlXTypeLibNET.dll</HintPath>
+    </Reference>
+    <Reference Include="DPFPCtlXWrapperNET">
+      <HintPath>Libs\DPFPCtlXWrapperNET.dll</HintPath>
+    </Reference>
+    <Reference Include="DPFPDevNET">
+      <HintPath>Libs\DPFPDevNET.dll</HintPath>
+    </Reference>
+    <Reference Include="DPFPEngNET">
+      <HintPath>Libs\DPFPEngNET.dll</HintPath>
+    </Reference>
+    <Reference Include="DPFPGuiNET">
+      <HintPath>Libs\DPFPGuiNET.dll</HintPath>
+    </Reference>
+    <Reference Include="DPFPShrNET">
+      <HintPath>Libs\DPFPShrNET.dll</HintPath>
+    </Reference>
+    <Reference Include="DPFPShrXTypeLibNET">
+      <HintPath>Libs\DPFPShrXTypeLibNET.dll</HintPath>
+    </Reference>
+    <Reference Include="DPFPVerNET">
+      <HintPath>Libs\DPFPVerNET.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+</Project>

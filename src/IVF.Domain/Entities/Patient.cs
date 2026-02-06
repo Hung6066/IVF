@@ -12,14 +12,20 @@ public class Patient : BaseEntity
     public string? IdentityNumber { get; private set; }
     public string? Phone { get; private set; }
     public string? Address { get; private set; }
-    public byte[]? Photo { get; private set; }
-    public byte[]? Fingerprint { get; private set; }
     public PatientType PatientType { get; private set; }
 
-    // Navigation properties
+    // Navigation properties - Biometrics (1:1 for photo, 1:N for fingerprints)
+    public virtual PatientPhoto? Photo { get; private set; }
+    public virtual ICollection<PatientFingerprint> Fingerprints { get; private set; } = new List<PatientFingerprint>();
+
+    // Navigation properties - Couples
     public virtual ICollection<Couple> AsWife { get; private set; } = new List<Couple>();
     public virtual ICollection<Couple> AsHusband { get; private set; } = new List<Couple>();
     public virtual ICollection<QueueTicket> QueueTickets { get; private set; } = new List<QueueTicket>();
+
+    // Computed properties
+    public bool HasPhoto => Photo != null;
+    public bool HasFingerprint => Fingerprints.Any();
 
     private Patient() { }
 
@@ -53,16 +59,5 @@ public class Patient : BaseEntity
         Address = address;
         SetUpdated();
     }
-
-    public void SetPhoto(byte[] photo)
-    {
-        Photo = photo;
-        SetUpdated();
-    }
-
-    public void SetFingerprint(byte[] fingerprint)
-    {
-        Fingerprint = fingerprint;
-        SetUpdated();
-    }
 }
+

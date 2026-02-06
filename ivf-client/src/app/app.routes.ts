@@ -29,6 +29,10 @@ export const routes: Routes = [
                 loadComponent: () => import('./features/patients/patient-detail/patient-detail.component').then(m => m.PatientDetailComponent)
             },
             {
+                path: 'patients/:id/biometrics',
+                loadComponent: () => import('./features/patients/patient-biometrics/patient-biometrics.component').then(m => m.PatientBiometricsComponent)
+            },
+            {
                 path: 'couples',
                 loadComponent: () => import('./features/couples/couple-list/couple-list.component').then(m => m.CoupleListComponent)
             },

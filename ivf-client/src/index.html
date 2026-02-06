@@ -7,7 +7,7 @@
   <base href="/">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Content-Security-Policy"
-    content="default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' http://localhost:5000 ws://localhost:5000;">
+    content="default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' http://localhost:5000 ws://localhost:5000 http://localhost:8000 https://localhost:8443 wss://127.0.0.1:9986;">
   <link rel="icon" type="image/x-icon" href="favicon.ico">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -16,6 +16,11 @@
 
 <body>
   <app-root></app-root>
+
+  <!-- Fingerprint SDKs -->
+  <script src="assets/dpcore.js"></script>
+  <script src="assets/dp-devices.js"></script>
+  <script src="assets/sgfplib.js"></script>
 </body>
 
 </html>

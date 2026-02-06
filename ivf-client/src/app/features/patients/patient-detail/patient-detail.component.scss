@@ -122,6 +122,77 @@
     padding-bottom: 0.75rem;
 }
 
+// Quick Actions Card
+.actions-card {
+    .action-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .action-item {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 1rem;
+        background: #f8fafc;
+        border-radius: 10px;
+        text-decoration: none;
+        border: 1px solid var(--border-color);
+        transition: all 0.2s ease;
+
+        &:hover {
+            border-color: var(--primary);
+            background: #eff6ff;
+            transform: translateX(4px);
+
+            .action-arrow {
+                transform: translateX(4px);
+                color: var(--primary);
+            }
+        }
+
+        &.biometrics .action-icon {
+            background: linear-gradient(135deg, #8b5cf6, #6366f1);
+        }
+    }
+
+    .action-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        background: var(--primary);
+        color: white;
+    }
+
+    .action-info {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+
+    .action-title {
+        font-weight: 600;
+        color: var(--text-primary);
+    }
+
+    .action-desc {
+        font-size: 0.8rem;
+        color: var(--text-secondary);
+    }
+
+    .action-arrow {
+        font-size: 1.25rem;
+        color: var(--text-secondary);
+        transition: all 0.2s ease;
+    }
+}
+
 .cycles-card {
     grid-column: 1 / -1;
 }

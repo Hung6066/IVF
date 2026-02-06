@@ -11,6 +11,8 @@ public class IvfDbContext : DbContext
 
     public DbSet<User> Users => Set<User>();
     public DbSet<Patient> Patients => Set<Patient>();
+    public DbSet<PatientPhoto> PatientPhotos => Set<PatientPhoto>();
+    public DbSet<PatientFingerprint> PatientFingerprints => Set<PatientFingerprint>();
     public DbSet<Couple> Couples => Set<Couple>();
     public DbSet<TreatmentCycle> TreatmentCycles => Set<TreatmentCycle>();
     public DbSet<QueueTicket> QueueTickets => Set<QueueTicket>();

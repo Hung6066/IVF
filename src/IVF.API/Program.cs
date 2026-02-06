@@ -158,10 +158,12 @@ app.UseRateLimiter(); // Enable Rate Limiting
 // SignalR Hubs
 app.MapHub<IVF.API.Hubs.QueueHub>("/hubs/queue");
 app.MapHub<IVF.API.Hubs.NotificationHub>("/hubs/notifications");
+app.MapHub<IVF.API.Hubs.FingerprintHub>("/hubs/fingerprint");
 
 // Register Endpoints
 app.MapAuthEndpoints();
 app.MapPatientEndpoints();
+app.MapPatientBiometricsEndpoints();
 app.MapCoupleEndpoints();
 app.MapCycleEndpoints();
 app.MapCyclePhaseEndpoints();

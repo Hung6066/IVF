@@ -43,6 +43,21 @@
             </div>
         </section>
 
+        <!-- Quick Actions -->
+        <section class="card actions-card">
+            <h2 class="card-title">Thao tác nhanh</h2>
+            <div class="action-grid">
+                <a [routerLink]="['/patients', patientId, 'biometrics']" class="action-item biometrics">
+                    <span class="action-icon">📷</span>
+                    <div class="action-info">
+                        <span class="action-title">Sinh trắc học</span>
+                        <span class="action-desc">Ảnh chân dung & vân tay</span>
+                    </div>
+                    <span class="action-arrow">→</span>
+                </a>
+            </div>
+        </section>
+
         <!-- Partner Info (if exists) -->
         @if (couple()) {
         <section class="card info-card partner">

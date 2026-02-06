@@ -1,0 +1,192 @@
+<div class="biometrics-container">
+    <header class="page-header">
+        <a [routerLink]="['/patients', patientId()]" class="back-link">← Quay lại hồ sơ</a>
+        <h1>📷 Sinh trắc học</h1>
+    </header>
+
+    <!-- Tab Navigation -->
+    <nav class="tab-nav">
+        <button class="tab-btn" [class.active]="activeTab() === 'photo'" (click)="setTab('photo')">
+            📸 Ảnh chân dung
+        </button>
+        <button class="tab-btn" [class.active]="activeTab() === 'fingerprint'" (click)="setTab('fingerprint')">
+            👆 Vân tay
+        </button>
+    </nav>
+
+    <!-- Photo Tab -->
+    @if (activeTab() === 'photo') {
+    <section class="card photo-section">
+        <h2>Ảnh chân dung bệnh nhân</h2>
+
+        <div class="photo-container">
+            @if (hasPhoto()) {
+            <div class="photo-preview">
+                <img [src]="photoUrl()" alt="Ảnh bệnh nhân" />
+            </div>
+            } @else {
+            <div class="photo-placeholder">
+                <span class="placeholder-icon">👤</span>
+                <p>Chưa có ảnh</p>
+            </div>
+            }
+        </div>
+
+        <div class="photo-actions">
+            <input type="file" #fileInput accept="image/*" (change)="onFileSelected($event)" hidden />
+            <button class="btn btn-primary" (click)="openFileSelector()" [disabled]="uploading()">
+                📁 Chọn file
+            </button>
+            <button class="btn btn-secondary" (click)="openWebcam()" [disabled]="uploading()">
+                📷 Chụp webcam
+            </button>
+            @if (hasPhoto()) {
+            <button class="btn btn-danger" (click)="deletePhoto()">
+                🗑️ Xóa ảnh
+            </button>
+            }
+        </div>
+
+        @if (uploading()) {
+        <div class="loading-indicator">
+            <span class="spinner"></span> Đang tải lên...
+        </div>
+        }
+
+        <!-- Webcam Modal -->
+        @if (showWebcam()) {
+        <div class="modal-overlay" (click)="closeWebcam()">
+            <div class="modal-content webcam-modal" (click)="$event.stopPropagation()">
+                <div class="modal-header">
+                    <h3>📷 Chụp ảnh từ webcam</h3>
+                    <button class="close-btn" (click)="closeWebcam()">×</button>
+                </div>
+                <div class="modal-body">
+                    <video #videoElement autoplay playsinline></video>
+                    <canvas #canvasElement hidden></canvas>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" (click)="closeWebcam()">Hủy</button>
+                    <button class="btn btn-primary" (click)="captureFromWebcam()">📸 Chụp</button>
+                </div>
+            </div>
+        </div>
+        }
+    </section>
+    }
+
+    <!-- Fingerprint Tab -->
+    @if (activeTab() === 'fingerprint') {
+    <section class="card fingerprint-section">
+        <h2>Đăng ký vân tay</h2>
+
+        <!-- SDK Selection -->
+        <div class="sdk-selector">
+            <div class="mode-toggle">
+                <label class="toggle-label">
+                    <input type="checkbox" [checked]="useSignalR()" (change)="toggleSignalRMode()">
+                    <span>Dùng ứng dụng Desktop (SignalR)</span>
+                </label>
+            </div>
+
+            @if (!useSignalR()) {
+            <label>Chọn thiết bị:</label>
+            <div class="sdk-options">
+                <button class="sdk-btn" [class.active]="selectedSdk() === 1" (click)="selectSdk(1)">
+                    DigitalPersona
+                </button>
+                <button class="sdk-btn" [class.active]="selectedSdk() === 2" (click)="selectSdk(2)">
+                    SecuGen
+                </button>
+            </div>
+            }
+            <div class="sdk-status" [class.ready]="sdkReady()">
+                {{ sdkStatus() }}
+            </div>
+        </div>
+
+        <!-- Finger Selection -->
+        <div class="form-group finger-selector-wrapper">
+            <label class="section-label">Chọn ngón tay:</label>
+            <app-hand-finger-selector [selected]="selectedFinger" [enrolledFingers]="enrolledFingerTypes"
+                (fingerSelected)="selectedFinger.set($event)">
+            </app-hand-finger-selector>
+
+            <div class="selected-finger-label">
+                Đang chọn: <strong>{{ getFingerTypeName(selectedFinger().toString()) }}</strong>
+            </div>
+        </div>
+
+        <!-- Capture Area -->
+        <div class="capture-area">
+            <div class="fingerprint-preview" [class.has-data]="capturedData()">
+                @if (fingerprintPreview()) {
+                <img [src]="fingerprintPreview()" alt="Fingerprint preview" class="fp-preview-img">
+                } @else if (capturedData()) {
+                <span class="fp-icon success">✅</span>
+                <p>Đã chụp vân tay</p>
+                } @else {
+                <span class="fp-icon">👆</span>
+                <p>Đặt ngón tay lên thiết bị</p>
+                }
+            </div>
+
+            @if (captureProgress()) {
+            <div class="capture-progress">
+                <span class="progress-text">{{ captureProgress() }}</span>
+            </div>
+            }
+
+            <div class="capture-actions">
+                @if (useSignalR() && sdkReady()) {
+                <button class="btn btn-warning btn-lg" (click)="verifyFingerprint()" [disabled]="capturing()">
+                    ⚡ Xác thực nhanh
+                </button>
+                }
+
+                <button class="btn btn-primary btn-lg" (click)="captureFingerprint()"
+                    [disabled]="capturing() || !sdkReady()">
+                    @if (capturing()) {
+                    <span class="spinner"></span> Đang chụp...
+                    } @else {
+                    👆 Chụp vân tay
+                    }
+                </button>
+                @if (capturing() && useSignalR()) {
+                <button class="btn btn-secondary" (click)="cancelCapture()">
+                    ❌ Hủy
+                </button>
+                }
+                @if (capturedData()) {
+                <button class="btn btn-success" (click)="registerFingerprint()">
+                    💾 Lưu vân tay
+                </button>
+                }
+            </div>
+        </div>
+
+        <!-- Registered Fingerprints -->
+        <div class="registered-fingerprints">
+            <h3>Vân tay đã đăng ký ({{ fingerprints().length }})</h3>
+            @if (fingerprints().length > 0) {
+            <div class="fp-list">
+                @for (fp of fingerprints(); track fp.id) {
+                <div class="fp-item">
+                    <span class="fp-icon small">👆</span>
+                    <div class="fp-info">
+                        <strong>{{ getFingerTypeName(fp.fingerType) }}</strong>
+                        <span class="fp-meta">
+                            {{ getSdkTypeName(fp.sdkType) }} • Chất lượng: {{ fp.quality }}%
+                        </span>
+                    </div>
+                    <button class="btn btn-sm btn-danger" (click)="deleteFingerprint(fp)">🗑️</button>
+                </div>
+                }
+            </div>
+            } @else {
+            <p class="empty-state-text">Chưa có vân tay nào được đăng ký</p>
+            }
+        </div>
+    </section>
+    }
+</div>
