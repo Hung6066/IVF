@@ -57,6 +57,25 @@ public static class DependencyInjection
         // Register Services
         services.AddScoped<INotificationService, Services.NotificationService>();
 
+        // Redis Configuration (High-Performance Matcher Cache)
+        var redisConnectionString = configuration.GetConnectionString("Redis") ?? "localhost:6379";
+        
+        // Ensure abortConnect=false so app starts even if Redis is down
+        if (!redisConnectionString.Contains("abortConnect=", StringComparison.OrdinalIgnoreCase))
+        {
+            redisConnectionString += ",abortConnect=false";
+        }
+
+        try 
+        {
+            var multiplexer = StackExchange.Redis.ConnectionMultiplexer.Connect(redisConnectionString);
+            services.AddSingleton<StackExchange.Redis.IConnectionMultiplexer>(multiplexer);
+        }
+        catch (Exception)
+        {
+            // Should not happen with abortConnect=false, but safe guard
+        }
+
         return services;
     }
 }

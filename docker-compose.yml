@@ -30,6 +30,7 @@ services:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_HTTP_PORTS=8080
       - ConnectionStrings__DefaultConnection=Host=db;Database=ivf_db;Username=postgres;Password=postgres
+      - ConnectionStrings__Redis=redis:6379,abortConnect=false
       - JwtSettings__Secret=SuperSecretKeyForDevelopmentOnly123!@#
       - JwtSettings__Issuer=IVF_System
       - JwtSettings__Audience=IVF_Users
@@ -38,9 +39,21 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_started
     networks:
       - ivf-network
     restart: on-failure
+
+  # Redis Cache
+  redis:
+    image: redis:alpine
+    container_name: ivf-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - ivf-network
+    restart: unless-stopped
 
 volumes:
   postgres_data:

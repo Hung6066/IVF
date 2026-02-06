@@ -117,15 +117,18 @@ public class RegisterPatientFingerprintHandler : IRequestHandler<RegisterPatient
     private readonly IPatientRepository _patientRepo;
     private readonly IPatientBiometricsRepository _biometricsRepo;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IBiometricMatcher _matcherService;
 
     public RegisterPatientFingerprintHandler(
         IPatientRepository patientRepo,
         IPatientBiometricsRepository biometricsRepo,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        IBiometricMatcher matcherService)
     {
         _patientRepo = patientRepo;
         _biometricsRepo = biometricsRepo;
         _unitOfWork = unitOfWork;
+        _matcherService = matcherService;
     }
 
     public async Task<Result<PatientFingerprintDto>> Handle(RegisterPatientFingerprintCommand request, CancellationToken ct)
@@ -153,6 +156,10 @@ public class RegisterPatientFingerprintHandler : IRequestHandler<RegisterPatient
         }
 
         await _unitOfWork.SaveChangesAsync(ct);
+
+        // Sync to Redis/Matcher
+        await _matcherService.SyncToRedis(patient.Id, existing.FingerType, existing.FingerprintData);
+
         return Result<PatientFingerprintDto>.Success(PatientFingerprintDto.FromEntity(existing));
     }
 }
