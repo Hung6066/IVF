@@ -120,13 +120,16 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAngular", policy =>
-        policy.WithOrigins("http://localhost:4200")
+        policy.SetIsOriginAllowed(_ => true) // Allow any origin for dev
               .AllowAnyMethod()
               .AllowAnyHeader()
               .AllowCredentials());
 });
 
 var app = builder.Build();
+
+// Enable CORS immediately
+app.UseCors("AllowAngular");
 
 // Validation exception handler
 app.UseExceptionHandler(appBuilder =>
@@ -151,7 +154,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
+    // app.UseHttpsRedirection();
 
 // OWASP Secure Headers
 app.Use(async (context, next) =>
@@ -164,7 +167,7 @@ app.Use(async (context, next) =>
     await next();
 });
 
-app.UseCors("AllowAngular");
+// app.UseCors("AllowAngular"); // Moved to top
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseRateLimiter(); // Enable Rate Limiting

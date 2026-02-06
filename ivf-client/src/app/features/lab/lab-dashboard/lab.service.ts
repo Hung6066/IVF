@@ -11,7 +11,7 @@ import { environment } from '../../../../environments/environment';
     providedIn: 'root'
 })
 export class LabService {
-    private apiUrl = `${environment.apiUrl}/api/lab`;
+    private apiUrl = `${environment.apiUrl}/lab`;
 
     constructor(
         private http: HttpClient,
