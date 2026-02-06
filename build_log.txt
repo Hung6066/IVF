@@ -1,69 +1,13 @@
   Determining projects to restore...
   All projects are up-to-date for restore.
-D:\Pr.Net\IVF\src\IVF.FingerprintClient\IdentificationForm.cs(24,12): warning CS8618: Non-nullable field 'lblStatus' must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring the field as nullable. [D:\Pr.Net\IVF\src\IVF.FingerprintClient\IVF.FingerprintClient.csproj]
-D:\Pr.Net\IVF\src\IVF.FingerprintClient\IdentificationForm.cs(24,12): warning CS8618: Non-nullable field 'lblPrompt' must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring the field as nullable. [D:\Pr.Net\IVF\src\IVF.FingerprintClient\IVF.FingerprintClient.csproj]
-D:\Pr.Net\IVF\src\IVF.FingerprintClient\IdentificationForm.cs(24,12): warning CS8618: Non-nullable field 'pictureBoxFingerprint' must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring the field as nullable. [D:\Pr.Net\IVF\src\IVF.FingerprintClient\IVF.FingerprintClient.csproj]
-D:\Pr.Net\IVF\src\IVF.FingerprintClient\IdentificationForm.cs(24,12): warning CS8618: Non-nullable field 'btnCancel' must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring the field as nullable. [D:\Pr.Net\IVF\src\IVF.FingerprintClient\IVF.FingerprintClient.csproj]
-D:\Pr.Net\IVF\src\IVF.FingerprintClient\IdentificationForm.cs(24,12): warning CS8618: Non-nullable field 'txtLog' must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring the field as nullable. [D:\Pr.Net\IVF\src\IVF.FingerprintClient\IVF.FingerprintClient.csproj]
-D:\Pr.Net\IVF\src\IVF.FingerprintClient\Services\FingerprintHubService.cs(46,16): error CS0160: A previous catch clause already catches all exceptions of this or of a super type ('Exception') [D:\Pr.Net\IVF\src\IVF.FingerprintClient\IVF.FingerprintClient.csproj]
-D:\Pr.Net\IVF\src\IVF.FingerprintClient\MainForm.cs(168,13): error CS0103: The name '_currentRequest' does not exist in the current context [D:\Pr.Net\IVF\src\IVF.FingerprintClient\IVF.FingerprintClient.csproj]
-D:\Pr.Net\IVF\src\IVF.FingerprintClient\MainForm.cs(171,13): error CS0103: The name '_currentRequest' does not exist in the current context [D:\Pr.Net\IVF\src\IVF.FingerprintClient\IVF.FingerprintClient.csproj]
-D:\Pr.Net\IVF\src\IVF.FingerprintClient\MainForm.cs(179,25): error CS0103: The name '_currentRequest' does not exist in the current context [D:\Pr.Net\IVF\src\IVF.FingerprintClient\IVF.FingerprintClient.csproj]
-D:\Pr.Net\IVF\src\IVF.FingerprintClient\MainForm.cs(188,13): error CS0103: The name '_captureForm' does not exist in the current context [D:\Pr.Net\IVF\src\IVF.FingerprintClient\IVF.FingerprintClient.csproj]
-D:\Pr.Net\IVF\src\IVF.FingerprintClient\MainForm.cs(188,38): error CS0103: The name '_captureForm' does not exist in the current context [D:\Pr.Net\IVF\src\IVF.FingerprintClient\IVF.FingerprintClient.csproj]
-D:\Pr.Net\IVF\src\IVF.FingerprintClient\MainForm.cs(190,13): error CS0103: The name '_captureForm' does not exist in the current context [D:\Pr.Net\IVF\src\IVF.FingerprintClient\IVF.FingerprintClient.csproj]
-D:\Pr.Net\IVF\src\IVF.FingerprintClient\MainForm.cs(200,9): error CS0103: The name '_captureForm' does not exist in the current context [D:\Pr.Net\IVF\src\IVF.FingerprintClient\IVF.FingerprintClient.csproj]
-D:\Pr.Net\IVF\src\IVF.FingerprintClient\MainForm.cs(201,9): error CS0103: The name '_captureForm' does not exist in the current context [D:\Pr.Net\IVF\src\IVF.FingerprintClient\IVF.FingerprintClient.csproj]
-D:\Pr.Net\IVF\src\IVF.FingerprintClient\MainForm.cs(234,9): error CS0103: The name '_captureForm' does not exist in the current context [D:\Pr.Net\IVF\src\IVF.FingerprintClient\IVF.FingerprintClient.csproj]
-D:\Pr.Net\IVF\src\IVF.FingerprintClient\MainForm.cs(240,9): error CS0103: The name '_captureForm' does not exist in the current context [D:\Pr.Net\IVF\src\IVF.FingerprintClient\IVF.FingerprintClient.csproj]
-D:\Pr.Net\IVF\src\IVF.FingerprintClient\MainForm.cs(241,9): error CS0103: The name '_captureForm' does not exist in the current context [D:\Pr.Net\IVF\src\IVF.FingerprintClient\IVF.FingerprintClient.csproj]
-D:\Pr.Net\IVF\src\IVF.FingerprintClient\MainForm.cs(275,13): error CS0103: The name '_currentRequest' does not exist in the current context [D:\Pr.Net\IVF\src\IVF.FingerprintClient\IVF.FingerprintClient.csproj]
-D:\Pr.Net\IVF\src\IVF.FingerprintClient\MainForm.cs(301,13): error CS0103: The name '_currentRequest' does not exist in the current context [D:\Pr.Net\IVF\src\IVF.FingerprintClient\IVF.FingerprintClient.csproj]
-D:\Pr.Net\IVF\src\IVF.FingerprintClient\MainForm.cs(303,17): error CS0103: The name '_captureForm' does not exist in the current context [D:\Pr.Net\IVF\src\IVF.FingerprintClient\IVF.FingerprintClient.csproj]
-D:\Pr.Net\IVF\src\IVF.FingerprintClient\MainForm.cs(303,42): error CS0103: The name '_captureForm' does not exist in the current context [D:\Pr.Net\IVF\src\IVF.FingerprintClient\IVF.FingerprintClient.csproj]
-D:\Pr.Net\IVF\src\IVF.FingerprintClient\MainForm.cs(305,17): error CS0103: The name '_captureForm' does not exist in the current context [D:\Pr.Net\IVF\src\IVF.FingerprintClient\IVF.FingerprintClient.csproj]
-D:\Pr.Net\IVF\src\IVF.FingerprintClient\MainForm.cs(334,13): error CS0103: The name '_verificationForm' does not exist in the current context [D:\Pr.Net\IVF\src\IVF.FingerprintClient\IVF.FingerprintClient.csproj]
-D:\Pr.Net\IVF\src\IVF.FingerprintClient\MainForm.cs(334,43): error CS0103: The name '_verificationForm' does not exist in the current context [D:\Pr.Net\IVF\src\IVF.FingerprintClient\IVF.FingerprintClient.csproj]
-D:\Pr.Net\IVF\src\IVF.FingerprintClient\MainForm.cs(336,13): error CS0103: The name '_verificationForm' does not exist in the current context [D:\Pr.Net\IVF\src\IVF.FingerprintClient\IVF.FingerprintClient.csproj]
-D:\Pr.Net\IVF\src\IVF.FingerprintClient\MainForm.cs(343,9): error CS0103: The name '_verificationForm' does not exist in the current context [D:\Pr.Net\IVF\src\IVF.FingerprintClient\IVF.FingerprintClient.csproj]
-D:\Pr.Net\IVF\src\IVF.FingerprintClient\MainForm.cs(344,9): error CS0103: The name '_verificationForm' does not exist in the current context [D:\Pr.Net\IVF\src\IVF.FingerprintClient\IVF.FingerprintClient.csproj]
-D:\Pr.Net\IVF\src\IVF.FingerprintClient\MainForm.cs(373,9): error CS0103: The name '_verificationForm' does not exist in the current context [D:\Pr.Net\IVF\src\IVF.FingerprintClient\IVF.FingerprintClient.csproj]
-D:\Pr.Net\IVF\src\IVF.FingerprintClient\MainForm.cs(378,9): error CS0103: The name '_verificationForm' does not exist in the current context [D:\Pr.Net\IVF\src\IVF.FingerprintClient\IVF.FingerprintClient.csproj]
-D:\Pr.Net\IVF\src\IVF.FingerprintClient\MainForm.cs(379,9): error CS0103: The name '_verificationForm' does not exist in the current context [D:\Pr.Net\IVF\src\IVF.FingerprintClient\IVF.FingerprintClient.csproj]
+  IVF.Domain -> D:\Pr.Net\IVF\src\IVF.Domain\bin\Debug\net10.0\IVF.Domain.dll
+  IVF.Application -> D:\Pr.Net\IVF\src\IVF.Application\bin\Debug\net10.0\IVF.Application.dll
+D:\Pr.Net\IVF\src\IVF.Infrastructure\Persistence\FlowSeeder.cs(129,75): error CS1061: 'Patient' does not contain a definition for 'Code' and no accessible extension method 'Code' accepting a first argument of type 'Patient' could be found (are you missing a using directive or an assembly reference?) [D:\Pr.Net\IVF\src\IVF.Infrastructure\IVF.Infrastructure.csproj]
 
 Build FAILED.
 
-D:\Pr.Net\IVF\src\IVF.FingerprintClient\IdentificationForm.cs(24,12): warning CS8618: Non-nullable field 'lblStatus' must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring the field as nullable. [D:\Pr.Net\IVF\src\IVF.FingerprintClient\IVF.FingerprintClient.csproj]
-D:\Pr.Net\IVF\src\IVF.FingerprintClient\IdentificationForm.cs(24,12): warning CS8618: Non-nullable field 'lblPrompt' must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring the field as nullable. [D:\Pr.Net\IVF\src\IVF.FingerprintClient\IVF.FingerprintClient.csproj]
-D:\Pr.Net\IVF\src\IVF.FingerprintClient\IdentificationForm.cs(24,12): warning CS8618: Non-nullable field 'pictureBoxFingerprint' must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring the field as nullable. [D:\Pr.Net\IVF\src\IVF.FingerprintClient\IVF.FingerprintClient.csproj]
-D:\Pr.Net\IVF\src\IVF.FingerprintClient\IdentificationForm.cs(24,12): warning CS8618: Non-nullable field 'btnCancel' must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring the field as nullable. [D:\Pr.Net\IVF\src\IVF.FingerprintClient\IVF.FingerprintClient.csproj]
-D:\Pr.Net\IVF\src\IVF.FingerprintClient\IdentificationForm.cs(24,12): warning CS8618: Non-nullable field 'txtLog' must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring the field as nullable. [D:\Pr.Net\IVF\src\IVF.FingerprintClient\IVF.FingerprintClient.csproj]
-D:\Pr.Net\IVF\src\IVF.FingerprintClient\Services\FingerprintHubService.cs(46,16): error CS0160: A previous catch clause already catches all exceptions of this or of a super type ('Exception') [D:\Pr.Net\IVF\src\IVF.FingerprintClient\IVF.FingerprintClient.csproj]
-D:\Pr.Net\IVF\src\IVF.FingerprintClient\MainForm.cs(168,13): error CS0103: The name '_currentRequest' does not exist in the current context [D:\Pr.Net\IVF\src\IVF.FingerprintClient\IVF.FingerprintClient.csproj]
-D:\Pr.Net\IVF\src\IVF.FingerprintClient\MainForm.cs(171,13): error CS0103: The name '_currentRequest' does not exist in the current context [D:\Pr.Net\IVF\src\IVF.FingerprintClient\IVF.FingerprintClient.csproj]
-D:\Pr.Net\IVF\src\IVF.FingerprintClient\MainForm.cs(179,25): error CS0103: The name '_currentRequest' does not exist in the current context [D:\Pr.Net\IVF\src\IVF.FingerprintClient\IVF.FingerprintClient.csproj]
-D:\Pr.Net\IVF\src\IVF.FingerprintClient\MainForm.cs(188,13): error CS0103: The name '_captureForm' does not exist in the current context [D:\Pr.Net\IVF\src\IVF.FingerprintClient\IVF.FingerprintClient.csproj]
-D:\Pr.Net\IVF\src\IVF.FingerprintClient\MainForm.cs(188,38): error CS0103: The name '_captureForm' does not exist in the current context [D:\Pr.Net\IVF\src\IVF.FingerprintClient\IVF.FingerprintClient.csproj]
-D:\Pr.Net\IVF\src\IVF.FingerprintClient\MainForm.cs(190,13): error CS0103: The name '_captureForm' does not exist in the current context [D:\Pr.Net\IVF\src\IVF.FingerprintClient\IVF.FingerprintClient.csproj]
-D:\Pr.Net\IVF\src\IVF.FingerprintClient\MainForm.cs(200,9): error CS0103: The name '_captureForm' does not exist in the current context [D:\Pr.Net\IVF\src\IVF.FingerprintClient\IVF.FingerprintClient.csproj]
-D:\Pr.Net\IVF\src\IVF.FingerprintClient\MainForm.cs(201,9): error CS0103: The name '_captureForm' does not exist in the current context [D:\Pr.Net\IVF\src\IVF.FingerprintClient\IVF.FingerprintClient.csproj]
-D:\Pr.Net\IVF\src\IVF.FingerprintClient\MainForm.cs(234,9): error CS0103: The name '_captureForm' does not exist in the current context [D:\Pr.Net\IVF\src\IVF.FingerprintClient\IVF.FingerprintClient.csproj]
-D:\Pr.Net\IVF\src\IVF.FingerprintClient\MainForm.cs(240,9): error CS0103: The name '_captureForm' does not exist in the current context [D:\Pr.Net\IVF\src\IVF.FingerprintClient\IVF.FingerprintClient.csproj]
-D:\Pr.Net\IVF\src\IVF.FingerprintClient\MainForm.cs(241,9): error CS0103: The name '_captureForm' does not exist in the current context [D:\Pr.Net\IVF\src\IVF.FingerprintClient\IVF.FingerprintClient.csproj]
-D:\Pr.Net\IVF\src\IVF.FingerprintClient\MainForm.cs(275,13): error CS0103: The name '_currentRequest' does not exist in the current context [D:\Pr.Net\IVF\src\IVF.FingerprintClient\IVF.FingerprintClient.csproj]
-D:\Pr.Net\IVF\src\IVF.FingerprintClient\MainForm.cs(301,13): error CS0103: The name '_currentRequest' does not exist in the current context [D:\Pr.Net\IVF\src\IVF.FingerprintClient\IVF.FingerprintClient.csproj]
-D:\Pr.Net\IVF\src\IVF.FingerprintClient\MainForm.cs(303,17): error CS0103: The name '_captureForm' does not exist in the current context [D:\Pr.Net\IVF\src\IVF.FingerprintClient\IVF.FingerprintClient.csproj]
-D:\Pr.Net\IVF\src\IVF.FingerprintClient\MainForm.cs(303,42): error CS0103: The name '_captureForm' does not exist in the current context [D:\Pr.Net\IVF\src\IVF.FingerprintClient\IVF.FingerprintClient.csproj]
-D:\Pr.Net\IVF\src\IVF.FingerprintClient\MainForm.cs(305,17): error CS0103: The name '_captureForm' does not exist in the current context [D:\Pr.Net\IVF\src\IVF.FingerprintClient\IVF.FingerprintClient.csproj]
-D:\Pr.Net\IVF\src\IVF.FingerprintClient\MainForm.cs(334,13): error CS0103: The name '_verificationForm' does not exist in the current context [D:\Pr.Net\IVF\src\IVF.FingerprintClient\IVF.FingerprintClient.csproj]
-D:\Pr.Net\IVF\src\IVF.FingerprintClient\MainForm.cs(334,43): error CS0103: The name '_verificationForm' does not exist in the current context [D:\Pr.Net\IVF\src\IVF.FingerprintClient\IVF.FingerprintClient.csproj]
-D:\Pr.Net\IVF\src\IVF.FingerprintClient\MainForm.cs(336,13): error CS0103: The name '_verificationForm' does not exist in the current context [D:\Pr.Net\IVF\src\IVF.FingerprintClient\IVF.FingerprintClient.csproj]
-D:\Pr.Net\IVF\src\IVF.FingerprintClient\MainForm.cs(343,9): error CS0103: The name '_verificationForm' does not exist in the current context [D:\Pr.Net\IVF\src\IVF.FingerprintClient\IVF.FingerprintClient.csproj]
-D:\Pr.Net\IVF\src\IVF.FingerprintClient\MainForm.cs(344,9): error CS0103: The name '_verificationForm' does not exist in the current context [D:\Pr.Net\IVF\src\IVF.FingerprintClient\IVF.FingerprintClient.csproj]
-D:\Pr.Net\IVF\src\IVF.FingerprintClient\MainForm.cs(373,9): error CS0103: The name '_verificationForm' does not exist in the current context [D:\Pr.Net\IVF\src\IVF.FingerprintClient\IVF.FingerprintClient.csproj]
-D:\Pr.Net\IVF\src\IVF.FingerprintClient\MainForm.cs(378,9): error CS0103: The name '_verificationForm' does not exist in the current context [D:\Pr.Net\IVF\src\IVF.FingerprintClient\IVF.FingerprintClient.csproj]
-D:\Pr.Net\IVF\src\IVF.FingerprintClient\MainForm.cs(379,9): error CS0103: The name '_verificationForm' does not exist in the current context [D:\Pr.Net\IVF\src\IVF.FingerprintClient\IVF.FingerprintClient.csproj]
-    5 Warning(s)
-    25 Error(s)
+D:\Pr.Net\IVF\src\IVF.Infrastructure\Persistence\FlowSeeder.cs(129,75): error CS1061: 'Patient' does not contain a definition for 'Code' and no accessible extension method 'Code' accepting a first argument of type 'Patient' could be found (are you missing a using directive or an assembly reference?) [D:\Pr.Net\IVF\src\IVF.Infrastructure\IVF.Infrastructure.csproj]
+    0 Warning(s)
+    1 Error(s)
 
-Time Elapsed 00:00:01.20
+Time Elapsed 00:00:01.99

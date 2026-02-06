@@ -369,3 +369,14 @@ Track consumables used (needles, catheters, etc.)
 | Pharmacy | REST API | Prescriptions |
 | SMS Gateway | REST API | Appointment reminders |
 | Payment Gateway | REST API | Card payments |
+
+
+
+## Auto-Phase-Advance for the entire IVF lifecycle. Now, whenever you fill out data and click Save, the system intelligently moves the cycle forward:
+
+- Stimulation (OvarianStimulation) → Saves AspirationDate → Moves to Egg Retrieval (Chọc hút).
+- Stimulation (OvarianStimulation) → Saves HcgDate → Moves to Trigger Shot.
+- Culture (EmbryoCulture) → Saves TotalFreezedEmbryo → Moves to Embryo Culture.
+- Transfer (EmbryoTransfer) → Saves TransferDate → Moves to Embryo Transfer.
+- Luteal (LutealSupport) → Saves Drugs → Moves to Luteal Support.
+- Pregnancy (PregnancyTest) → Saves BetaHcg → Moves to Pregnancy Test.

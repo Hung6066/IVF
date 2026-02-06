@@ -3,7 +3,7 @@ export interface TreatmentCycle {
     cycleCode: string;
     coupleId: string;
     method: 'QHTN' | 'IUI' | 'ICSI' | 'IVM';
-    phase: CyclePhase;
+    currentPhase: CyclePhase;
     outcome: CycleOutcome;
     startDate: string;
     endDate?: string;

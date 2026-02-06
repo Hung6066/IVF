@@ -109,6 +109,23 @@ public partial class MainForm : Form
 
         _identificationForm = new IdentificationForm(_hubService!, _cacheService, request);
         _identificationForm.FormClosed += (s, args) => _identificationForm = null;
+        
+        // Handle auto-minimize on success
+        _identificationForm.IdentificationCompleted += (s, success) =>
+        {
+            if (success && _settings.MinimizeToTray)
+            {
+                Invoke(() => 
+                {
+                    Task.Delay(1000).ContinueWith(_ => Invoke(() => 
+                    {
+                        Hide();
+                        notifyIcon.ShowBalloonTip(2000, "IVF Fingerprint Client", 
+                            "Định danh thành công. Ứng dụng đã ẩn xuống khay hệ thống.", ToolTipIcon.Info);
+                    }));
+                });
+            }
+        };
 
         _identificationForm.Show();
         _identificationForm.BringToFront();

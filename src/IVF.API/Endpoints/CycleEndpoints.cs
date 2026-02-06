@@ -32,6 +32,13 @@ public static class CycleEndpoints
             return r.IsSuccess ? Results.Ok(r.Value) : Results.NotFound(r.Error);
         });
 
+        // Match Frontend call
+        group.MapPost("/{id:guid}/advance", async (Guid id, AdvancePhaseRequest req, IMediator m) =>
+        {
+            var r = await m.Send(new AdvancePhaseCommand(id, req.Phase));
+            return r.IsSuccess ? Results.Ok(r.Value) : Results.NotFound(r.Error);
+        });
+
         group.MapPost("/{id:guid}/complete", async (Guid id, CompleteRequest req, IMediator m) =>
         {
             var r = await m.Send(new CompleteCycleCommand(id, req.Outcome));

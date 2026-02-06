@@ -1,6 +1,7 @@
 using IVF.Application.Common;
 using IVF.Application.Common.Interfaces;
 using IVF.Domain.Entities;
+using IVF.Domain.Enums;
 using MediatR;
 
 namespace IVF.Application.Features.Cycles.Commands;
@@ -71,6 +72,12 @@ public class UpdateTreatmentIndicationHandler : IRequestHandler<UpdateTreatmentI
             r.Timelapse, r.PgtA, r.PgtSr, r.PgtM,
             r.SubType, r.ScientificResearch, r.Source, r.ProcedurePlace, r.StopReason,
             r.TreatmentMonth, r.PreviousTreatmentsAtSite, r.PreviousTreatmentsOther);
+
+        // Auto-advance if in Consultation
+        if (cycle.CurrentPhase == CyclePhase.Consultation)
+        {
+            cycle.AdvancePhase(CyclePhase.OvarianStimulation);
+        }
 
         await _unitOfWork.SaveChangesAsync(ct);
         return Result<TreatmentIndicationDto>.Success(TreatmentIndicationDto.FromEntity(indication));
@@ -149,6 +156,16 @@ public class UpdateStimulationDataHandler : IRequestHandler<UpdateStimulationDat
             r.ProcedureType, r.AspirationDate, r.ProcedureDate, r.AspirationNo,
             r.TechniqueWife, r.TechniqueHusband);
 
+        // Auto-advance logic
+        if (r.AspirationDate.HasValue && cycle.CurrentPhase < CyclePhase.EggRetrieval)
+        {
+            cycle.AdvancePhase(CyclePhase.EggRetrieval);
+        }
+        else if (r.HcgDate.HasValue && cycle.CurrentPhase < CyclePhase.TriggerShot)
+        {
+            cycle.AdvancePhase(CyclePhase.TriggerShot);
+        }
+
         await _unitOfWork.SaveChangesAsync(ct);
         return Result<StimulationDataDto>.Success(StimulationDataDto.FromEntity(data));
     }
@@ -193,6 +210,13 @@ public class UpdateCultureDataHandler : IRequestHandler<UpdateCultureDataCommand
         }
 
         data.Update(r.TotalFreezedEmbryo, r.TotalThawedEmbryo, r.TotalTransferedEmbryo, r.RemainFreezedEmbryo);
+
+        // Auto-advance
+        if (cycle.CurrentPhase < CyclePhase.EmbryoCulture)
+        {
+            cycle.AdvancePhase(CyclePhase.EmbryoCulture);
+        }
+
         await _unitOfWork.SaveChangesAsync(ct);
         return Result<CultureDataDto>.Success(CultureDataDto.FromEntity(data));
     }
@@ -237,6 +261,13 @@ public class UpdateTransferDataHandler : IRequestHandler<UpdateTransferDataComma
         }
 
         data.Update(r.TransferDate, r.ThawingDate, r.DayOfTransfered, r.LabNote);
+
+        // Auto-advance
+        if (cycle.CurrentPhase < CyclePhase.EmbryoTransfer)
+        {
+            cycle.AdvancePhase(CyclePhase.EmbryoTransfer);
+        }
+
         await _unitOfWork.SaveChangesAsync(ct);
         return Result<TransferDataDto>.Success(TransferDataDto.FromEntity(data));
     }
@@ -281,6 +312,13 @@ public class UpdateLutealPhaseDataHandler : IRequestHandler<UpdateLutealPhaseDat
         }
 
         data.Update(r.LutealDrug1, r.LutealDrug2, r.EndometriumDrug1, r.EndometriumDrug2);
+
+        // Auto-advance
+        if (cycle.CurrentPhase < CyclePhase.LutealSupport)
+        {
+            cycle.AdvancePhase(CyclePhase.LutealSupport);
+        }
+
         await _unitOfWork.SaveChangesAsync(ct);
         return Result<LutealPhaseDataDto>.Success(LutealPhaseDataDto.FromEntity(data));
     }
@@ -328,7 +366,13 @@ public class UpdatePregnancyDataHandler : IRequestHandler<UpdatePregnancyDataCom
         }
 
         data.Update(r.BetaHcg, r.BetaHcgDate, r.IsPregnant, r.GestationalSacs, r.FetalHeartbeats, r.DueDate, r.Notes);
-        await _unitOfWork.SaveChangesAsync(ct);
+
+        // Auto-advance
+        if (cycle.CurrentPhase < CyclePhase.PregnancyTest)
+        {
+            cycle.AdvancePhase(CyclePhase.PregnancyTest);
+        }
+
         return Result<PregnancyDataDto>.Success(PregnancyDataDto.FromEntity(data));
     }
 }

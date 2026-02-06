@@ -13,6 +13,8 @@ public partial class IdentificationForm : Form, DPFP.Capture.EventHandler
     private readonly FingerprintHubService _hubService;
     private readonly TemplateCacheService _cacheService;
     private readonly IdentificationRequestDto _request;
+    
+    public event EventHandler<bool>? IdentificationCompleted;
 
     // UI Controls
     private Label lblStatus;
@@ -40,6 +42,7 @@ public partial class IdentificationForm : Form, DPFP.Capture.EventHandler
         this.StartPosition = FormStartPosition.CenterScreen;
         this.FormBorderStyle = FormBorderStyle.FixedDialog;
         this.MaximizeBox = false;
+        this.TopMost = true;
 
         lblPrompt = new Label { Text = "Đặt ngón tay để định danh", Location = new Point(20, 20), AutoSize = true, Font = new Font("Segoe UI", 12, FontStyle.Bold) };
         lblStatus = new Label { Text = "Sẵn sàng", Location = new Point(20, 50), AutoSize = true, ForeColor = Color.DimGray };
@@ -216,15 +219,23 @@ public partial class IdentificationForm : Form, DPFP.Capture.EventHandler
             {
                 UpdateStatus($"✅ TÌM THẤY! PatientID: {result.PatientId}");
                 // Assuming lblMessage is lblStatus based on context
-                lblStatus.ForeColor = Color.Green; 
-                // Close form after delay?
+                lblStatus.ForeColor = Color.Green;
+                
+                // Minimize to allow user to see the Web App result immediately
+                this.WindowState = FormWindowState.Minimized;
+
+                // Close form after delay
                 Task.Delay(2000).ContinueWith(_ => Invoke(Close));
+                
+                IdentificationCompleted?.Invoke(this, true);
             }
             else
             {
                 UpdateStatus($"❌ {result.ErrorMessage ?? "Không tìm thấy kết quả"}");
                 // Assuming lblMessage is lblStatus based on context
                 lblStatus.ForeColor = Color.Red;
+                
+                IdentificationCompleted?.Invoke(this, false);
             }
         });
     }

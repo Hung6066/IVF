@@ -4,10 +4,10 @@ import { FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { CycleService } from '../../../../core/services/cycle.service';
 
 @Component({
-    selector: 'app-culture-tab',
-    standalone: true,
-    imports: [CommonModule, ReactiveFormsModule],
-    template: `
+  selector: 'app-culture-tab',
+  standalone: true,
+  imports: [CommonModule, ReactiveFormsModule],
+  template: `
     <form [formGroup]="form" (ngSubmit)="onSubmit()" class="phase-form">
       <div class="form-section">
         <h3>Thống kê phôi</h3>
@@ -37,7 +37,7 @@ import { CycleService } from '../../../../core/services/cycle.service';
       </div>
     </form>
   `,
-    styles: [`
+  styles: [`
     .phase-form { padding: 1rem; }
     .form-section { margin-bottom: 1.5rem; padding: 1rem; background: var(--surface-elevated); border-radius: 8px; }
     .form-section h3 { margin: 0 0 1rem; font-size: 1rem; }
@@ -54,37 +54,43 @@ import { CycleService } from '../../../../core/services/cycle.service';
   `]
 })
 export class CultureTabComponent implements OnInit {
-    @Input() cycleId!: string;
-    @Output() saved = new EventEmitter<void>();
+  @Input() cycleId!: string;
+  @Output() saved = new EventEmitter<void>();
 
-    private fb = inject(FormBuilder);
-    private cycleService = inject(CycleService);
-    form!: FormGroup;
-    loading = false;
+  private fb = inject(FormBuilder);
+  private cycleService = inject(CycleService);
+  form!: FormGroup;
+  loading = false;
 
-    ngOnInit(): void {
-        this.form = this.fb.group({
-            totalFreezedEmbryo: [0],
-            totalThawedEmbryo: [0],
-            totalTransferedEmbryo: [0],
-            remainFreezedEmbryo: [0]
-        });
-        this.loadData();
-    }
+  ngOnInit(): void {
+    this.form = this.fb.group({
+      totalFreezedEmbryo: [0],
+      totalThawedEmbryo: [0],
+      totalTransferedEmbryo: [0],
+      remainFreezedEmbryo: [0]
+    });
+    this.loadData();
+  }
 
-    loadData(): void {
-        this.cycleService.getCycleCulture(this.cycleId).subscribe({
-            next: (data) => data && this.form.patchValue(data),
-            error: () => { }
-        });
-    }
+  loadData(): void {
+    this.cycleService.getCycleCulture(this.cycleId).subscribe({
+      next: (data) => data && this.form.patchValue(data),
+      error: () => { }
+    });
+  }
 
-    onSubmit(): void {
-        if (this.loading) return;
-        this.loading = true;
-        this.cycleService.updateCycleCulture(this.cycleId, this.form.value).subscribe({
-            next: () => { this.loading = false; this.saved.emit(); },
-            error: () => { this.loading = false; }
-        });
-    }
+  onSubmit(): void {
+    if (this.loading) return;
+    this.loading = true;
+
+    const formValue = { ...this.form.value };
+    Object.keys(formValue).forEach(key => {
+      if (formValue[key] === '') formValue[key] = null;
+    });
+
+    this.cycleService.updateCycleCulture(this.cycleId, formValue).subscribe({
+      next: () => { this.loading = false; this.saved.emit(); },
+      error: () => { this.loading = false; }
+    });
+  }
 }

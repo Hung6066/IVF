@@ -5,7 +5,7 @@
             <h1>Chu kỳ {{ cycle()?.cycleCode }}</h1>
             <div class="cycle-meta">
                 <span class="badge method">{{ getMethodName(cycle()?.method) }}</span>
-                <span class="badge phase">{{ getPhaseName(cycle()?.phase) }}</span>
+                <span class="badge phase">{{ getPhaseName(cycle()?.currentPhase) }}</span>
                 <span class="badge outcome" [class]="(cycle()?.outcome || '').toLowerCase()">
                     {{ getOutcomeName(cycle()?.outcome) }}
                 </span>

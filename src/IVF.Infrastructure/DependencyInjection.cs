@@ -56,6 +56,7 @@ public static class DependencyInjection
 
         // Register Services
         services.AddScoped<INotificationService, Services.NotificationService>();
+        services.AddScoped<IFlowSeeder, FlowSeeder>();
 
         // Redis Configuration (High-Performance Matcher Cache)
         var redisConnectionString = configuration.GetConnectionString("Redis") ?? "localhost:6379";

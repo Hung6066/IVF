@@ -4,10 +4,10 @@ import { FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { CycleService } from '../../../../core/services/cycle.service';
 
 @Component({
-    selector: 'app-transfer-tab',
-    standalone: true,
-    imports: [CommonModule, ReactiveFormsModule],
-    template: `
+  selector: 'app-transfer-tab',
+  standalone: true,
+  imports: [CommonModule, ReactiveFormsModule],
+  template: `
     <form [formGroup]="form" (ngSubmit)="onSubmit()" class="phase-form">
       <div class="form-section">
         <h3>Thông tin chuyển phôi</h3>
@@ -39,7 +39,7 @@ import { CycleService } from '../../../../core/services/cycle.service';
       </div>
     </form>
   `,
-    styles: [`
+  styles: [`
     .phase-form { padding: 1rem; }
     .form-section { margin-bottom: 1.5rem; padding: 1rem; background: var(--surface-elevated); border-radius: 8px; }
     .form-section h3 { margin: 0 0 1rem; font-size: 1rem; }
@@ -58,46 +58,52 @@ import { CycleService } from '../../../../core/services/cycle.service';
   `]
 })
 export class TransferTabComponent implements OnInit {
-    @Input() cycleId!: string;
-    @Output() saved = new EventEmitter<void>();
+  @Input() cycleId!: string;
+  @Output() saved = new EventEmitter<void>();
 
-    private fb = inject(FormBuilder);
-    private cycleService = inject(CycleService);
-    form!: FormGroup;
-    loading = false;
+  private fb = inject(FormBuilder);
+  private cycleService = inject(CycleService);
+  form!: FormGroup;
+  loading = false;
 
-    ngOnInit(): void {
-        this.form = this.fb.group({
-            transferDate: [''],
-            thawingDate: [''],
-            dayOfTransfered: [null],
-            labNote: ['']
-        });
-        this.loadData();
-    }
+  ngOnInit(): void {
+    this.form = this.fb.group({
+      transferDate: [''],
+      thawingDate: [''],
+      dayOfTransfered: [null],
+      labNote: ['']
+    });
+    this.loadData();
+  }
 
-    loadData(): void {
-        this.cycleService.getCycleTransfer(this.cycleId).subscribe({
-            next: (data) => {
-                if (data) {
-                    this.form.patchValue({
-                        transferDate: data.transferDate?.split('T')[0] || '',
-                        thawingDate: data.thawingDate?.split('T')[0] || '',
-                        dayOfTransfered: data.dayOfTransfered,
-                        labNote: data.labNote || ''
-                    });
-                }
-            },
-            error: () => { }
-        });
-    }
+  loadData(): void {
+    this.cycleService.getCycleTransfer(this.cycleId).subscribe({
+      next: (data) => {
+        if (data) {
+          this.form.patchValue({
+            transferDate: data.transferDate?.split('T')[0] || '',
+            thawingDate: data.thawingDate?.split('T')[0] || '',
+            dayOfTransfered: data.dayOfTransfered,
+            labNote: data.labNote || ''
+          });
+        }
+      },
+      error: () => { }
+    });
+  }
 
-    onSubmit(): void {
-        if (this.loading) return;
-        this.loading = true;
-        this.cycleService.updateCycleTransfer(this.cycleId, this.form.value).subscribe({
-            next: () => { this.loading = false; this.saved.emit(); },
-            error: () => { this.loading = false; }
-        });
-    }
+  onSubmit(): void {
+    if (this.loading) return;
+    this.loading = true;
+
+    const formValue = { ...this.form.value };
+    Object.keys(formValue).forEach(key => {
+      if (formValue[key] === '') formValue[key] = null;
+    });
+
+    this.cycleService.updateCycleTransfer(this.cycleId, formValue).subscribe({
+      next: () => { this.loading = false; this.saved.emit(); },
+      error: () => { this.loading = false; }
+    });
+  }
 }

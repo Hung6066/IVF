@@ -4,10 +4,10 @@ import { FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { CycleService } from '../../../../core/services/cycle.service';
 
 @Component({
-    selector: 'app-stimulation-tab',
-    standalone: true,
-    imports: [CommonModule, ReactiveFormsModule],
-    template: `
+  selector: 'app-stimulation-tab',
+  standalone: true,
+  imports: [CommonModule, ReactiveFormsModule],
+  template: `
     <form [formGroup]="form" (ngSubmit)="onSubmit()" class="phase-form">
       <div class="form-section">
         <h3>Thông tin kích thích</h3>
@@ -122,7 +122,7 @@ import { CycleService } from '../../../../core/services/cycle.service';
       </div>
     </form>
   `,
-    styles: [`
+  styles: [`
     .phase-form { padding: 1rem; }
     .form-section { margin-bottom: 1.5rem; padding: 1rem; background: var(--surface-elevated); border-radius: 8px; }
     .form-section h3 { margin: 0 0 1rem; font-size: 1rem; }
@@ -139,79 +139,88 @@ import { CycleService } from '../../../../core/services/cycle.service';
   `]
 })
 export class StimulationTabComponent implements OnInit {
-    @Input() cycleId!: string;
-    @Output() saved = new EventEmitter<void>();
+  @Input() cycleId!: string;
+  @Output() saved = new EventEmitter<void>();
 
-    private fb = inject(FormBuilder);
-    private cycleService = inject(CycleService);
+  private fb = inject(FormBuilder);
+  private cycleService = inject(CycleService);
 
-    form!: FormGroup;
-    loading = false;
+  form!: FormGroup;
+  loading = false;
 
-    ngOnInit(): void {
-        this.form = this.fb.group({
-            lastMenstruation: [''],
-            startDate: [''],
-            startDay: [null],
-            drug1: [''], drug1Duration: [0], drug1Posology: [''],
-            drug2: [''], drug2Duration: [0], drug2Posology: [''],
-            drug3: [''], drug3Duration: [0], drug3Posology: [''],
-            drug4: [''], drug4Duration: [0], drug4Posology: [''],
-            size12Follicle: [null],
-            size14Follicle: [null],
-            endometriumThickness: [null],
-            triggerDrug: [''],
-            triggerDrug2: [''],
-            hcgDate: [''],
-            hcgTime: [''],
-            aspirationDate: [''],
-            aspirationNo: [null],
-            lhLab: [null],
-            e2Lab: [null],
-            p4Lab: [null]
-        });
+  ngOnInit(): void {
+    this.form = this.fb.group({
+      lastMenstruation: [''],
+      startDate: [''],
+      startDay: [null],
+      drug1: [''], drug1Duration: [0], drug1Posology: [''],
+      drug2: [''], drug2Duration: [0], drug2Posology: [''],
+      drug3: [''], drug3Duration: [0], drug3Posology: [''],
+      drug4: [''], drug4Duration: [0], drug4Posology: [''],
+      size12Follicle: [null],
+      size14Follicle: [null],
+      endometriumThickness: [null],
+      triggerDrug: [''],
+      triggerDrug2: [''],
+      hcgDate: [''],
+      hcgTime: [''],
+      aspirationDate: [''],
+      aspirationNo: [null],
+      lhLab: [null],
+      e2Lab: [null],
+      p4Lab: [null]
+    });
 
-        this.loadData();
-    }
+    this.loadData();
+  }
 
-    loadData(): void {
-        this.cycleService.getCycleStimulation(this.cycleId).subscribe({
-            next: (data) => this.patchForm(data),
-            error: () => { }
-        });
-    }
+  loadData(): void {
+    this.cycleService.getCycleStimulation(this.cycleId).subscribe({
+      next: (data) => this.patchForm(data),
+      error: () => { }
+    });
+  }
 
-    patchForm(data: any): void {
-        if (!data) return;
-        this.form.patchValue({
-            lastMenstruation: data.lastMenstruation?.split('T')[0] || '',
-            startDate: data.startDate?.split('T')[0] || '',
-            startDay: data.startDay,
-            drug1: data.drug1 || '', drug1Duration: data.drug1Duration || 0, drug1Posology: data.drug1Posology || '',
-            drug2: data.drug2 || '', drug2Duration: data.drug2Duration || 0, drug2Posology: data.drug2Posology || '',
-            drug3: data.drug3 || '', drug3Duration: data.drug3Duration || 0, drug3Posology: data.drug3Posology || '',
-            drug4: data.drug4 || '', drug4Duration: data.drug4Duration || 0, drug4Posology: data.drug4Posology || '',
-            size12Follicle: data.size12Follicle,
-            size14Follicle: data.size14Follicle,
-            endometriumThickness: data.endometriumThickness,
-            triggerDrug: data.triggerDrug || '',
-            triggerDrug2: data.triggerDrug2 || '',
-            hcgDate: data.hcgDate?.split('T')[0] || '',
-            hcgTime: data.hcgTime || '',
-            aspirationDate: data.aspirationDate?.split('T')[0] || '',
-            aspirationNo: data.aspirationNo,
-            lhLab: data.lhLab,
-            e2Lab: data.e2Lab,
-            p4Lab: data.p4Lab
-        });
-    }
+  patchForm(data: any): void {
+    if (!data) return;
+    this.form.patchValue({
+      lastMenstruation: data.lastMenstruation?.split('T')[0] || '',
+      startDate: data.startDate?.split('T')[0] || '',
+      startDay: data.startDay,
+      drug1: data.drug1 || '', drug1Duration: data.drug1Duration || 0, drug1Posology: data.drug1Posology || '',
+      drug2: data.drug2 || '', drug2Duration: data.drug2Duration || 0, drug2Posology: data.drug2Posology || '',
+      drug3: data.drug3 || '', drug3Duration: data.drug3Duration || 0, drug3Posology: data.drug3Posology || '',
+      drug4: data.drug4 || '', drug4Duration: data.drug4Duration || 0, drug4Posology: data.drug4Posology || '',
+      size12Follicle: data.size12Follicle,
+      size14Follicle: data.size14Follicle,
+      endometriumThickness: data.endometriumThickness,
+      triggerDrug: data.triggerDrug || '',
+      triggerDrug2: data.triggerDrug2 || '',
+      hcgDate: data.hcgDate?.split('T')[0] || '',
+      hcgTime: data.hcgTime || '',
+      aspirationDate: data.aspirationDate?.split('T')[0] || '',
+      aspirationNo: data.aspirationNo,
+      lhLab: data.lhLab,
+      e2Lab: data.e2Lab,
+      p4Lab: data.p4Lab
+    });
+  }
 
-    onSubmit(): void {
-        if (this.loading) return;
-        this.loading = true;
-        this.cycleService.updateCycleStimulation(this.cycleId, this.form.value).subscribe({
-            next: () => { this.loading = false; this.saved.emit(); },
-            error: () => { this.loading = false; }
-        });
-    }
+  onSubmit(): void {
+    if (this.loading) return;
+    this.loading = true;
+
+    const formValue = { ...this.form.value };
+    // Convert empty strings to null for optional fields
+    Object.keys(formValue).forEach(key => {
+      if (formValue[key] === '') {
+        formValue[key] = null;
+      }
+    });
+
+    this.cycleService.updateCycleStimulation(this.cycleId, formValue).subscribe({
+      next: () => { this.loading = false; this.saved.emit(); },
+      error: () => { this.loading = false; }
+    });
+  }
 }

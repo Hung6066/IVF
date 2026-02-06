@@ -16,6 +16,12 @@
     --bg-card: #f8fafc;
     --border-color: #e2e8f0;
     --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+
+    /* Aliases for Cycle Components Compatibility */
+    --border: var(--border-color);
+    --surface: var(--bg-white);
+    --surface-elevated: var(--bg-card);
+    --text-primary: var(--text-main);
     --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
     --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
     --radius-sm: 6px;

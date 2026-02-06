@@ -5,10 +5,10 @@ import { CycleService } from '../../../../core/services/cycle.service';
 import { TreatmentIndication } from '../../../../core/models/api.models';
 
 @Component({
-    selector: 'app-indication-tab',
-    standalone: true,
-    imports: [CommonModule, ReactiveFormsModule],
-    template: `
+  selector: 'app-indication-tab',
+  standalone: true,
+  imports: [CommonModule, ReactiveFormsModule],
+  template: `
     <form [formGroup]="form" (ngSubmit)="onSubmit()" class="phase-form">
       <div class="form-section">
         <h3>Thông tin chỉ định</h3>
@@ -119,7 +119,7 @@ import { TreatmentIndication } from '../../../../core/models/api.models';
       </div>
     </form>
   `,
-    styles: [`
+  styles: [`
     .phase-form { padding: 1rem; }
     .form-section { margin-bottom: 1.5rem; padding: 1rem; background: var(--surface-elevated); border-radius: 8px; }
     .form-section h3 { margin: 0 0 1rem; font-size: 1rem; color: var(--text-primary); }
@@ -140,84 +140,88 @@ import { TreatmentIndication } from '../../../../core/models/api.models';
   `]
 })
 export class IndicationTabComponent implements OnInit {
-    @Input() cycleId!: string;
-    @Output() saved = new EventEmitter<void>();
+  @Input() cycleId!: string;
+  @Output() saved = new EventEmitter<void>();
 
-    private fb = inject(FormBuilder);
-    private cycleService = inject(CycleService);
+  private fb = inject(FormBuilder);
+  private cycleService = inject(CycleService);
 
-    form!: FormGroup;
-    loading = false;
+  form!: FormGroup;
+  loading = false;
 
-    ngOnInit(): void {
-        this.form = this.fb.group({
-            lastMenstruation: [''],
-            treatmentType: [''],
-            regimen: [''],
-            subType: [''],
-            wifeDiagnosis: [''],
-            wifeDiagnosis2: [''],
-            husbandDiagnosis: [''],
-            husbandDiagnosis2: [''],
-            freezeAll: [false],
-            sis: [false],
-            timelapse: [false],
-            pgtA: [false],
-            pgtSr: [false],
-            pgtM: [false],
-            source: [''],
-            procedurePlace: [''],
-            previousTreatmentsAtSite: [0],
-            previousTreatmentsOther: [0]
-        });
+  ngOnInit(): void {
+    this.form = this.fb.group({
+      lastMenstruation: [''],
+      treatmentType: [''],
+      regimen: [''],
+      subType: [''],
+      wifeDiagnosis: [''],
+      wifeDiagnosis2: [''],
+      husbandDiagnosis: [''],
+      husbandDiagnosis2: [''],
+      freezeAll: [false],
+      sis: [false],
+      timelapse: [false],
+      pgtA: [false],
+      pgtSr: [false],
+      pgtM: [false],
+      source: [''],
+      procedurePlace: [''],
+      previousTreatmentsAtSite: [0],
+      previousTreatmentsOther: [0]
+    });
 
-        this.loadData();
-    }
+    this.loadData();
+  }
 
-    loadData(): void {
-        this.cycleService.getCycleIndication(this.cycleId).subscribe({
-            next: (data) => {
-                if (data) {
-                    this.form.patchValue({
-                        lastMenstruation: data.lastMenstruation?.split('T')[0] || '',
-                        treatmentType: data.treatmentType || '',
-                        regimen: data.regimen || '',
-                        subType: data.subType || '',
-                        wifeDiagnosis: data.wifeDiagnosis || '',
-                        wifeDiagnosis2: data.wifeDiagnosis2 || '',
-                        husbandDiagnosis: data.husbandDiagnosis || '',
-                        husbandDiagnosis2: data.husbandDiagnosis2 || '',
-                        freezeAll: data.freezeAll,
-                        sis: data.sis,
-                        timelapse: data.timelapse,
-                        pgtA: data.pgtA,
-                        pgtSr: data.pgtSr,
-                        pgtM: data.pgtM,
-                        source: data.source || '',
-                        procedurePlace: data.procedurePlace || '',
-                        previousTreatmentsAtSite: data.previousTreatmentsAtSite,
-                        previousTreatmentsOther: data.previousTreatmentsOther
-                    });
-                }
-            },
-            error: () => { /* no existing data */ }
-        });
-    }
+  loadData(): void {
+    this.cycleService.getCycleIndication(this.cycleId).subscribe({
+      next: (data) => {
+        if (data) {
+          this.form.patchValue({
+            lastMenstruation: data.lastMenstruation?.split('T')[0] || '',
+            treatmentType: data.treatmentType || '',
+            regimen: data.regimen || '',
+            subType: data.subType || '',
+            wifeDiagnosis: data.wifeDiagnosis || '',
+            wifeDiagnosis2: data.wifeDiagnosis2 || '',
+            husbandDiagnosis: data.husbandDiagnosis || '',
+            husbandDiagnosis2: data.husbandDiagnosis2 || '',
+            freezeAll: data.freezeAll,
+            sis: data.sis,
+            timelapse: data.timelapse,
+            pgtA: data.pgtA,
+            pgtSr: data.pgtSr,
+            pgtM: data.pgtM,
+            source: data.source || '',
+            procedurePlace: data.procedurePlace || '',
+            previousTreatmentsAtSite: data.previousTreatmentsAtSite,
+            previousTreatmentsOther: data.previousTreatmentsOther
+          });
+        }
+      },
+      error: () => { /* no existing data */ }
+    });
+  }
 
-    onSubmit(): void {
-        if (this.loading) return;
-        this.loading = true;
+  onSubmit(): void {
+    if (this.loading) return;
+    this.loading = true;
 
-        const formVal = this.form.value;
-        this.cycleService.updateCycleIndication(this.cycleId, {
-            ...formVal,
-            lastMenstruation: formVal.lastMenstruation || undefined
-        }).subscribe({
-            next: () => {
-                this.loading = false;
-                this.saved.emit();
-            },
-            error: () => { this.loading = false; }
-        });
-    }
+    const formVal = { ...this.form.value };
+    Object.keys(formVal).forEach(key => {
+      if (formVal[key] === '') formVal[key] = null;
+    });
+
+    this.cycleService.updateCycleIndication(this.cycleId, {
+      ...formVal,
+      lastMenstruation: formVal.lastMenstruation || undefined
+    }).subscribe({
+      next: () => {
+        this.loading = false;
+        this.saved.emit();
+      },
+      error: () => { this.loading = false; }
+    });
+  }
 }

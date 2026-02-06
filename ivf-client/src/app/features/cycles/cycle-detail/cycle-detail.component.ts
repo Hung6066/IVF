@@ -91,6 +91,8 @@ export class CycleDetailComponent implements OnInit {
 
     onTabSaved(): void {
         this.notificationService.success('Thành công', 'Đã lưu thành công!');
+        // Reload data to reflect any phase changes (e.g. Auto-Advance)
+        this.loadData(this.cycleId());
     }
 
     getMethodName(method?: string): string {
@@ -119,11 +121,11 @@ export class CycleDetailComponent implements OnInit {
     }
 
     isActivePhase(phase: string): boolean {
-        return this.cycle()?.phase === phase;
+        return this.cycle()?.currentPhase === phase;
     }
 
     isCompletedPhase(phase: string, index: number): boolean {
-        const currentPhase = this.cycle()?.phase;
+        const currentPhase = this.cycle()?.currentPhase;
         if (!currentPhase) return false;
 
         const currentIndex = this.phases.findIndex(p => p.key === currentPhase);
@@ -134,7 +136,7 @@ export class CycleDetailComponent implements OnInit {
         const c = this.cycle();
         if (!c) return;
 
-        const currentIndex = this.phases.findIndex(p => p.key === c.phase);
+        const currentIndex = this.phases.findIndex(p => p.key === c.currentPhase);
         if (currentIndex < this.phases.length - 1) {
             const nextPhase = this.phases[currentIndex + 1].key;
             this.cycleService.advanceCyclePhase(c.id, nextPhase).subscribe((updatedCycle: TreatmentCycle) => {

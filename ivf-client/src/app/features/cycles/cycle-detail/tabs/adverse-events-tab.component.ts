@@ -157,7 +157,13 @@ export class AdverseEventsTabComponent implements OnInit {
   onSubmit(): void {
     if (this.loading) return;
     this.loading = true;
-    this.cycleService.createCycleAdverseEvent(this.cycleId, this.form.value).subscribe({
+
+    const formValue = { ...this.form.value };
+    Object.keys(formValue).forEach(key => {
+      if (formValue[key] === '') formValue[key] = null;
+    });
+
+    this.cycleService.createCycleAdverseEvent(this.cycleId, formValue).subscribe({
       next: () => {
         this.loading = false;
         this.form.reset();

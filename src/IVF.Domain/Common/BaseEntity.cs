@@ -13,6 +13,12 @@ public abstract class BaseEntity
         UpdatedAt = DateTime.UtcNow;
     }
 
+    public void Restore()
+    {
+        IsDeleted = false;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
     public void SetUpdated()
     {
         UpdatedAt = DateTime.UtcNow;
