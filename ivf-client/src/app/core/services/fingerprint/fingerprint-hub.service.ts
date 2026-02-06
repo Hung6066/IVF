@@ -50,6 +50,13 @@ export interface VerificationResult {
     verifiedAt: Date;
 }
 
+export interface IdentificationResult {
+    success: boolean;
+    patientId?: string;
+    requestedBy?: string;
+    errorMessage?: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class FingerprintHubService {
     private hubConnection: signalR.HubConnection | null = null;
@@ -57,6 +64,13 @@ export class FingerprintHubService {
 
     // Reactive state
     isConnected = signal(false);
+
+    /**
+     * Check if actually connected
+     */
+    public isConnectedState(): boolean {
+        return this.hubConnection?.state === signalR.HubConnectionState.Connected;
+    }
     connectionError = signal<string | null>(null);
     currentPatientId = signal<string | null>(null);
 
@@ -68,6 +82,7 @@ export class FingerprintHubService {
     enrollmentProgress$ = new Subject<EnrollmentProgress>();
     captureCancelled$ = new Subject<string>();
     verificationResult$ = new Subject<VerificationResult>();
+    identificationResult$ = new Subject<IdentificationResult>();
 
     /**
      * Connect to the FingerprintHub with JWT authentication
@@ -76,6 +91,11 @@ export class FingerprintHubService {
         if (this.hubConnection?.state === signalR.HubConnectionState.Connected) {
             console.log('[FingerprintHub] Already connected');
             return true;
+        }
+
+        if (!accessToken) {
+            console.warn('[FingerprintHub] Cannot connect: No access token provided');
+            return false;
         }
 
         try {
@@ -168,6 +188,22 @@ export class FingerprintHubService {
     }
 
     /**
+     * Request 1:N Identification
+     */
+    async requestIdentification(): Promise<void> {
+        if (!this.hubConnection || this.hubConnection.state !== signalR.HubConnectionState.Connected) {
+            console.warn('[FingerprintHub] Hub not connected, attempting to reconnect...');
+            // Try to reconnect if we have a token? 
+            // Ideally the component handles this, but here we can throw specific error
+            this.isConnected.set(false);
+            throw new Error('Hub not connected');
+        }
+
+        await this.hubConnection.invoke('RequestIdentification');
+        console.log('[FingerprintHub] Identification requested');
+    }
+
+    /**
      * Cancel an ongoing capture request
      */
     async cancelCapture(patientId: string): Promise<void> {
@@ -253,6 +289,11 @@ export class FingerprintHubService {
         this.hubConnection.on('VerificationResult', (result: VerificationResult) => {
             console.log('[FingerprintHub] Verification result:', result);
             this.verificationResult$.next(result);
+        });
+
+        this.hubConnection.on('IdentificationResult', (result: IdentificationResult) => {
+            console.log('[FingerprintHub] Identification result:', result);
+            this.identificationResult$.next(result);
         });
     }
 }

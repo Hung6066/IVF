@@ -66,6 +66,22 @@ public static class PatientBiometricsEndpoints
             return r.IsSuccess ? Results.Ok(r.Value) : Results.BadRequest(r.Error);
         });
 
+        // Get all fingerprints (for 1:N Identification) - Desktop Client Auth via API Key
+        group.MapGet("/fingerprints/all", async (IMediator m, HttpRequest request, IConfiguration config) =>
+        {
+            // Manual API Key Validation for Desktop Client
+            var apiKey = request.Headers["X-API-Key"].FirstOrDefault() ?? request.Query["apiKey"].FirstOrDefault();
+            var validApiKeys = config.GetSection("DesktopClients:ApiKeys").Get<string[]>() ?? Array.Empty<string>();
+            
+            if (string.IsNullOrEmpty(apiKey) || !validApiKeys.Contains(apiKey))
+            {
+                return Results.Unauthorized();
+            }
+
+            var r = await m.Send(new GetAllPatientFingerprintsQuery());
+            return r.IsSuccess ? Results.Ok(r.Value) : Results.BadRequest(r.Error);
+        }).AllowAnonymous();
+
         // Delete fingerprint
         group.MapDelete("/fingerprints/{fingerprintId:guid}", async (Guid fingerprintId, IMediator m) =>
         {

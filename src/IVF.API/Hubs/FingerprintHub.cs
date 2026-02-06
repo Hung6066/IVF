@@ -20,12 +20,18 @@ public class FingerprintHub : Hub
     private readonly ILogger<FingerprintHub> _logger;
     private readonly IConfiguration _configuration;
     private readonly MediatR.ISender _sender;
+    private readonly Services.BiometricMatcherService _matcher;
 
-    public FingerprintHub(ILogger<FingerprintHub> logger, IConfiguration configuration, MediatR.ISender sender)
+    public FingerprintHub(
+        ILogger<FingerprintHub> logger, 
+        IConfiguration configuration, 
+        MediatR.ISender sender,
+        Services.BiometricMatcherService matcher)
     {
         _logger = logger;
         _configuration = configuration;
         _sender = sender;
+        _matcher = matcher;
     }
 
     public override async Task OnConnectedAsync()
@@ -185,6 +191,20 @@ public class FingerprintHub : Hub
     }
 
     /// <summary>
+    /// Request identification (1:N) (called by Angular UI)
+    /// </summary>
+    public async Task RequestIdentification()
+    {
+        _logger.LogInformation("Identification requested by {ConnectionId}", Context.ConnectionId);
+
+        await Clients.Group("DesktopClients").SendAsync("IdentificationRequested", new IdentificationRequestDto
+        {
+            RequestedBy = Context.ConnectionId,
+            RequestedAt = DateTime.UtcNow
+        });
+    }
+
+    /// <summary>
     /// Request verification for a patient (called by Angular UI)
     /// Fetches all enrolled fingerprints and sends them to desktop client for local matching
     /// </summary>
@@ -210,10 +230,11 @@ public class FingerprintHub : Hub
 
         var templates = result.Value
             .Where(f => !string.IsNullOrEmpty(f.FingerType) && f.FingerType != "Unknown") // Ensure valid type
+            .Where(f => !string.IsNullOrEmpty(f.TemplateData)) // Ensure template data exists
             .Select(f => new FingerprintTemplateDto
             {
                 FingerType = f.FingerType,
-                TemplateData = f.TemplateData // Now available in DTO
+                TemplateData = f.TemplateData! // Validated by Where above
             })
             .ToList();
             
@@ -242,7 +263,104 @@ public class FingerprintHub : Hub
         await Clients.Group(GetPatientGroup(result.PatientId)).SendAsync("VerificationResult", result);
     }
 
+
+
+    // ... (Existing OnConnected/OnDisconnected)
+
+    /// <summary>
+    /// Identify a patient by fingerprint features (Server-Side Matching)
+    /// </summary>
+    public async Task IdentifyFingerprint(string featureSetBase64, string? originalRequesterId)
+    {
+        try 
+        {
+            _logger.LogInformation("Received identification request from {ConnectionId} (Server-Side Match)", Context.ConnectionId);
+
+            if (!_matcher.IsLoaded)
+            {
+                var error = new IdentificationResultDto 
+                { 
+                    Success = false, 
+                    ErrorMessage = "System is initializing. Please try again in a moment." 
+                };
+                await Clients.Caller.SendAsync("IdentificationResult", error);
+                 if (!string.IsNullOrEmpty(originalRequesterId))
+                {
+                     await Clients.Client(originalRequesterId).SendAsync("IdentificationResult", error);
+                }
+                return;
+            }
+
+            byte[] features = Convert.FromBase64String(featureSetBase64);
+            
+            // Perform match in memory
+            var (match, patientId, score) = _matcher.Identify(features);
+
+            var result = new IdentificationResultDto
+            {
+                Success = match,
+                PatientId = match ? patientId.ToString() : null,
+                ErrorMessage = match ? null : "No matching fingerprint found."
+            };
+
+            // 1. Notify the Desktop Client (Caller) - so it can show green/red
+            await Clients.Caller.SendAsync("IdentificationResult", result);
+
+            // 2. Notify the Angular Client (Original Requester) - so it can navigate
+            if (!string.IsNullOrEmpty(originalRequesterId))
+            {
+                _logger.LogInformation("Notifying original requester: {RequesterId}", originalRequesterId);
+                await Clients.Client(originalRequesterId).SendAsync("IdentificationResult", result);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during server-side identification");
+            var error = new IdentificationResultDto 
+            { 
+                Success = false, 
+                ErrorMessage = "Server error during matching." 
+            };
+            await Clients.Caller.SendAsync("IdentificationResult", error);
+            if (!string.IsNullOrEmpty(originalRequesterId))
+            {
+                    await Clients.Client(originalRequesterId).SendAsync("IdentificationResult", error);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Send identification result back to UI (called by WinForms app)
+    /// </summary>
+    public async Task SendIdentificationResult(IdentificationResultDto result)
+    {
+        _logger.LogInformation("Identification result received. Match: {Success}, Patient: {PatientId}", 
+            result.Success, result.PatientId);
+
+        // Notify the specific requester (Angular UI)
+        if (!string.IsNullOrEmpty(result.RequestedBy))
+        {
+            await Clients.Client(result.RequestedBy).SendAsync("IdentificationResult", result);
+        }
+    }
+
     private static string GetPatientGroup(string patientId) => $"fingerprint_{patientId}";
+}
+
+// ... existing DTOs ...
+
+public record IdentificationRequestDto
+{
+    public string RequestedBy { get; init; } = string.Empty;
+    public DateTime RequestedAt { get; init; }
+}
+
+public record IdentificationResultDto
+{
+    public bool Success { get; init; }
+    public string? PatientId { get; init; }
+    public string? RequestedBy { get; init; }
+    public string? ErrorMessage { get; init; }
 }
 
 // ==================== DTOs for SignalR messages ====================

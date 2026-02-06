@@ -50,6 +50,26 @@ public class GetPatientFingerprintsHandler : IRequestHandler<GetPatientFingerpri
     }
 }
 
+// ==================== GET ALL FINGERPRINTS (FOR 1:N) ====================
+public record GetAllPatientFingerprintsQuery() : IRequest<Result<IReadOnlyList<PatientFingerprintDto>>>;
+
+public class GetAllPatientFingerprintsHandler : IRequestHandler<GetAllPatientFingerprintsQuery, Result<IReadOnlyList<PatientFingerprintDto>>>
+{
+    private readonly IPatientBiometricsRepository _biometricsRepo;
+
+    public GetAllPatientFingerprintsHandler(IPatientBiometricsRepository biometricsRepo)
+    {
+        _biometricsRepo = biometricsRepo;
+    }
+
+    public async Task<Result<IReadOnlyList<PatientFingerprintDto>>> Handle(GetAllPatientFingerprintsQuery request, CancellationToken ct)
+    {
+        var fingerprints = await _biometricsRepo.GetAllFingerprintsAsync(ct);
+        var dtos = fingerprints.Select(PatientFingerprintDto.FromEntity).ToList();
+        return Result<IReadOnlyList<PatientFingerprintDto>>.Success(dtos);
+    }
+}
+
 // ==================== DTO ====================
 public record PatientPhotoDataDto(
     Guid Id,

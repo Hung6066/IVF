@@ -21,4 +21,5 @@ public interface IPatientBiometricsRepository
 
     // Fingerprint matching
     Task<IReadOnlyList<PatientFingerprint>> GetAllFingerprintsBySdkTypeAsync(FingerprintSdkType sdkType, CancellationToken ct = default);
+    Task<IReadOnlyList<PatientFingerprint>> GetAllFingerprintsAsync(CancellationToken ct = default);
 }

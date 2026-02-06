@@ -85,4 +85,11 @@ public class PatientBiometricsRepository : IPatientBiometricsRepository
             .Where(f => f.SdkType == sdkType)
             .ToListAsync(ct);
     }
+
+    public async Task<IReadOnlyList<PatientFingerprint>> GetAllFingerprintsAsync(CancellationToken ct = default)
+    {
+        return await _context.PatientFingerprints
+            .AsNoTracking() // Performance optimization for read-only
+            .ToListAsync(ct);
+    }
 }

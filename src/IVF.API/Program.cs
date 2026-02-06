@@ -100,6 +100,8 @@ builder.Services.AddRateLimiter(options =>
 
 builder.Services.AddSignalR();
 builder.Services.AddSingleton<IVF.API.Hubs.IQueueNotifier, IVF.API.Hubs.QueueNotifier>();
+builder.Services.AddSingleton<IVF.API.Services.BiometricMatcherService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<IVF.API.Services.BiometricMatcherService>());
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 

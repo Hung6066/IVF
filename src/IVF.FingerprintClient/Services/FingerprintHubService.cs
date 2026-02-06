@@ -14,6 +14,8 @@ public class FingerprintHubService : IAsyncDisposable
 
     public event EventHandler<CaptureRequestEventArgs>? CaptureRequested;
     public event EventHandler<VerificationRequestEventArgs>? VerificationRequested;
+    public event EventHandler<IdentificationRequestEventArgs>? IdentificationRequested;
+    public event EventHandler<IdentificationResultDto>? IdentificationResultReceived;
     public event EventHandler? CaptureCancelled;
     public event EventHandler<string>? StatusChanged;
     public event EventHandler<bool>? ConnectionChanged;
@@ -41,6 +43,39 @@ public class FingerprintHubService : IAsyncDisposable
         {
             StatusChanged?.Invoke(this, $"Lỗi gửi verification result: {ex.Message}");
             throw;
+        }
+
+    }
+
+    public async Task SendIdentificationResultAsync(IdentificationResultDto result)
+    {
+        if (_hubConnection is null || !IsConnected) return;
+
+        try
+        {
+            StatusChanged?.Invoke(this, $"Gửi kết quả định danh: match={result.Success}");
+            await _hubConnection.SendAsync("SendIdentificationResult", result);
+        }
+        catch (Exception ex)
+        {
+            StatusChanged?.Invoke(this, $"Lỗi gửi kết quả định danh: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Send features to server for matching (Server-Side Matching)
+    /// </summary>
+    public async Task IdentifyFingerprintAsync(string featureSetBase64, string? originalRequesterId)
+    {
+        if (_hubConnection is null || !IsConnected) return;
+        try
+        {
+            StatusChanged?.Invoke(this, "Gửi mẫu vân tay lên server...");
+            await _hubConnection.SendAsync("IdentifyFingerprint", featureSetBase64, originalRequesterId);
+        }
+        catch (Exception ex)
+        {
+           StatusChanged?.Invoke(this, $"Lỗi gửi mẫu vân tay: {ex.Message}");
         }
     }
 
@@ -269,12 +304,23 @@ public class FingerprintHubService : IAsyncDisposable
                 
                 VerificationRequested?.Invoke(this, new VerificationRequestEventArgs(dto));
             });
-// ... (lines 271-351 unchanged)
 
+            // Listen for identification requests
+            _hubConnection.On<IdentificationRequestDto>("IdentificationRequested", dto =>
+            {
+                StatusChanged?.Invoke(this, "Nhận yêu cầu định danh (1:N)");
+                IdentificationRequested?.Invoke(this, new IdentificationRequestEventArgs(dto));
+            });
 
-
-        // Listen for capture cancellation
-        _hubConnection.On<string>("CaptureCancelled", patientId =>
+            // Listen for identification results (Server-Side Matching Response)
+            _hubConnection.On<IdentificationResultDto>("IdentificationResult", dto =>
+            {
+                StatusChanged?.Invoke(this, $"Nhận kết quả định danh: {dto.Success}");
+                IdentificationResultReceived?.Invoke(this, dto);
+            });
+            
+            // Listen for capture cancellation
+            _hubConnection.On<string>("CaptureCancelled", patientId =>
         {
             if (patientId == _currentPatientId)
             {
@@ -358,8 +404,30 @@ public record VerificationResultDto
     public DateTime VerifiedAt { get; init; }
 }
 
-public class VerificationRequestEventArgs : EventArgs
-{
-    public VerificationRequestData Request { get; }
-    public VerificationRequestEventArgs(VerificationRequestDto dto) => Request = dto.Request;
-}
+    public class VerificationRequestEventArgs : EventArgs
+    {
+        public VerificationRequestData Request { get; }
+        public VerificationRequestEventArgs(VerificationRequestDto dto) => Request = dto.Request;
+    }
+
+    public class IdentificationRequestEventArgs : EventArgs
+    {
+        public IdentificationRequestDto Request { get; }
+        public IdentificationRequestEventArgs(IdentificationRequestDto dto) => Request = dto;
+    }
+
+    // ==================== IDENTIFICATION (1:N) ====================
+    
+    public record IdentificationRequestDto
+    {
+        public string RequestedBy { get; init; } = string.Empty;
+        public DateTime RequestedAt { get; init; }
+    }
+
+    public record IdentificationResultDto
+    {
+        public bool Success { get; init; }
+        public string? PatientId { get; init; }
+        public string? RequestedBy { get; init; }
+        public string? ErrorMessage { get; init; }
+    }

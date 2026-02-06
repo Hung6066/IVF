@@ -6,8 +6,9 @@ import { ReceptionService, CheckinRecord } from './reception.service';
 import { Patient } from '../../../core/models/api.models';
 import { CatalogService } from '../../../core/services/catalog.service';
 import { Observable, forkJoin } from 'rxjs';
-
+import { FingerprintHubService } from '../../../core/services/fingerprint/fingerprint-hub.service';
 import { GlobalNotificationService } from '../../../core/services/global-notification.service';
+import { AuthService } from '../../../core/services/auth.service';
 
 @Component({
   selector: 'app-reception-dashboard',
@@ -21,6 +22,8 @@ export class ReceptionDashboardComponent implements OnInit {
   private router = inject(Router);
   private catalogService = inject(CatalogService);
   private notificationService = inject(GlobalNotificationService);
+  private fingerprintService = inject(FingerprintHubService);
+  private authService = inject(AuthService);
 
   services = signal<any[]>([]);
 
@@ -50,6 +53,41 @@ export class ReceptionDashboardComponent implements OnInit {
   ngOnInit(): void {
     this.refreshQueue();
     this.loadServices();
+
+    // Subscribe to identification results
+    this.fingerprintService.identificationResult$.subscribe(result => {
+      if (result.success && result.patientId) {
+        this.notificationService.success('Định danh thành công', `Tìm thấy bệnh nhân: ${result.patientId}`);
+        this.router.navigate(['/patients', result.patientId]);
+      } else {
+        this.notificationService.error('Định danh thất bại', result.errorMessage || 'Không tìm thấy bệnh nhân');
+      }
+    });
+
+    const token = this.authService.getToken();
+    if (!this.fingerprintService.isConnectedState() && token) {
+      this.fingerprintService.connect(token);
+    }
+  }
+
+  async scanFingerprint() {
+    if (!this.fingerprintService.isConnectedState()) {
+      const token = this.authService.getToken();
+      if (!token) {
+        this.notificationService.error('Lỗi', 'Chưa đăng nhập hệ thống. Vui lòng đăng nhập lại.');
+        return;
+      }
+
+      const success = await this.fingerprintService.connect(token);
+      if (!success) {
+        this.notificationService.error('Lỗi', 'Không thể kết nối đến máy chủ vân tay. Vui lòng thử lại.');
+        return;
+      }
+    }
+
+    this.fingerprintService.requestIdentification().catch(err => {
+      this.notificationService.error('Lỗi', 'Không thể gửi yêu cầu: ' + err.message);
+    });
   }
 
   loadServices() {

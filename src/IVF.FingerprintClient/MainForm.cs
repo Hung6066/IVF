@@ -17,6 +17,8 @@ public partial class MainForm : Form
     private CaptureRequestDto? _currentRequest;
     private CaptureForm? _captureForm;
     private VerificationForm? _verificationForm;
+    private TemplateCacheService? _cacheService;
+    private IdentificationForm? _identificationForm;
 
     public MainForm()
     {
@@ -27,6 +29,9 @@ public partial class MainForm : Form
     private async void MainForm_Load(object sender, EventArgs e)
     {
         _hubService = new FingerprintHubService(_settings.HubUrl);
+        // Extract base URL from Hub URL (approximate)
+        var apiBaseUrl = _settings.HubUrl.Replace("/hubs/fingerprint", "");
+        _cacheService = new TemplateCacheService(apiBaseUrl, _settings.ApiKey);
         
         // Subscribe to hub events
         _hubService.StatusChanged += HubService_StatusChanged;
@@ -34,12 +39,26 @@ public partial class MainForm : Form
         _hubService.CaptureRequested += HubService_CaptureRequested;
         _hubService.CaptureRequested += HubService_CaptureRequested;
         _hubService.VerificationRequested += HubService_VerificationRequested;
+        _hubService.IdentificationRequested += HubService_IdentificationRequested;
         _hubService.CaptureCancelled += HubService_CaptureCancelled;
 
         // Auto-connect if configured
         if (_settings.AutoConnect)
         {
             await ConnectToHub();
+            // Start cache refresh in background
+            _ = Task.Run(async () => {
+                try 
+                {
+                    Invoke(() => UpdateStatus("Đang tải CSDL vân tay...", Color.Orange));
+                    await _cacheService.RefreshCacheAsync();
+                    Invoke(() => UpdateStatus($"Đã tải {_cacheService.TemplateCount} mẫu vân tay", Color.Green));
+                }
+                catch 
+                {
+                   // Invoke(() => UpdateStatus("Lỗi tải CSDL vân tay", Color.Red));
+                }
+            });
         }
 
         // Minimize to tray on startup if configured
@@ -50,6 +69,51 @@ public partial class MainForm : Form
                 "Ứng dụng đang chạy nền, chờ yêu cầu từ hệ thống", ToolTipIcon.Info);
         }
     }
+// ...
+    private void HubService_IdentificationRequested(object? sender, IdentificationRequestEventArgs e)
+    {
+        Invoke(() =>
+        {
+            notifyIcon.ShowBalloonTip(3000, "Yêu cầu định danh (1:N)",
+                "Đang mở form định danh...",
+                ToolTipIcon.Info);
+
+            OpenIdentificationForm(e.Request);
+
+            if (!Visible)
+            {
+                Show();
+                WindowState = FormWindowState.Normal;
+            }
+            BringToFront();
+            FlashWindow();
+        });
+    }
+
+    private void OpenIdentificationForm(IdentificationRequestDto request)
+    {
+        if (_identificationForm != null && !_identificationForm.IsDisposed)
+        {
+            _identificationForm.BringToFront();
+            return;
+        }
+        
+        if (_cacheService == null || !_cacheService.IsLoaded)
+        {
+            MessageBox.Show("Chưa tải cơ sở dữ liệu vân tay. Vui lòng chờ.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        lblPatientInfo.Text = "Đang định danh bệnh nhân...";
+        Text = "IVF Fingerprint Client - Identification";
+
+        _identificationForm = new IdentificationForm(_hubService!, _cacheService, request);
+        _identificationForm.FormClosed += (s, args) => _identificationForm = null;
+
+        _identificationForm.Show();
+        _identificationForm.BringToFront();
+    }
+// ...
 
     private async void MainForm_FormClosing(object sender, FormClosingEventArgs e)
     {
