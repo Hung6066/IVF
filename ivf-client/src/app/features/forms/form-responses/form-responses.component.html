@@ -1,0 +1,200 @@
+<div class="responses-container">
+    <header class="page-header">
+        <div class="header-content">
+            <h1>📊 Phản hồi biểu mẫu</h1>
+            <p>Xem và quản lý tất cả các phản hồi đã gửi</p>
+        </div>
+        <div class="header-actions">
+            <button class="btn btn-secondary" (click)="exportCSV()">📥 Xuất CSV</button>
+        </div>
+    </header>
+
+    <!-- Filters -->
+    <div class="filters-bar">
+        <div class="filter-group">
+            <label>Biểu mẫu:</label>
+            <select [(ngModel)]="filterTemplateId" (change)="onTemplateChange()">
+                <option value="">Tất cả</option>
+                @for (t of templates; track t.id) {
+                <option [value]="t.id">{{ t.name }}</option>
+                }
+            </select>
+        </div>
+        <div class="filter-group">
+            <label>Từ ngày:</label>
+            <input type="date" [(ngModel)]="filterFrom" (change)="loadResponses()">
+        </div>
+        <div class="filter-group">
+            <label>Đến ngày:</label>
+            <input type="date" [(ngModel)]="filterTo" (change)="loadResponses()">
+        </div>
+        <div class="filter-group">
+            <label>Trạng thái:</label>
+            <select [(ngModel)]="filterStatus" (change)="loadResponses()">
+                <option value="">Tất cả</option>
+                <option value="1">Bản nháp</option>
+                <option value="2">Đã gửi</option>
+                <option value="3">Đã xem</option>
+                <option value="4">Đã duyệt</option>
+                <option value="5">Từ chối</option>
+            </select>
+        </div>
+        <div class="filter-group view-toggle">
+            <button class="toggle-btn" [class.active]="viewMode === 'table'" (click)="viewMode = 'table'">
+                📋 Bảng
+            </button>
+            <button class="toggle-btn" [class.active]="viewMode === 'grid'" (click)="viewMode = 'grid'">
+                📦 Thẻ
+            </button>
+        </div>
+    </div>
+
+    <!-- Summary Stats -->
+    @if (filterTemplateId && selectedTemplate) {
+    <div class="stats-row">
+        <div class="stat-card">
+            <span class="stat-value">{{ totalResponses }}</span>
+            <span class="stat-label">Tổng phản hồi</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-value">{{ getStatusCount(ResponseStatus.Submitted) }}</span>
+            <span class="stat-label">Chờ duyệt</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-value">{{ getStatusCount(ResponseStatus.Approved) }}</span>
+            <span class="stat-label">Đã duyệt</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-value">{{ selectedTemplate.fields?.length || 0 }}</span>
+            <span class="stat-label">Số trường</span>
+        </div>
+    </div>
+    }
+
+    <!-- Multi-column Table View -->
+    @if (viewMode === 'table') {
+    <div class="responses-table-wrapper">
+        <table class="responses-table">
+            <thead>
+                <tr>
+                    <th class="sticky-col">STT</th>
+                    <th class="sticky-col">Trạng thái</th>
+                    @if (!filterTemplateId) {
+                    <th>Biểu mẫu</th>
+                    }
+                    <th>Bệnh nhân</th>
+                    <!-- Dynamic field columns -->
+                    @if (selectedTemplate?.fields) {
+                    @for (field of selectedTemplate!.fields!; track field.id) {
+                    <th [style.min-width.px]="getColumnWidth(field)">{{ field.label }}</th>
+                    }
+                    }
+                    <th>Ngày gửi</th>
+                    <th class="sticky-col-right">Thao tác</th>
+                </tr>
+            </thead>
+            <tbody>
+                @for (response of responses; track response.id; let i = $index) {
+                <tr [class.even]="i % 2 === 0">
+                    <td class="sticky-col">{{ (currentPage - 1) * pageSize + i + 1 }}</td>
+                    <td class="sticky-col">
+                        <span class="status-badge" [class]="getStatusClass(response.status)">
+                            {{ getStatusLabel(response.status) }}
+                        </span>
+                    </td>
+                    @if (!filterTemplateId) {
+                    <td>{{ response.formTemplateName }}</td>
+                    }
+                    <td>{{ response.patientName || 'N/A' }}</td>
+                    <!-- Dynamic field values -->
+                    @if (selectedTemplate?.fields) {
+                    @for (field of selectedTemplate!.fields!; track field.id) {
+                    <td>{{ getFieldValue(response, field) }}</td>
+                    }
+                    }
+                    <td>{{ response.submittedAt ? (response.submittedAt | date:'dd/MM/yyyy HH:mm') : '-' }}</td>
+                    <td class="sticky-col-right">
+                        <div class="actions">
+                            <a [routerLink]="['/forms/responses', response.id]" class="btn-icon" title="Xem">👁️</a>
+                            @if (response.status === ResponseStatus.Submitted) {
+                            <button class="btn-icon success" title="Duyệt" (click)="approve(response)">✅</button>
+                            <button class="btn-icon danger" title="Từ chối" (click)="reject(response)">❌</button>
+                            }
+                        </div>
+                    </td>
+                </tr>
+                }
+
+                @if (responses.length === 0) {
+                <tr>
+                    <td [attr.colspan]="getColumnCount()" class="empty-row">
+                        <div class="empty-state">
+                            <span class="icon">📭</span>
+                            <p>Chưa có phản hồi nào</p>
+                        </div>
+                    </td>
+                </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    }
+
+    <!-- Grid/Card View -->
+    @if (viewMode === 'grid') {
+    <div class="responses-grid">
+        @for (response of responses; track response.id) {
+        <div class="response-card" [class]="getStatusClass(response.status)">
+            <div class="card-header">
+                <span class="status-badge" [class]="getStatusClass(response.status)">
+                    {{ getStatusLabel(response.status) }}
+                </span>
+                <span class="date">{{ response.submittedAt | date:'dd/MM/yyyy' }}</span>
+            </div>
+            <h3>{{ response.formTemplateName }}</h3>
+            @if (response.patientName) {
+            <p class="patient">👤 {{ response.patientName }}</p>
+            }
+
+            <div class="field-values">
+                @if (response.fieldValues) {
+                @for (fv of response.fieldValues.slice(0, 4); track fv.formFieldId) {
+                <div class="field-value-row">
+                    <span class="label">{{ fv.fieldLabel }}:</span>
+                    <span class="value">{{ getDisplayValue(fv) }}</span>
+                </div>
+                }
+                @if (response.fieldValues.length > 4) {
+                <div class="more-fields">+{{ response.fieldValues.length - 4 }} trường khác</div>
+                }
+                }
+            </div>
+
+            <div class="card-footer">
+                <a [routerLink]="['/forms/responses', response.id]" class="btn btn-sm">Xem chi tiết</a>
+                @if (response.status === ResponseStatus.Submitted) {
+                <button class="btn btn-sm btn-success" (click)="approve(response)">Duyệt</button>
+                }
+            </div>
+        </div>
+        }
+    </div>
+
+    @if (responses.length === 0) {
+    <div class="empty-state-centered">
+        <span class="icon">📭</span>
+        <h3>Chưa có phản hồi nào</h3>
+        <p>Các phản hồi sẽ xuất hiện ở đây khi người dùng gửi biểu mẫu</p>
+    </div>
+    }
+    }
+
+    <!-- Pagination -->
+    @if (totalResponses > pageSize) {
+    <div class="pagination">
+        <button (click)="prevPage()" [disabled]="currentPage === 1">← Trước</button>
+        <span>Trang {{ currentPage }} / {{ totalPages }} ({{ totalResponses }} phản hồi)</span>
+        <button (click)="nextPage()" [disabled]="currentPage >= totalPages">Sau →</button>
+    </div>
+    }
+</div>

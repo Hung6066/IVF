@@ -1,0 +1,268 @@
+<div class="form-builder-container">
+    <!-- Header -->
+    <header class="builder-header">
+        <div class="header-left">
+            <button class="back-btn" (click)="goBack()">← Quay lại</button>
+            <input type="text" class="form-name-input" [(ngModel)]="formName" placeholder="Tên biểu mẫu..."
+                (blur)="saveFormSettings()">
+        </div>
+        <div class="header-right">
+            <button class="btn btn-secondary" (click)="preview()">👁️ Xem trước</button>
+            @if (templateId && !template?.isPublished) {
+            <button class="btn btn-success" (click)="publish()">📤 Xuất bản</button>
+            }
+            <button class="btn btn-primary" (click)="save()">💾 Lưu</button>
+        </div>
+    </header>
+
+    <div class="builder-content">
+        <!-- Field Palette -->
+        <aside class="field-palette">
+            <h3>Các loại trường</h3>
+            <div class="field-types">
+                @for (fieldType of fieldTypes; track fieldType.type) {
+                <button class="field-type-btn" draggable="true" (dragstart)="onDragStart($event, fieldType.type)"
+                    (click)="addField(fieldType.type)">
+                    <span class="field-icon">{{ fieldType.icon }}</span>
+                    <span>{{ fieldType.label }}</span>
+                </button>
+                }
+            </div>
+
+            <div class="palette-section">
+                <h4>Cài đặt biểu mẫu</h4>
+                <div class="form-group">
+                    <label>Danh mục</label>
+                    <select [(ngModel)]="selectedCategoryId" (change)="saveFormSettings()">
+                        @for (cat of categories; track cat.id) {
+                        <option [value]="cat.id">{{ cat.name }}</option>
+                        }
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Mô tả</label>
+                    <textarea [(ngModel)]="formDescription" placeholder="Mô tả biểu mẫu..."
+                        (blur)="saveFormSettings()"></textarea>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Form Canvas -->
+        <main class="form-canvas">
+            <div class="canvas-header">
+                <h2>{{ formName || 'Biểu mẫu mới' }}</h2>
+                <p>{{ formDescription || 'Kéo thả các trường từ bên trái để xây dựng biểu mẫu' }}</p>
+            </div>
+
+            <div class="fields-container grid-layout" cdkDropList (cdkDropListDropped)="onDropField($event)"
+                (dragover)="onDragOver($event)" (drop)="onDrop($event)">
+
+                @if (fields.length === 0) {
+                <div class="empty-canvas">
+                    <div class="drop-zone">
+                        <span class="drop-icon">📥</span>
+                        <p>Kéo trường vào đây hoặc click vào loại trường bên trái</p>
+                    </div>
+                </div>
+                }
+
+                @for (field of fields; track field.id || field.fieldKey; let i = $index) {
+                <div class="field-item" cdkDrag [style.grid-column]="'span ' + getFieldColSpan(field)"
+                    [class.selected]="selectedField?.id === field.id || selectedField?.fieldKey === field.fieldKey"
+                    [class.col-1]="getFieldColSpan(field) === 1" [class.col-2]="getFieldColSpan(field) === 2"
+                    [class.col-3]="getFieldColSpan(field) === 3" [class.col-4]="getFieldColSpan(field) === 4"
+                    (click)="selectField(field)">
+                    <div class="field-header">
+                        <div class="drag-handle" cdkDragHandle>⋮⋮</div>
+                        <span class="col-indicator" title="Chiều rộng cột">{{ getFieldColSpan(field) }}/4</span>
+                        <button class="delete-btn" (click)="deleteField(field, $event)">🗑️</button>
+                    </div>
+                    <div class="field-preview">
+                        <label>
+                            {{ field.label }}
+                            @if (field.isRequired) {
+                            <span class="required">*</span>
+                            }
+                        </label>
+                        @switch (field.fieldType) {
+                        @case (FieldType.Text) {
+                        <input type="text" [placeholder]="field.placeholder || ''"
+                            [style.height]="getFieldHeight(field)" disabled>
+                        }
+                        @case (FieldType.TextArea) {
+                        <textarea [placeholder]="field.placeholder || ''" [style.height]="getFieldHeight(field)"
+                            disabled></textarea>
+                        }
+                        @case (FieldType.Number) {
+                        <input type="number" [placeholder]="field.placeholder || ''" disabled>
+                        }
+                        @case (FieldType.Date) {
+                        <input type="date" disabled>
+                        }
+                        @case (FieldType.Dropdown) {
+                        <select disabled>
+                            <option>-- Chọn --</option>
+                        </select>
+                        }
+                        @case (FieldType.Radio) {
+                        <div class="radio-preview">
+                            @for (opt of getOptions(field); track opt.value) {
+                            <label><input type="radio" disabled> {{ opt.label }}</label>
+                            }
+                        </div>
+                        }
+                        @case (FieldType.Checkbox) {
+                        <label class="checkbox-preview">
+                            <input type="checkbox" disabled>
+                            <span>{{ field.placeholder || 'Checkbox' }}</span>
+                        </label>
+                        }
+                        @case (FieldType.Rating) {
+                        <div class="rating-preview">⭐⭐⭐⭐⭐</div>
+                        }
+                        @case (FieldType.Section) {
+                        <hr class="section-divider">
+                        }
+                        @default {
+                        <input type="text" disabled [placeholder]="getFieldTypeLabel(field.fieldType)">
+                        }
+                        }
+                        @if (field.helpText) {
+                        <small class="help-text">{{ field.helpText }}</small>
+                        }
+                    </div>
+                </div>
+                }
+            </div>
+        </main>
+
+        <!-- Field Properties Panel -->
+        @if (selectedField) {
+        <aside class="properties-panel">
+            <div class="panel-header">
+                <h3>Thuộc tính trường</h3>
+                <button class="close-btn" (click)="selectedField = null">✕</button>
+            </div>
+
+            <div class="panel-body">
+                <div class="form-group">
+                    <label>Nhãn</label>
+                    <input type="text" [(ngModel)]="selectedField.label" (blur)="updateField()">
+                </div>
+
+                <div class="form-group">
+                    <label>Key (định danh)</label>
+                    <input type="text" [(ngModel)]="selectedField.fieldKey" (blur)="updateField()">
+                </div>
+
+                <div class="form-group">
+                    <label>Placeholder</label>
+                    <input type="text" [(ngModel)]="selectedField.placeholder" (blur)="updateField()">
+                </div>
+
+                <div class="form-group">
+                    <label>Gợi ý</label>
+                    <input type="text" [(ngModel)]="selectedField.helpText" (blur)="updateField()">
+                </div>
+
+                <div class="form-group">
+                    <label>Giá trị mặc định</label>
+                    <input type="text" [(ngModel)]="selectedField.defaultValue" (blur)="updateField()">
+                </div>
+
+                <div class="form-group checkbox-group">
+                    <label>
+                        <input type="checkbox" [(ngModel)]="selectedField.isRequired" (change)="updateField()">
+                        Bắt buộc
+                    </label>
+                </div>
+
+                @if (hasOptions(selectedField.fieldType)) {
+                <div class="form-group">
+                    <label>Các lựa chọn</label>
+                    <textarea [ngModel]="getOptionsText(selectedField)"
+                        (blur)="setOptionsFromText($event, selectedField)"
+                        placeholder="Mỗi dòng một lựa chọn"></textarea>
+                    <small>Mỗi dòng một lựa chọn (value|label)</small>
+                </div>
+                }
+
+                <!-- Concept Mapping Section -->
+                <div class="section-divider">
+                    <span>🔗 Liên kết thuật ngữ</span>
+                </div>
+
+                <div class="form-group">
+                    <label>Medical Concept</label>
+
+                    @if (selectedField.id && getLinkedConcept(selectedField.id)) {
+                    <div class="linked-concept-display">
+                        <div class="concept-info">
+                            <span class="concept-code">
+                                {{ getLinkedConcept(selectedField.id)!.code }}
+                            </span>
+                            <span class="concept-name">
+                                {{ getLinkedConcept(selectedField.id)!.display }}
+                            </span>
+                        </div>
+
+                        @for (mapping of getLinkedConcept(selectedField.id)!.mappings; track mapping.id) {
+                        @if (mapping.targetSystem === 'SNOMED CT') {
+                        <div class="snomed-badge">
+                            SNOMED: {{ mapping.targetCode }}
+                        </div>
+                        }
+                        }
+
+                        <button class="unlink-btn"
+                            (click)="selectedFieldForConcept=selectedField; showConceptPicker=true" type="button">
+                            🔄 Change Concept
+                        </button>
+                    </div>
+                    } @else {
+                    <button class="link-concept-btn" (click)="openConceptPicker(selectedField!)" type="button">
+                        🔗 Link to Medical Concept
+                    </button>
+                    }
+                </div>
+
+                <div class="section-divider">
+                    <span>📐 Bố cục</span>
+                </div>
+
+                <div class="layout-controls">
+                    <div class="form-group">
+                        <label>Chiều rộng</label>
+                        <div class="width-buttons">
+                            <button type="button" [class.active]="selectedFieldColSpan === '1'"
+                                (click)="setColSpan('1')" title="25%">¼</button>
+                            <button type="button" [class.active]="selectedFieldColSpan === '2'"
+                                (click)="setColSpan('2')" title="50%">½</button>
+                            <button type="button" [class.active]="selectedFieldColSpan === '3'"
+                                (click)="setColSpan('3')" title="75%">¾</button>
+                            <button type="button" [class.active]="selectedFieldColSpan === '4'"
+                                (click)="setColSpan('4')" title="100%">1</button>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Chiều cao</label>
+                        <select [(ngModel)]="selectedFieldHeight" (change)="updateFieldLayout()">
+                            <option value="auto">Tự động</option>
+                            <option value="small">Nhỏ (60px)</option>
+                            <option value="medium">Vừa (100px)</option>
+                            <option value="large">Lớn (150px)</option>
+                            <option value="xlarge">Rất lớn (200px)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </aside>
+        }
+    </div>
+
+    <!-- Concept Picker Modal -->
+    <app-concept-picker [isOpen]="showConceptPicker" [fieldId]="selectedFieldForConcept?.id"
+        (conceptLinked)="onConceptLinked($event)" (closed)="showConceptPicker = false">
+    </app-concept-picker>
+</div>

@@ -21,9 +21,14 @@ public class FormField : BaseEntity
     public string? HelpText { get; private set; }
     public string? ConditionalLogicJson { get; private set; }
 
+    // Link to medical concept
+    public Guid? ConceptId { get; private set; }
+
     // Navigation
     public FormTemplate FormTemplate { get; private set; } = null!;
+    public Concept? Concept { get; private set; }
     public ICollection<FormFieldValue> FieldValues { get; private set; } = new List<FormFieldValue>();
+    public ICollection<FormFieldOption> Options { get; private set; } = new List<FormFieldOption>();
 
     private FormField() { }
 
@@ -89,5 +94,45 @@ public class FormField : BaseEntity
     {
         DisplayOrder = displayOrder;
         SetUpdated();
+    }
+
+    /// <summary>
+    /// Link this field to a medical concept from your concept library
+    /// </summary>
+    public void LinkToConcept(Guid conceptId)
+    {
+        ConceptId = conceptId;
+        SetUpdated();
+    }
+
+    /// <summary>
+    /// Remove concept mapping from this field
+    /// </summary>
+    public void UnlinkConcept()
+    {
+        ConceptId = null;
+        SetUpdated();
+    }
+
+    /// <summary>
+    /// Add an option to this field (for dropdown/radio/checkbox types)
+    /// </summary>
+    public FormFieldOption AddOption(
+        string value,
+        string label,
+        int displayOrder,
+        Guid? conceptId = null)
+    {
+        var option = FormFieldOption.Create(
+            this.Id,
+            value,
+            label,
+            displayOrder,
+            conceptId
+        );
+        
+        Options.Add(option);
+        SetUpdated();
+        return option;
     }
 }

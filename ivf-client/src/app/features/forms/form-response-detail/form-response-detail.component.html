@@ -1,0 +1,52 @@
+<div class="response-detail-container">
+    @if (response && template) {
+    <header class="detail-header">
+        <div class="header-info">
+            <a routerLink="/forms/responses" class="back-link">← Quay lại</a>
+            <h1>{{ response.formTemplateName }}</h1>
+            <div class="meta-info">
+                <span class="status-badge" [class]="getStatusClass(response.status)">
+                    {{ getStatusLabel(response.status) }}
+                </span>
+                <span>📅 Gửi: {{ response.submittedAt | date:'dd/MM/yyyy HH:mm' }}</span>
+                @if (response.patientName) {
+                <span>👤 {{ response.patientName }}</span>
+                }
+            </div>
+        </div>
+        <div class="header-actions">
+            <button class="btn btn-secondary" (click)="print()">🖨️ In</button>
+        </div>
+    </header>
+
+    <div class="response-content">
+        <div class="form-preview-card">
+            <h2>Nội dung phản hồi</h2>
+            <div class="values-grid">
+                @for (field of template.fields; track field.id) {
+                <div class="value-item" [style.grid-column]="'span ' + getFieldColSpan(field)"
+                    [class.col-1]="getFieldColSpan(field) === 1" [class.col-2]="getFieldColSpan(field) === 2"
+                    [class.col-3]="getFieldColSpan(field) === 3" [class.col-4]="getFieldColSpan(field) === 4">
+                    <label>
+                        {{ field.label }}
+                        @if (field.isRequired) {
+                        <span class="required">*</span>
+                        }
+                    </label>
+                    <div class="value">{{ getFieldDisplayValue(field) }}</div>
+                </div>
+                }
+
+                @if (!template.fields?.length) {
+                <p class="no-data">Không có trường nào</p>
+                }
+            </div>
+        </div>
+    </div>
+    } @else {
+    <div class="loading">
+        <div class="spinner"></div>
+        <p>Đang tải...</p>
+    </div>
+    }
+</div>

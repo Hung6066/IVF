@@ -167,6 +167,9 @@ public static class DatabaseSeeder
 
             await context.SaveChangesAsync();
 
+            // Seed Concepts
+            await IVF.Infrastructure.Seeding.ConceptSeeder.SeedConceptsAsync(serviceProvider);
+
             Console.WriteLine("[Seeder] Database seed completed successfully!");
         }
         catch (Exception ex)

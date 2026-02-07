@@ -10,6 +10,7 @@ import { LabQueueComponent } from './components/lab-queue/lab-queue.component';
 import { LabEmbryosComponent } from './components/lab-embryos/lab-embryos.component';
 import { LabScheduleComponent } from './components/lab-schedule/lab-schedule.component';
 import { LabCryoComponent } from './components/lab-cryo/lab-cryo.component';
+import { QuickFormsWidgetComponent } from '../../forms/quick-forms-widget/quick-forms-widget.component';
 
 @Component({
   selector: 'app-lab-dashboard',
@@ -21,7 +22,8 @@ import { LabCryoComponent } from './components/lab-cryo/lab-cryo.component';
     LabQueueComponent,
     LabEmbryosComponent,
     LabScheduleComponent,
-    LabCryoComponent
+    LabCryoComponent,
+    QuickFormsWidgetComponent
   ],
   templateUrl: './lab-dashboard.component.html',
   styleUrls: ['./lab-dashboard.component.scss']

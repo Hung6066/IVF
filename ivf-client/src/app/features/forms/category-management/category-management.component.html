@@ -1,0 +1,85 @@
+<div class="category-management">
+    <header class="page-header">
+        <div class="header-content">
+            <h1>📁 Quản lý Danh mục</h1>
+            <p>Tạo và quản lý danh mục biểu mẫu</p>
+        </div>
+        <button class="btn btn-primary" (click)="openModal()">
+            ➕ Thêm danh mục
+        </button>
+    </header>
+
+    <div class="categories-grid">
+        @for (cat of categories; track cat.id) {
+        <div class="category-card" [class.inactive]="!cat.isActive">
+            <div class="card-header">
+                <span class="icon">{{ cat.iconName || '📁' }}</span>
+                <div class="card-actions">
+                    <button class="btn-icon" (click)="edit(cat)" title="Sửa">✏️</button>
+                    <button class="btn-icon danger" (click)="delete(cat)" title="Xóa">🗑️</button>
+                </div>
+            </div>
+            <h3>{{ cat.name }}</h3>
+            <p class="description">{{ cat.description || 'Không có mô tả' }}</p>
+            <div class="card-footer">
+                <span class="template-count">{{ cat.templateCount || 0 }} biểu mẫu</span>
+                <span class="status" [class.active]="cat.isActive">
+                    {{ cat.isActive ? '✅ Hoạt động' : '⏸️ Tạm dừng' }}
+                </span>
+            </div>
+        </div>
+        }
+
+        @if (categories.length === 0) {
+        <div class="empty-state">
+            <span class="empty-icon">📂</span>
+            <h3>Chưa có danh mục nào</h3>
+            <p>Tạo danh mục đầu tiên để tổ chức biểu mẫu</p>
+            <button class="btn btn-primary" (click)="openModal()">Tạo danh mục</button>
+        </div>
+        }
+    </div>
+
+    <!-- Modal -->
+    @if (showModal) {
+    <div class="modal-overlay" (click)="closeModal()">
+        <div class="modal" (click)="$event.stopPropagation()">
+            <div class="modal-header">
+                <h3>{{ editingCategory ? 'Sửa danh mục' : 'Thêm danh mục mới' }}</h3>
+                <button class="close-btn" (click)="closeModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Tên danh mục *</label>
+                    <input type="text" [(ngModel)]="formData.name" placeholder="VD: Phòng Xét nghiệm">
+                </div>
+                <div class="form-group">
+                    <label>Mô tả</label>
+                    <textarea [(ngModel)]="formData.description" placeholder="Mô tả danh mục..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Icon (emoji)</label>
+                    <div class="icon-picker">
+                        @for (icon of commonIcons; track icon) {
+                        <button type="button" class="icon-option" [class.selected]="formData.iconName === icon"
+                            (click)="formData.iconName = icon">
+                            {{ icon }}
+                        </button>
+                        }
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Thứ tự hiển thị</label>
+                    <input type="number" [(ngModel)]="formData.displayOrder" min="0">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" (click)="closeModal()">Hủy</button>
+                <button class="btn btn-primary" (click)="save()" [disabled]="!formData.name">
+                    {{ editingCategory ? 'Cập nhật' : 'Tạo mới' }}
+                </button>
+            </div>
+        </div>
+    </div>
+    }
+</div>

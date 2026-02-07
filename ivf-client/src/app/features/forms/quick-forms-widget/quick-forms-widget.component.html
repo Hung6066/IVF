@@ -1,0 +1,34 @@
+<div class="quick-forms-widget">
+    <div class="widget-header">
+        <h3>📋 {{ title }}</h3>
+        @if (showViewAll) {
+        <button class="link-btn" (click)="viewAllForms()">Xem tất cả →</button>
+        }
+    </div>
+
+    @if (loading) {
+    <div class="loading">
+        <div class="spinner"></div>
+        <p>Đang tải...</p>
+    </div>
+    } @else if (filteredForms.length === 0) {
+    <div class="empty-state">
+        <p>Không có biểu mẫu nào</p>
+    </div>
+    } @else {
+    <div class="forms-grid">
+        @for (form of filteredForms; track form.id) {
+        <div class="form-card" (click)="openForm(form)">
+            <div class="form-icon">{{ getFormIcon(form) }}</div>
+            <div class="form-info">
+                <h4>{{ form.name }}</h4>
+                @if (form.description) {
+                <p>{{ form.description }}</p>
+                }
+            </div>
+            <div class="form-action">→</div>
+        </div>
+        }
+    </div>
+    }
+</div>

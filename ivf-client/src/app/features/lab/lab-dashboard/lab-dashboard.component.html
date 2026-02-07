@@ -17,6 +17,9 @@
             <button class="tab-btn" [class.active]="activeTab === 'report'" (click)="setActiveTab('report')">
                 📊 Báo cáo phôi
             </button>
+            <button class="tab-btn" [class.active]="activeTab === 'forms'" (click)="setActiveTab('forms')">
+                📋 Biểu mẫu
+            </button>
         </div>
     </header>
 
@@ -138,5 +141,12 @@
             </table>
         </div>
     </section>
+    }
+
+    @if (activeTab === 'forms') {
+    <app-quick-forms-widget
+    title="Biểu mẫu Lab"
+    [maxForms]="12">
+    </app-quick-forms-widget>
     }
 </div>

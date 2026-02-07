@@ -201,6 +201,7 @@ app.MapServiceCatalogEndpoints();
 app.MapSeedEndpoints();
 app.MapLabEndpoints();
 app.MapFormEndpoints();
+app.MapConceptEndpoints();
 
 // Auto-migrate and seed in dev
 if (app.Environment.IsDevelopment())

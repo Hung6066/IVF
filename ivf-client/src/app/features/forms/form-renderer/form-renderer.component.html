@@ -1,0 +1,139 @@
+<div class="form-renderer-container">
+    @if (template) {
+    <div class="form-card">
+        <div class="form-header">
+            <h1>{{ template.name }}</h1>
+            @if (template.description) {
+            <p class="description">{{ template.description }}</p>
+            }
+        </div>
+
+        <form [formGroup]="form" (ngSubmit)="submit()">
+            <div class="form-fields-grid">
+                @for (field of fields; track field.id) {
+                <div class="field-wrapper" [class.has-error]="hasError(field.fieldKey)"
+                    [style.grid-column]="'span ' + getFieldColSpan(field)">
+                    @if (field.fieldType !== FieldType.Section && field.fieldType !== FieldType.Label) {
+                    <label class="field-label">
+                        {{ field.label }}
+                        @if (field.isRequired) {
+                        <span class="required">*</span>
+                        }
+                    </label>
+                    }
+
+                    @switch (field.fieldType) {
+                    @case (FieldType.Text) {
+                    <input type="text" [formControlName]="field.fieldKey" [placeholder]="field.placeholder || ''"
+                        [style.height]="getFieldHeight(field)" class="form-input">
+                    }
+                    @case (FieldType.TextArea) {
+                    <textarea [formControlName]="field.fieldKey" [placeholder]="field.placeholder || ''"
+                        [style.height]="getFieldHeight(field)" [style.min-height]="getFieldHeight(field)"
+                        class="form-textarea"></textarea>
+                    }
+                    @case (FieldType.Number) {
+                    <input type="number" [formControlName]="field.fieldKey" [placeholder]="field.placeholder || ''"
+                        class="form-input">
+                    }
+                    @case (FieldType.Decimal) {
+                    <input type="number" step="0.01" [formControlName]="field.fieldKey"
+                        [placeholder]="field.placeholder || ''" class="form-input">
+                    }
+                    @case (FieldType.Date) {
+                    <input type="date" [formControlName]="field.fieldKey" class="form-input">
+                    }
+                    @case (FieldType.DateTime) {
+                    <input type="datetime-local" [formControlName]="field.fieldKey" class="form-input">
+                    }
+                    @case (FieldType.Time) {
+                    <input type="time" [formControlName]="field.fieldKey" class="form-input">
+                    }
+                    @case (FieldType.Dropdown) {
+                    <select [formControlName]="field.fieldKey" class="form-select">
+                        <option value="">-- Chọn --</option>
+                        @for (opt of getOptions(field); track opt.value) {
+                        <option [value]="opt.value">{{ opt.label }}</option>
+                        }
+                    </select>
+                    }
+                    @case (FieldType.MultiSelect) {
+                    <select [formControlName]="field.fieldKey" class="form-select" multiple>
+                        @for (opt of getOptions(field); track opt.value) {
+                        <option [value]="opt.value">{{ opt.label }}</option>
+                        }
+                    </select>
+                    }
+                    @case (FieldType.Radio) {
+                    <div class="radio-group">
+                        @for (opt of getOptions(field); track opt.value) {
+                        <label class="radio-option">
+                            <input type="radio" [formControlName]="field.fieldKey" [value]="opt.value">
+                            <span>{{ opt.label }}</span>
+                        </label>
+                        }
+                    </div>
+                    }
+                    @case (FieldType.Checkbox) {
+                    <label class="checkbox-option">
+                        <input type="checkbox" [formControlName]="field.fieldKey">
+                        <span>{{ field.placeholder || field.label }}</span>
+                    </label>
+                    }
+                    @case (FieldType.Rating) {
+                    <div class="rating-input">
+                        @for (star of [1,2,3,4,5]; track star) {
+                        <button type="button" class="star-btn" [class.active]="form.get(field.fieldKey)?.value >= star"
+                            (click)="setRating(field.fieldKey, star)">
+                            ⭐
+                        </button>
+                        }
+                    </div>
+                    }
+                    @case (FieldType.Section) {
+                    <div class="section-header">
+                        <h3>{{ field.label }}</h3>
+                        @if (field.helpText) {
+                        <p>{{ field.helpText }}</p>
+                        }
+                    </div>
+                    }
+                    @case (FieldType.Label) {
+                    <div class="label-field">
+                        <p>{{ field.label }}</p>
+                    </div>
+                    }
+                    @case (FieldType.FileUpload) {
+                    <input type="file" (change)="onFileChange($event, field.fieldKey)" class="form-file">
+                    }
+                    }
+
+                    @if (field.helpText && field.fieldType !== FieldType.Section) {
+                    <small class="help-text">{{ field.helpText }}</small>
+                    }
+
+                    @if (hasError(field.fieldKey)) {
+                    <small class="error-text">Trường này là bắt buộc</small>
+                    }
+                </div>
+                }
+            </div>
+
+            <div class="form-actions">
+                <button type="button" class="btn btn-secondary" (click)="cancel()">Hủy</button>
+                <button type="submit" class="btn btn-primary" [disabled]="isSubmitting">
+                    @if (isSubmitting) {
+                    <span class="spinner"></span>
+                    }
+                    Gửi phản hồi
+                </button>
+            </div>
+        </form>
+    </div>
+    } @else {
+    <div class="loading">
+        <div class="spinner-large"></div>
+        <p>Đang tải biểu mẫu...</p>
+    </div>
+    }
+</div>

@@ -1,0 +1,114 @@
+<div class="concept-picker-modal" *ngIf="isOpen">
+    <div class="modal-overlay" (click)="close()"></div>
+
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Link Medical Concept</h3>
+            <button class="close-btn" (click)="close()">&times;</button>
+        </div>
+
+        <div class="modal-body">
+            <!-- Search Box -->
+            <div class="search-box">
+                <input type="text" [(ngModel)]="searchTerm" (ngModelChange)="onSearchChange($event)"
+                    placeholder="Search concepts (e.g., blood pressure, glucose)" class="search-input" autofocus />
+                <span class="search-icon">🔍</span>
+            </div>
+
+            <!-- Type Filter -->
+            <div class="type-filter">
+                <button *ngFor="let type of conceptTypes" [class.active]="selectedType === type.value"
+                    (click)="filterByType(type.value)" class="type-btn">
+                    {{ type.label }}
+                </button>
+            </div>
+
+            <!-- Loading -->
+            <div *ngIf="loading" class="loading">
+                <div class="spinner"></div>
+                <span>Searching concepts...</span>
+            </div>
+
+            <!-- Results -->
+            <div *ngIf="!loading && searchResults" class="results">
+                <div class="results-count">
+                    Found {{ searchResults.totalCount }} concept(s)
+                </div>
+
+                <div class="concept-list">
+                    <div *ngFor="let concept of searchResults.concepts" class="concept-item"
+                        [class.selected]="selectedConcept?.id === concept.id" (click)="selectConcept(concept)">
+                        <div class="concept-main">
+                            <div class="concept-code">{{ concept.code }}</div>
+                            <div class="concept-display">{{ concept.display }}</div>
+                        </div>
+
+                        <div class="concept-description" *ngIf="concept.description">
+                            {{ concept.description }}
+                        </div>
+
+                        <!-- External Mappings -->
+                        <div class="concept-mappings" *ngIf="concept.mappings && concept.mappings.length > 0">
+                            <span *ngFor="let mapping of concept.mappings" class="mapping-badge"
+                                [title]="mapping.targetDisplay">
+                                {{ mapping.targetSystem }}: {{ mapping.targetCode }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- No Results -->
+                <div *ngIf="searchResults.concepts.length === 0" class="no-results">
+                    <p>No concepts found</p>
+                    <button class="create-btn" (click)="openCreateMode()">
+                        + Create New Concept
+                    </button>
+                </div>
+            </div>
+
+            <!-- Create New Concept Form -->
+            <div *ngIf="createMode" class="create-form">
+                <h4>Create New Concept</h4>
+
+                <div class="form-group">
+                    <label>Code *</label>
+                    <input type="text" [(ngModel)]="newConcept.code" placeholder="BP, GLUCOSE, etc." />
+                </div>
+
+                <div class="form-group">
+                    <label>Display Name *</label>
+                    <input type="text" [(ngModel)]="newConcept.display" placeholder="Blood Pressure" />
+                </div>
+
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea [(ngModel)]="newConcept.description" rows="2"
+                        placeholder="Detailed description of the concept"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>Type *</label>
+                    <select [(ngModel)]="newConcept.conceptType">
+                        <option *ngFor="let type of conceptTypes" [value]="type.value">
+                            {{ type.label }}
+                        </option>
+                    </select>
+                </div>
+
+                <div class="form-actions">
+                    <button class="cancel-btn" (click)="cancelCreate()">Cancel</button>
+                    <button class="save-btn" (click)="createConcept()" [disabled]="!canCreate()">
+                        Create & Link
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal-footer">
+            <button class="secondary-btn" (click)="close()">Cancel</button>
+            <button class="primary-btn" (click)="linkConcept()" [disabled]="!selectedConcept">
+                Link Concept
+            </button>
+        </div>
+    </div>
+</div>

@@ -3,18 +3,21 @@ using System;
 using IVF.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using NpgsqlTypes;
 
 #nullable disable
 
-namespace IVF.Infrastructure.Migrations
+namespace IVF.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(IvfDbContext))]
-    partial class IvfDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260207142721_AddConceptMappingAndFullTextSearch")]
+    partial class AddConceptMappingAndFullTextSearch
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -254,119 +257,6 @@ namespace IVF.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("birth_data", (string)null);
-                });
-
-            modelBuilder.Entity("IVF.Domain.Entities.Concept", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Code")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<int>("ConceptType")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
-                    b.Property<string>("Display")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<NpgsqlTsVector>("SearchVector")
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("tsvector")
-                        .HasComputedColumnSql("to_tsvector('english', \r\n                    coalesce(\"Code\", '') || ' ' || \r\n                    coalesce(\"Display\", '') || ' ' ||\r\n                    coalesce(\"Description\", '')\r\n                )", true);
-
-                    b.Property<string>("System")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasDefaultValue("LOCAL");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Code")
-                        .IsUnique();
-
-                    b.HasIndex("ConceptType");
-
-                    b.HasIndex("SearchVector");
-
-                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("SearchVector"), "GIN");
-
-                    b.HasIndex("System", "Code");
-
-                    b.ToTable("Concepts", (string)null);
-                });
-
-            modelBuilder.Entity("IVF.Domain.Entities.ConceptMapping", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("ConceptId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("IsActive")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(true);
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("Relationship")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<string>("TargetCode")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<string>("TargetDisplay")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<string>("TargetSystem")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("IsActive");
-
-                    b.HasIndex("ConceptId", "TargetSystem");
-
-                    b.HasIndex("TargetSystem", "TargetCode");
-
-                    b.ToTable("ConceptMappings", (string)null);
                 });
 
             modelBuilder.Entity("IVF.Domain.Entities.Couple", b =>
@@ -663,8 +553,21 @@ namespace IVF.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<Guid?>("ConceptId")
-                        .HasColumnType("uuid");
+                    b.Property<string>("ConceptCode")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("ConceptDisplay")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("ConceptId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("ConceptSystem")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
 
                     b.Property<string>("ConditionalLogicJson")
                         .HasColumnType("text");
@@ -711,6 +614,11 @@ namespace IVF.Infrastructure.Migrations
                         .HasMaxLength(300)
                         .HasColumnType("character varying(300)");
 
+                    b.Property<NpgsqlTsVector>("SearchVector")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("tsvector")
+                        .HasComputedColumnSql("to_tsvector('english', \r\n                    coalesce(\"Label\", '') || ' ' || \r\n                    coalesce(\"ConceptDisplay\", '') || ' ' || \r\n                    coalesce(\"ConceptCode\", '') || ' ' ||\r\n                    coalesce(\"HelpText\", '')\r\n                )", true);
+
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -719,9 +627,15 @@ namespace IVF.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ConceptId");
+                    b.HasIndex("ConceptCode");
 
                     b.HasIndex("FormTemplateId");
+
+                    b.HasIndex("SearchVector");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("SearchVector"), "GIN");
+
+                    b.HasIndex("ConceptSystem", "ConceptCode");
 
                     b.ToTable("FormFields", (string)null);
                 });
@@ -732,8 +646,21 @@ namespace IVF.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<Guid?>("ConceptId")
-                        .HasColumnType("uuid");
+                    b.Property<string>("ConceptCode")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("ConceptDisplay")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("ConceptId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("ConceptSystem")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -762,7 +689,7 @@ namespace IVF.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ConceptId");
+                    b.HasIndex("ConceptCode");
 
                     b.HasIndex("FormFieldId", "DisplayOrder");
 
@@ -2593,17 +2520,6 @@ namespace IVF.Infrastructure.Migrations
                     b.Navigation("Cycle");
                 });
 
-            modelBuilder.Entity("IVF.Domain.Entities.ConceptMapping", b =>
-                {
-                    b.HasOne("IVF.Domain.Entities.Concept", "Concept")
-                        .WithMany("Mappings")
-                        .HasForeignKey("ConceptId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Concept");
-                });
-
             modelBuilder.Entity("IVF.Domain.Entities.Couple", b =>
                 {
                     b.HasOne("IVF.Domain.Entities.Patient", "Husband")
@@ -2672,36 +2588,22 @@ namespace IVF.Infrastructure.Migrations
 
             modelBuilder.Entity("IVF.Domain.Entities.FormField", b =>
                 {
-                    b.HasOne("IVF.Domain.Entities.Concept", "Concept")
-                        .WithMany("FormFields")
-                        .HasForeignKey("ConceptId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
                     b.HasOne("IVF.Domain.Entities.FormTemplate", "FormTemplate")
                         .WithMany("Fields")
                         .HasForeignKey("FormTemplateId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("Concept");
-
                     b.Navigation("FormTemplate");
                 });
 
             modelBuilder.Entity("IVF.Domain.Entities.FormFieldOption", b =>
                 {
-                    b.HasOne("IVF.Domain.Entities.Concept", "Concept")
-                        .WithMany("FormFieldOptions")
-                        .HasForeignKey("ConceptId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
                     b.HasOne("IVF.Domain.Entities.FormField", "FormField")
                         .WithMany("Options")
                         .HasForeignKey("FormFieldId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("Concept");
 
                     b.Navigation("FormField");
                 });
@@ -3089,15 +2991,6 @@ namespace IVF.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
-                });
-
-            modelBuilder.Entity("IVF.Domain.Entities.Concept", b =>
-                {
-                    b.Navigation("FormFieldOptions");
-
-                    b.Navigation("FormFields");
-
-                    b.Navigation("Mappings");
                 });
 
             modelBuilder.Entity("IVF.Domain.Entities.Couple", b =>
