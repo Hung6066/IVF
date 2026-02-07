@@ -1,11 +1,12 @@
 using IVF.Application.Common.Interfaces;
+using IVF.Application.Features.Forms.DTOs;
 using IVF.Application.Features.Forms.Queries;
 using IVF.Domain.Entities;
 using MediatR;
 
 namespace IVF.Application.Features.Forms.Handlers;
 
-public class GetConceptByIdHandler : IRequestHandler<GetConceptByIdQuery, Concept?>
+public class GetConceptByIdHandler : IRequestHandler<GetConceptByIdQuery, ConceptDto?>
 {
     private readonly IConceptRepository _repository;
 
@@ -14,9 +15,26 @@ public class GetConceptByIdHandler : IRequestHandler<GetConceptByIdQuery, Concep
         _repository = repository;
     }
 
-    public async Task<Concept?> Handle(GetConceptByIdQuery request, CancellationToken cancellationToken)
+    public async Task<ConceptDto?> Handle(GetConceptByIdQuery request, CancellationToken cancellationToken)
     {
-        return await _repository.GetByIdAsync(request.Id, true, cancellationToken);
+        var c = await _repository.GetByIdAsync(request.Id, true, cancellationToken);
+        if (c == null) return null;
+
+        return new ConceptDto(
+            c.Id,
+            c.Code,
+            c.Display,
+            c.Description,
+            c.System,
+            (int)c.ConceptType,
+            c.Mappings.Select(m => new ConceptMappingDto(
+                m.Id,
+                m.TargetSystem,
+                m.TargetCode,
+                m.TargetDisplay,
+                m.Relationship
+            )).ToList()
+        );
     }
 }
 

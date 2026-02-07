@@ -39,6 +39,7 @@ export interface FormField {
     defaultValue?: string;
     helpText?: string;
     conditionalLogicJson?: string;
+    conceptId?: string;  // Linked medical concept ID
 }
 
 export interface FormResponse {

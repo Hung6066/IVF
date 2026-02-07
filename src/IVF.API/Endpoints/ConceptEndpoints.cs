@@ -1,4 +1,5 @@
 using IVF.Application.Features.Forms.Commands;
+using IVF.Application.Features.Forms.DTOs;
 using IVF.Application.Features.Forms.Queries;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
@@ -143,11 +144,19 @@ public static class ConceptEndpoints
                 request.ConceptId
             );
 
-            var option = await mediator.Send(command);
-            return Results.Ok(option);
+            var result = await mediator.Send(command);
+            return Results.Ok(result);
         })
         .WithName("LinkOptionToConcept")
         .WithSummary("Link a form field option to a concept");
+        // Seed concepts (development only)
+        group.MapPost("/seed", async (IServiceProvider services) =>
+        {
+            await IVF.Infrastructure.Seeding.ConceptSeeder.SeedConceptsAsync(services);
+            return Results.Ok(new { Message = "Concepts seeded successfully" });
+        })
+        .WithName("SeedConcepts")
+        .WithSummary("Seed medical concepts (development only)");
     }
 }
 

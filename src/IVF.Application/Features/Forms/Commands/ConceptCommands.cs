@@ -1,3 +1,4 @@
+using IVF.Application.Features.Forms.DTOs;
 using IVF.Domain.Entities;
 using MediatR;
 
@@ -12,7 +13,7 @@ public record CreateConceptCommand(
     string? Description,
     string System,
     int ConceptType
-) : IRequest<Concept>;
+) : IRequest<ConceptDto>;
 
 /// <summary>
 /// Update an existing concept
@@ -21,7 +22,7 @@ public record UpdateConceptCommand(
     Guid Id,
     string Display,
     string? Description
-) : IRequest<Concept>;
+) : IRequest<ConceptDto>;
 
 /// <summary>
 /// Add external terminology mapping to a concept
@@ -32,7 +33,7 @@ public record AddConceptMappingCommand(
     string TargetCode,
     string TargetDisplay,
     string? Relationship
-) : IRequest<ConceptMapping>;
+) : IRequest<ConceptMappingDto>;
 
 /// <summary>
 /// Link form field to a concept
@@ -40,7 +41,7 @@ public record AddConceptMappingCommand(
 public record LinkFieldToConceptCommand(
     Guid FieldId,
     Guid ConceptId
-) : IRequest<FormField>;
+) : IRequest<FormFieldDto>;
 
 /// <summary>
 /// Link form field option to a concept
@@ -48,4 +49,4 @@ public record LinkFieldToConceptCommand(
 public record LinkOptionToConceptCommand(
     Guid OptionId,
     Guid ConceptId
-) : IRequest<FormFieldOption>;
+) : IRequest<bool>;

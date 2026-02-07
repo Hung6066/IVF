@@ -173,7 +173,8 @@ public record FormFieldDto(
     string? ValidationRulesJson,
     string? DefaultValue,
     string? HelpText,
-    string? ConditionalLogicJson
+    string? ConditionalLogicJson,
+    Guid? ConceptId
 );
 
 public record CreateFormFieldDto(
@@ -404,7 +405,7 @@ public class FormTemplateCommandsHandler :
         t.Fields?.Select(f => new FormFieldDto(
             f.Id, f.FieldKey, f.Label, f.Placeholder, f.FieldType, f.DisplayOrder,
             f.IsRequired, f.OptionsJson, f.ValidationRulesJson, f.DefaultValue,
-            f.HelpText, f.ConditionalLogicJson)).ToList());
+            f.HelpText, f.ConditionalLogicJson, f.ConceptId)).ToList());
 }
 
 public class FormFieldCommandsHandler :
@@ -479,7 +480,7 @@ public class FormFieldCommandsHandler :
     private static FormFieldDto MapToDto(FormField f) => new(
         f.Id, f.FieldKey, f.Label, f.Placeholder, f.FieldType, f.DisplayOrder,
         f.IsRequired, f.OptionsJson, f.ValidationRulesJson, f.DefaultValue,
-        f.HelpText, f.ConditionalLogicJson);
+        f.HelpText, f.ConditionalLogicJson, f.ConceptId);
 }
 
 public class FormResponseCommandsHandler :

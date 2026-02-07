@@ -70,7 +70,7 @@ export class ConceptService {
     ): Observable<SearchConceptsResult> {
         let params = new HttpParams()
             .set('pageSize', pageSize.toString())
-            .set('page Number', pageNumber.toString());
+            .set('pageNumber', pageNumber.toString());
 
         if (searchTerm) {
             params = params.set('q', searchTerm);

@@ -138,7 +138,7 @@ public class FormTemplatesQueryHandler :
             request.IncludeFields ? t.Fields?.Select(f => new FormFieldDto(
                 f.Id, f.FieldKey, f.Label, f.Placeholder, f.FieldType, f.DisplayOrder,
                 f.IsRequired, f.OptionsJson, f.ValidationRulesJson, f.DefaultValue,
-                f.HelpText, f.ConditionalLogicJson)).ToList() : null)).ToList();
+                f.HelpText, f.ConditionalLogicJson, f.ConceptId)).ToList() : null)).ToList();
     }
 
     public async Task<FormTemplateDto?> Handle(GetFormTemplateByIdQuery request, CancellationToken ct)
@@ -158,7 +158,7 @@ public class FormTemplatesQueryHandler :
             template.Fields?.Select(f => new FormFieldDto(
                 f.Id, f.FieldKey, f.Label, f.Placeholder, f.FieldType, f.DisplayOrder,
                 f.IsRequired, f.OptionsJson, f.ValidationRulesJson, f.DefaultValue,
-                f.HelpText, f.ConditionalLogicJson)).ToList());
+                f.HelpText, f.ConditionalLogicJson, f.ConceptId)).ToList());
     }
 }
 
@@ -178,7 +178,7 @@ public class FormFieldsQueryHandler : IRequestHandler<GetFormFieldsByTemplateQue
         return fields.Select(f => new FormFieldDto(
             f.Id, f.FieldKey, f.Label, f.Placeholder, f.FieldType, f.DisplayOrder,
             f.IsRequired, f.OptionsJson, f.ValidationRulesJson, f.DefaultValue,
-            f.HelpText, f.ConditionalLogicJson)).ToList();
+            f.HelpText, f.ConditionalLogicJson, f.ConceptId)).ToList();
     }
 }
 

@@ -1,3 +1,4 @@
+using IVF.Application.Features.Forms.DTOs;
 using IVF.Domain.Entities;
 using MediatR;
 
@@ -6,7 +7,7 @@ namespace IVF.Application.Features.Forms.Queries;
 /// <summary>
 /// Get concept by ID with all mappings
 /// </summary>
-public record GetConceptByIdQuery(Guid Id) : IRequest<Concept?>;
+public record GetConceptByIdQuery(Guid Id) : IRequest<ConceptDto?>;
 
 /// <summary>
 /// Full-text search concepts using PostgreSQL TsVector
@@ -21,24 +22,6 @@ public record SearchConceptsQuery(
 public record SearchConceptsResult(
     List<ConceptDto> Concepts,
     int TotalCount
-);
-
-public record ConceptDto(
-    Guid Id,
-    string Code,
-    string Display,
-    string? Description,
-    string System,
-    int ConceptType,
-    List<ConceptMappingDto> Mappings
-);
-
-public record ConceptMappingDto(
-    Guid Id,
-    string TargetSystem,
-    string TargetCode,
-    string TargetDisplay,
-    string? Relationship
 );
 
 /// <summary>

@@ -1,11 +1,12 @@
 using IVF.Application.Common.Interfaces;
 using IVF.Application.Features.Forms.Commands;
+using IVF.Application.Features.Forms.DTOs;
 using IVF.Domain.Entities;
 using MediatR;
 
 namespace IVF.Application.Features.Forms.Handlers;
 
-public class CreateConceptHandler : IRequestHandler<CreateConceptCommand, Concept>
+public class CreateConceptHandler : IRequestHandler<CreateConceptCommand, ConceptDto>
 {
     private readonly IConceptRepository _repository;
 
@@ -14,7 +15,7 @@ public class CreateConceptHandler : IRequestHandler<CreateConceptCommand, Concep
         _repository = repository;
     }
 
-    public async Task<Concept> Handle(CreateConceptCommand request, CancellationToken cancellationToken)
+    public async Task<ConceptDto> Handle(CreateConceptCommand request, CancellationToken cancellationToken)
     {
         var concept = Concept.Create(
             request.Code,
@@ -24,11 +25,15 @@ public class CreateConceptHandler : IRequestHandler<CreateConceptCommand, Concep
             (ConceptType)request.ConceptType
         );
 
-        return await _repository.AddAsync(concept, cancellationToken);
+        await _repository.AddAsync(concept, cancellationToken);
+        
+        return new ConceptDto(
+            concept.Id, concept.Code, concept.Display, concept.Description, 
+            concept.System, (int)concept.ConceptType, new List<ConceptMappingDto>());
     }
 }
 
-public class UpdateConceptHandler : IRequestHandler<UpdateConceptCommand, Concept>
+public class UpdateConceptHandler : IRequestHandler<UpdateConceptCommand, ConceptDto>
 {
     private readonly IConceptRepository _repository;
 
@@ -37,19 +42,29 @@ public class UpdateConceptHandler : IRequestHandler<UpdateConceptCommand, Concep
         _repository = repository;
     }
 
-    public async Task<Concept> Handle(UpdateConceptCommand request, CancellationToken cancellationToken)
+    public async Task<ConceptDto> Handle(UpdateConceptCommand request, CancellationToken cancellationToken)
     {
-        var concept = await _repository.GetByIdAsync(request.Id, false, cancellationToken)
+        var concept = await _repository.GetByIdAsync(request.Id, true, cancellationToken)
             ?? throw new Exception("Concept not found");
 
         concept.Update(request.Display, request.Description);
         await _repository.UpdateAsync(concept, cancellationToken);
 
-        return concept;
+        return new ConceptDto(
+            concept.Id,
+            concept.Code,
+            concept.Display,
+            concept.Description,
+            concept.System,
+            (int)concept.ConceptType,
+            concept.Mappings.Select(m => new ConceptMappingDto(
+                m.Id, m.TargetSystem, m.TargetCode, m.TargetDisplay, m.Relationship
+            )).ToList()
+        );
     }
 }
 
-public class AddConceptMappingHandler : IRequestHandler<AddConceptMappingCommand, ConceptMapping>
+public class AddConceptMappingHandler : IRequestHandler<AddConceptMappingCommand, ConceptMappingDto>
 {
     private readonly IConceptRepository _repository;
 
@@ -58,7 +73,7 @@ public class AddConceptMappingHandler : IRequestHandler<AddConceptMappingCommand
         _repository = repository;
     }
 
-    public async Task<ConceptMapping> Handle(AddConceptMappingCommand request, CancellationToken cancellationToken)
+    public async Task<ConceptMappingDto> Handle(AddConceptMappingCommand request, CancellationToken cancellationToken)
     {
         var concept = await _repository.GetByIdAsync(request.ConceptId, true, cancellationToken)
             ?? throw new Exception("Concept not found");
@@ -72,11 +87,12 @@ public class AddConceptMappingHandler : IRequestHandler<AddConceptMappingCommand
 
         await _repository.UpdateAsync(concept, cancellationToken);
 
-        return mapping;
+        return new ConceptMappingDto(
+            mapping.Id, mapping.TargetSystem, mapping.TargetCode, mapping.TargetDisplay, mapping.Relationship);
     }
 }
 
-public class LinkFieldToConceptHandler : IRequestHandler<LinkFieldToConceptCommand, FormField>
+public class LinkFieldToConceptHandler : IRequestHandler<LinkFieldToConceptCommand, FormFieldDto>
 {
     private readonly IConceptRepository _repository;
 
@@ -85,23 +101,26 @@ public class LinkFieldToConceptHandler : IRequestHandler<LinkFieldToConceptComma
         _repository = repository;
     }
 
-    public async Task<FormField> Handle(LinkFieldToConceptCommand request, CancellationToken cancellationToken)
+    public async Task<FormFieldDto> Handle(LinkFieldToConceptCommand request, CancellationToken cancellationToken)
     {
-        var field = await _repository.GetFieldByIdAsync(request.FieldId, cancellationToken)
+        var f = await _repository.GetFieldByIdAsync(request.FieldId, cancellationToken)
             ?? throw new Exception("Form field not found");
 
         var conceptExists = await _repository.ExistsAsync(request.ConceptId, cancellationToken);
         if (!conceptExists)
             throw new Exception("Concept not found");
 
-        field.LinkToConcept(request.ConceptId);
-        await _repository.UpdateFieldAsync(field, cancellationToken);
+        f.LinkToConcept(request.ConceptId);
+        await _repository.UpdateFieldAsync(f, cancellationToken);
 
-        return field;
+        return new FormFieldDto(
+            f.Id, f.FieldKey, f.Label, f.Placeholder, f.FieldType, f.DisplayOrder,
+            f.IsRequired, f.OptionsJson, f.ValidationRulesJson, f.DefaultValue,
+            f.HelpText, f.ConditionalLogicJson, f.ConceptId);
     }
 }
 
-public class LinkOptionToConceptHandler : IRequestHandler<LinkOptionToConceptCommand, FormFieldOption>
+public class LinkOptionToConceptHandler : IRequestHandler<LinkOptionToConceptCommand, bool>
 {
     private readonly IConceptRepository _repository;
 
@@ -110,7 +129,7 @@ public class LinkOptionToConceptHandler : IRequestHandler<LinkOptionToConceptCom
         _repository = repository;
     }
 
-    public async Task<FormFieldOption> Handle(LinkOptionToConceptCommand request, CancellationToken cancellationToken)
+    public async Task<bool> Handle(LinkOptionToConceptCommand request, CancellationToken cancellationToken)
     {
         var option = await _repository.GetFieldOptionByIdAsync(request.OptionId, cancellationToken)
             ?? throw new Exception("Form field option not found");
@@ -122,6 +141,6 @@ public class LinkOptionToConceptHandler : IRequestHandler<LinkOptionToConceptCom
         option.LinkToConcept(request.ConceptId);
         await _repository.UpdateFieldOptionAsync(option, cancellationToken);
 
-        return option;
+        return true;
     }
 }

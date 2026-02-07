@@ -69,6 +69,30 @@ export class FormBuilderComponent implements OnInit {
             this.formDescription = template.description || '';
             this.selectedCategoryId = template.categoryId;
             this.fields = template.fields || [];
+
+            // Load linked concepts for fields that have conceptId
+            this.loadLinkedConcepts();
+        });
+    }
+
+    private loadLinkedConcepts() {
+        this.linkedConcepts.clear();
+
+        // Get all fields that have conceptId
+        const fieldsWithConcepts = this.fields.filter(f => f.conceptId);
+
+        // Fetch each linked concept
+        fieldsWithConcepts.forEach(field => {
+            if (field.conceptId) {
+                this.conceptService.getConceptById(field.conceptId).subscribe({
+                    next: (concept) => {
+                        this.linkedConcepts.set(field.id, concept);
+                    },
+                    error: (err) => {
+                        console.error(`Failed to load concept for field ${field.id}:`, err);
+                    }
+                });
+            }
         });
     }
 
@@ -311,6 +335,13 @@ export class FormBuilderComponent implements OnInit {
     linkedConcepts = new Map<string, Concept>();
     private conceptService = inject(ConceptService);
 
+    // Inline concept search
+    conceptSearchTerm = '';
+    conceptSearchResults: Concept[] = [];
+    showConceptDropdown = false;
+    isSearchingConcepts = false;
+    private searchTimeout: any;
+
     openConceptPicker(field: FormField) {
         this.selectedFieldForConcept = field;
         this.showConceptPicker = true;
@@ -332,4 +363,58 @@ export class FormBuilderComponent implements OnInit {
     getLinkedConcept(fieldId: string): Concept | undefined {
         return this.linkedConcepts.get(fieldId);
     }
+
+    // Inline concept search methods
+    searchConcepts() {
+        clearTimeout(this.searchTimeout);
+
+        if (!this.conceptSearchTerm || this.conceptSearchTerm.length < 2) {
+            this.conceptSearchResults = [];
+            return;
+        }
+
+        this.isSearchingConcepts = true;
+        this.searchTimeout = setTimeout(() => {
+            this.conceptService.searchConcepts(this.conceptSearchTerm).subscribe({
+                next: (result) => {
+                    this.conceptSearchResults = result.concepts;
+                    this.isSearchingConcepts = false;
+                },
+                error: () => {
+                    this.conceptSearchResults = [];
+                    this.isSearchingConcepts = false;
+                }
+            });
+        }, 300);
+    }
+
+    selectConcept(concept: Concept) {
+        if (this.selectedField?.id) {
+            // Link the concept to the field via API
+            this.conceptService.linkFieldToConcept(this.selectedField.id, concept.id).subscribe({
+                next: () => {
+                    this.linkedConcepts.set(this.selectedField!.id || '', concept);
+
+                    // Set field label to concept display name
+                    this.selectedField!.label = concept.display;
+                    this.updateField();
+
+                    this.conceptSearchTerm = '';
+                    this.conceptSearchResults = [];
+                    this.showConceptDropdown = false;
+                },
+                error: (err) => {
+                    console.error('Failed to link concept:', err);
+                }
+            });
+        }
+    }
+
+    unlinkConcept(field: FormField) {
+        if (field.id) {
+            this.linkedConcepts.delete(field.id);
+            // Note: API call to unlink could be added here if needed
+        }
+    }
 }
+

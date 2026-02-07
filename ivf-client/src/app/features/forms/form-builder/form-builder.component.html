@@ -148,6 +148,54 @@
                 <div class="form-group">
                     <label>Nhãn</label>
                     <input type="text" [(ngModel)]="selectedField.label" (blur)="updateField()">
+
+                    <!-- Inline Concept Search -->
+                    <div class="concept-link-section">
+                        @if (selectedField.id && getLinkedConcept(selectedField.id)) {
+                        <div class="linked-concept-badge">
+                            <span class="concept-tag">
+                                🔗 {{ getLinkedConcept(selectedField.id)!.code }}
+                                <span class="concept-display">{{ getLinkedConcept(selectedField.id)!.display }}</span>
+                            </span>
+                            @for (mapping of getLinkedConcept(selectedField.id)!.mappings; track mapping.id) {
+                            @if (mapping.targetSystem === 'SNOMED CT') {
+                            <span class="snomed-tag">SNOMED: {{ mapping.targetCode }}</span>
+                            }
+                            }
+                            <button class="remove-concept-btn" (click)="unlinkConcept(selectedField)"
+                                title="Bỏ liên kết">✕</button>
+                        </div>
+                        } @else {
+                        <div class="concept-search-inline">
+                            <input type="text" class="concept-search-input" placeholder="🔍 Tìm concept y khoa..."
+                                [(ngModel)]="conceptSearchTerm" (input)="searchConcepts()"
+                                (focus)="showConceptDropdown = true">
+
+                            @if (showConceptDropdown && conceptSearchResults.length > 0) {
+                            <div class="concept-dropdown">
+                                @for (concept of conceptSearchResults; track concept.id) {
+                                <div class="concept-option" (click)="selectConcept(concept)">
+                                    <span class="concept-code">{{ concept.code }}</span>
+                                    <span class="concept-name">{{ concept.display }}</span>
+                                    @for (mapping of concept.mappings; track mapping.id) {
+                                    @if (mapping.targetSystem === 'SNOMED CT') {
+                                    <span class="snomed-mini">SNOMED</span>
+                                    }
+                                    }
+                                </div>
+                                }
+                            </div>
+                            }
+
+                            @if (showConceptDropdown && conceptSearchTerm && conceptSearchResults.length === 0 &&
+                            !isSearchingConcepts) {
+                            <div class="concept-dropdown">
+                                <div class="no-results">Không tìm thấy concept</div>
+                            </div>
+                            }
+                        </div>
+                        }
+                    </div>
                 </div>
 
                 <div class="form-group">
@@ -186,45 +234,6 @@
                     <small>Mỗi dòng một lựa chọn (value|label)</small>
                 </div>
                 }
-
-                <!-- Concept Mapping Section -->
-                <div class="section-divider">
-                    <span>🔗 Liên kết thuật ngữ</span>
-                </div>
-
-                <div class="form-group">
-                    <label>Medical Concept</label>
-
-                    @if (selectedField.id && getLinkedConcept(selectedField.id)) {
-                    <div class="linked-concept-display">
-                        <div class="concept-info">
-                            <span class="concept-code">
-                                {{ getLinkedConcept(selectedField.id)!.code }}
-                            </span>
-                            <span class="concept-name">
-                                {{ getLinkedConcept(selectedField.id)!.display }}
-                            </span>
-                        </div>
-
-                        @for (mapping of getLinkedConcept(selectedField.id)!.mappings; track mapping.id) {
-                        @if (mapping.targetSystem === 'SNOMED CT') {
-                        <div class="snomed-badge">
-                            SNOMED: {{ mapping.targetCode }}
-                        </div>
-                        }
-                        }
-
-                        <button class="unlink-btn"
-                            (click)="selectedFieldForConcept=selectedField; showConceptPicker=true" type="button">
-                            🔄 Change Concept
-                        </button>
-                    </div>
-                    } @else {
-                    <button class="link-concept-btn" (click)="openConceptPicker(selectedField!)" type="button">
-                        🔗 Link to Medical Concept
-                    </button>
-                    }
-                </div>
 
                 <div class="section-divider">
                     <span>📐 Bố cục</span>
