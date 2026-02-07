@@ -79,6 +79,32 @@ public class SemenAnalysisRepository : ISemenAnalysisRepository
         return concentrations.Average();
     }
 
+    public async Task<Dictionary<string, int>> GetConcentrationDistributionAsync(CancellationToken ct = default)
+    {
+        var concentrations = await _context.SemenAnalyses
+            .Where(s => s.Concentration.HasValue)
+            .Select(s => s.Concentration!.Value)
+            .ToListAsync(ct);
+
+        var dist = new Dictionary<string, int>
+        {
+            { "Normozoospermia", 0 },
+            { "Oligozoospermia", 0 },
+            { "Severe Oligo", 0 },
+            { "Azoospermia", 0 }
+        };
+
+        foreach (var c in concentrations)
+        {
+            if (c >= 15) dist["Normozoospermia"]++;
+            else if (c >= 5) dist["Oligozoospermia"]++;
+            else if (c > 0) dist["Severe Oligo"]++;
+            else dist["Azoospermia"]++; // 0
+        }
+
+        return dist;
+    }
+
     public async Task<SemenAnalysis> AddAsync(SemenAnalysis analysis, CancellationToken ct = default)
     {
         await _context.SemenAnalyses.AddAsync(analysis, ct);

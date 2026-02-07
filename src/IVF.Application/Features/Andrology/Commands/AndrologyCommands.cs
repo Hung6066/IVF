@@ -96,12 +96,8 @@ public class CreateSemenAnalysisHandler : IRequestHandler<CreateSemenAnalysisCom
         }
 
         // 4. Return DTO
-        var dto = new SemenAnalysisDto(
-            analysis.Id, analysis.PatientId, analysis.CycleId, analysis.AnalysisDate, analysis.AnalysisType.ToString(),
-            analysis.Volume, analysis.Concentration, analysis.TotalCount, analysis.ProgressiveMotility, analysis.NormalMorphology, analysis.Vitality, analysis.CreatedAt,
-            patient.FullName, patient.PatientCode,
-            analysis.Concentration == null ? "Pending" : "Completed"
-        );
+        // 4. Return DTO
+        var dto = SemenAnalysisDto.FromEntity(analysis);
 
         return Result<SemenAnalysisDto>.Success(dto);
     }

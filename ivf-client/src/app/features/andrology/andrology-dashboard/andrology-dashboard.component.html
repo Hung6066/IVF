@@ -234,16 +234,20 @@
                 <h4>Phân loại mật độ tinh trùng</h4>
                 <div class="bar-chart">
                     <div class="bar-item"><span class="bar-label">Normozoospermia</span>
-                        <div class="bar" style="width: 45%"></div><span>45%</span>
+                        <div class="bar" [style.width.%]="getDistPercentage('Normozoospermia')"></div><span>{{
+                            getDistPercentage('Normozoospermia') }}%</span>
                     </div>
                     <div class="bar-item"><span class="bar-label">Oligozoospermia</span>
-                        <div class="bar warning" style="width: 25%"></div><span>25%</span>
+                        <div class="bar warning" [style.width.%]="getDistPercentage('Oligozoospermia')"></div><span>{{
+                            getDistPercentage('Oligozoospermia') }}%</span>
                     </div>
                     <div class="bar-item"><span class="bar-label">Severe Oligo</span>
-                        <div class="bar danger" style="width: 15%"></div><span>15%</span>
+                        <div class="bar danger" [style.width.%]="getDistPercentage('Severe Oligo')"></div><span>{{
+                            getDistPercentage('Severe Oligo') }}%</span>
                     </div>
                     <div class="bar-item"><span class="bar-label">Azoospermia</span>
-                        <div class="bar danger" style="width: 15%"></div><span>15%</span>
+                        <div class="bar danger" [style.width.%]="getDistPercentage('Azoospermia')"></div><span>{{
+                            getDistPercentage('Azoospermia') }}%</span>
                     </div>
                 </div>
             </div>

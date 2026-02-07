@@ -140,7 +140,18 @@ export class AndrologyService {
 
     getStatistics(): Observable<any> {
         return this.http.get(`${this.baseUrl}/statistics`).pipe(
-            catchError(() => of({ todayAnalyses: 0, todayWashings: 0, pendingAnalyses: 0, avgConcentration: 0 }))
+            catchError(() => of({
+                todayAnalyses: 0,
+                todayWashings: 0,
+                pendingAnalyses: 0,
+                avgConcentration: 0,
+                concentrationDistribution: {
+                    'Normozoospermia': 0,
+                    'Oligozoospermia': 0,
+                    'Severe Oligo': 0,
+                    'Azoospermia': 0
+                }
+            }))
         );
     }
 

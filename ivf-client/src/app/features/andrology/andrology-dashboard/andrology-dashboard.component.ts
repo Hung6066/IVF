@@ -27,6 +27,16 @@ export class AndrologyDashboardComponent implements OnInit {
     todayWashing = signal(0);
     pendingCount = signal(0);
     avgConcentration = signal(0);
+    concentrationDist = signal<Record<string, number>>({});
+
+    totalConcentrations = this.concentrationDist; // We will use a getter or simple logic in template for total
+
+    getDistPercentage(key: string): number {
+        const dist = this.concentrationDist();
+        const total = Object.values(dist).reduce((a, b) => a + b, 0);
+        if (total === 0) return 0;
+        return Math.round(((dist[key] || 0) / total) * 100);
+    }
 
     showNewAnalysis = false;
     showNewWashing = false;
@@ -140,6 +150,7 @@ export class AndrologyDashboardComponent implements OnInit {
                 this.todayWashing.set(stats.todayWashings);
                 this.pendingCount.set(stats.pendingAnalyses);
                 this.avgConcentration.set(Math.round(stats.avgConcentration * 10) / 10);
+                this.concentrationDist.set(stats.concentrationDistribution || {});
             }
         });
     }

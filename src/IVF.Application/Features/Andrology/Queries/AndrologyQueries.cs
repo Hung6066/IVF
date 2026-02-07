@@ -74,7 +74,7 @@ public class SearchSpermWashingsHandler : IRequestHandler<SearchSpermWashingsQue
 }
 
 // ==================== STATISTICS ====================
-public record AndrologyStatisticsDto(int TodayAnalyses, int TodayWashings, int PendingAnalyses, decimal AvgConcentration);
+public record AndrologyStatisticsDto(int TodayAnalyses, int TodayWashings, int PendingAnalyses, decimal AvgConcentration, Dictionary<string, int> ConcentrationDistribution);
 
 public record GetAndrologyStatisticsQuery : IRequest<AndrologyStatisticsDto>;
 
@@ -95,18 +95,11 @@ public class GetAndrologyStatisticsHandler : IRequestHandler<GetAndrologyStatist
         var todayAnalyses = await _analysisRepo.GetCountByDateAsync(today, ct);
         var todayWashings = await _washingRepo.GetCountByDateAsync(today, ct);
         
-        // Approx pending: Logic depends on status, for now separate query or count.
-        // Let's assume Pending means concentration is null.
-        // We can add a specific count method to repo or search.
-        // For efficiency adding GetPendingCount to repo is better, but SearchAsync with status can work too if optimized.
-        // Let's use SearchAsync with status="Pending", page 1, limit 0 to just get count? No, search returns items.
-        // I'll assume 0 for pending for now or add a quick query.
-        // Actually I added GetCountByDateAsync. I should probably add GetPendingCountAsync.
-        // Or just use SearchAsync(status="Pending").Total.
         var (_, pendingCount) = await _analysisRepo.SearchAsync(null, null, null, "Pending", 1, 1, ct);
         
         var avgConc = await _analysisRepo.GetAverageConcentrationAsync(ct);
+        var dist = await _analysisRepo.GetConcentrationDistributionAsync(ct);
 
-        return new AndrologyStatisticsDto(todayAnalyses, todayWashings, pendingCount, avgConc ?? 0);
+        return new AndrologyStatisticsDto(todayAnalyses, todayWashings, pendingCount, avgConc ?? 0, dist);
     }
 }

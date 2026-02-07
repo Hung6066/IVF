@@ -10,6 +10,7 @@ public interface ISemenAnalysisRepository
     Task<(IReadOnlyList<SemenAnalysis> Items, int Total)> SearchAsync(string? query, DateTime? fromDate, DateTime? toDate, string? status, int page, int pageSize, CancellationToken ct = default);
     Task<int> GetCountByDateAsync(DateTime date, CancellationToken ct = default);
     Task<decimal?> GetAverageConcentrationAsync(CancellationToken ct = default);
+    Task<Dictionary<string, int>> GetConcentrationDistributionAsync(CancellationToken ct = default);
     Task<SemenAnalysis> AddAsync(SemenAnalysis analysis, CancellationToken ct = default);
     Task UpdateAsync(SemenAnalysis analysis, CancellationToken ct = default);
 }
