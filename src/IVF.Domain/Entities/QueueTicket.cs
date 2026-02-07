@@ -19,6 +19,9 @@ public class QueueTicket : BaseEntity
     
     // Service indications - JSON array of service IDs selected during check-in
     public string? ServiceIndications { get; private set; }
+    
+    // Notes from service completion (e.g., consultation notes)
+    public string? Notes { get; set; }
 
     // Navigation properties
     public virtual Patient Patient { get; private set; } = null!;

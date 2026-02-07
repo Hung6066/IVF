@@ -53,7 +53,7 @@
                     <tr>
                         <td class="stt-cell">{{ q.ticketNumber }}</td>
                         <td>{{ q.patientName }}</td>
-                        <!-- <td><span class="code-cell">{{ q.patientId }}</span></td> -->
+                        <td><span class="code-cell">{{ q.patientCode }}</span></td>
                         <td>{{ formatTime(q.issuedAt) }}</td>
                         <td>
                             @if (q.status === 'Waiting') { <span class="status-badge pending">Đang chờ</span> }
@@ -63,8 +63,12 @@
                             @else { <span class="status-badge">{{ q.status }}</span> }
                         </td>
                         <td class="actions-cell">
-                            <button class="btn btn-sm btn-primary" (click)="callPatient(q)">📢 Gọi</button>
-                            <button class="btn btn-sm btn-success" (click)="startConsult(q)">👨‍⚕️ Tư vấn</button>
+                            <button class="btn btn-sm btn-primary" (click)="callPatient(q)"
+                                [disabled]="q.status !== 'Waiting'">📢 Gọi</button>
+                            <button class="btn btn-sm btn-success" (click)="startConsult(q)"
+                                [disabled]="q.status === 'InService'">👨‍⚕️ Tư vấn</button>
+                            <button class="btn btn-sm btn-warning" (click)="skipPatient(q)"
+                                [disabled]="q.status === 'InService'">⏭️ Bỏ qua</button>
                         </td>
                     </tr>
                     } @empty {
@@ -80,7 +84,37 @@
 
     @if (activeTab === 'history') {
     <section class="card">
-        <div class="empty-state">Tính năng lịch sử đang phát triển</div>
+        <div class="section-header">
+            <h2>Lịch sử tư vấn</h2>
+        </div>
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>STT</th>
+                        <th>Họ tên</th>
+                        <th>Mã BN</th>
+                        <th>Giờ hoàn thành</th>
+                        <th>Ghi chú</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (h of history(); track h.id) {
+                    <tr>
+                        <td>{{ h.ticketNumber }}</td>
+                        <td>{{ h.patientName }}</td>
+                        <td><span class="code-cell">{{ h.patientCode }}</span></td>
+                        <td>{{ formatTime(h.completedAt) }}</td>
+                        <td>{{ h.notes || '-' }}</td>
+                    </tr>
+                    } @empty {
+                    <tr>
+                        <td colspan="5" class="empty-state">Chưa có lịch sử tư vấn</td>
+                    </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
     </section>
     }
 

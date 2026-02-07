@@ -62,7 +62,7 @@ public class IssueTicketHandler : IRequestHandler<IssueTicketCommand, Result<Que
         await _queueRepo.AddAsync(ticket, ct);
         await _unitOfWork.SaveChangesAsync(ct);
 
-        return Result<QueueTicketDto>.Success(QueueTicketDto.FromEntity(ticket, patient.FullName));
+        return Result<QueueTicketDto>.Success(QueueTicketDto.FromEntity(ticket, patient.FullName, patient.PatientCode));
     }
 
     private QueueType GetQueueType(string deptCode)
@@ -106,12 +106,40 @@ public class CallTicketHandler : IRequestHandler<CallTicketCommand, Result<Queue
         await _queueRepo.UpdateAsync(ticket, ct);
         await _unitOfWork.SaveChangesAsync(ct);
 
-        return Result<QueueTicketDto>.Success(QueueTicketDto.FromEntity(ticket, ticket.Patient?.FullName ?? ""));
+        return Result<QueueTicketDto>.Success(QueueTicketDto.FromEntity(ticket, ticket.Patient?.FullName ?? "", ticket.Patient?.PatientCode));
+    }
+}
+
+// Start Service Command
+public record StartServiceCommand(Guid TicketId) : IRequest<Result<QueueTicketDto>>;
+
+public class StartServiceHandler : IRequestHandler<StartServiceCommand, Result<QueueTicketDto>>
+{
+    private readonly IQueueTicketRepository _queueRepo;
+    private readonly IUnitOfWork _unitOfWork;
+
+    public StartServiceHandler(IQueueTicketRepository queueRepo, IUnitOfWork unitOfWork)
+    {
+        _queueRepo = queueRepo;
+        _unitOfWork = unitOfWork;
+    }
+
+    public async Task<Result<QueueTicketDto>> Handle(StartServiceCommand request, CancellationToken ct)
+    {
+        var ticket = await _queueRepo.GetByIdAsync(request.TicketId, ct);
+        if (ticket == null)
+            return Result<QueueTicketDto>.Failure("Ticket not found");
+
+        ticket.StartService();
+        await _queueRepo.UpdateAsync(ticket, ct);
+        await _unitOfWork.SaveChangesAsync(ct);
+
+        return Result<QueueTicketDto>.Success(QueueTicketDto.FromEntity(ticket, ticket.Patient?.FullName ?? "", ticket.Patient?.PatientCode));
     }
 }
 
 // ==================== COMPLETE TICKET ====================
-public record CompleteTicketCommand(Guid TicketId) : IRequest<Result>;
+public record CompleteTicketCommand(Guid TicketId, string? Notes = null) : IRequest<Result>;
 
 public class CompleteTicketHandler : IRequestHandler<CompleteTicketCommand, Result>
 {
@@ -131,6 +159,8 @@ public class CompleteTicketHandler : IRequestHandler<CompleteTicketCommand, Resu
             return Result.Failure("Ticket not found");
 
         ticket.Complete();
+        if (!string.IsNullOrEmpty(request.Notes))
+            ticket.Notes = request.Notes;
         await _queueRepo.UpdateAsync(ticket, ct);
         await _unitOfWork.SaveChangesAsync(ct);
 
@@ -171,6 +201,7 @@ public record QueueTicketDto(
     Guid Id,
     string TicketNumber,
     Guid PatientId,
+    string PatientCode,
     string PatientName,
     string QueueType,
     string DepartmentCode,
@@ -178,10 +209,11 @@ public record QueueTicketDto(
     DateTime IssuedAt,
     DateTime? CalledAt,
     DateTime? CompletedAt,
+    string? Notes,
     List<Guid>? ServiceIds
 )
 {
-    public static QueueTicketDto FromEntity(QueueTicket t, string patientName)
+    public static QueueTicketDto FromEntity(QueueTicket t, string patientName, string? patientCode = null)
     {
         List<Guid>? serviceIds = null;
         if (!string.IsNullOrEmpty(t.ServiceIndications))
@@ -190,9 +222,9 @@ public record QueueTicketDto(
             catch { }
         }
         return new(
-            t.Id, t.TicketNumber, t.PatientId, patientName,
+            t.Id, t.TicketNumber, t.PatientId, patientCode ?? "", patientName,
             t.QueueType.ToString(), t.DepartmentCode, t.Status.ToString(),
-            t.IssuedAt, t.CalledAt, t.CompletedAt, serviceIds
+            t.IssuedAt, t.CalledAt, t.CompletedAt, t.Notes, serviceIds
         );
     }
 }

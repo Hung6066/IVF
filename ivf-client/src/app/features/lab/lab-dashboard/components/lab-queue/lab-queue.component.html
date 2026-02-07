@@ -28,8 +28,12 @@
                         @else { <span class="badge badge-neutral">{{ q.status }}</span> }
                     </td>
                     <td>
-                        <button class="btn btn-warning btn-sm" (click)="onCall(q)">📢 Gọi</button>
-                        <button class="btn btn-primary btn-sm" (click)="onStart(q)">🧪 Thực hiện</button>
+                        <button class="btn btn-warning btn-sm" (click)="onCall(q)"
+                            [disabled]="q.status !== 'Waiting'">📢 Gọi</button>
+                        <button class="btn btn-primary btn-sm" (click)="onStart(q)"
+                            [disabled]="q.status === 'InService'">🧪 Thực hiện</button>
+                        <button class="btn btn-danger btn-sm" (click)="onSkip(q)"
+                            [disabled]="q.status === 'InService'">⏭️ Bỏ qua</button>
                     </td>
                 </tr>
                 } @empty {

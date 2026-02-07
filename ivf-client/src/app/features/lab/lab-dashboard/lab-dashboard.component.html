@@ -59,7 +59,8 @@
     </div>
 
     @if (activeTab === 'queue') {
-    <app-lab-queue [queue]="queue()" (callPatient)="onCallPatient($event)" (startProcedure)="onStartProcedure($event)">
+    <app-lab-queue [queue]="queue()" (callPatient)="onCallPatient($event)" (startProcedure)="onStartProcedure($event)"
+        (skipPatient)="onSkipPatient($event)">
     </app-lab-queue>
     }
 

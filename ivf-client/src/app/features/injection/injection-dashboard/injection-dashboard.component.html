@@ -58,8 +58,12 @@
                             @else { <span class="status-badge">{{ q.status }}</span> }
                         </td>
                         <td class="actions-cell">
-                            <button class="btn btn-sm btn-primary" (click)="callPatient(q)">📢 Gọi</button>
-                            <button class="btn btn-sm btn-success" (click)="startInjection(q)">💉 Tiêm</button>
+                            <button class="btn btn-sm btn-primary" (click)="callPatient(q)"
+                                [disabled]="q.status !== 'Waiting'">📢 Gọi</button>
+                            <button class="btn btn-sm btn-success" (click)="startInjection(q)"
+                                [disabled]="q.status === 'InService'">💉 Tiêm</button>
+                            <button class="btn btn-sm btn-warning" (click)="skipPatient(q)"
+                                [disabled]="q.status === 'InService'">⏭️ Bỏ qua</button>
                         </td>
                     </tr>
                     } @empty {
@@ -75,26 +79,62 @@
 
     @if (activeTab === 'history') {
     <section class="card">
-        <div class="empty-state">Chưa có lịch sử</div>
+        <div class="section-header">
+            <h2>Lịch sử tiêm hôm nay ({{ completedCount() }})</h2>
+        </div>
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>STT</th>
+                        <th>Họ tên</th>
+                        <th>Giờ tiêm</th>
+                        <th>Ghi chú</th>
+                        <th>Trạng thái</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (h of history(); track h.id) {
+                    <tr>
+                        <td class="stt-cell">{{ h.ticketNumber }}</td>
+                        <td>{{ h.patientName }}</td>
+                        <td>{{ formatTime(h.completedAt || h.issuedAt) }}</td>
+                        <td>{{ h.notes || '-' }}</td>
+                        <td><span class="status-badge success">Đã tiêm</span></td>
+                    </tr>
+                    } @empty {
+                    <tr>
+                        <td colspan="5" class="empty-state">Chưa có lịch sử tiêm hôm nay</td>
+                    </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
     </section>
     }
 
     @if (showForm) {
     <div class="modal-overlay" (click)="showForm = false">
         <div class="modal-content" (click)="$event.stopPropagation()">
-            <h3>💉 Xác nhận tiêm thuốc</h3>
-            <div class="patient-info">
-                <strong>BN: </strong> {{ currentPatientName }}
+            <div class="modal-header">
+                <h3>💉 Xác nhận tiêm thuốc</h3>
+                <button class="close-btn" (click)="showForm = false">×</button>
             </div>
 
             <form (ngSubmit)="submitInjection()">
-                <div class="form-group">
-                    <label class="form-label">Loại thuốc / Ghi chú</label>
-                    <textarea class="form-control" [(ngModel)]="injectionNotes" name="notes" rows="3"
-                        placeholder="Ghi chú thuốc đã tiêm..."></textarea>
+                <div class="modal-body">
+                    <div class="patient-info-summary"
+                        style="margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px dashed #e2e8f0;">
+                        <strong>BN: </strong> {{ currentPatientName }}
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Loại thuốc / Ghi chú</label>
+                        <textarea class="form-control" [(ngModel)]="injectionNotes" name="notes" rows="3"
+                            placeholder="Ghi chú thuốc đã tiêm..."></textarea>
+                    </div>
                 </div>
 
-                <div class="modal-actions">
+                <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" (click)="showForm = false">Huỷ</button>
                     <button type="submit" class="btn btn-primary">Xác nhận Tiêm xong</button>
                 </div>

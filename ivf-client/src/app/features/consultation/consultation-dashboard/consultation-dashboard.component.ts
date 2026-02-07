@@ -19,6 +19,7 @@ export class ConsultationDashboardComponent implements OnInit {
 
   activeTab = 'queue';
   queue = signal<QueueTicket[]>([]);
+  history = signal<any[]>([]);
   queueCount = signal(0);
   completedCount = signal(0);
 
@@ -29,12 +30,23 @@ export class ConsultationDashboardComponent implements OnInit {
 
   ngOnInit() {
     this.refreshQueue();
+    this.refreshHistory();
+
+    // Auto-refresh queue every 10 seconds
+    setInterval(() => this.refreshQueue(), 10000);
   }
 
   refreshQueue() {
     this.service.getQueue().subscribe(data => {
       this.queue.set(data);
       this.queueCount.set(data.length);
+    });
+  }
+
+  refreshHistory() {
+    this.service.getHistory().subscribe((data: any[]) => {
+      this.history.set(data);
+      this.completedCount.set(data.length);
     });
   }
 
@@ -53,20 +65,39 @@ export class ConsultationDashboardComponent implements OnInit {
   }
 
   startConsult(q: QueueTicket) {
-    this.currentTicketId = q.id;
-    this.currentPatientName = q.patientName || '';
-    this.showForm = true;
+    this.service.startService(q.id).subscribe({
+      next: () => {
+        this.currentTicketId = q.id;
+        this.currentPatientName = q.patientName || '';
+        this.showForm = true;
+        this.refreshQueue();
+      },
+      error: err => this.notificationService.error('Lỗi', 'Lỗi khi bắt đầu: ' + err.message)
+    });
+  }
+
+  skipPatient(q: QueueTicket) {
+    if (confirm(`Bỏ qua bệnh nhân ${q.patientName}?`)) {
+      this.service.skipTicket(q.id).subscribe({
+        next: () => {
+          this.refreshQueue();
+          this.notificationService.info('Đã bỏ qua', `Đã bỏ qua ${q.patientName}`);
+        },
+        error: err => this.notificationService.error('Lỗi', 'Lỗi: ' + err.message)
+      });
+    }
   }
 
   submitConsult() {
     if (!this.currentTicketId) return;
-    this.service.completeTicket(this.currentTicketId).subscribe(() => {
+    this.service.completeTicket(this.currentTicketId, this.consultNotes).subscribe(() => {
       this.notificationService.success('Thành công', 'Đã hoàn thành tư vấn!');
       this.showForm = false;
       this.consultNotes = '';
       this.currentTicketId = null;
       this.completedCount.update(c => c + 1);
       this.refreshQueue();
+      this.refreshHistory(); // Refresh history after completing
     });
   }
 }

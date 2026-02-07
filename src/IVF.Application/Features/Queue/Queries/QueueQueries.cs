@@ -27,7 +27,26 @@ public class GetQueueByDepartmentHandler : IRequestHandler<GetQueueByDepartmentQ
         else
             tickets = await _queueRepo.GetByDepartmentTodayAsync(request.DepartmentCode, ct);
             
-        return tickets.Select(t => QueueTicketDto.FromEntity(t, t.Patient?.FullName ?? "")).ToList();
+        return tickets.Select(t => QueueTicketDto.FromEntity(t, t.Patient?.FullName ?? "", t.Patient?.PatientCode)).ToList();
+    }
+}
+
+// ==================== GET DEPARTMENT HISTORY ====================
+public record GetDepartmentHistoryQuery(string DepartmentCode) : IRequest<IReadOnlyList<QueueTicketDto>>;
+
+public class GetDepartmentHistoryHandler : IRequestHandler<GetDepartmentHistoryQuery, IReadOnlyList<QueueTicketDto>>
+{
+    private readonly IQueueTicketRepository _queueRepo;
+
+    public GetDepartmentHistoryHandler(IQueueTicketRepository queueRepo)
+    {
+        _queueRepo = queueRepo;
+    }
+
+    public async Task<IReadOnlyList<QueueTicketDto>> Handle(GetDepartmentHistoryQuery request, CancellationToken ct)
+    {
+        var tickets = await _queueRepo.GetDepartmentHistoryTodayAsync(request.DepartmentCode, ct);
+        return tickets.Select(t => QueueTicketDto.FromEntity(t, t.Patient?.FullName ?? "", t.Patient?.PatientCode)).ToList();
     }
 }
 

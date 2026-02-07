@@ -126,8 +126,12 @@
                     <div class="form-grid">
                         <div class="form-group">
                             <label class="form-label">Bác sĩ chỉ định (tùy chọn)</label>
-                            <input class="form-control" type="text" [(ngModel)]="checkinData.doctor" name="doctor"
-                                placeholder="VD: BS. Giang" />
+                            <select class="form-control" [(ngModel)]="checkinData.doctor" name="doctor">
+                                <option value="">-- Chọn bác sĩ --</option>
+                                @for (doc of doctors(); track doc.id) {
+                                <option [value]="doc.id">{{ doc.fullName }}</option>
+                                }
+                            </select>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Mức độ ưu tiên</label>

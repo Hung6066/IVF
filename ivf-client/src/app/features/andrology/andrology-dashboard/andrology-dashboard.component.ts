@@ -37,6 +37,9 @@ export class AndrologyDashboardComponent implements OnInit {
     ngOnInit(): void {
         this.refreshQueue();
         this.loadData();
+
+        // Auto-refresh queue every 10 seconds
+        setInterval(() => this.refreshQueue(), 10000);
     }
 
     refreshQueue() {
@@ -76,9 +79,24 @@ export class AndrologyDashboardComponent implements OnInit {
     }
 
     startExam(q: AndrologyQueueItem) {
-        this.activeTab = 'analysis';
-        this.showNewAnalysis = true;
-        this.newAnalysis = { patientName: q.patientName, patientCode: q.patientCode };
+        this.service.startService(q.id).subscribe({
+            next: () => {
+                this.activeTab = 'analysis';
+                this.showNewAnalysis = true;
+                this.newAnalysis = { patientName: q.patientName, patientCode: q.patientCode };
+                this.refreshQueue();
+            },
+            error: () => alert('Lỗi bắt đầu xét nghiệm')
+        });
+    }
+
+    skipPatient(q: AndrologyQueueItem) {
+        if (confirm(`Bỏ qua bệnh nhân ${q.patientName}?`)) {
+            this.service.skipTicket(q.id).subscribe({
+                next: () => this.refreshQueue(),
+                error: () => alert('Lỗi khi bỏ qua')
+            });
+        }
     }
 
     filteredAnalyses(): SemenAnalysis[] {

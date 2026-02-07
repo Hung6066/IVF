@@ -17,6 +17,7 @@ export class InjectionDashboardComponent implements OnInit {
 
   activeTab = 'queue';
   queue = signal<QueueTicket[]>([]);
+  history = signal<QueueTicket[]>([]);
   queueCount = signal(0);
   completedCount = signal(0);
 
@@ -27,12 +28,20 @@ export class InjectionDashboardComponent implements OnInit {
 
   ngOnInit() {
     this.refreshQueue();
+
+    // Auto-refresh queue every 10 seconds
+    setInterval(() => this.refreshQueue(), 10000);
   }
 
   refreshQueue() {
     this.service.getQueue().subscribe(data => {
       this.queue.set(data);
       this.queueCount.set(data.length);
+    });
+
+    this.service.getHistory().subscribe(data => {
+      this.history.set(data);
+      this.completedCount.set(data.length);
     });
   }
 
@@ -51,14 +60,29 @@ export class InjectionDashboardComponent implements OnInit {
   }
 
   startInjection(q: QueueTicket) {
-    this.currentTicketId = q.id;
-    this.currentPatientName = q.patientName || '';
-    this.showForm = true;
+    this.service.startService(q.id).subscribe({
+      next: () => {
+        this.currentTicketId = q.id;
+        this.currentPatientName = q.patientName || '';
+        this.showForm = true;
+        this.refreshQueue();
+      },
+      error: err => alert('Lỗi bắt đầu: ' + err.message)
+    });
+  }
+
+  skipPatient(q: QueueTicket) {
+    if (confirm(`Bỏ qua bệnh nhân ${q.patientName}?`)) {
+      this.service.skipTicket(q.id).subscribe({
+        next: () => this.refreshQueue(),
+        error: err => alert('Lỗi: ' + err.message)
+      });
+    }
   }
 
   submitInjection() {
     if (!this.currentTicketId) return;
-    this.service.completeTicket(this.currentTicketId).subscribe(() => {
+    this.service.completeTicket(this.currentTicketId, this.injectionNotes).subscribe(() => {
       alert('Đã hoàn thành tiêm!');
       this.showForm = false;
       this.injectionNotes = '';

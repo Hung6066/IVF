@@ -2,13 +2,16 @@ import { Component, OnInit, signal, inject, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule, Router } from '@angular/router';
+import { HttpClient } from '@angular/common/http';
 import { ReceptionService, CheckinRecord } from './reception.service';
 import { Patient } from '../../../core/models/api.models';
 import { CatalogService } from '../../../core/services/catalog.service';
+import { QueueService } from '../../../core/services/queue.service';
 import { Observable, forkJoin } from 'rxjs';
 import { FingerprintHubService } from '../../../core/services/fingerprint/fingerprint-hub.service';
 import { GlobalNotificationService } from '../../../core/services/global-notification.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { environment } from '../../../../environments/environment';
 
 @Component({
   selector: 'app-reception-dashboard',
@@ -21,6 +24,8 @@ export class ReceptionDashboardComponent implements OnInit {
   private service = inject(ReceptionService);
   private router = inject(Router);
   private catalogService = inject(CatalogService);
+  private queueService = inject(QueueService);
+  private http = inject(HttpClient);
   private notificationService = inject(GlobalNotificationService);
   private fingerprintService = inject(FingerprintHubService);
   private authService = inject(AuthService);
@@ -49,6 +54,7 @@ export class ReceptionDashboardComponent implements OnInit {
   paymentCount = signal(42);
   pendingPayment = signal(8);
   recentCheckins = signal<CheckinRecord[]>([]);
+  doctors = signal<any[]>([]);
 
   showCheckinModal = false;
   selectedPatient: Patient | null = null;
@@ -70,6 +76,12 @@ export class ReceptionDashboardComponent implements OnInit {
   ngOnInit(): void {
     this.refreshQueue();
     this.loadServices();
+    this.loadDoctors();
+
+    // Auto-refresh queue every 10 seconds
+    setInterval(() => {
+      this.refreshQueue();
+    }, 10000);
 
     // Subscribe to identification results
     this.fingerprintService.identificationResult$.subscribe(result => {
@@ -114,8 +126,21 @@ export class ReceptionDashboardComponent implements OnInit {
     });
   }
 
+  loadDoctors() {
+    this.http.get<any[]>(`${environment.apiUrl}/doctors?pageSize=100`).subscribe({
+      next: (doctors) => this.doctors.set(doctors),
+      error: () => { }
+    });
+  }
+
   refreshQueue() {
     this.service.getRecentCheckins().subscribe(data => this.recentCheckins.set(data));
+
+    // Fetch queue counts for each department
+    this.queueService.getQueueByDept('TV').subscribe((data: any[]) => this.queueTuVan.set(data.length));
+    this.queueService.getQueueByDept('US').subscribe((data: any[]) => this.queueSieuAm.set(data.length));
+    this.queueService.getQueueByDept('TM').subscribe((data: any[]) => this.queueTiem.set(data.length));
+    this.queueService.getQueueByDept('XN').subscribe((data: any[]) => this.queueXN.set(data.length));
   }
 
   searchPatient(): void {

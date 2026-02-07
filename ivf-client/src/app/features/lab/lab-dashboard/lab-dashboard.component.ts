@@ -52,6 +52,9 @@ export class LabDashboardComponent implements OnInit {
 
   ngOnInit(): void {
     this.refreshData();
+
+    // Auto-refresh queue every 10 seconds
+    setInterval(() => this.labService.getQueue().subscribe(data => this.queue.set(data)), 10000);
   }
 
   setActiveTab(tab: string) {
@@ -126,8 +129,22 @@ export class LabDashboardComponent implements OnInit {
   }
 
   onStartProcedure(q: QueueItem) {
-    this.activeTab = 'schedule';
-    alert('Mời bệnh nhân vào phòng thủ thuật/lấy mẫu');
+    this.labService.startService(q.id).subscribe({
+      next: () => {
+        alert(`Bắt đầu thực hiện cho ${q.patientName}`);
+        this.refreshData(); // Refresh queue to show updated status
+      },
+      error: (err) => alert('Lỗi khi bắt đầu thực hiện: ' + (err.error?.detail || err.message))
+    });
+  }
+
+  onSkipPatient(q: QueueItem) {
+    if (confirm(`Bỏ qua bệnh nhân ${q.patientName}?`)) {
+      this.labService.skipTicket(q.id).subscribe({
+        next: () => this.refreshData(),
+        error: (err) => alert('Lỗi: ' + (err.error?.detail || err.message))
+      });
+    }
   }
 
   onSelectEmbryo(embryo: EmbryoCard) {

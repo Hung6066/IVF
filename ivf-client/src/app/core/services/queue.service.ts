@@ -13,6 +13,10 @@ export class QueueService {
         return this.http.get<QueueTicket[]>(`${this.baseUrl}/queue/${deptCode}`);
     }
 
+    getQueueHistory(deptCode: string): Observable<QueueTicket[]> {
+        return this.http.get<QueueTicket[]>(`${this.baseUrl}/queue/${deptCode}/history`);
+    }
+
     issueTicket(patientId: string, departmentCode: string, priority: 'Normal' | 'VIP' | 'Emergency' = 'Normal', notes?: string, cycleId?: string, serviceIds?: string[]): Observable<QueueTicket> {
         return this.http.post<QueueTicket>(`${this.baseUrl}/queue/issue`, {
             patientId,
@@ -28,8 +32,12 @@ export class QueueService {
         return this.http.post<void>(`${this.baseUrl}/queue/${ticketId}/call`, {});
     }
 
-    completeTicket(ticketId: string): Observable<void> {
-        return this.http.post<void>(`${this.baseUrl}/queue/${ticketId}/complete`, {});
+    startService(ticketId: string): Observable<void> {
+        return this.http.post<void>(`${this.baseUrl}/queue/${ticketId}/start`, {});
+    }
+
+    completeTicket(ticketId: string, notes?: string): Observable<void> {
+        return this.http.post<void>(`${this.baseUrl}/queue/${ticketId}/complete`, { notes });
     }
 
     skipTicket(ticketId: string): Observable<void> {

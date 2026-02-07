@@ -77,11 +77,17 @@
                             </span>
                         </td>
                         <td class="actions-cell">
-                            <button class="btn btn-sm btn-info" (click)="callPatient(q)">
+                            <button class="btn btn-sm btn-info" (click)="callPatient(q)"
+                                [disabled]="q.status !== 'Waiting'">
                                 📢 Gọi
                             </button>
-                            <button class="btn btn-sm btn-success" (click)="startExam(q)">
+                            <button class="btn btn-sm btn-success" (click)="startExam(q)"
+                                [disabled]="q.status === 'InService'">
                                 👨‍⚕️ Khám
+                            </button>
+                            <button class="btn btn-sm btn-warning" (click)="skipPatient(q)"
+                                [disabled]="q.status === 'InService'">
+                                ⏭️ Bỏ qua
                             </button>
                         </td>
                     </tr>
@@ -151,54 +157,57 @@
                 <button class="close-btn" (click)="showNewExam = false">×</button>
             </header>
 
-            <form (ngSubmit)="submitExam()" class="modal-body">
-                <div class="form-group full-width">
-                    <label>Bệnh nhân <span class="required">*</span></label>
-                    <input type="text" [(ngModel)]="newExam.patient" name="patient" required
-                        placeholder="Tìm kiếm bệnh nhân..." class="form-control" [readonly]="!!currentTicketId" />
-                </div>
-
-                <div class="form-group full-width">
-                    <label>Loại siêu âm</label>
-                    <select [(ngModel)]="newExam.type" name="type" class="form-control">
-                        <option value="2D TC-PP">2D Tử cung - Phần phụ</option>
-                        <option value="Canh noãn">Canh noãn</option>
-                        <option value="Doppler">Doppler màu</option>
-                    </select>
-                </div>
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Tử cung</label>
-                        <input type="text" [(ngModel)]="newExam.uterus" name="uterus"
-                            placeholder="Tư thế, kích thước..." class="form-control" />
+            <form (ngSubmit)="submitExam()" class="modal-form-wrapper">
+                <div class="modal-body">
+                    <div class="form-group full-width">
+                        <label>Bệnh nhân <span class="required">*</span></label>
+                        <input type="text" [(ngModel)]="newExam.patient" name="patient" required
+                            placeholder="Tìm kiếm bệnh nhân..." class="form-control" [readonly]="!!currentTicketId" />
                     </div>
-                    <div class="form-group">
-                        <label>Nội mạc (mm)</label>
-                        <input type="number" [(ngModel)]="newExam.endometrium" name="endo" step="0.1"
-                            class="form-control" />
-                    </div>
-                </div>
 
-                <fieldset class="form-group fieldset">
-                    <legend>Buồng trứng (Số lượng nang)</legend>
+                    <div class="form-group full-width">
+                        <label>Loại siêu âm</label>
+                        <select [(ngModel)]="newExam.type" name="type" class="form-control">
+                            <option value="2D TC-PP">2D Tử cung - Phần phụ</option>
+                            <option value="Canh noãn">Canh noãn</option>
+                            <option value="Doppler">Doppler màu</option>
+                        </select>
+                    </div>
+
                     <div class="form-row">
                         <div class="form-group">
-                            <label>Phải (MP)</label>
-                            <input type="text" [(ngModel)]="newExam.rightOvary" name="ro"
-                                placeholder="VD: 3 nang (10,12,14mm)" class="form-control" />
+                            <label>Tử cung</label>
+                            <input type="text" [(ngModel)]="newExam.uterus" name="uterus"
+                                placeholder="Tư thế, kích thước..." class="form-control" />
                         </div>
                         <div class="form-group">
-                            <label>Trái (MT)</label>
-                            <input type="text" [(ngModel)]="newExam.leftOvary" name="lo" placeholder="VD: 5 nang nhỏ"
+                            <label>Nội mạc (mm)</label>
+                            <input type="number" [(ngModel)]="newExam.endometrium" name="endo" step="0.1"
                                 class="form-control" />
                         </div>
                     </div>
-                </fieldset>
 
-                <div class="form-group full-width">
-                    <label>Kết luận</label>
-                    <textarea [(ngModel)]="newExam.conclusion" name="concl" rows="3" class="form-control"></textarea>
+                    <fieldset class="form-group fieldset">
+                        <legend>Buồng trứng (Số lượng nang)</legend>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Phải (MP)</label>
+                                <input type="text" [(ngModel)]="newExam.rightOvary" name="ro"
+                                    placeholder="VD: 3 nang (10,12,14mm)" class="form-control" />
+                            </div>
+                            <div class="form-group">
+                                <label>Trái (MT)</label>
+                                <input type="text" [(ngModel)]="newExam.leftOvary" name="lo"
+                                    placeholder="VD: 5 nang nhỏ" class="form-control" />
+                            </div>
+                        </div>
+                    </fieldset>
+
+                    <div class="form-group full-width">
+                        <label>Kết luận</label>
+                        <textarea [(ngModel)]="newExam.conclusion" name="concl" rows="3"
+                            class="form-control"></textarea>
+                    </div>
                 </div>
 
                 <div class="modal-footer">

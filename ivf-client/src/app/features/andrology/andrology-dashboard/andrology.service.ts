@@ -63,6 +63,18 @@ export class AndrologyService {
         return this.queueService.callTicket(id);
     }
 
+    startService(id: string): Observable<any> {
+        return this.queueService.startService(id);
+    }
+
+    completeTicket(id: string): Observable<any> {
+        return this.queueService.completeTicket(id);
+    }
+
+    skipTicket(id: string): Observable<any> {
+        return this.queueService.skipTicket(id);
+    }
+
     // Mock API calls for Andrology specific data until real endpoints exist
     getAnalyses(): Observable<SemenAnalysis[]> {
         return of([

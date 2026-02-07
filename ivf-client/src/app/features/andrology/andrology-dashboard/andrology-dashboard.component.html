@@ -86,8 +86,12 @@
                             </span>
                         </td>
                         <td class="actions-cell">
-                            <button class="btn btn-sm btn-info" (click)="callPatient(q)">📢 Gọi</button>
-                            <button class="btn btn-sm btn-primary" (click)="startExam(q)">🧪 Nhận mẫu</button>
+                            <button class="btn btn-sm btn-info" (click)="callPatient(q)"
+                                [disabled]="q.status !== 'Waiting'">📢 Gọi</button>
+                            <button class="btn btn-sm btn-primary" (click)="startExam(q)"
+                                [disabled]="q.status === 'InService'">🧪 Nhận mẫu</button>
+                            <button class="btn btn-sm btn-warning" (click)="skipPatient(q)"
+                                [disabled]="q.status === 'InService'">⏭️ Bỏ qua</button>
                         </td>
                     </tr>
                     } @empty {
@@ -254,45 +258,50 @@
                 <h3>Xét nghiệm tinh dịch đồ mới</h3>
                 <button class="close-btn" (click)="showNewAnalysis = false">×</button>
             </header>
-            <form (ngSubmit)="submitAnalysis()" class="modal-body">
-                <div class="form-group">
-                    <label>Tìm bệnh nhân</label>
-                    <input type="text" [(ngModel)]="newAnalysis.patientSearch" name="search"
-                        placeholder="Mã BN hoặc tên..." class="form-control" />
-                </div>
-
-                <div class="form-section-title">Đại thể (Macroscopic)</div>
-                <div class="grid-4">
-                    <div class="form-group"><label>Thể tích (ml)</label><input type="number"
-                            [(ngModel)]="newAnalysis.volume" name="volume" step="0.1" class="form-control" /></div>
-                    <div class="form-group"><label>Màu sắc</label><input type="text"
-                            [(ngModel)]="newAnalysis.appearance" name="appearance" class="form-control" /></div>
-                    <div class="form-group"><label>Ly giải</label><input type="text"
-                            [(ngModel)]="newAnalysis.liquefaction" name="liquefaction" class="form-control" /></div>
-                    <div class="form-group"><label>pH</label><input type="number" [(ngModel)]="newAnalysis.ph" name="ph"
-                            step="0.1" class="form-control" /></div>
-                </div>
-
-                <div class="form-section-title">Vi thể (Microscopic)</div>
-                <div class="grid-2">
-                    <div class="form-group"><label>Mật độ (M/ml)</label><input type="number"
-                            [(ngModel)]="newAnalysis.concentration" name="concentration" step="0.1"
-                            class="form-control" /></div>
-                    <div class="form-group"><label>Tổng số (M)</label><input type="number"
-                            [(ngModel)]="newAnalysis.totalCount" name="totalCount" step="0.1" class="form-control" />
+            <form (ngSubmit)="submitAnalysis()">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>Tìm bệnh nhân</label>
+                        <input type="text" [(ngModel)]="newAnalysis.patientSearch" name="search"
+                            placeholder="Mã BN hoặc tên..." class="form-control" />
                     </div>
-                </div>
-                <div class="grid-3">
-                    <div class="form-group"><label>Di động PR (%)</label><input type="number"
-                            [(ngModel)]="newAnalysis.progressiveMotility" name="pr" max="100" class="form-control" />
-                    </div>
-                    <div class="form-group"><label>Di động NP (%)</label><input type="number"
-                            [(ngModel)]="newAnalysis.nonProgressiveMotility" name="np" max="100" class="form-control" />
-                    </div>
-                    <div class="form-group"><label>Bất động (%)</label><input type="number"
-                            [(ngModel)]="newAnalysis.immotile" name="im" max="100" class="form-control" /></div>
-                </div>
 
+                    <div class="form-section-title">Đại thể (Macroscopic)</div>
+                    <div class="grid-4">
+                        <div class="form-group"><label>Thể tích (ml)</label><input type="number"
+                                [(ngModel)]="newAnalysis.volume" name="volume" step="0.1" class="form-control" /></div>
+                        <div class="form-group"><label>Màu sắc</label><input type="text"
+                                [(ngModel)]="newAnalysis.appearance" name="appearance" class="form-control" /></div>
+                        <div class="form-group"><label>Ly giải</label><input type="text"
+                                [(ngModel)]="newAnalysis.liquefaction" name="liquefaction" class="form-control" /></div>
+                        <div class="form-group"><label>pH</label><input type="number" [(ngModel)]="newAnalysis.ph"
+                                name="ph" step="0.1" class="form-control" /></div>
+                    </div>
+
+                    <div class="form-section-title">Vi thể (Microscopic)</div>
+                    <div class="grid-2">
+                        <div class="form-group"><label>Mật độ (M/ml)</label><input type="number"
+                                [(ngModel)]="newAnalysis.concentration" name="concentration" step="0.1"
+                                class="form-control" /></div>
+                        <div class="form-group"><label>Tổng số (M)</label><input type="number"
+                                [(ngModel)]="newAnalysis.totalCount" name="totalCount" step="0.1"
+                                class="form-control" />
+                        </div>
+                    </div>
+                    <div class="grid-3">
+                        <div class="form-group"><label>Di động PR (%)</label><input type="number"
+                                [(ngModel)]="newAnalysis.progressiveMotility" name="pr" max="100"
+                                class="form-control" />
+                        </div>
+                        <div class="form-group"><label>Di động NP (%)</label><input type="number"
+                                [(ngModel)]="newAnalysis.nonProgressiveMotility" name="np" max="100"
+                                class="form-control" />
+                        </div>
+                        <div class="form-group"><label>Bất động (%)</label><input type="number"
+                                [(ngModel)]="newAnalysis.immotile" name="im" max="100" class="form-control" /></div>
+                    </div>
+
+                </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" (click)="showNewAnalysis = false">Huỷ</button>
                     <button type="submit" class="btn btn-primary">Lưu kết quả</button>
@@ -309,27 +318,31 @@
                 <h3>➕ Lọc rửa mới</h3>
                 <button class="close-btn" (click)="showNewWashing = false">×</button>
             </header>
-            <form (ngSubmit)="submitWashing()" class="modal-body">
-                <div class="form-group"><label>Mã chu kỳ <span class="required">*</span></label><input type="text"
-                        [(ngModel)]="newWashing.cycleCode" name="cycle" required placeholder="CK-XXX"
-                        class="form-control" /></div>
-                <div class="form-group"><label>Tên bệnh nhân <span class="required">*</span></label><input type="text"
-                        [(ngModel)]="newWashing.patientName" name="patient" required class="form-control" /></div>
-                <div class="form-group"><label>Phương pháp</label><select [(ngModel)]="newWashing.method" name="method"
-                        class="form-control">
-                        <option value="Gradient">Gradient</option>
-                        <option value="Swim-up">Swim-up</option>
-                    </select></div>
-                <div class="grid-2">
-                    <div class="form-group"><label>Mật độ trước (M/ml)</label><input type="number"
-                            [(ngModel)]="newWashing.prewashConc" name="pre" step="0.1" class="form-control" /></div>
-                    <div class="form-group"><label>Mật độ sau (M/ml)</label><input type="number"
-                            [(ngModel)]="newWashing.postwashConc" name="post" step="0.1" class="form-control" /></div>
-                </div>
-                <div class="form-group"><label>Di động sau (%)</label><input type="number"
-                        [(ngModel)]="newWashing.postwashMotility" name="motility" max="100" class="form-control" />
-                </div>
+            <form (ngSubmit)="submitWashing()">
+                <div class="modal-body">
+                    <div class="form-group"><label>Mã chu kỳ <span class="required">*</span></label><input type="text"
+                            [(ngModel)]="newWashing.cycleCode" name="cycle" required placeholder="CK-XXX"
+                            class="form-control" /></div>
+                    <div class="form-group"><label>Tên bệnh nhân <span class="required">*</span></label><input
+                            type="text" [(ngModel)]="newWashing.patientName" name="patient" required
+                            class="form-control" /></div>
+                    <div class="form-group"><label>Phương pháp</label><select [(ngModel)]="newWashing.method"
+                            name="method" class="form-control">
+                            <option value="Gradient">Gradient</option>
+                            <option value="Swim-up">Swim-up</option>
+                        </select></div>
+                    <div class="grid-2">
+                        <div class="form-group"><label>Mật độ trước (M/ml)</label><input type="number"
+                                [(ngModel)]="newWashing.prewashConc" name="pre" step="0.1" class="form-control" /></div>
+                        <div class="form-group"><label>Mật độ sau (M/ml)</label><input type="number"
+                                [(ngModel)]="newWashing.postwashConc" name="post" step="0.1" class="form-control" />
+                        </div>
+                    </div>
+                    <div class="form-group"><label>Di động sau (%)</label><input type="number"
+                            [(ngModel)]="newWashing.postwashMotility" name="motility" max="100" class="form-control" />
+                    </div>
 
+                </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" (click)="showNewWashing = false">Huỷ</button>
                     <button type="submit" class="btn btn-primary">Lưu kết quả</button>

@@ -32,12 +32,19 @@ export class UltrasoundDashboardComponent implements OnInit {
             { id: '1', code: 'US-001', patientName: 'Nguyễn Thị A', type: 'Canh noãn', conclusion: 'BT Phải 1 nang 18mm', doctor: 'BS. Giang' },
             { id: '2', code: 'US-002', patientName: 'Trần Thị B', type: '2D TC-PP', conclusion: 'Bình thường', doctor: 'BS. Giang' }
         ]);
+
+        // Auto-refresh queue every 10 seconds
+        setInterval(() => this.refreshQueue(), 10000);
     }
 
     refreshQueue() {
         this.service.getQueue().subscribe(data => {
             this.queue.set(data);
             this.queueCount.set(data.length);
+        });
+
+        this.service.getHistory().subscribe(data => {
+            this.completedCount.set(data.length);
         });
     }
 
@@ -56,10 +63,25 @@ export class UltrasoundDashboardComponent implements OnInit {
     }
 
     startExam(q: UltrasoundQueueItem) {
-        this.currentTicketId = q.id;
-        this.showNewExam = true;
-        this.newExam.patient = q.patientName;
-        this.newExam.patientId = q.patientId;
+        this.service.startService(q.id).subscribe({
+            next: () => {
+                this.currentTicketId = q.id;
+                this.showNewExam = true;
+                this.newExam.patient = q.patientName;
+                this.newExam.patientId = q.patientId;
+                this.refreshQueue();
+            },
+            error: (err: any) => alert('Lỗi bắt đầu: ' + err.error?.message)
+        });
+    }
+
+    skipPatient(q: UltrasoundQueueItem) {
+        if (confirm(`Bỏ qua bệnh nhân ${q.patientName}?`)) {
+            this.service.skipTicket(q.id).subscribe({
+                next: () => this.refreshQueue(),
+                error: (err: any) => alert('Lỗi: ' + err.error?.message)
+            });
+        }
     }
 
     viewExam(ex: UltrasoundExam) {

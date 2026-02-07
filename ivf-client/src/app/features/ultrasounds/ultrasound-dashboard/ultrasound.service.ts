@@ -49,12 +49,24 @@ export class UltrasoundService {
         );
     }
 
+    getHistory(): Observable<any[]> {
+        return this.queueService.getQueueHistory('US');
+    }
+
     callPatient(id: string): Observable<any> {
         return this.queueService.callTicket(id);
     }
 
     completeTicket(id: string): Observable<void> {
         return this.queueService.completeTicket(id);
+    }
+
+    startService(id: string): Observable<any> {
+        return this.queueService.startService(id);
+    }
+
+    skipTicket(id: string): Observable<any> {
+        return this.queueService.skipTicket(id);
     }
 
     submitExamResult(data: any): Observable<any> {

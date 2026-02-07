@@ -18,7 +18,19 @@ export class InjectionService {
         return this.queueService.callTicket(ticketId);
     }
 
-    completeTicket(ticketId: string): Observable<any> {
-        return this.queueService.completeTicket(ticketId);
+    getHistory(): Observable<any[]> {
+        return this.queueService.getQueueHistory('TM');
+    }
+
+    completeTicket(ticketId: string, notes?: string): Observable<any> {
+        return this.queueService.completeTicket(ticketId, notes);
+    }
+
+    startService(ticketId: string): Observable<any> {
+        return this.queueService.startService(ticketId);
+    }
+
+    skipTicket(ticketId: string): Observable<any> {
+        return this.queueService.skipTicket(ticketId);
     }
 }

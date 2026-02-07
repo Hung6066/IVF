@@ -21,7 +21,7 @@ export class LabService {
     ) { }
 
     getQueue(): Observable<QueueItem[]> {
-        return this.queueService.getQueueByDept('LAB').pipe(
+        return this.queueService.getQueueByDept('XN').pipe(
             map((data: any[]) => data.map((item, index) => ({
                 id: item.id || String(index),
                 number: item.ticketNumber,
@@ -33,8 +33,17 @@ export class LabService {
         );
     }
 
+
     callPatient(id: string): Observable<any> {
         return this.queueService.callTicket(id);
+    }
+
+    startService(id: string): Observable<any> {
+        return this.queueService.startService(id);
+    }
+
+    skipTicket(id: string): Observable<any> {
+        return this.queueService.skipTicket(id);
     }
 
     getActiveCycles(): Observable<any[]> {

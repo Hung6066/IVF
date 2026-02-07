@@ -32,3 +32,6 @@ public record RecordQualityRequest(decimal? Volume, decimal? Concentration, deci
 // Billing
 public record AddItemRequest(string ServiceCode, string Description, int Quantity, decimal UnitPrice);
 public record RecordPaymentRequest(decimal Amount, PaymentMethod PaymentMethod, string? TransactionReference);
+
+// Queue
+public record CompleteTicketRequest(string? Notes);

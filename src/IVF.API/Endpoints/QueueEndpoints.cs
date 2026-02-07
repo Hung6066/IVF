@@ -15,6 +15,9 @@ public static class QueueEndpoints
         group.MapGet("/{departmentCode}", async (string departmentCode, IMediator m) =>
             Results.Ok(await m.Send(new GetQueueByDepartmentQuery(departmentCode))));
 
+        group.MapGet("/{departmentCode}/history", async (string departmentCode, IMediator m) =>
+            Results.Ok(await m.Send(new GetDepartmentHistoryQuery(departmentCode))));
+
         group.MapPost("/issue", async (IssueTicketCommand cmd, IMediator m) =>
         {
             var r = await m.Send(cmd);
@@ -28,9 +31,15 @@ public static class QueueEndpoints
             return r.IsSuccess ? Results.Ok(r.Value) : Results.NotFound(r.Error);
         });
 
-        group.MapPost("/{id:guid}/complete", async (Guid id, IMediator m) =>
+        group.MapPost("/{id:guid}/start", async (Guid id, IMediator m) =>
         {
-            var r = await m.Send(new CompleteTicketCommand(id));
+            var r = await m.Send(new StartServiceCommand(id));
+            return r.IsSuccess ? Results.Ok(r.Value) : Results.NotFound(r.Error);
+        });
+
+        group.MapPost("/{id:guid}/complete", async (Guid id, CompleteTicketRequest? req, IMediator m) =>
+        {
+            var r = await m.Send(new CompleteTicketCommand(id, req?.Notes));
             return r.IsSuccess ? Results.NoContent() : Results.NotFound(r.Error);
         });
 

@@ -13,6 +13,7 @@ export class LabQueueComponent {
   @Input() queue: QueueItem[] = [];
   @Output() callPatient = new EventEmitter<QueueItem>();
   @Output() startProcedure = new EventEmitter<QueueItem>();
+  @Output() skipPatient = new EventEmitter<QueueItem>();
 
   formatTime(date: string): string {
     return new Date(date).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
@@ -24,5 +25,9 @@ export class LabQueueComponent {
 
   onStart(q: QueueItem) {
     this.startProcedure.emit(q);
+  }
+
+  onSkip(q: QueueItem) {
+    this.skipPatient.emit(q);
   }
 }

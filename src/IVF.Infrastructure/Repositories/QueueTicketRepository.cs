@@ -18,9 +18,25 @@ public class QueueTicketRepository : IQueueTicketRepository
     {
         var today = DateTime.UtcNow.Date;
         return await _context.QueueTickets
-            .Where(q => q.DepartmentCode == departmentCode && q.IssuedAt >= today)
+            .Where(q => q.DepartmentCode == departmentCode && q.IssuedAt >= today
+                && q.Status != Domain.Enums.TicketStatus.Completed
+                && q.Status != Domain.Enums.TicketStatus.Skipped
+                && q.Status != Domain.Enums.TicketStatus.Cancelled)
             .Include(q => q.Patient)
             .OrderBy(q => q.IssuedAt)
+            .ToListAsync(ct);
+    }
+
+    public async Task<IReadOnlyList<QueueTicket>> GetDepartmentHistoryTodayAsync(string departmentCode, CancellationToken ct = default)
+    {
+        var today = DateTime.UtcNow.Date;
+        return await _context.QueueTickets
+            .Where(q => q.DepartmentCode == departmentCode && q.IssuedAt >= today
+                && (q.Status == Domain.Enums.TicketStatus.Completed
+                 || q.Status == Domain.Enums.TicketStatus.Skipped
+                 || q.Status == Domain.Enums.TicketStatus.Cancelled))
+            .Include(q => q.Patient)
+            .OrderByDescending(q => q.CompletedAt ?? q.IssuedAt)
             .ToListAsync(ct);
     }
 
@@ -38,7 +54,10 @@ public class QueueTicketRepository : IQueueTicketRepository
     {
         var today = DateTime.UtcNow.Date;
         return await _context.QueueTickets
-            .Where(q => q.IssuedAt >= today)
+            .Where(q => q.IssuedAt >= today
+                && q.Status != Domain.Enums.TicketStatus.Completed
+                && q.Status != Domain.Enums.TicketStatus.Skipped
+                && q.Status != Domain.Enums.TicketStatus.Cancelled)
             .Include(q => q.Patient)
             .OrderBy(q => q.IssuedAt)
             .ToListAsync(ct);
