@@ -23,7 +23,8 @@ export class ServiceCatalogComponent implements OnInit {
 
   showModal = false;
   editingService: any = null;
-  formData: any = { code: '', name: '', category: 'KhamBenh', unitPrice: 0, unit: 'lần', description: '', isActive: true };
+  formData: any = { code: '', name: '', category: 'LabTest', unitPrice: 0, unit: 'lần', description: '', isActive: true };
+
 
   private searchTimeout?: ReturnType<typeof setTimeout>;
 
@@ -89,7 +90,8 @@ export class ServiceCatalogComponent implements OnInit {
     if (service) {
       this.formData = { ...service };
     } else {
-      this.formData = { code: '', name: '', category: 'KhamBenh', unitPrice: 0, unit: 'lần', description: '', isActive: true };
+      this.formData = { code: '', name: '', category: 'LabTest', unitPrice: 0, unit: 'lần', description: '', isActive: true };
+
     }
     this.showModal = true;
   }

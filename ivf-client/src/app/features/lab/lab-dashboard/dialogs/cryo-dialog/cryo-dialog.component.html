@@ -1,0 +1,43 @@
+<div class="modal-overlay" (click)="close()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+            <h2>{{ isEdit ? '✏️ Cập nhật tủ' : '🆕 Thêm vị trí đông lạnh' }}</h2>
+            <button class="close-btn" (click)="close()">×</button>
+        </div>
+        <form (ngSubmit)="onSubmit()">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Tên bình (Tank) *</label>
+                    <input type="text" [(ngModel)]="location.tank" name="tank" required placeholder="VD: Tank A1"
+                        class="form-control" [disabled]="isEdit" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Loại mẫu</label>
+                    <select [(ngModel)]="location.specimenType" name="specimenType" class="form-control">
+                        <option [ngValue]="0">Phôi (Embryo)</option>
+                        <option [ngValue]="1">Tinh trùng (Sperm)</option>
+                        <option [ngValue]="2">Trứng (Oocyte)</option>
+                    </select>
+                </div>
+                <div class="form-grid grid-3">
+                    <div class="form-group"><label class="form-label">Số canister</label><input type="number"
+                            [(ngModel)]="location.canister" name="canister" min="0" class="form-control" /></div>
+                    <div class="form-group"><label class="form-label">Số cane</label><input type="number"
+                            [(ngModel)]="location.cane" name="cane" min="0" class="form-control" /></div>
+                    <div class="form-group"><label class="form-label">Số goblet</label><input type="number"
+                            [(ngModel)]="location.goblet" name="goblet" min="0" class="form-control" /></div>
+                </div>
+                <div class="form-grid">
+                    <div class="form-group"><label class="form-label">Sức chứa (Available)</label><input type="number"
+                            [(ngModel)]="location.available" name="avail" min="0" class="form-control" /></div>
+                    <div class="form-group"><label class="form-label">Đang sử dụng (Used)</label><input type="number"
+                            [(ngModel)]="location.used" name="used" min="0" class="form-control" /></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" (click)="close()">Huỷ</button>
+                <button type="submit" class="btn btn-primary">{{ isEdit ? 'Cập nhật' : 'Thêm vị trí' }}</button>
+            </div>
+        </form>
+    </div>
+</div>

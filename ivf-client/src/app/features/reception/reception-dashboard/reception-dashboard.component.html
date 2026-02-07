@@ -101,7 +101,7 @@
     <div class="modal-overlay" (click)="showCheckinModal = false">
         <div class="modal-content large-modal" (click)="$event.stopPropagation()">
             <div class="modal-header">
-                <h3>📝 Đăng ký khám: {{ selectedPatient?.fullName }}</h3>
+                <h3>Đăng ký khám: {{ selectedPatient?.fullName }}</h3>
                 <button class="close-btn" (click)="showCheckinModal = false">&times;</button>
             </div>
 
@@ -146,9 +146,17 @@
                     </div>
 
                     <div class="form-group services-section">
-                        <label class="form-label">📋 Chỉ định dịch vụ</label>
+                        <div class="services-header">
+                            <label class="form-label">📋 Chỉ định dịch vụ</label>
+                            @if (checkinData.selectedServices.length > 0) {
+                            <div class="services-total-inline">
+                                <span>{{ checkinData.selectedServices.length }} dịch vụ:</span>
+                                <strong>{{ formatCurrency(getSelectedServicesTotal()) }}</strong>
+                            </div>
+                            }
+                        </div>
                         <div class="services-grid">
-                            @for (svc of services(); track svc.id) {
+                            @for (svc of filteredServices(); track svc.id) {
                             <div class="service-item" [class.selected]="isServiceSelected(svc.id)"
                                 (click)="toggleService(svc.id)">
                                 <div class="service-check">
@@ -163,12 +171,6 @@
                             </div>
                             }
                         </div>
-                        @if (checkinData.selectedServices.length > 0) {
-                        <div class="services-total">
-                            <span>Tổng {{ checkinData.selectedServices.length }} dịch vụ:</span>
-                            <strong>{{ formatCurrency(getSelectedServicesTotal()) }}</strong>
-                        </div>
-                        }
                     </div>
                 </div>
 

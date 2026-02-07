@@ -16,6 +16,9 @@ public class FlowSeeder : IFlowSeeder
 
     public async Task SeedFlowDataAsync(CancellationToken cancellationToken = default)
     {
+        // Seed services first
+        await SeedServicesAsync();
+        
         // 1. Patient ready for Consultation (New)
         var p1 = await CreatePatientAsync("BN-TEST-001", "Nguyễn Thị Tư Vấn", 1995, Gender.Female);
         var p1h = await CreatePatientAsync("BN-TEST-002", "Trần Văn Chồng Tư Vấn", 1990, Gender.Male);
@@ -97,7 +100,7 @@ public class FlowSeeder : IFlowSeeder
         if (!await _context.Embryos.AnyAsync(x => x.CycleId == cy5.Id))
         {
             var e5_1 = Embryo.Create(cy5.Id, 1, DateTime.UtcNow.AddDays(-1));
-            e5_1.UpdateGrade(EmbryoGrade.AB, EmbryoDay.D1);
+            e5_1.UpdateGrade("AB", EmbryoDay.D1);
             _context.Embryos.Add(e5_1);
         }
 
@@ -112,9 +115,9 @@ public class FlowSeeder : IFlowSeeder
         if (!await _context.Embryos.AnyAsync(x => x.CycleId == cy6.Id))
         {
             var e6_1 = Embryo.Create(cy6.Id, 1, DateTime.UtcNow.AddDays(-5));
-            e6_1.UpdateGrade(EmbryoGrade.AA, EmbryoDay.D5);
+            e6_1.UpdateGrade("AA", EmbryoDay.D5);
             var e6_2 = Embryo.Create(cy6.Id, 2, DateTime.UtcNow.AddDays(-5));
-            e6_2.UpdateGrade(EmbryoGrade.AB, EmbryoDay.D5);
+            e6_2.UpdateGrade("AB", EmbryoDay.D5);
             _context.Embryos.AddRange(e6_1, e6_2);
         }
         
@@ -227,5 +230,56 @@ public class FlowSeeder : IFlowSeeder
         _context.TreatmentCycles.Add(cycle);
         await _context.SaveChangesAsync();
         return cycle;
+    }
+
+    private async Task SeedServicesAsync()
+    {
+        var servicesToSeed = new List<(string Code, string Name, ServiceCategory Category, decimal Price, string Unit, string Description)>
+        {
+            // Lab Tests (Xét nghiệm)
+            ("XN-001", "Xét nghiệm máu tổng quát", ServiceCategory.LabTest, 150000m, "lần", "Complete Blood Count"),
+            ("XN-002", "Xét nghiệm hormone FSH", ServiceCategory.LabTest, 200000m, "lần", "Follicle Stimulating Hormone"),
+            ("XN-003", "Xét nghiệm hormone LH", ServiceCategory.LabTest, 200000m, "lần", "Luteinizing Hormone"),
+            ("XN-004", "Xét nghiệm hormone AMH", ServiceCategory.LabTest, 500000m, "lần", "Anti-Mullerian Hormone"),
+            ("XN-005", "Xét nghiệm tinh dịch đồ", ServiceCategory.LabTest, 300000m, "lần", "Semen Analysis"),
+            ("XN-006", "Nuôi cấy phôi", ServiceCategory.LabTest, 5000000m, "lần", "Embryo Culture"),
+            ("XN-007", "Đông lạnh phôi", ServiceCategory.LabTest, 2000000m, "lần", "Embryo Freezing"),
+            ("XN-008", "Đông lạnh tinh trùng", ServiceCategory.LabTest, 1000000m, "lần", "Sperm Freezing"),
+            
+            // Ultrasound (Siêu âm)
+            ("SA-001", "Siêu âm theo dõi nang trứng", ServiceCategory.Ultrasound, 200000m, "lần", "Follicle Monitoring"),
+            ("SA-002", "Siêu âm thai", ServiceCategory.Ultrasound, 250000m, "lần", "Pregnancy Ultrasound"),
+            
+            // Procedures (Thủ thuật)
+            ("TT-001", "Chọc hút trứng (OPU)", ServiceCategory.Procedure, 8000000m, "lần", "Oocyte Pickup"),
+            ("TT-002", "Chuyển phôi (ET)", ServiceCategory.Procedure, 5000000m, "lần", "Embryo Transfer"),
+            ("TT-003", "Rã đông phôi", ServiceCategory.Procedure, 1500000m, "lần", "Embryo Thawing"),
+            
+            // Consultation (Tư vấn)
+            ("TV-001", "Khám tư vấn IVF", ServiceCategory.Consultation, 300000m, "lần", "IVF Consultation"),
+            ("TV-002", "Tư vấn dinh dưỡng", ServiceCategory.Consultation, 200000m, "lần", "Nutrition Counseling"),
+            
+            // Andrology (Nam khoa)
+            ("NK-001", "Khám nam khoa", ServiceCategory.Andrology, 250000m, "lần", "Andrology Consultation"),
+            ("NK-002", "Lấy tinh trùng TESE", ServiceCategory.Andrology, 10000000m, "lần", "Testicular Sperm Extraction"),
+            
+            // Medications (Thuốc)
+            ("TH-001", "Gonal-F 450IU", ServiceCategory.Medication, 2500000m, "lọ", "Ovarian Stimulation"),
+            ("TH-002", "Puregon 300IU", ServiceCategory.Medication, 2000000m, "lọ", "Ovarian Stimulation"),
+            ("TH-003", "Ovitrelle 250mcg", ServiceCategory.Medication, 800000m, "lọ", "Trigger Injection"),
+        };
+
+        foreach (var (code, name, category, price, unit, description) in servicesToSeed)
+        {
+            // Check if service with this code already exists
+            var exists = await _context.ServiceCatalogs.AnyAsync(s => s.Code == code);
+            if (!exists)
+            {
+                var service = ServiceCatalog.Create(code, name, category, price, unit, description);
+                _context.ServiceCatalogs.Add(service);
+            }
+        }
+
+        await _context.SaveChangesAsync();
     }
 }

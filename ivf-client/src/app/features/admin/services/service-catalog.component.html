@@ -19,12 +19,15 @@
 
         <select [(ngModel)]="categoryFilter" (change)="loadServices()" class="filter-select">
             <option value="">Tất cả danh mục</option>
-            <option value="KhamBenh">Khám bệnh</option>
-            <option value="XetNghiem">Xét nghiệm</option>
-            <option value="SieuAm">Siêu âm</option>
-            <option value="ThuThuat">Thủ thuật</option>
-            <option value="Thuoc">Thuốc</option>
-            <option value="VatTu">Vật tư</option>
+            <option value="LabTest">Xét nghiệm</option>
+            <option value="Ultrasound">Siêu âm</option>
+            <option value="Procedure">Thủ thuật</option>
+            <option value="Medication">Thuốc</option>
+            <option value="Consultation">Tư vấn</option>
+            <option value="IVF">IVF</option>
+            <option value="Andrology">Nam khoa</option>
+            <option value="SpermBank">Ngân hàng tinh trùng</option>
+            <option value="Other">Khác</option>
         </select>
 
         <button class="btn-secondary" (click)="loadServices()">Áp dụng</button>
@@ -114,12 +117,15 @@
                 <div class="form-group">
                     <label>Danh mục <span class="required">*</span></label>
                     <select class="modern-select" [(ngModel)]="formData.category" name="category" required>
-                        <option value="KhamBenh">Khám bệnh</option>
-                        <option value="XetNghiem">Xét nghiệm</option>
-                        <option value="SieuAm">Siêu âm</option>
-                        <option value="ThuThuat">Thủ thuật</option>
-                        <option value="Thuoc">Thuốc</option>
-                        <option value="VatTu">Vật tư</option>
+                        <option value="LabTest">Xét nghiệm</option>
+                        <option value="Ultrasound">Siêu âm</option>
+                        <option value="Procedure">Thủ thuật</option>
+                        <option value="Medication">Thuốc</option>
+                        <option value="Consultation">Tư vấn</option>
+                        <option value="IVF">IVF</option>
+                        <option value="Andrology">Nam khoa</option>
+                        <option value="SpermBank">Ngân hàng tinh trùng</option>
+                        <option value="Other">Khác</option>
                     </select>
                 </div>
 

@@ -3,13 +3,13 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { LabService } from './lab.service';
-import { QueueItem, EmbryoCard, ScheduleItem, CryoLocation, LabStats } from './lab-dashboard.models';
+import { QueueItem, EmbryoCard, ScheduleItem, CryoLocation, LabStats, EmbryoReport } from './lab-dashboard.models';
 
 // Import Child Components
-import { LabQueueComponent } from './components/lab-queue.component';
-import { LabEmbryosComponent } from './components/lab-embryos.component';
-import { LabScheduleComponent } from './components/lab-schedule.component';
-import { LabCryoComponent } from './components/lab-cryo.component';
+import { LabQueueComponent } from './components/lab-queue/lab-queue.component';
+import { LabEmbryosComponent } from './components/lab-embryos/lab-embryos.component';
+import { LabScheduleComponent } from './components/lab-schedule/lab-schedule.component';
+import { LabCryoComponent } from './components/lab-cryo/lab-cryo.component';
 
 @Component({
   selector: 'app-lab-dashboard',
@@ -37,6 +37,8 @@ export class LabDashboardComponent implements OnInit {
   embryos = signal<EmbryoCard[]>([]);
   schedule = signal<ScheduleItem[]>([]);
   cryoLocations = signal<CryoLocation[]>([]);
+  activeCycles = signal<any[]>([]); // New signal for active cycles
+  doctors = signal<any[]>([]); // New signal for doctors
   stats = signal<LabStats>({
     eggRetrievalCount: 0,
     cultureCount: 0,
@@ -46,6 +48,7 @@ export class LabDashboardComponent implements OnInit {
     totalFrozenEggs: 0,
     totalFrozenSperm: 0
   });
+  embryoReport = signal<EmbryoReport[]>([]);
 
   ngOnInit(): void {
     this.refreshData();
@@ -61,6 +64,9 @@ export class LabDashboardComponent implements OnInit {
     this.labService.getSchedule(this.currentDate).subscribe(data => this.schedule.set(data));
     this.labService.getCryoLocations().subscribe(data => this.cryoLocations.set(data));
     this.labService.getStats().subscribe(data => this.stats.set(data));
+    this.labService.getActiveCycles().subscribe(data => this.activeCycles.set(data));
+    this.labService.getDoctors().subscribe(data => this.doctors.set(data));
+    this.labService.getEmbryoReport(this.currentDate).subscribe(data => this.embryoReport.set(data));
   }
 
   changeDay(days: number) {
@@ -76,6 +82,41 @@ export class LabDashboardComponent implements OnInit {
   }
 
   // --- Event Handlers ---
+
+  onSaveEmbryo(data: any) {
+    const isEdit = !!data.id;
+    const operation = isEdit
+      ? this.labService.updateEmbryo(data.id, data)
+      : this.labService.createEmbryo(data);
+
+    operation.subscribe({
+      next: () => {
+        alert(isEdit ? 'Đã cập nhật phôi thành công' : 'Đã thêm phôi thành công');
+        this.refreshData();
+      },
+      error: (err) => alert(`Lỗi khi ${isEdit ? 'cập nhật' : 'thêm'} phôi: ` + (err.error?.detail || err.message))
+    });
+  }
+
+  onDeleteEmbryo(id: string) {
+    this.labService.deleteEmbryo(id).subscribe({
+      next: () => {
+        alert('Đã xóa phôi thành công');
+        this.refreshData();
+      },
+      error: (err) => alert('Lỗi khi xóa phôi: ' + (err.error?.detail || err.message))
+    });
+  }
+
+  onAddSchedule(data: any) {
+    this.labService.scheduleProcedure(data).subscribe({
+      next: () => {
+        alert('Đã lên lịch thủ thuật thành công');
+        this.refreshData();
+      },
+      error: (err) => alert('Lỗi khi lên lịch: ' + (err.error?.detail || err.message))
+    });
+  }
 
   onCallPatient(q: QueueItem) {
     this.labService.callPatient(q.id).subscribe(() => {
@@ -104,14 +145,22 @@ export class LabDashboardComponent implements OnInit {
 
   onAddCryoLocation(location: CryoLocation) {
     this.labService.addCryoLocation(location).subscribe(() => {
-      this.cryoLocations.update(list => [...list, location]);
+      this.refreshData();
     });
+  }
+
+  onUpdateCryoLocation(location: any) {
+    this.labService.updateCryoLocation(location.tank, { used: location.used, specimenType: location.specimenType })
+      .subscribe({
+        next: () => this.refreshData(),
+        error: (err) => alert('Lỗi cập nhật: ' + (err.error?.detail || err.message))
+      });
   }
 
   onDeleteCryoLocation(tank: string) {
     this.labService.deleteCryoLocation(tank).subscribe({
       next: () => {
-        this.cryoLocations.update(list => list.filter(l => l.tank !== tank));
+        this.refreshData();
       },
       error: (err) => alert('Không thể xóa tủ: ' + (err.error?.detail || err.message))
     });

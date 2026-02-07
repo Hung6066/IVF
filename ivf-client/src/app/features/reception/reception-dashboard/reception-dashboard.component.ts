@@ -1,4 +1,4 @@
-import { Component, OnInit, signal, inject } from '@angular/core';
+import { Component, OnInit, signal, inject, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule, Router } from '@angular/router';
@@ -26,6 +26,18 @@ export class ReceptionDashboardComponent implements OnInit {
   private authService = inject(AuthService);
 
   services = signal<any[]>([]);
+  filteredServices = computed(() => {
+    const allServices = this.services();
+    const selectedDepts = this.selectedDepartments();
+
+    if (selectedDepts.length === 0) return allServices;
+
+    return allServices.filter(svc => {
+      const deptCode = this.getDeptCode(svc.category);
+      return selectedDepts.includes(deptCode);
+    });
+  });
+
 
   searchTerm = '';
   searchResults = signal<Patient[]>([]);
@@ -40,7 +52,12 @@ export class ReceptionDashboardComponent implements OnInit {
 
   showCheckinModal = false;
   selectedPatient: Patient | null = null;
-  checkinData: any = { department: ['TV'], priority: 'Normal', doctor: '', notes: '', selectedServices: [] };
+  selectedDepartments = signal<string[]>(['TV']);
+  checkinData: any = { priority: 'Normal', doctor: '', notes: '', selectedServices: [] };
+
+  get department() {
+    return this.selectedDepartments();
+  }
 
   departments = [
     { code: 'TV', name: 'Tư vấn (TV)' },
@@ -113,7 +130,8 @@ export class ReceptionDashboardComponent implements OnInit {
 
   checkinPatient(patient: Patient): void {
     this.selectedPatient = patient;
-    this.checkinData = { department: ['TV'], priority: 'Normal', doctor: '', notes: '', selectedServices: [] };
+    this.selectedDepartments.set(['TV']);
+    this.checkinData = { priority: 'Normal', doctor: '', notes: '', selectedServices: [] };
     this.showCheckinModal = true;
   }
 
@@ -156,20 +174,17 @@ export class ReceptionDashboardComponent implements OnInit {
   }
 
   toggleDept(code: string) {
-    if (!Array.isArray(this.checkinData.department)) {
-      this.checkinData.department = [this.checkinData.department || 'TV'];
-    }
-    const idx = this.checkinData.department.indexOf(code);
+    const current = this.selectedDepartments();
+    const idx = current.indexOf(code);
     if (idx >= 0) {
-      this.checkinData.department.splice(idx, 1);
+      this.selectedDepartments.set(current.filter(d => d !== code));
     } else {
-      this.checkinData.department.push(code);
+      this.selectedDepartments.set([...current, code]);
     }
   }
 
   isDeptSelected(code: string): boolean {
-    if (!Array.isArray(this.checkinData.department)) return this.checkinData.department === code;
-    return this.checkinData.department.includes(code);
+    return this.selectedDepartments().includes(code);
   }
 
   submitCheckin(): void {
@@ -179,7 +194,7 @@ export class ReceptionDashboardComponent implements OnInit {
     const deptsToIssue = new Set<string>();
 
     // Add manually selected departments
-    const manualArr = Array.isArray(this.checkinData.department) ? this.checkinData.department : [this.checkinData.department];
+    const manualArr = this.selectedDepartments();
     manualArr.forEach((d: string) => deptsToIssue.add(d));
 
     const servicesByDept = new Map<string, string[]>();

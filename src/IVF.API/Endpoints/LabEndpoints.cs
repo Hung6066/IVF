@@ -1,3 +1,4 @@
+using IVF.API.Contracts;
 using IVF.Application.Features.Lab.Commands;
 using IVF.Application.Features.Lab.Queries;
 using MediatR;
@@ -33,6 +34,12 @@ public static class LabEndpoints
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
         });
 
+        group.MapPost("/schedule", async ([FromBody] CreateLabScheduleCommand command, ISender sender) =>
+        {
+            var result = await sender.Send(command);
+            return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
+        });
+
         // Cryo Locations
         group.MapGet("/cryo-locations", async (ISender sender) =>
         {
@@ -49,6 +56,19 @@ public static class LabEndpoints
         group.MapDelete("/cryo-locations/{tank}", async (string tank, ISender sender) =>
         {
             var result = await sender.Send(new DeleteCryoLocationCommand(tank));
+            return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
+        });
+
+        group.MapPut("/cryo-locations/{tank}", async (string tank, [FromBody] UpdateCryoTankRequest req, ISender sender) =>
+        {
+            var result = await sender.Send(new UpdateCryoTankCommand(tank, req.Used, req.SpecimenType));
+            return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
+        });
+
+        // Embryo Report
+        group.MapGet("/embryo-report", async ([AsParameters] GetEmbryoReportQuery query, ISender sender) =>
+        {
+            var result = await sender.Send(query);
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
         });
     }

@@ -40,17 +40,20 @@ public class GetActiveEmbryosHandler : IRequestHandler<GetActiveEmbryosQuery, IR
         var active = await _repo.GetActiveAsync(ct);
         return active.Select(e => new EmbryoActiveDto(
             e.Id,
+            e.CycleId,
             e.Cycle?.CycleCode ?? "",
             e.Cycle?.Couple?.Wife?.FullName ?? "",
             e.EmbryoNumber,
             e.Grade?.ToString() ?? "",
             e.Day.ToString(),
-            e.Status.ToString()
+            e.Status.ToString(),
+            e.FertilizationDate,
+            e.CryoLocation?.Tank // Added location tank name
         )).ToList();
     }
 }
 
-public record EmbryoActiveDto(Guid Id, string CycleCode, string PatientName, int Number, string Grade, string Day, string Status);
+public record EmbryoActiveDto(Guid Id, Guid CycleId, string CycleCode, string PatientName, int Number, string Grade, string Day, string Status, DateTime FertilizationDate, string? Location);
 
 // ==================== GET CRYO STATS ====================
 public record GetCryoStorageStatsQuery() : IRequest<IReadOnlyList<CryoStatsDto>>;

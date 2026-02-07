@@ -1,0 +1,43 @@
+<section class="content-section card">
+    <div class="section-header">
+        <h2>Danh sách chờ ({{ queue.length }})</h2>
+    </div>
+    <div class="table-container">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>STT</th>
+                    <th>Họ tên</th>
+                    <th>Mã BN</th>
+                    <th>Giờ lấy số</th>
+                    <th>Trạng thái</th>
+                    <th>Thao tác</th>
+                </tr>
+            </thead>
+            <tbody>
+                @for (q of queue; track q.id) {
+                <tr>
+                    <td class="stt">{{ q.number }}</td>
+                    <td>{{ q.patientName }}</td>
+                    <td class="code">{{ q.patientCode }}</td>
+                    <td>{{ formatTime(q.issueTime) }}</td>
+                    <td>
+                        @if (q.status === 'Waiting') { <span class="badge badge-warning">Đang chờ</span> }
+                        @else if (q.status === 'Called') { <span class="badge badge-info">Đang gọi</span> }
+                        @else if (q.status === 'InService') { <span class="badge badge-success">Đang làm</span> }
+                        @else { <span class="badge badge-neutral">{{ q.status }}</span> }
+                    </td>
+                    <td>
+                        <button class="btn btn-warning btn-sm" (click)="onCall(q)">📢 Gọi</button>
+                        <button class="btn btn-primary btn-sm" (click)="onStart(q)">🧪 Thực hiện</button>
+                    </td>
+                </tr>
+                } @empty {
+                <tr>
+                    <td colspan="6" class="empty-state">Không có bệnh nhân chờ</td>
+                </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</section>

@@ -1,11 +1,15 @@
+import { ScheduleType, ScheduleStatus } from '../../../core/constants/lab.constants';
+
 export interface EmbryoCard {
     id: string;
+    cycleId: string;
     cycleCode: string;
     patientName: string;
     embryoNumber: number;
     grade: string;
     day: string;
     status: string;
+    fertilizationDate: string;
     location?: string;
     notes?: string;
 }
@@ -16,8 +20,8 @@ export interface ScheduleItem {
     patientName: string;
     cycleCode: string;
     procedure: string;
-    type: 'retrieval' | 'transfer' | 'report';
-    status: 'pending' | 'done';
+    type: ScheduleType;
+    status: ScheduleStatus;
 }
 
 export interface CryoLocation {
@@ -27,6 +31,7 @@ export interface CryoLocation {
     goblet: number;
     available: number;
     used: number;
+    specimenType?: number;
 }
 
 export interface QueueItem {
@@ -46,4 +51,18 @@ export interface LabStats {
     totalFrozenEmbryos: number;
     totalFrozenEggs: number;
     totalFrozenSperm: number;
+}
+
+export interface EmbryoReport {
+    cycleCode: string;
+    patientName: string;
+    aspirationDate: string;
+    totalEggs: number;
+    mII: number;
+    twoPN: number;
+    d3: number;
+    d5D6: string;
+    transferred: number;
+    frozen: number;
+    status: string;
 }

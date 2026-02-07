@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { UltrasoundService } from '../../../core/services/ultrasound.service';
+import { DateService } from '../../../core/services/date.service';
 
 @Component({
   selector: 'app-ultrasound-form',
@@ -29,7 +30,8 @@ export class UltrasoundFormComponent implements OnInit {
   constructor(
     private route: ActivatedRoute,
     private router: Router,
-    private ultrasoundService: UltrasoundService
+    private ultrasoundService: UltrasoundService,
+    private dateService: DateService
   ) { }
 
   ngOnInit(): void {
@@ -40,10 +42,13 @@ export class UltrasoundFormComponent implements OnInit {
 
   submit(): void {
     this.saving.set(true);
-    this.ultrasoundService.createUltrasound({
+    const payload = {
       cycleId: this.cycleId,
-      ...this.formData
-    } as any).subscribe({
+      ...this.formData,
+      examDate: this.dateService.toISOString(this.formData.examDate)
+    };
+
+    this.ultrasoundService.createUltrasound(payload as any).subscribe({
       next: () => {
         this.saving.set(false);
         this.goBack();

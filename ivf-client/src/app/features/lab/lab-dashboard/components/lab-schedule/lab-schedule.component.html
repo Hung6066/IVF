@@ -1,0 +1,61 @@
+<section class="content-section card">
+    <div class="section-header">
+        <h2>Lịch thủ thuật - {{ currentDate | date:'dd/MM/yyyy' }}</h2>
+        <button class="btn btn-primary btn-sm" (click)="onAdd()">➕ Lên lịch</button>
+    </div>
+    <div class="schedule-grid">
+        <div class="schedule-column">
+            <h3>🥚 Chọc hút ({{ getByType('retrieval').length }})</h3>
+            @for (item of getByType('retrieval'); track item.id) {
+            <div class="schedule-item retrieval" [class.done]="item.status === 'done'">
+                <span class="time">{{ item.time }}</span>
+                <div class="details">
+                    <strong>{{ item.patientName }}</strong>
+                    <span>{{ item.cycleCode }}</span>
+                </div>
+                <button class="btn-status" (click)="onToggle(item)">{{ item.status === 'done' ? '✓' : '○' }}</button>
+            </div>
+            } @empty {
+            <div class="empty-schedule">Không có lịch</div>
+            }
+        </div>
+
+        <div class="schedule-column">
+            <h3>💉 Chuyển phôi ({{ getByType('transfer').length }})</h3>
+            @for (item of getByType('transfer'); track item.id) {
+            <div class="schedule-item transfer" [class.done]="item.status === 'done'">
+                <span class="time">{{ item.time }}</span>
+                <div class="details">
+                    <strong>{{ item.patientName }}</strong>
+                    <span>{{ item.cycleCode }} - {{ item.procedure }}</span>
+                </div>
+                <button class="btn-status" (click)="onToggle(item)">{{ item.status === 'done' ? '✓' : '○' }}</button>
+            </div>
+            } @empty {
+            <div class="empty-schedule">Không có lịch</div>
+            }
+        </div>
+
+        <div class="schedule-column">
+            <h3>📋 Báo phôi ({{ getByType('report').length }})</h3>
+            @for (item of getByType('report'); track item.id) {
+            <div class="schedule-item report" [class.done]="item.status === 'done'">
+                <span class="time">{{ item.time }}</span>
+                <div class="details">
+                    <strong>{{ item.patientName }}</strong>
+                    <span>{{ item.cycleCode }} - {{ item.procedure }}</span>
+                </div>
+                <button class="btn-status" (click)="onToggle(item)">{{ item.status === 'done' ? '✓' : '○' }}</button>
+            </div>
+            } @empty {
+            <div class="empty-schedule">Không có lịch</div>
+            }
+        </div>
+    </div>
+</section>
+
+@if (showDialog) {
+<app-schedule-dialog [initialDate]="currentDate" [activeCycles]="activeCycles" [doctors]="doctors"
+    (save)="onSave($event)" (cancel)="onCancel()">
+</app-schedule-dialog>
+}

@@ -1,0 +1,60 @@
+<div class="modal-overlay" (click)="close()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+            <h2>📅 Lịch thủ thuật</h2>
+            <button class="close-btn" (click)="close()">×</button>
+        </div>
+        <form (ngSubmit)="onSubmit()">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Loại thủ thuật *</label>
+                    <select [(ngModel)]="schedule.type" name="type" required class="form-control">
+                        <option [value]="ScheduleTypes.RETRIEVAL">Chọc hút trứng (Opu)</option>
+                        <option [value]="ScheduleTypes.TRANSFER">Chuyển phôi (Transfer)</option>
+                        <option [value]="ScheduleTypes.REPORT">Báo phôi (Report)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Chọn hồ sơ (Cycle) *</label>
+                    <select [(ngModel)]="schedule.cycleId" name="cycleId" required class="form-control"
+                        (change)="onCycleChange()">
+                        <option value="" disabled>-- Chọn hồ sơ --</option>
+                        @for (cycle of activeCycles; track cycle.id) {
+                        <option [value]="cycle.id">
+                            {{ cycle.cycleCode }} - {{ cycle.wifeName }}
+                        </option>
+                        }
+                    </select>
+                </div>
+
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">Ngày thực hiện *</label>
+                        <input type="date" [(ngModel)]="schedule.date" name="date" required class="form-control" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Giờ *</label>
+                        <input type="time" [(ngModel)]="schedule.time" name="time" required class="form-control" />
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Bác sĩ thực hiện</label>
+                    <select [(ngModel)]="schedule.doctorName" name="doctorName" class="form-control">
+                        <option value="" disabled>-- Chọn bác sĩ --</option>
+                        @for (doc of doctors; track doc.id) {
+                        <option [value]="doc.fullName">
+                            {{ doc.fullName }} {{ doc.department ? '- ' + doc.department : '' }}
+                        </option>
+                        }
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" (click)="close()">Huỷ</button>
+                <button type="submit" class="btn btn-primary">Lên lịch</button>
+            </div>
+        </form>
+    </div>
+</div>

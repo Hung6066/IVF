@@ -46,6 +46,25 @@ public class GetCyclesByCoupleHandler : IRequestHandler<GetCyclesByCoupleQuery, 
     }
 }
 
+// ==================== GET ACTIVE CYCLES ====================
+public record GetActiveCyclesQuery() : IRequest<IReadOnlyList<CycleDto>>;
+
+public class GetActiveCyclesHandler : IRequestHandler<GetActiveCyclesQuery, IReadOnlyList<CycleDto>>
+{
+    private readonly ITreatmentCycleRepository _cycleRepo;
+
+    public GetActiveCyclesHandler(ITreatmentCycleRepository cycleRepo)
+    {
+        _cycleRepo = cycleRepo;
+    }
+
+    public async Task<IReadOnlyList<CycleDto>> Handle(GetActiveCyclesQuery request, CancellationToken ct)
+    {
+        var cycles = await _cycleRepo.GetActiveCyclesAsync(ct);
+        return cycles.Select(CycleDto.FromEntity).ToList();
+    }
+}
+
 // ==================== DETAIL DTO ====================
 public record CycleDetailDto(
     Guid Id,

@@ -17,6 +17,8 @@ public interface ITreatmentCycleRepository
     // Lab Dashboard
     Task<Dictionary<IVF.Domain.Enums.CyclePhase, int>> GetPhaseCountsAsync(CancellationToken ct = default);
     Task<List<LabScheduleDto>> GetLabScheduleAsync(DateTime date, CancellationToken ct = default);
+    Task<IReadOnlyList<TreatmentCycle>> GetActiveCyclesAsync(CancellationToken ct = default);
+    Task<IReadOnlyList<TreatmentCycle>> GetAllWithDetailsAsync(CancellationToken ct = default);
 }
 
 public class LabScheduleDto

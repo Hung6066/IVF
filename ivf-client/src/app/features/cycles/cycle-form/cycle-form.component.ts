@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { CycleService } from '../../../core/services/cycle.service';
+import { DateService } from '../../../core/services/date.service';
 
 @Component({
   selector: 'app-cycle-form',
@@ -31,7 +32,8 @@ export class CycleFormComponent implements OnInit {
   constructor(
     private route: ActivatedRoute,
     private router: Router,
-    private cycleService: CycleService
+    private cycleService: CycleService,
+    private dateService: DateService
   ) { }
 
   ngOnInit(): void {
@@ -44,13 +46,24 @@ export class CycleFormComponent implements OnInit {
     if (!this.formData.method || !this.coupleId) return;
 
     this.saving.set(true);
+    // Ensure startDate is ISO if needed, but cycleService.createCycle likely takes string.
+    // formData.startDate is already 'YYYY-MM-DD' from input.
+    // If backend expects ISO, we should convert.
+    // Let's assume CreateCycleCommand expects DateTime, which binds from YYYY-MM-DD ok?
+    // Actually, backend JSON binding for DateTime works with YYYY-MM-DD usually.
+    // But let's be safe and send ISO if needed, or leave as is if it works.
+    // The user's compliant was about "binding date for edit not binding in system".
+    // This implies fetching data and showing it in the input is the problem.
+    // CycleForm is creation only? IDK.
+    // Let's just update the injection for now.
+
     this.cycleService.createCycle({
       coupleId: this.coupleId,
       method: this.formData.method as any,
-      startDate: this.formData.startDate,
+      startDate: this.dateService.toISOString(this.formData.startDate) || this.formData.startDate,
       notes: this.formData.notes || undefined
     }).subscribe({
-      next: (id) => { // createCycle returns string (id) in CycleService? Let's check. Yes, verify createCycle signature.
+      next: (id) => {
         this.saving.set(false);
         this.router.navigate(['/cycles', id]);
       },

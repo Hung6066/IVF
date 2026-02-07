@@ -16,8 +16,10 @@ public record SetDonorRequest(Guid DonorId);
 public record AdvancePhaseRequest(CyclePhase Phase);
 public record CompleteRequest(CycleOutcome Outcome);
 public record RecordFolliclesRequest(int? LeftOvaryCount, int? RightOvaryCount, string? LeftFollicles, string? RightFollicles, decimal? EndometriumThickness, string? Findings);
-public record UpdateGradeRequest(EmbryoGrade Grade, EmbryoDay Day);
+public record UpdateGradeRequest(string Grade, EmbryoDay Day);
+
 public record FreezeRequest(Guid CryoLocationId);
+public record UpdateCryoTankRequest(int Used, SpecimenType SpecimenType);
 
 // Andrology
 public record RecordMacroscopicRequest(decimal? Volume, string? Appearance, string? Liquefaction, decimal? Ph);

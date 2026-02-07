@@ -1,0 +1,82 @@
+<div class="modal-overlay" (click)="close()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+            <h2>{{ isEdit ? '✏️ Cập nhật phôi' : '➕ Thêm phôi mới' }}</h2>
+            <button class="close-btn" (click)="close()">×</button>
+        </div>
+        <form (ngSubmit)="onSubmit()">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Chọn hồ sơ (Cycle) *</label>
+                    <select [(ngModel)]="embryo.cycleId" name="cycleId" required class="form-control"
+                        [disabled]="isEdit" (change)="onCycleChange()">
+                        <option value="" disabled>-- Chọn hồ sơ --</option>
+                        @for (cycle of activeCycles; track cycle.id) {
+                        <option [value]="cycle.id">
+                            {{ cycle.cycleCode }} - {{ cycle.wifeName }}
+                        </option>
+                        }
+                    </select>
+                </div>
+
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">Ngày thụ tinh *</label>
+                        <input type="date" [(ngModel)]="embryo.fertilizationDate" name="fertilizationDate" required
+                            class="form-control" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Số phôi *</label>
+                        <input type="number" [(ngModel)]="embryo.embryoNumber" name="number" required min="1"
+                            class="form-control" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Ngày nuôi (Day)</label>
+                        <select [(ngModel)]="embryo.day" name="day" class="form-control">
+                            <option value="D3">Ngày 3</option>
+                            <option value="D5">Ngày 5</option>
+                            <option value="D6">Ngày 6</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Chất lượng (Grade) *</label>
+                    <input type="text" [(ngModel)]="embryo.grade" name="grade" required placeholder="VD: 4AA, 3AB..."
+                        class="form-control" />
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Trạng thái</label>
+                    <select [(ngModel)]="embryo.status" name="status" class="form-control">
+                        <option value="Developing">Đang nuôi (Developing)</option>
+                        <option value="Frozen">Đông lạnh (Frozen)</option>
+                        <option value="Transferred">Đã chuyển (Transferred)</option>
+                        <option value="Discarded">Loại bỏ (Discarded)</option>
+                    </select>
+                </div>
+
+                @if (embryo.status === 'Frozen') {
+                <div class="form-group">
+                    <label class="form-label">Vị trí lưu trữ</label>
+                    <select [(ngModel)]="embryo.location" name="location" class="form-control">
+                        <option value="" disabled>-- Chọn vị trí --</option>
+                        @for (loc of cryoLocations; track loc.tank) {
+                        <option [value]="loc.tank">
+                            {{ loc.tank }} (Còn: {{ loc.available }})
+                        </option>
+                        }
+                    </select>
+                </div>
+                }
+            </div>
+            <div class="modal-footer">
+                @if (isEdit) {
+                <button type="button" class="btn btn-danger" (click)="onDelete()">🗑️ Xóa phôi</button>
+                }
+                <button type="button" class="btn btn-secondary" (click)="close()">Huỷ</button>
+                <button type="submit" class="btn btn-primary">Lưu thông tin</button>
+            </div>
+        </form>
+    </div>
+</div>

@@ -1,0 +1,41 @@
+<section class="content-section card">
+    <div class="section-header">
+        <h2>Quản lý kho đông lạnh</h2>
+        <button class="btn btn-primary" (click)="onAdd()">➕ Thêm vị trí</button>
+    </div>
+    <div class="cryo-grid">
+        @for (loc of locations; track loc.tank) {
+        <div class="cryo-tank">
+            <div class="tank-header">
+                <span class="tank-name">🧊 {{ loc.tank }}</span>
+                <div class="actions">
+                    <button class="btn-xs" (click)="onEdit(loc)" title="Cập nhật">✏️</button>
+                    <button class="btn-delete-sm" (click)="onDelete(loc.tank)" title="Xóa tủ">🗑️</button>
+                </div>
+                <span class="tank-capacity">{{ loc.used }}/{{ loc.available + loc.used }}</span>
+            </div>
+            <div class="tank-bar">
+                <div class="tank-fill" [style.width.%]="(loc.used / (loc.available + loc.used)) * 100"></div>
+            </div>
+            <div class="tank-details">
+                <span>{{ loc.canister }} canisters</span>
+                <span>{{ loc.cane }} canes</span>
+                <span>{{ loc.goblet }} goblets</span>
+            </div>
+        </div>
+        }
+    </div>
+    <div class="cryo-summary">
+        <div class="summary-item"><span class="label">Tổng phôi đông lạnh</span><span class="value">{{
+                stats.totalFrozenEmbryos }}</span></div>
+        <div class="summary-item"><span class="label">Tổng trứng đông lạnh</span><span class="value">{{
+                stats.totalFrozenEggs }}</span></div>
+        <div class="summary-item"><span class="label">Tổng tinh trùng đông lạnh</span><span class="value">{{
+                stats.totalFrozenSperm }}</span></div>
+    </div>
+</section>
+
+@if (showDialog) {
+<app-cryo-dialog [location]="selectedLocation" [isEdit]="isEdit" (save)="onSave($event)" (cancel)="onCancel()">
+</app-cryo-dialog>
+}

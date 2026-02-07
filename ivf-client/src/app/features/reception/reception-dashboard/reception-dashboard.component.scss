@@ -282,13 +282,41 @@
     border-top: 1px dashed #e2e8f0;
 }
 
+.services-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.services-total-inline {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: linear-gradient(135deg, #e0e7ff, #f0f5ff);
+    border-radius: 8px;
+
+    span {
+        color: #4338ca;
+        font-size: 0.85rem;
+    }
+
+    strong {
+        font-size: 1rem;
+        color: #1e40af;
+    }
+}
+
 .services-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     gap: 0.5rem;
-    max-height: 250px;
+    max-height: 180px; // Reduced from 250px for better footer visibility
     overflow-y: auto;
+    overflow-x: hidden; // Prevent horizontal scroll
     padding: 0.5rem;
+    padding-bottom: 1rem; // Extra padding at bottom for better visibility
     background: #f8fafc;
     border-radius: 8px;
     margin-top: 0.5rem;
@@ -431,4 +459,162 @@
 
 .large-modal {
     max-width: 800px !important;
+}
+
+// Modal styles
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 1rem;
+}
+
+.modal-content {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    max-width: 600px;
+    width: 100%;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.5rem;
+    border-bottom: 1px solid #e2e8f0;
+    background: white;
+
+    h3 {
+        margin: 0;
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: #1e293b;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+
+        &::before {
+            content: '📝';
+            font-size: 1.5rem;
+        }
+    }
+
+    .close-btn {
+        background: none;
+        border: none;
+        font-size: 1.5rem;
+        color: #64748b;
+        cursor: pointer;
+        padding: 0;
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        transition: all 0.2s;
+
+        &:hover {
+            background: #f1f5f9;
+            color: #1e293b;
+        }
+    }
+}
+
+.modal-body {
+    padding: 1.5rem;
+    padding-bottom: 0.5rem; // Reduce bottom padding
+    overflow-y: auto;
+    overflow-x: hidden; // Prevent horizontal scroll
+    flex: 1;
+    max-height: calc(80vh - 180px); // More space for footer
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    padding: 1.5rem;
+    border-top: 1px solid #e2e8f0;
+    background: white;
+
+    button {
+        padding: 0.75rem 1.5rem;
+        border-radius: 8px;
+        font-weight: 500;
+        font-size: 0.95rem;
+        cursor: pointer;
+        transition: all 0.2s;
+
+        &.btn-secondary {
+            background: white;
+            border: 1px solid #cbd5e1;
+            color: #475569;
+
+            &:hover {
+                background: #f8fafc;
+                border-color: #94a3b8;
+            }
+        }
+
+        &.btn-primary {
+            background: #6366f1;
+            border: 1px solid #6366f1;
+            color: white;
+
+            &:hover {
+                background: #4f46e5;
+            }
+        }
+    }
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+
+    .form-label {
+        display: block;
+        font-weight: 600;
+        color: #1e293b;
+        margin-bottom: 0.5rem;
+        font-size: 0.95rem;
+    }
+
+    .form-control {
+        width: 100%;
+        padding: 0.75rem;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        font-size: 0.95rem;
+        transition: border-color 0.2s;
+
+        &:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+        }
+    }
+
+    textarea.form-control {
+        resize: vertical;
+        min-height: 80px;
+    }
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
 }

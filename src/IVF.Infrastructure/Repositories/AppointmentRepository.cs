@@ -40,6 +40,7 @@ public class AppointmentRepository : IAppointmentRepository
     public async Task<IReadOnlyList<Appointment>> GetByDateRangeAsync(DateTime start, DateTime end, CancellationToken ct = default)
         => await _context.Appointments
             .Include(a => a.Patient)
+            .Include(a => a.Cycle)
             .Include(a => a.Doctor).ThenInclude(d => d!.User)
             .Where(a => a.ScheduledAt >= start && a.ScheduledAt <= end)
             .OrderBy(a => a.ScheduledAt)

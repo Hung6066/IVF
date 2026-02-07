@@ -155,13 +155,13 @@ public static class DatabaseSeeder
 
             // Seed Embryos
             var embryo1 = Embryo.Create(cycle1.Id, 1, DateTime.UtcNow.AddDays(-3));
-            embryo1.UpdateGrade(EmbryoGrade.AA, EmbryoDay.D3);
+            embryo1.UpdateGrade("AA", EmbryoDay.D3);
 
             var embryo2 = Embryo.Create(cycle1.Id, 2, DateTime.UtcNow.AddDays(-3));
-            embryo2.UpdateGrade(EmbryoGrade.AB, EmbryoDay.D3);
+            embryo2.UpdateGrade("AB", EmbryoDay.D3);
 
             var embryo3 = Embryo.Create(cycle1.Id, 3, DateTime.UtcNow.AddDays(-3));
-            embryo3.UpdateGrade(EmbryoGrade.BB, EmbryoDay.D3);
+            embryo3.UpdateGrade("BB", EmbryoDay.D3);
 
             context.Embryos.AddRange(embryo1, embryo2, embryo3);
 

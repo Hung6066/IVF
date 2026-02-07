@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
 import { PatientService } from '../../../core/services/patient.service';
+import { DateService } from '../../../core/services/date.service';
 
 @Component({
   selector: 'app-patient-form',
@@ -26,7 +27,11 @@ export class PatientFormComponent {
     address: ''
   };
 
-  constructor(private patientService: PatientService, private router: Router) { }
+  constructor(
+    private patientService: PatientService,
+    private router: Router,
+    private dateService: DateService
+  ) { }
 
   submit(): void {
     if (!this.formData.fullName || !this.formData.dateOfBirth) {
@@ -34,7 +39,13 @@ export class PatientFormComponent {
     }
 
     this.saving.set(true);
-    this.patientService.createPatient(this.formData as any).subscribe({
+    // Convert to ISO for backend
+    const payload = {
+      ...this.formData,
+      dateOfBirth: this.dateService.toISOString(this.formData.dateOfBirth)
+    };
+
+    this.patientService.createPatient(payload as any).subscribe({
       next: (patient) => {
         this.saving.set(false);
         this.router.navigate(['/patients', patient.id]);

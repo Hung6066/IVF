@@ -64,18 +64,21 @@
     }
 
     @if (activeTab === 'embryos') {
-    <app-lab-embryos [embryos]="embryos()" [currentDate]="currentDate" (selectEmbryo)="onSelectEmbryo($event)">
+    <app-lab-embryos [embryos]="embryos()" [activeCycles]="activeCycles()" [cryoLocations]="cryoLocations()"
+        [currentDate]="currentDate" (selectEmbryo)="onSelectEmbryo($event)" (saveEmbryo)="onSaveEmbryo($event)"
+        (deleteEmbryo)="onDeleteEmbryo($event)">
     </app-lab-embryos>
     }
 
     @if (activeTab === 'schedule') {
-    <app-lab-schedule [schedule]="schedule()" [currentDate]="currentDate" (toggleStatus)="onToggleSchedule($event)">
+    <app-lab-schedule [schedule]="schedule()" [activeCycles]="activeCycles()" [doctors]="doctors()"
+        [currentDate]="currentDate" (toggleStatus)="onToggleSchedule($event)" (addSchedule)="onAddSchedule($event)">
     </app-lab-schedule>
     }
 
     @if (activeTab === 'cryo') {
     <app-lab-cryo [locations]="cryoLocations()" [stats]="stats()" (addLocation)="onAddCryoLocation($event)"
-        (deleteLocation)="onDeleteCryoLocation($event)">
+        (updateLocation)="onUpdateCryoLocation($event)" (deleteLocation)="onDeleteCryoLocation($event)">
     </app-lab-cryo>
     }
 
@@ -106,32 +109,30 @@
                     </tr>
                 </thead>
                 <tbody>
+                    @for (row of embryoReport(); track row.cycleCode) {
                     <tr>
-                        <td class="code">CK-001</td>
-                        <td>Nguyễn T.H</td>
-                        <td>28/01</td>
-                        <td>15</td>
-                        <td>12</td>
-                        <td>10</td>
-                        <td>8</td>
-                        <td>6 (4AA, 4BA, 3AB...)</td>
-                        <td>2</td>
-                        <td>4</td>
-                        <td><span class="badge badge-success">Hoàn thành</span></td>
+                        <td class="code">{{ row.cycleCode }}</td>
+                        <td>{{ row.patientName }}</td>
+                        <td>{{ row.aspirationDate }}</td>
+                        <td>{{ row.totalEggs }}</td>
+                        <td>{{ row.mII }}</td>
+                        <td>{{ row.twoPN }}</td>
+                        <td>{{ row.d3 }}</td>
+                        <td>{{ row.d5D6 }}</td>
+                        <td>{{ row.transferred > 0 ? row.transferred : '—' }}</td>
+                        <td>{{ row.frozen > 0 ? row.frozen : '—' }}</td>
+                        <td>
+                            <span class="badge" [class.badge-success]="row.status === 'Hoàn thành'"
+                                [class.badge-info]="row.status !== 'Hoàn thành'">
+                                {{ row.status }}
+                            </span>
+                        </td>
                     </tr>
+                    } @empty {
                     <tr>
-                        <td class="code">CK-002</td>
-                        <td>Trần M.L</td>
-                        <td>29/01</td>
-                        <td>8</td>
-                        <td>6</td>
-                        <td>5</td>
-                        <td>4</td>
-                        <td>—</td>
-                        <td>—</td>
-                        <td>—</td>
-                        <td><span class="badge badge-info">D3</span></td>
+                        <td colspan="11" class="text-center text-muted">Không có dữ liệu</td>
                     </tr>
+                    }
                 </tbody>
             </table>
         </div>

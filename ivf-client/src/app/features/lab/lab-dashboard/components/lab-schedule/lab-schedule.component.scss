@@ -1,0 +1,80 @@
+.schedule-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+}
+
+.schedule-column h3 {
+    font-size: 0.9rem;
+    color: var(--text-main);
+    margin: 0 0 1rem;
+}
+
+.schedule-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    background: var(--bg-card);
+    border-radius: var(--radius-md);
+    margin-bottom: 0.5rem;
+    border-left: 3px solid var(--primary);
+}
+
+.schedule-item.retrieval {
+    border-left-color: var(--warning);
+}
+
+.schedule-item.transfer {
+    border-left-color: var(--success);
+}
+
+.schedule-item.report {
+    border-left-color: var(--secondary);
+}
+
+.schedule-item.done {
+    opacity: 0.6;
+}
+
+.time {
+    font-weight: 600;
+    color: var(--primary);
+    font-size: 0.8rem;
+    min-width: 45px;
+}
+
+.details {
+    flex: 1;
+}
+
+.details strong {
+    display: block;
+    font-size: 0.8rem;
+}
+
+.details span {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+}
+
+.btn-status {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 2px solid var(--primary);
+    background: white;
+    cursor: pointer;
+    font-size: 0.75rem;
+    color: var(--primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.empty-schedule {
+    text-align: center;
+    color: var(--text-light);
+    padding: 1rem;
+    font-size: 0.8rem;
+}

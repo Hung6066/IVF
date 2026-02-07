@@ -20,6 +20,9 @@ public static class CycleEndpoints
         group.MapGet("/couple/{coupleId:guid}", async (Guid coupleId, IMediator m) =>
             Results.Ok(await m.Send(new GetCyclesByCoupleQuery(coupleId))));
 
+        group.MapGet("/active", async (IMediator m) =>
+            Results.Ok(await m.Send(new GetActiveCyclesQuery())));
+
         group.MapPost("/", async (CreateCycleCommand cmd, IMediator m) =>
         {
             var r = await m.Send(cmd);

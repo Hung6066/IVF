@@ -1,4 +1,5 @@
 using IVF.Application.Common.Interfaces;
+using IVF.Domain.Constants;
 using IVF.Domain.Entities;
 using IVF.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -79,7 +80,7 @@ public class TreatmentCycleRepository : ITreatmentCycleRepository
 
     public async Task<List<LabScheduleDto>> GetLabScheduleAsync(DateTime date, CancellationToken ct = default)
     {
-        var queryDate = date.Date;
+        var queryDate = DateTime.SpecifyKind(date.Date, DateTimeKind.Utc);
         var list = new List<LabScheduleDto>();
 
         // Retrievals
@@ -95,8 +96,8 @@ public class TreatmentCycleRepository : ITreatmentCycleRepository
             PatientName = r.Cycle.Couple?.Wife?.FullName ?? "Unknown",
             CycleCode = r.Cycle.CycleCode,
             Procedure = "Chọc hút",
-            Type = "retrieval",
-            Status = r.Cycle.CurrentPhase > IVF.Domain.Enums.CyclePhase.EggRetrieval ? "done" : "pending"
+            Type = ScheduleTypes.Retrieval,
+            Status = r.Cycle.CurrentPhase > IVF.Domain.Enums.CyclePhase.EggRetrieval ? ScheduleStatuses.Done : ScheduleStatuses.Pending
         }));
 
         // Transfers
@@ -112,10 +113,31 @@ public class TreatmentCycleRepository : ITreatmentCycleRepository
             PatientName = t.Cycle.Couple?.Wife?.FullName ?? "Unknown",
             CycleCode = t.Cycle.CycleCode,
             Procedure = "Chuyển phôi",
-            Type = "transfer",
-            Status = t.Cycle.CurrentPhase > IVF.Domain.Enums.CyclePhase.EmbryoTransfer ? "done" : "pending"
+            Type = ScheduleTypes.Transfer,
+            Status = t.Cycle.CurrentPhase > IVF.Domain.Enums.CyclePhase.EmbryoTransfer ? ScheduleStatuses.Done : ScheduleStatuses.Pending
         }));
 
         return list.OrderBy(x => x.Time).ToList();
     }
+
+    public async Task<IReadOnlyList<TreatmentCycle>> GetActiveCyclesAsync(CancellationToken ct = default)
+    {
+        return await _context.TreatmentCycles
+            .Include(c => c.Couple).ThenInclude(cp => cp.Wife)
+            .Include(c => c.Couple).ThenInclude(cp => cp.Husband)
+            .Where(c => c.Outcome == Domain.Enums.CycleOutcome.Ongoing)
+            .OrderByDescending(c => c.StartDate)
+            .ToListAsync(ct);
+    }
+
+    public async Task<IReadOnlyList<TreatmentCycle>> GetAllWithDetailsAsync(CancellationToken ct = default)
+    {
+        return await _context.TreatmentCycles
+            .Include(c => c.Couple).ThenInclude(cp => cp.Wife)
+            .Include(c => c.Couple).ThenInclude(cp => cp.Husband)
+            .Include(c => c.Stimulation)
+            .OrderByDescending(c => c.StartDate)
+            .ToListAsync(ct);
+    }
 }
+

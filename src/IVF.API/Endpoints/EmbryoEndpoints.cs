@@ -26,6 +26,14 @@ public static class EmbryoEndpoints
             return r.IsSuccess ? Results.Created($"/api/embryos/{r.Value!.Id}", r.Value) : Results.BadRequest(r.Error);
         });
 
+        group.MapPut("/{id:guid}", async (Guid id, UpdateEmbryoCommand cmd, IMediator m) =>
+        {
+            if (id != cmd.Id)
+                return Results.BadRequest("ID mismatch");
+            var r = await m.Send(cmd);
+            return r.IsSuccess ? Results.Ok(r.Value) : Results.BadRequest(r.Error);
+        });
+
         group.MapPut("/{id:guid}/grade", async (Guid id, UpdateGradeRequest req, IMediator m) =>
         {
             var r = await m.Send(new UpdateEmbryoGradeCommand(id, req.Grade, req.Day));
@@ -48,6 +56,12 @@ public static class EmbryoEndpoints
         {
             var r = await m.Send(new ThawEmbryoCommand(id));
             return r.IsSuccess ? Results.Ok(r.Value) : Results.NotFound(r.Error);
+        });
+
+        group.MapDelete("/{id:guid}", async (Guid id, IMediator m) =>
+        {
+            var r = await m.Send(new DeleteEmbryoCommand(id));
+            return r.IsSuccess ? Results.NoContent() : Results.NotFound(r.Error);
         });
     }
 }

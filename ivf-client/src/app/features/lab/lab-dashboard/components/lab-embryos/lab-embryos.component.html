@@ -1,0 +1,39 @@
+<section class="content-section card">
+    <div class="section-header">
+        <h2>Bảng theo dõi phôi - {{ currentDate | date:'dd/MM' }}</h2>
+        <div class="filters" style="display: flex; gap: 0.5rem;">
+            <button class="btn btn-primary btn-sm" (click)="onAdd()">➕ Thêm phôi</button>
+            <select [(ngModel)]="filterDay" class="form-control" style="width: auto;">
+                <option value="all">Tất cả</option>
+                <option value="D3">Ngày 3</option>
+                <option value="D5">Ngày 5</option>
+                <option value="D6">Ngày 6</option>
+            </select>
+        </div>
+    </div>
+    <div class="embryo-grid">
+        @for (embryo of filteredEmbryos(); track embryo.id) {
+        <div class="embryo-card" [class]="getCardClass(embryo.status)" (click)="onSelect(embryo)">
+            <div class="embryo-header">
+                <span class="cycle">{{ embryo.cycleCode }}</span>
+                <span class="day-badge">{{ embryo.day }}</span>
+            </div>
+            <div class="embryo-number">#{{ embryo.embryoNumber }}</div>
+            <div class="embryo-grade">{{ embryo.grade }}</div>
+            <div class="embryo-patient">{{ embryo.patientName }}</div>
+            <div class="embryo-status">{{ getStatusName(embryo.status) }}</div>
+            @if (embryo.location) {
+            <div class="embryo-location">📍 {{ embryo.location }}</div>
+            }
+        </div>
+        } @empty {
+        <div class="empty-full">Không có phôi đang nuôi</div>
+        }
+    </div>
+</section>
+
+@if (showDialog) {
+<app-embryo-dialog [existingEmbryo]="selectedEmbryo" [activeCycles]="activeCycles" [cryoLocations]="cryoLocations"
+    (save)="onSave($event)" (delete)="onDialogDelete($event)" (cancel)="onCancel()">
+</app-embryo-dialog>
+}

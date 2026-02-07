@@ -33,6 +33,12 @@ public class EmbryoRepository : IEmbryoRepository
         return Task.CompletedTask;
     }
 
+    public Task DeleteAsync(Embryo embryo, CancellationToken ct = default)
+    {
+        _context.Embryos.Remove(embryo);
+        return Task.CompletedTask;
+    }
+
     public async Task<int> GetNextNumberForCycleAsync(Guid cycleId, CancellationToken ct = default)
     {
         var max = await _context.Embryos
@@ -44,7 +50,8 @@ public class EmbryoRepository : IEmbryoRepository
     public async Task<IReadOnlyList<Embryo>> GetActiveAsync(CancellationToken ct = default)
         => await _context.Embryos
             .Include(e => e.Cycle).ThenInclude(c => c.Couple).ThenInclude(cp => cp.Wife)
-            .Where(e => e.Status == EmbryoStatus.Developing)
+            .Include(e => e.CryoLocation) // Added for location tank name
+            .Where(e => e.Status == EmbryoStatus.Developing || e.Status == EmbryoStatus.Frozen)
             .OrderBy(e => e.CycleId)
             .ThenBy(e => e.EmbryoNumber)
             .ToListAsync(ct);
