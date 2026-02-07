@@ -147,21 +147,88 @@
         }
     }
 }
+
 // Modal styling
-.modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 1rem; }
-.modal-content { background: white; border-radius: 12px; width: 100%; max-width: 600px; max-height: 97vh; display: flex; flex-direction: column; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); }
-.modal-body { padding: 1.5rem; overflow-y: auto; flex: 1; }
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 1rem;
+}
+
+.modal-content {
+    background: white;
+    border-radius: 12px;
+    width: 100%;
+    max-width: 600px;
+    max-height: 97vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+.modal-body {
+    padding: 1.5rem;
+    overflow-y: auto;
+    flex: 1;
+}
 
 // Fix modal footer layout 
-.modal-content { max-height: 90vh !important; } 
-.modal-form-wrapper { display: flex; flex-direction: column; flex: 1; overflow: hidden; } 
-.modal-body { overflow-y: auto; flex: 1; } 
-.modal-footer { position: relative; z-index: 10; background: white; border-top: 1px solid #e2e8f0; border-bottom-left-radius: 12px; border-bottom-right-radius: 12px; padding: 1rem 1.5rem; }
+.modal-content {
+    max-height: 90vh !important;
+}
+
+.modal-form-wrapper {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    overflow: hidden;
+}
+
+.modal-body {
+    overflow-y: auto;
+    flex: 1;
+}
+
+.modal-footer {
+    position: relative;
+    z-index: 10;
+    background: white;
+    border-top: 1px solid #e2e8f0;
+    border-bottom-left-radius: 12px;
+    border-bottom-right-radius: 12px;
+    padding: 1rem 1.5rem;
+}
 
 // Fix horizontal scroll 
-.modal-content { width: 600px; max-width: 600px; margin: 1rem; } 
-.modal-body { overflow-x: hidden; } 
+.modal-content {
+    width: 600px;
+    max-width: 600px;
+    margin: 1rem;
+}
+
+.modal-body {
+    overflow-x: hidden;
+}
 
 // Fix input width 
-.form-control { width: 100%; padding: 0.5rem; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 0.9rem; box-sizing: border-box; } 
-.form-control:focus { outline: none; border-color: #3b82f6; }
+.form-control {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    box-sizing: border-box;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: #3b82f6;
+}

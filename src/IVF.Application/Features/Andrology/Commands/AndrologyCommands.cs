@@ -13,15 +13,29 @@ public record CreateSemenAnalysisCommand(
     DateTime AnalysisDate,
     AnalysisType AnalysisType,
     Guid? CycleId,
-    Guid? PerformedByUserId
+    Guid? PerformedByUserId,
+    // Macroscopic (Optional)
+    decimal? Volume,
+    string? Appearance,
+    string? Liquefaction,
+    decimal? Ph,
+    // Microscopic (Optional)
+    decimal? Concentration,
+    decimal? TotalCount,
+    decimal? ProgressiveMotility,
+    decimal? NonProgressiveMotility,
+    decimal? Immotile,
+    decimal? NormalMorphology,
+    decimal? Vitality
 ) : IRequest<Result<SemenAnalysisDto>>;
 
 public class CreateSemenAnalysisValidator : AbstractValidator<CreateSemenAnalysisCommand>
 {
     public CreateSemenAnalysisValidator()
     {
-        RuleFor(x => x.PatientId).NotEmpty();
-        RuleFor(x => x.AnalysisDate).NotEmpty();
+        RuleFor(x => x.PatientId).NotEmpty().WithMessage("Patient ID is required");
+        RuleFor(x => x.AnalysisDate).NotEmpty().WithMessage("Analysis Date is required");
+        RuleFor(x => x.AnalysisType).IsInEnum().WithMessage("Invalid Analysis Type");
     }
 }
 
@@ -40,15 +54,56 @@ public class CreateSemenAnalysisHandler : IRequestHandler<CreateSemenAnalysisCom
 
     public async Task<Result<SemenAnalysisDto>> Handle(CreateSemenAnalysisCommand request, CancellationToken ct)
     {
+        // 1. Validate Patient
         var patient = await _patientRepo.GetByIdAsync(request.PatientId, ct);
         if (patient == null)
-            return Result<SemenAnalysisDto>.Failure("Patient not found");
+            return Result<SemenAnalysisDto>.Failure($"Patient with ID {request.PatientId} not found");
 
-        var analysis = SemenAnalysis.Create(request.PatientId, request.AnalysisDate, request.AnalysisType, request.CycleId, request.PerformedByUserId);
-        await _analysisRepo.AddAsync(analysis, ct);
-        await _unitOfWork.SaveChangesAsync(ct);
+        // 2. Create Entity
+        var analysis = SemenAnalysis.Create(
+            request.PatientId, 
+            request.AnalysisDate, 
+            request.AnalysisType, 
+            request.CycleId, 
+            request.PerformedByUserId);
+        
+        // 3. Record results (if any provided)
+        // Check Macroscopic
+        if (request.Volume.HasValue || !string.IsNullOrWhiteSpace(request.Appearance) || 
+            !string.IsNullOrWhiteSpace(request.Liquefaction) || request.Ph.HasValue)
+        {
+            analysis.RecordMacroscopic(request.Volume, request.Appearance, request.Liquefaction, request.Ph);
+        }
 
-        return Result<SemenAnalysisDto>.Success(SemenAnalysisDto.FromEntity(analysis));
+        // Check Microscopic
+        if (request.Concentration.HasValue || request.TotalCount.HasValue || request.ProgressiveMotility.HasValue ||
+            request.NonProgressiveMotility.HasValue || request.Immotile.HasValue || 
+            request.NormalMorphology.HasValue || request.Vitality.HasValue)
+        {
+            analysis.RecordMicroscopic(request.Concentration, request.TotalCount, request.ProgressiveMotility,
+                request.NonProgressiveMotility, request.Immotile, request.NormalMorphology, request.Vitality);
+        }
+
+        try 
+        {
+            await _analysisRepo.AddAsync(analysis, ct);
+            await _unitOfWork.SaveChangesAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            // Log error here if logger available
+            return Result<SemenAnalysisDto>.Failure($"Failed to save analysis: {ex.Message}");
+        }
+
+        // 4. Return DTO
+        var dto = new SemenAnalysisDto(
+            analysis.Id, analysis.PatientId, analysis.CycleId, analysis.AnalysisDate, analysis.AnalysisType.ToString(),
+            analysis.Volume, analysis.Concentration, analysis.TotalCount, analysis.ProgressiveMotility, analysis.NormalMorphology, analysis.Vitality, analysis.CreatedAt,
+            patient.FullName, patient.PatientCode,
+            analysis.Concentration == null ? "Pending" : "Completed"
+        );
+
+        return Result<SemenAnalysisDto>.Success(dto);
     }
 }
 
@@ -132,16 +187,29 @@ public record SemenAnalysisDto(
     DateTime AnalysisDate,
     string AnalysisType,
     decimal? Volume,
+    string? Appearance,
+    string? Liquefaction,
+    decimal? Ph,
     decimal? Concentration,
     decimal? TotalCount,
     decimal? ProgressiveMotility,
+    decimal? NonProgressiveMotility,
+    decimal? Immotile,
     decimal? NormalMorphology,
     decimal? Vitality,
-    DateTime CreatedAt
+    DateTime CreatedAt,
+    string PatientName,
+    string PatientCode,
+    string Status
 )
 {
     public static SemenAnalysisDto FromEntity(SemenAnalysis a) => new(
         a.Id, a.PatientId, a.CycleId, a.AnalysisDate, a.AnalysisType.ToString(),
-        a.Volume, a.Concentration, a.TotalCount, a.ProgressiveMotility, a.NormalMorphology, a.Vitality, a.CreatedAt
+        a.Volume, a.Appearance, a.Liquefaction, a.Ph,
+        a.Concentration, a.TotalCount, a.ProgressiveMotility, 
+        a.NonProgressiveMotility, a.Immotile, 
+        a.NormalMorphology, a.Vitality, a.CreatedAt,
+        a.Patient?.FullName ?? "", a.Patient?.PatientCode ?? "",
+        a.Concentration == null ? "Pending" : "Completed"
     );
 }

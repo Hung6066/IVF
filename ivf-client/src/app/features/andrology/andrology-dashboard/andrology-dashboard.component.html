@@ -154,7 +154,8 @@
                             '—' }}%</td>
                         <td>{{ item.nonProgressiveMotility ?? '—' }}%</td>
                         <td>{{ item.immotile ?? '—' }}%</td>
-                        <td [class.text-danger]="(item.morphology ?? 0) < 4">{{ item.morphology ?? '—' }}%</td>
+                        <td [class.text-danger]="(item.normalMorphology ?? 0) < 4">{{ item.normalMorphology ?? '—' }}%
+                        </td>
                         <td>{{ item.vitality ?? '—' }}%</td>
                         <td>
                             <span class="status-badge" [ngClass]="item.status.toLowerCase()">{{
@@ -203,15 +204,15 @@
                         <td class="code-cell">{{ item.cycleCode }}</td>
                         <td class="name-cell">{{ item.patientName }}</td>
                         <td>{{ item.method }}</td>
-                        <td>{{ item.prewashConc ?? '—' }} M/ml</td>
-                        <td>{{ item.postwashConc ?? '—' }} M/ml</td>
-                        <td>{{ item.postwashMotility ?? '—' }}%</td>
+                        <td>{{ item.preWashConcentration ?? '—' }} M/ml</td>
+                        <td>{{ item.postWashConcentration ?? '—' }} M/ml</td>
+                        <td>{{ item.postWashMotility ?? '—' }}%</td>
                         <td>{{ formatDate(item.washDate) }}</td>
                         <td><span class="status-badge" [ngClass]="item.status.toLowerCase()">{{
                                 getStatusName(item.status) }}</span></td>
                         <td class="actions-cell">
-                            <button class="btn-icon" title="Sửa">✏️</button>
-                            <button class="btn-icon" title="In">🖨️</button>
+                            <button class="btn-icon" title="Sửa" (click)="editWashing(item)">✏️</button>
+                            <button class="btn-icon" title="In" (click)="printWashing(item)">🖨️</button>
                         </td>
                     </tr>
                     } @empty {
@@ -255,15 +256,20 @@
     <div class="modal-overlay" (click)="showNewAnalysis = false">
         <div class="modal-content large" (click)="$event.stopPropagation()">
             <header class="modal-header">
-                <h3>Xét nghiệm tinh dịch đồ mới</h3>
+                <h3>{{ editingAnalysisId ? '✏️ Cập nhật kết quả' : '➕ Xét nghiệm tinh dịch đồ mới' }}</h3>
                 <button class="close-btn" (click)="showNewAnalysis = false">×</button>
             </header>
             <form (ngSubmit)="submitAnalysis()">
                 <div class="modal-body">
-                    <div class="form-group">
+                    <div class="form-group" [class.disabled]="editingAnalysisId">
                         <label>Tìm bệnh nhân</label>
-                        <input type="text" [(ngModel)]="newAnalysis.patientSearch" name="search"
-                            placeholder="Mã BN hoặc tên..." class="form-control" />
+                        @if(editingAnalysisId) {
+                        <input type="text" [value]="newAnalysis.patientName" class="form-control" disabled />
+                        } @else {
+                        <app-patient-search [placeholder]="'Nhập mã hoặc tên bệnh nhân...'"
+                            [(ngModel)]="selectedAnalysisPatientId" name="analysisPatientName" [genderFilter]="'Male'"
+                            (patientSelected)="onPatientChange($event)"></app-patient-search>
+                        }
                     </div>
 
                     <div class="form-section-title">Đại thể (Macroscopic)</div>
@@ -299,6 +305,12 @@
                         </div>
                         <div class="form-group"><label>Bất động (%)</label><input type="number"
                                 [(ngModel)]="newAnalysis.immotile" name="im" max="100" class="form-control" /></div>
+                        <div class="form-group"><label>Hình thái (% bình thường)</label><input type="number"
+                                [(ngModel)]="newAnalysis.normalMorphology" name="morph" max="100"
+                                class="form-control" />
+                        </div>
+                        <div class="form-group"><label>Tỷ lệ sống (%)</label><input type="number"
+                                [(ngModel)]="newAnalysis.vitality" name="vital" max="100" class="form-control" /></div>
                     </div>
 
                 </div>
@@ -315,17 +327,30 @@
     <div class="modal-overlay" (click)="showNewWashing = false">
         <div class="modal-content" (click)="$event.stopPropagation()">
             <header class="modal-header">
-                <h3>➕ Lọc rửa mới</h3>
+                <h3>{{ editingWashingId ? '✏️ Cập nhật lọc rửa' : '➕ Lọc rửa mới' }}</h3>
                 <button class="close-btn" (click)="showNewWashing = false">×</button>
             </header>
             <form (ngSubmit)="submitWashing()">
                 <div class="modal-body">
-                    <div class="form-group"><label>Mã chu kỳ <span class="required">*</span></label><input type="text"
-                            [(ngModel)]="newWashing.cycleCode" name="cycle" required placeholder="CK-XXX"
-                            class="form-control" /></div>
-                    <div class="form-group"><label>Tên bệnh nhân <span class="required">*</span></label><input
-                            type="text" [(ngModel)]="newWashing.patientName" name="patient" required
-                            class="form-control" /></div>
+                    <div class="form-group" [class.disabled]="editingWashingId">
+                        <label>Mã chu kỳ <span class="required">*</span></label>
+                        @if(editingWashingId) {
+                        <input type="text" [value]="newWashing.cycleCode" class="form-control" disabled />
+                        } @else {
+                        <app-cycle-search [placeholder]="'Nhập mã chu kỳ...'" [patientId]="selectedWashingPatientId"
+                            (cycleSelected)="onCycleChange($event)"></app-cycle-search>
+                        }
+                    </div>
+                    <div class="form-group" [class.disabled]="editingWashingId">
+                        <label>Tìm bệnh nhân <span class="required">*</span></label>
+                        @if(editingWashingId) {
+                        <input type="text" [value]="newWashing.patientName" class="form-control" disabled />
+                        } @else {
+                        <app-patient-search [placeholder]="'Nhập tên hoặc mã bệnh nhân...'"
+                            [(ngModel)]="selectedWashingPatientId" [suggestedPatients]="suggestedPatients"
+                            name="patientName" (patientSelected)="onWashingPatientChange($event)"></app-patient-search>
+                        }
+                    </div>
                     <div class="form-group"><label>Phương pháp</label><select [(ngModel)]="newWashing.method"
                             name="method" class="form-control">
                             <option value="Gradient">Gradient</option>
@@ -333,13 +358,15 @@
                         </select></div>
                     <div class="grid-2">
                         <div class="form-group"><label>Mật độ trước (M/ml)</label><input type="number"
-                                [(ngModel)]="newWashing.prewashConc" name="pre" step="0.1" class="form-control" /></div>
+                                [(ngModel)]="newWashing.preWashConcentration" name="pre" step="0.1"
+                                class="form-control" /></div>
                         <div class="form-group"><label>Mật độ sau (M/ml)</label><input type="number"
-                                [(ngModel)]="newWashing.postwashConc" name="post" step="0.1" class="form-control" />
+                                [(ngModel)]="newWashing.postWashConcentration" name="post" step="0.1"
+                                class="form-control" />
                         </div>
                     </div>
                     <div class="form-group"><label>Di động sau (%)</label><input type="number"
-                            [(ngModel)]="newWashing.postwashMotility" name="motility" max="100" class="form-control" />
+                            [(ngModel)]="newWashing.postWashMotility" name="motility" max="100" class="form-control" />
                     </div>
 
                 </div>
@@ -348,6 +375,122 @@
                     <button type="submit" class="btn btn-primary">Lưu kết quả</button>
                 </div>
             </form>
+        </div>
+    </div>
+    }
+</div>
+
+<!-- Print Templates (Visible only when printing) -->
+<div class="print-container">
+    @if (printAnalysisData) {
+    <div class="print-content">
+        <h1 class="text-center">PHIẾU XÉT NGHIỆM TINH DỊCH ĐỒ</h1>
+        <h3 class="text-center">SEMEN ANALYSIS REPORT</h3>
+        <hr>
+        <div class="patient-info">
+            <p><strong>Họ tên:</strong> {{ printAnalysisData.patientName }}</p>
+            <p><strong>Mã BN:</strong> {{ printAnalysisData.patientCode }}</p>
+            <p><strong>Ngày XN:</strong> {{ formatDate(printAnalysisData.analysisDate) }}</p>
+        </div>
+
+        <h4 class="section-title">1. ĐẠI THỂ (MACROSCOPIC)</h4>
+        <table class="print-table">
+            <tr>
+                <td>Thể tích (Volume)</td>
+                <td>{{ printAnalysisData.volume ?? '—' }} ml</td>
+            </tr>
+            <tr>
+                <td>Màu sắc (Appearance)</td>
+                <td>Bình thường</td>
+            </tr>
+            <tr>
+                <td>Ly giải (Liquefaction)</td>
+                <td>{{ printAnalysisData.volume ? '< 30 phút' : '—' }}</td>
+            </tr>
+            <tr>
+                <td>pH</td>
+                <td>{{ printAnalysisData.volume ? '7.2' : '—' }}</td>
+            </tr>
+        </table>
+
+        <h4 class="section-title">2. VI THỂ (MICROSCOPIC)</h4>
+        <table class="print-table">
+            <tr>
+                <td>Mật độ (Concentration)</td>
+                <td>{{ printAnalysisData.concentration ?? '—' }} M/ml</td>
+            </tr>
+            <tr>
+                <td>Tổng số (Total Count)</td>
+                <td>{{ printAnalysisData.totalCount ?? '—' }} M</td>
+            </tr>
+            <tr>
+                <td>Di động tiến tới (PR)</td>
+                <td>{{ printAnalysisData.progressiveMotility ?? '—' }}%</td>
+            </tr>
+            <tr>
+                <td>Di động không tiến tới (NP)</td>
+                <td>{{ printAnalysisData.nonProgressiveMotility ?? '—' }}%</td>
+            </tr>
+            <tr>
+                <td>Bất động (Immotile)</td>
+                <td>{{ printAnalysisData.immotile ?? '—' }}%</td>
+            </tr>
+            <tr>
+                <td>Hình thái bình thường</td>
+                <td>{{ printAnalysisData.normalMorphology ?? '—' }}%</td>
+            </tr>
+            <tr>
+                <td>Tỷ lệ sống</td>
+                <td>{{ printAnalysisData.vitality ?? '—' }}%</td>
+            </tr>
+        </table>
+
+        <div class="footer-sign">
+            <p><strong>Chuyên viên thực hiện</strong></p>
+            <br><br><br>
+            <p>BS. Andrology</p>
+        </div>
+    </div>
+    }
+
+    @if (printWashingData) {
+    <div class="print-content">
+        <h1 class="text-center">PHIẾU LỌC RỬA TINH TRÙNG</h1>
+        <h3 class="text-center">SPERM PREPARATION REPORT</h3>
+        <hr>
+        <div class="patient-info">
+            <p><strong>Họ tên:</strong> {{ printWashingData.patientName }}</p>
+            <p><strong>Mã chu kỳ:</strong> {{ printWashingData.cycleCode }}</p>
+            <p><strong>Ngày lọc:</strong> {{ formatDate(printWashingData.washDate) }}</p>
+            <p><strong>Phương pháp:</strong> {{ printWashingData.method }}</p>
+        </div>
+
+        <table class="print-table">
+            <thead>
+                <tr>
+                    <th>Thông số</th>
+                    <th>Trước lọc (Pre-wash)</th>
+                    <th>Sau lọc (Post-wash)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Mật độ (Concentration)</td>
+                    <td>{{ printWashingData.preWashConcentration ?? '—' }} M/ml</td>
+                    <td>{{ printWashingData.postWashConcentration ?? '—' }} M/ml</td>
+                </tr>
+                <tr>
+                    <td>Di động (Motility)</td>
+                    <td>—</td>
+                    <td>{{ printWashingData.postWashMotility ?? '—' }}%</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="footer-sign">
+            <p><strong>Chuyên viên thực hiện</strong></p>
+            <br><br><br>
+            <p>BS. Andrology</p>
         </div>
     </div>
     }

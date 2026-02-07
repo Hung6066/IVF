@@ -11,8 +11,8 @@ public static class PatientEndpoints
     {
         var group = app.MapGroup("/api/patients").WithTags("Patients").RequireAuthorization();
 
-        group.MapGet("/", async (IMediator m, string? q, int page = 1, int pageSize = 20) =>
-            Results.Ok(await m.Send(new SearchPatientsQuery(q, page, pageSize))));
+        group.MapGet("/", async (IMediator m, string? q, string? gender, int page = 1, int pageSize = 20) =>
+            Results.Ok(await m.Send(new SearchPatientsQuery(q, gender, page, pageSize))));
 
         group.MapGet("/{id:guid}", async (Guid id, IMediator m) =>
         {

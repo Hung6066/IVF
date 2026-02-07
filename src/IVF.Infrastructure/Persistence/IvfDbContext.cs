@@ -20,6 +20,7 @@ public class IvfDbContext : DbContext
     public DbSet<Embryo> Embryos => Set<Embryo>();
     public DbSet<CryoLocation> CryoLocations => Set<CryoLocation>();
     public DbSet<SemenAnalysis> SemenAnalyses => Set<SemenAnalysis>();
+    public DbSet<SpermWashing> SpermWashings => Set<SpermWashing>();
     public DbSet<SpermDonor> SpermDonors => Set<SpermDonor>();
     public DbSet<SpermSample> SpermSamples => Set<SpermSample>();
     public DbSet<Invoice> Invoices => Set<Invoice>();

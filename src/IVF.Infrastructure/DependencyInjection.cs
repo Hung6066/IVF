@@ -43,6 +43,7 @@ public static class DependencyInjection
         services.AddScoped<ISemenAnalysisRepository, SemenAnalysisRepository>();
         services.AddScoped<ISpermDonorRepository, SpermDonorRepository>();
         services.AddScoped<ISpermSampleRepository, SpermSampleRepository>();
+        services.AddScoped<ISpermWashingRepository, SpermWashingRepository>();
         services.AddScoped<IInvoiceRepository, InvoiceRepository>();
         services.AddScoped<IPaymentRepository, PaymentRepository>();
         services.AddScoped<IDoctorRepository, DoctorRepository>();

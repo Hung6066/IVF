@@ -513,3 +513,119 @@ label {
     grid-template-columns: repeat(2, 1fr);
     gap: 1.5rem;
 }
+
+/* ==================== PRINT STYLES ==================== */
+/* Defined globally to ensure we can hide all layout elements */
+
+.print-container {
+    display: none;
+    /* Hidden by default in screen view */
+}
+
+@media print {
+
+    /* Hide all main layout elements */
+    app-sidebar,
+    app-header,
+    .sidebar,
+    .page-header,
+    .dashboard-layout>*:not(.print-container),
+    .stats-grid,
+    .tabs-container,
+    .content-section,
+    .filter-bar,
+    .modal-overlay {
+        display: none !important;
+    }
+
+    /* Reset global layout containers to allow full page print */
+    body,
+    html,
+    app-root,
+    .dashboard-layout {
+        background: white !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+        height: auto !important;
+        overflow: visible !important;
+    }
+
+    /* Show and Position the Print Container */
+    .print-container {
+        display: block !important;
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        margin: 0;
+        padding: 20px;
+        /* Printer friendly padding */
+        z-index: 9999;
+        background: white;
+    }
+
+    /* Print-specific typography and layout */
+    .print-content {
+        max-width: 100%;
+        margin: 0 auto;
+        font-family: 'Times New Roman', serif;
+        color: black;
+    }
+
+    .print-content h1 {
+        font-size: 24pt;
+        margin-bottom: 0.5rem;
+        text-transform: uppercase;
+        text-align: center;
+    }
+
+    .print-content h3 {
+        font-size: 14pt;
+        margin-bottom: 2rem;
+        font-weight: normal;
+        text-transform: uppercase;
+        text-align: center;
+    }
+
+    .print-content .patient-info {
+        margin: 2rem 0;
+        line-height: 1.6;
+        font-size: 12pt;
+    }
+
+    .print-content .section-title {
+        margin-top: 2rem;
+        margin-bottom: 1rem;
+        border-bottom: 1px solid #000;
+        font-size: 12pt;
+        font-weight: bold;
+        text-transform: uppercase;
+    }
+
+    .print-content .print-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 2rem;
+    }
+
+    .print-content .print-table td,
+    .print-content .print-table th {
+        border: 1px solid #ccc;
+        padding: 8px;
+        font-size: 11pt;
+    }
+
+    .print-content .print-table th {
+        background: #eee;
+        font-weight: bold;
+        -webkit-print-color-adjust: exact;
+    }
+
+    .print-content .footer-sign {
+        margin-top: 4rem;
+        text-align: right;
+        margin-right: 2rem;
+        page-break-inside: avoid;
+    }
+}

@@ -11,6 +11,10 @@ public static class CycleEndpoints
     {
         var group = app.MapGroup("/api/cycles").WithTags("Cycles").RequireAuthorization("DoctorOrAdmin");
 
+        group.MapGet("/", async (string? q, Guid? patientId, IMediator m) =>
+            Results.Ok(await m.Send(new SearchCyclesQuery(q ?? "", patientId))));
+
+
         group.MapGet("/{id:guid}", async (Guid id, IMediator m) =>
         {
             var r = await m.Send(new GetCycleByIdQuery(id));

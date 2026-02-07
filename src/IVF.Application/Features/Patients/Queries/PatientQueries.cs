@@ -28,7 +28,7 @@ public class GetPatientByIdHandler : IRequestHandler<GetPatientByIdQuery, Result
 }
 
 // ==================== SEARCH PATIENTS ====================
-public record SearchPatientsQuery(string? Query, int Page = 1, int PageSize = 20) 
+public record SearchPatientsQuery(string? Query, string? Gender = null, int Page = 1, int PageSize = 20) 
     : IRequest<PagedResult<PatientDto>>;
 
 public class SearchPatientsHandler : IRequestHandler<SearchPatientsQuery, PagedResult<PatientDto>>
@@ -42,7 +42,7 @@ public class SearchPatientsHandler : IRequestHandler<SearchPatientsQuery, PagedR
 
     public async Task<PagedResult<PatientDto>> Handle(SearchPatientsQuery request, CancellationToken ct)
     {
-        var (items, total) = await _patientRepo.SearchAsync(request.Query, request.Page, request.PageSize, ct);
+        var (items, total) = await _patientRepo.SearchAsync(request.Query, request.Gender, request.Page, request.PageSize, ct);
         var dtos = items.Select(PatientDto.FromEntity).ToList();
         return new PagedResult<PatientDto>(dtos, total, request.Page, request.PageSize);
     }

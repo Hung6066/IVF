@@ -417,12 +417,12 @@
     background: #dbeafe;
     color: #1d4ed8;
   }
-  
+
   &.pending {
     background: #fef3c7;
     color: #92400e;
   }
-  
+
   &.called {
     background: #e0e7ff;
     color: #3730a3;
@@ -477,7 +477,7 @@
     border: 1px solid #e2e8f0;
     border-radius: 6px;
     font-size: 0.9rem;
-    
+
     &:focus {
       outline: none;
       border-color: #667eea;
@@ -489,7 +489,7 @@
 .form-row {
   display: flex;
   gap: 1rem;
-  
+
   .form-group {
     flex: 1;
   }
@@ -500,7 +500,7 @@
   justify-content: flex-end;
   gap: 1rem;
   margin-top: 1.5rem;
-  
+
   button {
     padding: 0.6rem 1.2rem;
     border-radius: 8px;
@@ -509,20 +509,20 @@
     font-size: 0.85rem;
     font-weight: 500;
   }
-  
+
   .btn-cancel {
     background: #f1f5f9;
     color: #475569;
-    
+
     &:hover {
       background: #e2e8f0;
     }
   }
-  
+
   .btn-submit {
     background: linear-gradient(135deg, #667eea, #764ba2);
     color: white;
-    
+
     &:hover {
       box-shadow: 0 4px 12px rgba(102, 126, 234, 0.25);
     }
@@ -530,7 +530,8 @@
 }
 
 /* Queue specific styles */
-.btn-call, .btn-exam {
+.btn-call,
+.btn-exam {
   padding: 0.3rem 0.6rem;
   border: none;
   border-radius: 4px;

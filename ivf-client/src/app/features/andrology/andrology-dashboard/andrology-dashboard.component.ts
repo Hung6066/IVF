@@ -3,11 +3,13 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { AndrologyService, SemenAnalysis, SpermWashing, AndrologyQueueItem } from './andrology.service';
+import { PatientSearchComponent } from '../../../shared/components/patient-search/patient-search.component';
+import { CycleSearchComponent } from '../../../shared/components/cycle-search/cycle-search.component';
 
 @Component({
     selector: 'app-andrology-dashboard',
     standalone: true,
-    imports: [CommonModule, FormsModule, RouterModule],
+    imports: [CommonModule, FormsModule, RouterModule, PatientSearchComponent, CycleSearchComponent],
     templateUrl: './andrology-dashboard.component.html',
     styleUrls: ['./andrology-dashboard.component.scss']
 })
@@ -17,9 +19,10 @@ export class AndrologyDashboardComponent implements OnInit {
     activeTab = 'queue';
     queue = signal<AndrologyQueueItem[]>([]);
     queueCount = signal(0);
-
     analyses = signal<SemenAnalysis[]>([]);
     washings = signal<SpermWashing[]>([]);
+
+
     todayAnalysis = signal(0);
     todayWashing = signal(0);
     pendingCount = signal(0);
@@ -31,8 +34,89 @@ export class AndrologyDashboardComponent implements OnInit {
     filterStatus = '';
     searchTerm = '';
 
-    newAnalysis: any = {};
-    newWashing: any = { cycleCode: '', patientName: '', method: 'Gradient', prewashConc: null, postwashConc: null, postwashMotility: null };
+    newAnalysis: any = {
+        analysisDate: new Date().toISOString(),
+        analysisType: 'PreWash',
+        volume: null,
+        concentration: null,
+        progressiveMotility: null,
+        nonProgressiveMotility: null,
+        immotile: null,
+        normalMorphology: null,
+        vitality: null
+    };
+    newWashing: any = {
+        cycleCode: '',
+        patientName: '',
+        method: 'Gradient',
+        preWashConcentration: null,
+        postWashConcentration: null,
+        postWashMotility: null,
+        status: 'Processing',
+        washDate: new Date().toISOString()
+    };
+
+    // Store selected patient ID for filtering cycles
+    selectedWashingPatientId: string | null = null;
+
+    // Store suggested patients based on cycle
+    suggestedPatients: any[] = [];
+
+    selectedAnalysisPatientId: string | null = null;
+
+    constructor() {
+        // Effects to log or handle signal changes if needed
+    }
+
+    onPatientChange(patient: any) {
+        if (patient) {
+            this.newAnalysis.patientId = patient.id;
+            this.newAnalysis.patientName = patient.fullName;
+            this.newAnalysis.patientCode = patient.patientCode;
+            this.selectedAnalysisPatientId = patient.id;
+        } else {
+            this.selectedAnalysisPatientId = null;
+        }
+    }
+
+    onCycleChange(cycle: any) {
+        if (cycle) {
+            this.newWashing.cycleCode = cycle.cycleCode;
+            this.newWashing.cycleId = cycle.id;
+
+            // Auto-fill patient if not already set
+            if (cycle.couple) {
+                const wife = cycle.couple.wife;
+                const husband = cycle.couple.husband;
+
+                // Prepare suggestions
+                this.suggestedPatients = [];
+                if (husband) this.suggestedPatients.push(husband);
+                if (wife) this.suggestedPatients.push({ ...wife, fullName: wife.fullName + ' (Vợ)' });
+
+                if (husband) {
+                    this.newWashing.patientName = husband.fullName;
+                    this.newWashing.patientId = husband.id; // Set ID directly
+                    this.selectedWashingPatientId = husband.id;
+                } else if (wife) {
+                    this.newWashing.patientName = wife.fullName + " (Vợ)";
+                    this.newWashing.patientId = wife.id; // Set ID directly
+                    this.selectedWashingPatientId = wife.id;
+                }
+            }
+        }
+    }
+
+    onWashingPatientChange(patient: any) {
+        if (patient) {
+            this.newWashing.patientName = patient.fullName;
+            this.newWashing.patientId = patient.id; // Set ID directly
+            this.selectedWashingPatientId = patient.id;
+        } else {
+            this.selectedWashingPatientId = null;
+            this.newWashing.patientId = null;
+        }
+    }
 
     ngOnInit(): void {
         this.refreshQueue();
@@ -42,25 +126,30 @@ export class AndrologyDashboardComponent implements OnInit {
         setInterval(() => this.refreshQueue(), 10000);
     }
 
+    loadData(): void {
+        // Load independent data streams
+        this.service.getAnalyses().subscribe(data => this.analyses.set(data));
+        this.service.getWashings().subscribe(data => this.washings.set(data));
+        this.refreshStatistics();
+    }
+
+    refreshStatistics() {
+        this.service.getStatistics().subscribe(stats => {
+            if (stats) {
+                this.todayAnalysis.set(stats.todayAnalyses);
+                this.todayWashing.set(stats.todayWashings);
+                this.pendingCount.set(stats.pendingAnalyses);
+                this.avgConcentration.set(Math.round(stats.avgConcentration * 10) / 10);
+            }
+        });
+    }
+
     refreshQueue() {
         this.service.getQueue().subscribe(data => {
             this.queue.set(data);
             this.queueCount.set(data.length);
         });
-    }
-
-    loadData(): void {
-        this.service.getAnalyses().subscribe(data => {
-            this.analyses.set(data);
-            this.todayAnalysis.set(8); // Mock stats
-            this.pendingCount.set(3);
-            this.avgConcentration.set(38);
-        });
-
-        this.service.getWashings().subscribe(data => {
-            this.washings.set(data);
-            this.todayWashing.set(5);
-        });
+        this.refreshStatistics();
     }
 
     formatTime(date: string): string {
@@ -83,7 +172,21 @@ export class AndrologyDashboardComponent implements OnInit {
             next: () => {
                 this.activeTab = 'analysis';
                 this.showNewAnalysis = true;
-                this.newAnalysis = { patientName: q.patientName, patientCode: q.patientCode };
+                this.newAnalysis = {
+                    patientId: q.patientId,
+                    patientName: q.patientName,
+                    patientCode: q.patientCode,
+                    analysisDate: new Date().toISOString(),
+                    analysisType: 'PreWash',
+                    volume: null,
+                    concentration: null,
+                    progressiveMotility: null,
+                    nonProgressiveMotility: null,
+                    immotile: null,
+                    normalMorphology: null,
+                    vitality: null
+                };
+                this.selectedAnalysisPatientId = q.patientId;
                 this.refreshQueue();
             },
             error: () => alert('Lỗi bắt đầu xét nghiệm')
@@ -115,21 +218,127 @@ export class AndrologyDashboardComponent implements OnInit {
         return names[status] || status;
     }
 
-    editAnalysis(item: SemenAnalysis): void { console.log('Edit', item); }
-    printResult(item: SemenAnalysis): void { console.log('Print', item); }
+    // Edit Mode Tracking
+    editingAnalysisId: string | null = null;
+    editingWashingId: string | null = null;
+
+    // Print Data
+    printAnalysisData: SemenAnalysis | null = null;
+    printWashingData: SpermWashing | null = null;
+
+    editAnalysis(item: SemenAnalysis): void {
+        this.editingAnalysisId = item.id;
+        this.newAnalysis = { ...item };
+        // Ensure manual mapping if needed or use object spread if fields match
+        // Need to fill patient info to ensure search component shows it
+        this.selectedAnalysisPatientId = null; // Reset to force re-bind if needed, or just keep name
+        // actually patientId and name are in item.
+        this.showNewAnalysis = true;
+    }
+
+    printResult(item: SemenAnalysis): void {
+        this.printAnalysisData = item;
+        setTimeout(() => window.print(), 100);
+    }
+
+    editWashing(item: SpermWashing): void {
+        this.editingWashingId = item.id;
+        this.newWashing = { ...item };
+        this.showNewWashing = true;
+    }
+
+    printWashing(item: SpermWashing): void {
+        this.printWashingData = item;
+        setTimeout(() => window.print(), 100);
+    }
 
     submitAnalysis(): void {
-        this.service.createAnalysis(this.newAnalysis).subscribe(res => {
-            this.analyses.update(list => [res, ...list]);
-            this.showNewAnalysis = false;
-        });
+        if (this.editingAnalysisId) {
+            // Update
+            const macroData = {
+                volume: this.newAnalysis.volume,
+                appearance: this.newAnalysis.appearance,
+                liquefaction: this.newAnalysis.liquefaction,
+                ph: this.newAnalysis.ph
+            };
+            const microData = {
+                concentration: this.newAnalysis.concentration,
+                totalCount: this.newAnalysis.totalCount,
+                progressiveMotility: this.newAnalysis.progressiveMotility,
+                nonProgressiveMotility: this.newAnalysis.nonProgressiveMotility,
+                immotile: this.newAnalysis.immotile,
+                normalMorphology: this.newAnalysis.normalMorphology,
+                vitality: this.newAnalysis.vitality
+            };
+
+            // Call both updates sequentially
+            this.service.updateAnalysisMacroscopic(this.editingAnalysisId, macroData).subscribe(() => {
+                this.service.updateAnalysisMicroscopic(this.editingAnalysisId!, microData).subscribe(() => {
+                    this.loadData(); // Reload to refresh list
+                    this.showNewAnalysis = false;
+                    this.editingAnalysisId = null;
+                    this.resetAnalysisForm();
+                });
+            });
+        } else {
+            // Create
+            this.service.createAnalysis(this.newAnalysis).subscribe(res => {
+                this.analyses.update(list => [res, ...list]);
+                this.showNewAnalysis = false;
+                this.resetAnalysisForm();
+            });
+        }
     }
 
     submitWashing(): void {
-        this.service.createWashing(this.newWashing).subscribe(res => {
-            this.washings.update(list => [res, ...list]);
-            this.showNewWashing = false;
-            this.newWashing = { cycleCode: '', patientName: '', method: 'Gradient', prewashConc: null, postwashConc: null, postwashMotility: null };
-        });
+        if (this.editingWashingId) {
+            // Backend only allows updating results/notes via updateWashing endpoint
+            const updateData = {
+                notes: this.newWashing.notes,
+                preWashConcentration: this.newWashing.preWashConcentration,
+                postWashConcentration: this.newWashing.postWashConcentration,
+                postWashMotility: this.newWashing.postWashMotility
+            };
+            this.service.updateWashing(this.editingWashingId, updateData).subscribe(() => {
+                this.loadData();
+                this.showNewWashing = false;
+                this.editingWashingId = null;
+                this.resetWashingForm();
+            });
+        } else {
+            this.service.createWashing(this.newWashing).subscribe(res => {
+                this.washings.update(list => [res, ...list]);
+                this.showNewWashing = false;
+                this.resetWashingForm();
+            });
+        }
+    }
+
+    resetAnalysisForm() {
+        this.newAnalysis = {
+            analysisDate: new Date().toISOString(),
+            analysisType: 'PreWash',
+            volume: null,
+            concentration: null,
+            progressiveMotility: null,
+            nonProgressiveMotility: null,
+            immotile: null,
+            normalMorphology: null,
+            vitality: null
+        };
+        this.selectedAnalysisPatientId = null;
+    }
+
+    resetWashingForm() {
+        this.newWashing = {
+            cycleCode: '',
+            patientName: '',
+            method: 'Gradient',
+            preWashConcentration: null,
+            postWashConcentration: null,
+            postWashMotility: null,
+            washDate: new Date().toISOString()
+        };
+        this.selectedWashingPatientId = null;
     }
 }

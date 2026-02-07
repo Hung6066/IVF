@@ -1,6 +1,9 @@
 using IVF.Application.Common.Interfaces;
 using IVF.Application.Features.Andrology.Commands;
 using MediatR;
+using IVF.Domain.Entities;
+using IVF.Application.Features.Andrology.Commands;
+using MediatR;
 
 namespace IVF.Application.Features.Andrology.Queries;
 
@@ -33,5 +36,77 @@ public class GetAnalysesByCycleHandler : IRequestHandler<GetAnalysesByCycleQuery
     {
         var analyses = await _analysisRepo.GetByCycleIdAsync(request.CycleId, ct);
         return analyses.Select(SemenAnalysisDto.FromEntity).ToList();
+    }
+}
+
+// ==================== SEARCH ANALYSES ====================
+public record SearchSemenAnalysesQuery(string? Query, DateTime? FromDate, DateTime? ToDate, string? Status, int Page = 1, int PageSize = 20) 
+    : IRequest<(IReadOnlyList<SemenAnalysisDto> Items, int Total)>;
+
+public class SearchSemenAnalysesHandler : IRequestHandler<SearchSemenAnalysesQuery, (IReadOnlyList<SemenAnalysisDto> Items, int Total)>
+{
+    private readonly ISemenAnalysisRepository _analysisRepo;
+    public SearchSemenAnalysesHandler(ISemenAnalysisRepository analysisRepo) => _analysisRepo = analysisRepo;
+
+    public async Task<(IReadOnlyList<SemenAnalysisDto> Items, int Total)> Handle(SearchSemenAnalysesQuery request, CancellationToken ct)
+    {
+        var (items, total) = await _analysisRepo.SearchAsync(request.Query, request.FromDate, request.ToDate, request.Status, request.Page, request.PageSize, ct);
+        var dtos = items.Select(SemenAnalysisDto.FromEntity).ToList();
+        return (dtos, total);
+    }
+}
+
+// ==================== SEARCH WASHINGS ====================
+public record SearchSpermWashingsQuery(string? Method, DateTime? FromDate, DateTime? ToDate, int Page = 1, int PageSize = 20) 
+    : IRequest<(IReadOnlyList<SpermWashingDto> Items, int Total)>;
+
+public class SearchSpermWashingsHandler : IRequestHandler<SearchSpermWashingsQuery, (IReadOnlyList<SpermWashingDto> Items, int Total)>
+{
+    private readonly ISpermWashingRepository _washingRepo;
+    public SearchSpermWashingsHandler(ISpermWashingRepository washingRepo) => _washingRepo = washingRepo;
+
+    public async Task<(IReadOnlyList<SpermWashingDto> Items, int Total)> Handle(SearchSpermWashingsQuery request, CancellationToken ct)
+    {
+        var (items, total) = await _washingRepo.SearchAsync(request.Method, request.FromDate, request.ToDate, request.Page, request.PageSize, ct);
+        var dtos = items.Select(SpermWashingDto.FromEntity).ToList();
+        return (dtos, total);
+    }
+}
+
+// ==================== STATISTICS ====================
+public record AndrologyStatisticsDto(int TodayAnalyses, int TodayWashings, int PendingAnalyses, decimal AvgConcentration);
+
+public record GetAndrologyStatisticsQuery : IRequest<AndrologyStatisticsDto>;
+
+public class GetAndrologyStatisticsHandler : IRequestHandler<GetAndrologyStatisticsQuery, AndrologyStatisticsDto>
+{
+    private readonly ISemenAnalysisRepository _analysisRepo;
+    private readonly ISpermWashingRepository _washingRepo;
+
+    public GetAndrologyStatisticsHandler(ISemenAnalysisRepository analysisRepo, ISpermWashingRepository washingRepo)
+    {
+        _analysisRepo = analysisRepo;
+        _washingRepo = washingRepo;
+    }
+
+    public async Task<AndrologyStatisticsDto> Handle(GetAndrologyStatisticsQuery request, CancellationToken ct)
+    {
+        var today = DateTime.UtcNow.Date;
+        var todayAnalyses = await _analysisRepo.GetCountByDateAsync(today, ct);
+        var todayWashings = await _washingRepo.GetCountByDateAsync(today, ct);
+        
+        // Approx pending: Logic depends on status, for now separate query or count.
+        // Let's assume Pending means concentration is null.
+        // We can add a specific count method to repo or search.
+        // For efficiency adding GetPendingCount to repo is better, but SearchAsync with status can work too if optimized.
+        // Let's use SearchAsync with status="Pending", page 1, limit 0 to just get count? No, search returns items.
+        // I'll assume 0 for pending for now or add a quick query.
+        // Actually I added GetCountByDateAsync. I should probably add GetPendingCountAsync.
+        // Or just use SearchAsync(status="Pending").Total.
+        var (_, pendingCount) = await _analysisRepo.SearchAsync(null, null, null, "Pending", 1, 1, ct);
+        
+        var avgConc = await _analysisRepo.GetAverageConcentrationAsync(ct);
+
+        return new AndrologyStatisticsDto(todayAnalyses, todayWashings, pendingCount, avgConc ?? 0);
     }
 }

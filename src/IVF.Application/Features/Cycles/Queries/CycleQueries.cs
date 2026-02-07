@@ -65,6 +65,32 @@ public class GetActiveCyclesHandler : IRequestHandler<GetActiveCyclesQuery, IRea
     }
 }
 
+// ==================== SEARCH CYCLES ====================
+public record SearchCyclesQuery(string Query, Guid? PatientId = null) : IRequest<IReadOnlyList<CycleDto>>;
+
+public class SearchCyclesHandler : IRequestHandler<SearchCyclesQuery, IReadOnlyList<CycleDto>>
+{
+    private readonly ITreatmentCycleRepository _cycleRepo;
+
+
+    public SearchCyclesHandler(ITreatmentCycleRepository cycleRepo)
+    {
+        _cycleRepo = cycleRepo;
+    }
+
+    public async Task<IReadOnlyList<CycleDto>> Handle(SearchCyclesQuery request, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(request.Query) && request.PatientId == null)
+        {
+             // If no query and no patient filter, return empty
+             return new List<CycleDto>();
+        }
+
+        var cycles = await _cycleRepo.SearchAsync(request.Query, request.PatientId, ct);
+        return cycles.Select(CycleDto.FromEntity).ToList();
+    }
+}
+
 // ==================== DETAIL DTO ====================
 public record CycleDetailDto(
     Guid Id,

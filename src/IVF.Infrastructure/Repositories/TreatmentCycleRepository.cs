@@ -136,7 +136,33 @@ public class TreatmentCycleRepository : ITreatmentCycleRepository
             .Include(c => c.Couple).ThenInclude(cp => cp.Wife)
             .Include(c => c.Couple).ThenInclude(cp => cp.Husband)
             .Include(c => c.Stimulation)
+            .Include(c => c.Stimulation)
             .OrderByDescending(c => c.StartDate)
+            .ToListAsync(ct);
+    }
+
+    public async Task<IReadOnlyList<TreatmentCycle>> SearchAsync(string query, Guid? patientId = null, CancellationToken ct = default)
+    {
+        var q = (query ?? "").ToLower();
+        var baseQuery = _context.TreatmentCycles
+            .Include(c => c.Couple).ThenInclude(cp => cp.Wife)
+            .Include(c => c.Couple).ThenInclude(cp => cp.Husband)
+            .AsQueryable();
+
+        if (patientId.HasValue)
+        {
+            baseQuery = baseQuery.Where(c => c.Couple.WifeId == patientId || c.Couple.HusbandId == patientId);
+        }
+
+        if (!string.IsNullOrWhiteSpace(q))
+        {
+            baseQuery = baseQuery.Where(c => c.CycleCode.ToLower().Contains(q) || 
+                        (c.Couple != null && (c.Couple.Wife.FullName.ToLower().Contains(q) || c.Couple.Husband.FullName.ToLower().Contains(q))));
+        }
+
+        return await baseQuery
+            .OrderByDescending(c => c.StartDate)
+            .Take(20) // Limit results
             .ToListAsync(ct);
     }
 }

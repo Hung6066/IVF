@@ -19,6 +19,7 @@ public interface ITreatmentCycleRepository
     Task<List<LabScheduleDto>> GetLabScheduleAsync(DateTime date, CancellationToken ct = default);
     Task<IReadOnlyList<TreatmentCycle>> GetActiveCyclesAsync(CancellationToken ct = default);
     Task<IReadOnlyList<TreatmentCycle>> GetAllWithDetailsAsync(CancellationToken ct = default);
+    Task<IReadOnlyList<TreatmentCycle>> SearchAsync(string query, Guid? patientId = null, CancellationToken ct = default);
 }
 
 public class LabScheduleDto

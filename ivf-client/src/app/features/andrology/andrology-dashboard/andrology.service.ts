@@ -1,11 +1,13 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, signal, inject } from '@angular/core';
 import { QueueService } from '../../../core/services/queue.service';
 import { Observable, of } from 'rxjs';
 import { map, catchError } from 'rxjs/operators';
+import { HttpClient, HttpParams } from '@angular/common/http';
 
 export interface AndrologyQueueItem {
     id: string;
     number: number;
+    patientId: string;
     patientName: string;
     patientCode: string;
     status: string;
@@ -18,13 +20,20 @@ export interface SemenAnalysis {
     patientCode: string;
     analysisDate: string;
     volume?: number;
+    appearance?: string;
+    liquefaction?: string;
+    ph?: number;
     concentration?: number;
+    totalCount?: number;
     progressiveMotility?: number;
     nonProgressiveMotility?: number;
     immotile?: number;
-    morphology?: number;
+    normalMorphology?: number;
     vitality?: number;
     status: string;
+    cycleId?: string;
+    cycleCode?: string;
+    notes?: string;
 }
 
 export interface SpermWashing {
@@ -32,24 +41,48 @@ export interface SpermWashing {
     cycleCode: string;
     patientName: string;
     method: string;
-    prewashConc?: number;
-    postwashConc?: number;
-    postwashMotility?: number;
+    preWashConcentration?: number;
+    postWashConcentration?: number;
+    postWashMotility?: number;
     washDate: string;
     status: string;
+    notes?: string;
 }
+
+import { PatientService } from '../../../core/services/patient.service';
+import { CycleService } from '../../../core/services/cycle.service';
+import { Patient } from '../../../core/models/patient.models';
+import { TreatmentCycle } from '../../../core/models/cycle.models';
+import { environment } from '../../../../environments/environment';
 
 @Injectable({
     providedIn: 'root'
 })
 export class AndrologyService {
+    private patientService = inject(PatientService);
+    private cycleService = inject(CycleService);
+
     constructor(private queueService: QueueService) { }
+
+    getPatients(): Observable<Patient[]> {
+        return this.patientService.searchPatients('', 1, 100).pipe(
+            map(res => res.items), // Assuming response has items array
+            catchError(() => of([]))
+        );
+    }
+
+    getCycles(): Observable<TreatmentCycle[]> {
+        return this.cycleService.searchCycles().pipe(
+            catchError(() => of([]))
+        );
+    }
 
     getQueue(): Observable<AndrologyQueueItem[]> {
         return this.queueService.getQueueByDept('NAM').pipe(
             map((data: any[]) => data.map((item, index) => ({
                 id: item.id || String(index),
                 number: item.ticketNumber,
+                patientId: item.patientId,
                 patientName: item.patientName,
                 patientCode: item.patientCode,
                 status: item.status || 'Waiting',
@@ -75,28 +108,59 @@ export class AndrologyService {
         return this.queueService.skipTicket(id);
     }
 
-    // Mock API calls for Andrology specific data until real endpoints exist
-    getAnalyses(): Observable<SemenAnalysis[]> {
-        return of([
-            { id: '1', patientCode: 'BN-2024-001', patientName: 'Nguyễn Văn A', analysisDate: new Date().toISOString(), volume: 3.2, concentration: 45, progressiveMotility: 42, nonProgressiveMotility: 18, immotile: 40, morphology: 8, vitality: 75, status: 'Completed' },
-            { id: '2', patientCode: 'BN-2024-002', patientName: 'Trần Văn B', analysisDate: new Date().toISOString(), volume: 2.5, concentration: 12, progressiveMotility: 25, nonProgressiveMotility: 15, immotile: 60, morphology: 3, vitality: 55, status: 'Completed' },
-            { id: '3', patientCode: 'BN-2024-003', patientName: 'Lê Văn C', analysisDate: new Date().toISOString(), status: 'Pending' }
-        ]);
+    private baseUrl = environment.apiUrl + '/andrology';
+    private http = inject(HttpClient);
+
+    // ... (queue methods remain same)
+
+    getAnalyses(query?: string, fromDate?: string, toDate?: string, status?: string): Observable<SemenAnalysis[]> {
+        let params = new HttpParams();
+        if (query) params = params.set('q', query);
+        if (fromDate) params = params.set('from', fromDate);
+        if (toDate) params = params.set('to', toDate);
+        if (status) params = params.set('status', status);
+
+        return this.http.get<{ items: SemenAnalysis[], total: number }>(`${this.baseUrl}/analyses`, { params }).pipe(
+            map(res => res.items),
+            catchError(() => of([]))
+        );
     }
 
-    getWashings(): Observable<SpermWashing[]> {
-        return of([
-            { id: '1', cycleCode: 'CK-001', patientName: 'Nguyễn Văn A', method: 'Gradient', prewashConc: 45, postwashConc: 85, postwashMotility: 92, washDate: new Date().toISOString(), status: 'Completed' },
-            { id: '2', cycleCode: 'CK-002', patientName: 'Trần Văn B', method: 'Swim-up', prewashConc: 12, postwashConc: 28, postwashMotility: 85, washDate: new Date().toISOString(), status: 'Completed' }
-        ]);
+    getWashings(method?: string, fromDate?: string, toDate?: string): Observable<SpermWashing[]> {
+        let params = new HttpParams();
+        if (method) params = params.set('method', method);
+        if (fromDate) params = params.set('from', fromDate);
+        if (toDate) params = params.set('to', toDate);
+
+        return this.http.get<{ items: SpermWashing[], total: number }>(`${this.baseUrl}/washings`, { params }).pipe(
+            map(res => res.items),
+            catchError(() => of([]))
+        );
+    }
+
+    getStatistics(): Observable<any> {
+        return this.http.get(`${this.baseUrl}/statistics`).pipe(
+            catchError(() => of({ todayAnalyses: 0, todayWashings: 0, pendingAnalyses: 0, avgConcentration: 0 }))
+        );
     }
 
     createWashing(data: any): Observable<any> {
-        // Mock creation
-        return of({ ...data, id: Date.now().toString(), washDate: new Date().toISOString(), status: 'Completed' });
+        return this.http.post(`${this.baseUrl}/washings`, data);
+    }
+
+    updateWashing(id: string, data: any): Observable<any> {
+        return this.http.put(`${this.baseUrl}/washings/${id}`, data);
     }
 
     createAnalysis(data: any): Observable<any> {
-        return of({ ...data, id: Date.now().toString(), status: 'Completed' });
+        return this.http.post(`${this.baseUrl}`, data);
+    }
+
+    updateAnalysisMacroscopic(id: string, data: any): Observable<any> {
+        return this.http.put(`${this.baseUrl}/${id}/macroscopic`, data);
+    }
+
+    updateAnalysisMicroscopic(id: string, data: any): Observable<any> {
+        return this.http.put(`${this.baseUrl}/${id}/microscopic`, data);
     }
 }

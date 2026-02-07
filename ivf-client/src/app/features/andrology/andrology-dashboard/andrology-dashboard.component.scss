@@ -189,6 +189,133 @@
     border-bottom: 1px solid var(--border-color);
 }
 
+// Fix for input overflow and layout
+* {
+    box-sizing: border-box;
+}
+
 .modal-content.large {
-    max-width: 800px;
+    width: 600px;
+    max-width: 600px;
+}
+
+.modal-body {
+    overflow-x: hidden;
+}
+
+.grid-4,
+.grid-3,
+.grid-2 {
+    display: grid;
+    gap: 1.5rem;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.grid-4 {
+    grid-template-columns: repeat(4, 1fr);
+}
+
+.grid-3 {
+    grid-template-columns: repeat(3, 1fr);
+}
+
+.grid-2 {
+    grid-template-columns: repeat(2, 1fr);
+}
+
+.form-control {
+    width: 100%;
+    box-sizing: border-box;
+
+    // ==================== PRINT STYLES ====================
+    .print-container {
+        display: none; // Hidden by default
+    }
+
+    @media print {
+
+        // Hide everything else
+        .dashboard-layout,
+        .sidebar,
+        .header,
+        app-sidebar,
+        app-header {
+            display: none !important;
+        }
+
+        // Show print container
+        .print-container {
+            display: block !important;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            background: white;
+            padding: 2rem;
+            z-index: 9999;
+        }
+
+        .print-content {
+            max-width: 800px;
+            margin: 0 auto;
+            font-family: 'Times New Roman', serif;
+        }
+
+        h1 {
+            font-size: 24pt;
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+        }
+
+        h3 {
+            font-size: 14pt;
+            margin-bottom: 2rem;
+            font-weight: normal;
+            text-transform: uppercase;
+        }
+
+        .patient-info {
+            margin: 2rem 0;
+            line-height: 1.6;
+            font-size: 12pt;
+        }
+
+        .section-title {
+            margin-top: 2rem;
+            margin-bottom: 1rem;
+            border-bottom: 1px solid #000;
+            font-size: 12pt;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .print-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 2rem;
+
+            td,
+            th {
+                border: 1px solid #ccc;
+                padding: 8px;
+                font-size: 11pt;
+            }
+
+            th {
+                background: #eee;
+                font-weight: bold;
+            }
+        }
+
+        .footer-sign {
+            margin-top: 4rem;
+            text-align: right;
+            margin-right: 2rem;
+
+            p {
+                margin: 0.5rem 0;
+            }
+        }
+    }
 }

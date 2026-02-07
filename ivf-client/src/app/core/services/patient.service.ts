@@ -9,13 +9,17 @@ export class PatientService {
     private http = inject(HttpClient);
     private readonly baseUrl = environment.apiUrl;
 
-    searchPatients(query?: string, page = 1, pageSize = 20): Observable<PatientListResponse> {
+    searchPatients(query?: string, page = 1, pageSize = 20, gender?: string): Observable<PatientListResponse> {
         let params = new HttpParams()
             .set('page', page)
             .set('pageSize', pageSize);
 
         if (query) {
             params = params.set('q', query);
+        }
+
+        if (gender) {
+            params = params.set('gender', gender);
         }
 
         return this.http.get<PatientListResponse>(`${this.baseUrl}/patients`, { params });

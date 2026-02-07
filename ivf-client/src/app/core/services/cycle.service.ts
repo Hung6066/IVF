@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
 import {
     TreatmentCycle, TreatmentCycleDetail,
@@ -15,6 +16,21 @@ export class CycleService {
 
     getCycle(id: string): Observable<TreatmentCycleDetail> {
         return this.http.get<TreatmentCycleDetail>(`${this.baseUrl}/cycles/${id}`);
+    }
+
+    searchCycles(query?: string, patientId?: string): Observable<TreatmentCycle[]> {
+        let params = new HttpParams();
+        if (query) {
+            params = params.set('q', query);
+        }
+        if (patientId) {
+            params = params.set('patientId', patientId);
+        }
+        // Assuming the API might return a wrapper like PatientListResponse or just array
+        // We'll return any here and let component handle or map it if we knew the structure
+        return this.http.get<any>(`${this.baseUrl}/cycles`, { params }).pipe(
+            map(res => res.items || res)
+        );
     }
 
     getCyclesByCouple(coupleId: string): Observable<TreatmentCycle[]> {
