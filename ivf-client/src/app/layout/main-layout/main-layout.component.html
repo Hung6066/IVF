@@ -63,6 +63,12 @@
             <a *ngIf="isAdmin()" routerLink="/admin/services" routerLinkActive="active" class="nav-item">
                 <span class="icon">📋</span> Danh mục DV
             </a>
+            <a *ngIf="isAdmin()" routerLink="/forms" routerLinkActive="active" class="nav-item">
+                <span class="icon">📝</span> Biểu mẫu
+            </a>
+            <a *ngIf="isAdmin()" routerLink="/forms/categories" routerLinkActive="active" class="nav-item">
+                <span class="icon">📁</span> Danh mục BM
+            </a>
             <a *ngIf="canView('ViewAuditLog')" routerLink="/admin/audit-logs" routerLinkActive="active"
                 class="nav-item">
                 <span class="icon">📝</span> Nhật ký

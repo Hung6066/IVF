@@ -19,6 +19,7 @@ builder.Services.AddInfrastructure(builder.Configuration);
 // JSON Options
 builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(options =>
 {
+    options.SerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
     options.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
     options.SerializerOptions.Converters.Add(new IVF.API.Converters.UtcDateTimeConverter());
 });
@@ -199,6 +200,7 @@ app.MapUserEndpoints();
 app.MapServiceCatalogEndpoints();
 app.MapSeedEndpoints();
 app.MapLabEndpoints();
+app.MapFormEndpoints();
 
 // Auto-migrate and seed in dev
 if (app.Environment.IsDevelopment())

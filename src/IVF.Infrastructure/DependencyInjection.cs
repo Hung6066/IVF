@@ -53,6 +53,7 @@ public static class DependencyInjection
         services.AddScoped<IUserPermissionRepository, UserPermissionRepository>();
         services.AddScoped<IServiceCatalogRepository, ServiceCatalogRepository>();
         services.AddScoped<ICyclePhaseDataRepository, CyclePhaseDataRepository>();
+        services.AddScoped<IFormRepository, FormRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 
         // Register Services

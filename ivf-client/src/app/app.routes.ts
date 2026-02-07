@@ -116,6 +116,10 @@ export const routes: Routes = [
                 path: 'admin/services',
                 loadComponent: () => import('./features/admin/services/service-catalog.component').then(m => m.ServiceCatalogComponent)
             },
+            {
+                path: 'forms',
+                loadChildren: () => import('./features/forms/forms.routes').then(m => m.FORMS_ROUTES)
+            },
             { path: '', redirectTo: 'dashboard', pathMatch: 'full' }
         ]
     },

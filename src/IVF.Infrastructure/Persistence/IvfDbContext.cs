@@ -44,7 +44,13 @@ public class IvfDbContext : DbContext
     public DbSet<BirthData> BirthData => Set<BirthData>();
     public DbSet<AdverseEventData> AdverseEventData => Set<AdverseEventData>();
 
-
+    // Dynamic Form Builder
+    public DbSet<FormCategory> FormCategories => Set<FormCategory>();
+    public DbSet<FormTemplate> FormTemplates => Set<FormTemplate>();
+    public DbSet<FormField> FormFields => Set<FormField>();
+    public DbSet<FormResponse> FormResponses => Set<FormResponse>();
+    public DbSet<FormFieldValue> FormFieldValues => Set<FormFieldValue>();
+    public DbSet<ReportTemplate> ReportTemplates => Set<ReportTemplate>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
