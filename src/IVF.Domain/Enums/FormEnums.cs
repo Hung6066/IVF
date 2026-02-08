@@ -19,7 +19,8 @@ public enum FieldType
     FileUpload = 12,
     Rating = 13,
     Section = 14,
-    Label = 15
+    Label = 15,
+    Tags = 16
 }
 
 /// <summary>

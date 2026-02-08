@@ -764,3 +764,293 @@
             color: #64748b;
             font-size: 13px;
         }
+
+        // ===== Structured Options Editor =====
+        .options-section {
+            margin-top: 16px;
+            padding: 12px;
+            background: #f8fafc;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+
+            >label {
+                display: block;
+                font-weight: 600;
+                margin-bottom: 12px;
+                color: #334155;
+            }
+
+            small {
+                display: block;
+                margin-top: 8px;
+                color: #64748b;
+                font-size: 11px;
+            }
+        }
+
+        .options-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .option-row {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding: 10px;
+            background: white;
+            border-radius: 6px;
+            border: 1px solid #e2e8f0;
+            position: relative;
+
+            .remove-option-btn {
+                position: absolute;
+                top: 8px;
+                right: 8px;
+            }
+        }
+
+        .option-inputs {
+            display: flex;
+            gap: 8px;
+            width: 100%;
+
+            .opt-value {
+                flex: 1;
+                padding: 6px 8px;
+                border: 1px solid #e2e8f0;
+                border-radius: 4px;
+                font-size: 12px;
+                font-family: monospace;
+                color: #64748b;
+
+                &:focus {
+                    outline: none;
+                    border-color: #667eea;
+                }
+            }
+
+            .opt-label {
+                flex: 2;
+                padding: 6px 8px;
+                border: 1px solid #e2e8f0;
+                border-radius: 4px;
+                font-size: 12px;
+
+                &:focus {
+                    outline: none;
+                    border-color: #667eea;
+                }
+            }
+        }
+
+        .option-actions {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+
+            button {
+                padding: 4px 8px;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 12px;
+                transition: background 0.2s;
+            }
+        }
+
+        .link-concept-btn {
+            background: #dbeafe;
+            color: #1e40af;
+
+            &:hover {
+                background: #bfdbfe;
+            }
+        }
+
+        .unlink-btn {
+            background: #fee2e2;
+            color: #991b1b;
+            font-size: 10px !important;
+
+            &:hover {
+                background: #fecaca;
+            }
+        }
+
+        .remove-option-btn {
+            background: #f1f5f9;
+            color: #64748b;
+
+            &:hover {
+                background: #e2e8f0;
+            }
+        }
+
+        .add-option-btn {
+            margin-top: 8px;
+            padding: 8px 16px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+
+            &:hover {
+                background: #5a67d8;
+            }
+        }
+
+        .concept-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 8px;
+            background: #dbeafe;
+            color: #1e40af;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 600;
+        }
+
+        .tags-preview {
+            padding: 8px 12px;
+            background: #f1f5f9;
+            border: 1px dashed #94a3b8;
+            border-radius: 6px;
+            color: #64748b;
+            font-size: 13px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .tag-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 10px;
+            background: #dbeafe;
+            color: #1e40af;
+            border-radius: 16px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .tags-placeholder {
+            font-style: italic;
+        }
+
+        // ===== Inline Concept Search for Options =====
+        .option-concept {
+            flex: 1;
+            min-width: 150px;
+            position: relative;
+        }
+
+        .linked-concept-info {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .concept-search-wrapper {
+            position: relative;
+        }
+
+        .concept-search-input {
+            width: 100%;
+            padding: 6px 8px;
+            border: 1px solid #e2e8f0;
+            border-radius: 4px;
+            font-size: 11px;
+
+            &:focus {
+                outline: none;
+                border-color: #667eea;
+            }
+        }
+
+        .concept-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1000;
+        }
+
+        .concept-option {
+            padding: 8px 10px;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            border-bottom: 1px solid #f1f5f9;
+
+            &:hover {
+                background: #f8fafc;
+            }
+
+            &:last-child {
+                border-bottom: none;
+            }
+        }
+
+        .concept-code {
+            font-size: 10px;
+            font-family: monospace;
+            color: #667eea;
+            font-weight: 600;
+        }
+
+        .concept-name {
+            font-size: 12px;
+            color: #334155;
+        }
+
+        .option-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            padding: 10px;
+            background: white;
+            border-radius: 6px;
+            border: 1px solid #e2e8f0;
+            flex-wrap: wrap;
+        }
+
+        .option-inputs {
+            display: flex;
+            gap: 6px;
+            min-width: 180px;
+
+            input {
+                padding: 6px 8px;
+                border: 1px solid #e2e8f0;
+                border-radius: 4px;
+                font-size: 12px;
+
+                &:focus {
+                    outline: none;
+                    border-color: #667eea;
+                }
+            }
+
+            .opt-value {
+                width: 70px;
+                font-family: monospace;
+                color: #64748b;
+            }
+
+            .opt-label {
+                width: 100px;
+            }
+        }

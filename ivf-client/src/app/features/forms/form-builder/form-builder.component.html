@@ -112,10 +112,25 @@
                         </div>
                         }
                         @case (FieldType.Checkbox) {
-                        <label class="checkbox-preview">
-                            <input type="checkbox" disabled>
-                            <span>{{ field.placeholder || 'Checkbox' }}</span>
-                        </label>
+                        <div class="checkbox-preview">
+                            @for (opt of getOptions(field); track opt.value) {
+                            <label><input type="checkbox" disabled> {{ opt.label }}</label>
+                            }
+                            @if (getOptions(field).length === 0) {
+                            <label><input type="checkbox" disabled> {{ field.placeholder || 'Checkbox' }}</label>
+                            }
+                        </div>
+                        }
+                        @case (FieldType.Tags) {
+                        <div class="tags-preview">
+                            @if (getOptions(field).length > 0) {
+                            @for (opt of getOptions(field); track opt.value) {
+                            <span class="tag-badge">🏷️ {{ opt.label }}</span>
+                            }
+                            } @else {
+                            <span class="tags-placeholder">🏷️ Chọn từ danh sách concepts...</span>
+                            }
+                        </div>
                         }
                         @case (FieldType.Rating) {
                         <div class="rating-preview">⭐⭐⭐⭐⭐</div>
@@ -225,13 +240,58 @@
                     </label>
                 </div>
 
+
+
                 @if (hasOptions(selectedField.fieldType)) {
-                <div class="form-group">
+                <div class="options-section">
                     <label>Các lựa chọn</label>
-                    <textarea [ngModel]="getOptionsText(selectedField)"
-                        (blur)="setOptionsFromText($event, selectedField)"
-                        placeholder="Mỗi dòng một lựa chọn"></textarea>
-                    <small>Mỗi dòng một lựa chọn (value|label)</small>
+                    <div class="options-list">
+                        @for (opt of editableOptions; track opt.value; let i = $index) {
+                        <div class="option-row">
+                            <div class="option-inputs">
+                                <input type="text" [(ngModel)]="opt.value" placeholder="Value" (blur)="saveOptions()"
+                                    class="opt-value">
+                                <input type="text" [(ngModel)]="opt.label" placeholder="Label" (blur)="saveOptions()"
+                                    class="opt-label">
+                            </div>
+
+                            <!-- Concept Search for this option -->
+                            <div class="option-concept">
+                                @if (opt.conceptId) {
+                                <div class="linked-concept-info">
+                                    <span class="concept-badge" [title]="opt.conceptCode">
+                                        🔗 {{ opt.conceptDisplay || opt.conceptCode }}
+                                    </span>
+                                    <button type="button" class="unlink-btn" (click)="unlinkOptionConcept(i)"
+                                        title="Bỏ liên kết">✕</button>
+                                </div>
+                                } @else {
+                                <div class="concept-search-wrapper">
+                                    <input type="text" class="concept-search-input" placeholder="🔍 Tìm concept..."
+                                        [(ngModel)]="optionConceptSearch[i]" (input)="searchConceptsForOption(i)"
+                                        (focus)="activeOptionSearchIndex = i">
+                                    @if (activeOptionSearchIndex === i && optionConceptResults[i] &&
+                                    optionConceptResults[i].length > 0) {
+                                    <div class="concept-dropdown">
+                                        @for (concept of optionConceptResults[i] || []; track concept.id) {
+                                        <div class="concept-option" (click)="selectConceptForOption(i, concept)">
+                                            <span class="concept-code">{{ concept.code }}</span>
+                                            <span class="concept-name">{{ concept.display }}</span>
+                                        </div>
+                                        }
+                                    </div>
+                                    }
+                                </div>
+                                }
+                            </div>
+
+                            <button type="button" class="remove-option-btn" (click)="removeOption(i)"
+                                title="Xóa">🗑️</button>
+                        </div>
+                        }
+                    </div>
+                    <button type="button" class="add-option-btn" (click)="addOption()">+ Thêm lựa chọn</button>
+                    <small>Mỗi option có thể liên kết với Concept để phục vụ báo cáo/thống kê</small>
                 </div>
                 }
 

@@ -117,7 +117,8 @@ export enum FieldType {
     FileUpload = 12,
     Rating = 13,
     Section = 14,
-    Label = 15
+    Label = 15,
+    Tags = 16
 }
 
 export enum ResponseStatus {
@@ -151,7 +152,8 @@ export const FieldTypeLabels: { [key: number]: string } = {
     [FieldType.FileUpload]: 'Tải file',
     [FieldType.Rating]: 'Đánh giá sao',
     [FieldType.Section]: 'Phân đoạn',
-    [FieldType.Label]: 'Nhãn hiển thị'
+    [FieldType.Label]: 'Nhãn hiển thị',
+    [FieldType.Tags]: 'Tags'
 };
 
 // Request DTOs
