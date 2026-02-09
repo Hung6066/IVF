@@ -96,7 +96,7 @@ public record ReorderFormFieldsCommand(
 
 public record SubmitFormResponseCommand(
     Guid FormTemplateId,
-    Guid SubmittedByUserId,
+    Guid? SubmittedByUserId,  // Made nullable
     Guid? PatientId,
     Guid? CycleId,
     List<FormFieldValueDto> FieldValues
@@ -106,6 +106,11 @@ public record UpdateFormResponseStatusCommand(
     Guid Id,
     ResponseStatus NewStatus,
     string? Notes = null
+) : IRequest<Result<FormResponseDto>>;
+
+public record UpdateFormResponseCommand(
+    Guid Id,
+    List<FormFieldValueDto> FieldValues
 ) : IRequest<Result<FormResponseDto>>;
 
 public record DeleteFormResponseCommand(Guid Id) : IRequest<Result<bool>>;
@@ -485,6 +490,7 @@ public class FormFieldCommandsHandler :
 
 public class FormResponseCommandsHandler :
     IRequestHandler<SubmitFormResponseCommand, Result<FormResponseDto>>,
+    IRequestHandler<UpdateFormResponseCommand, Result<FormResponseDto>>,
     IRequestHandler<UpdateFormResponseStatusCommand, Result<FormResponseDto>>,
     IRequestHandler<DeleteFormResponseCommand, Result<bool>>
 {
@@ -522,6 +528,40 @@ public class FormResponseCommandsHandler :
         response = await _repo.GetResponseByIdAsync(response.Id, true, ct);
 
         return Result<FormResponseDto>.Success(MapToDto(response!));
+    }
+
+    public async Task<Result<FormResponseDto>> Handle(UpdateFormResponseCommand request, CancellationToken ct)
+    {
+        var response = await _repo.GetResponseByIdAsync(request.Id, true, ct);
+        if (response == null)
+            return Result<FormResponseDto>.Failure("Response not found");
+
+        // Update existing field values or add new ones
+        var existingValues = response.FieldValues.ToDictionary(fv => fv.FormFieldId);
+        
+        foreach (var fv in request.FieldValues)
+        {
+            if (existingValues.TryGetValue(fv.FormFieldId, out var existing))
+            {
+                // Update existing value
+                existing.Update(fv.TextValue, fv.NumericValue, fv.DateValue, fv.BooleanValue, fv.JsonValue);
+            }
+            else
+            {
+                // Add new value
+                response.AddFieldValue(
+                    fv.FormFieldId,
+                    fv.TextValue,
+                    fv.NumericValue,
+                    fv.DateValue,
+                    fv.BooleanValue,
+                    fv.JsonValue);
+            }
+        }
+
+        await _repo.UpdateResponseAsync(response, ct);
+
+        return Result<FormResponseDto>.Success(MapToDto(response));
     }
 
     public async Task<Result<FormResponseDto>> Handle(UpdateFormResponseStatusCommand request, CancellationToken ct)

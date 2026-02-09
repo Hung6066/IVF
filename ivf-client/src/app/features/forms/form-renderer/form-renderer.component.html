@@ -11,7 +11,7 @@
         <form [formGroup]="form" (ngSubmit)="submit()">
             <div class="form-fields-grid">
                 @for (field of fields; track field.id) {
-                <div class="field-wrapper" [class.has-error]="hasError(field.fieldKey)"
+                <div class="field-wrapper" [class.has-error]="hasError(field.id)"
                     [style.grid-column]="'span ' + getFieldColSpan(field)">
                     @if (field.fieldType !== FieldType.Section && field.fieldType !== FieldType.Label) {
                     <label class="field-label">
@@ -24,33 +24,33 @@
 
                     @switch (field.fieldType) {
                     @case (FieldType.Text) {
-                    <input type="text" [formControlName]="field.fieldKey" [placeholder]="field.placeholder || ''"
+                    <input type="text" [formControlName]="field.id" [placeholder]="field.placeholder || ''"
                         [style.height]="getFieldHeight(field)" class="form-input">
                     }
                     @case (FieldType.TextArea) {
-                    <textarea [formControlName]="field.fieldKey" [placeholder]="field.placeholder || ''"
+                    <textarea [formControlName]="field.id" [placeholder]="field.placeholder || ''"
                         [style.height]="getFieldHeight(field)" [style.min-height]="getFieldHeight(field)"
                         class="form-textarea"></textarea>
                     }
                     @case (FieldType.Number) {
-                    <input type="number" [formControlName]="field.fieldKey" [placeholder]="field.placeholder || ''"
+                    <input type="number" [formControlName]="field.id" [placeholder]="field.placeholder || ''"
                         class="form-input">
                     }
                     @case (FieldType.Decimal) {
-                    <input type="number" step="0.01" [formControlName]="field.fieldKey"
+                    <input type="number" step="0.01" [formControlName]="field.id"
                         [placeholder]="field.placeholder || ''" class="form-input">
                     }
                     @case (FieldType.Date) {
-                    <input type="date" [formControlName]="field.fieldKey" class="form-input">
+                    <input type="date" [formControlName]="field.id" class="form-input">
                     }
                     @case (FieldType.DateTime) {
-                    <input type="datetime-local" [formControlName]="field.fieldKey" class="form-input">
+                    <input type="datetime-local" [formControlName]="field.id" class="form-input">
                     }
                     @case (FieldType.Time) {
-                    <input type="time" [formControlName]="field.fieldKey" class="form-input">
+                    <input type="time" [formControlName]="field.id" class="form-input">
                     }
                     @case (FieldType.Dropdown) {
-                    <select [formControlName]="field.fieldKey" class="form-select">
+                    <select [formControlName]="field.id" class="form-select">
                         <option value="">-- Chọn --</option>
                         @for (opt of getOptions(field); track opt.value) {
                         <option [value]="opt.value">{{ opt.label }}</option>
@@ -58,7 +58,7 @@
                     </select>
                     }
                     @case (FieldType.MultiSelect) {
-                    <select [formControlName]="field.fieldKey" class="form-select" multiple>
+                    <select [formControlName]="field.id" class="form-select" multiple>
                         @for (opt of getOptions(field); track opt.value) {
                         <option [value]="opt.value">{{ opt.label }}</option>
                         }
@@ -68,7 +68,7 @@
                     <div class="radio-group">
                         @for (opt of getOptions(field); track opt.value) {
                         <label class="radio-option">
-                            <input type="radio" [formControlName]="field.fieldKey" [value]="opt.value">
+                            <input type="radio" [formControlName]="field.id" [value]="opt.value">
                             <span>{{ opt.label }}</span>
                         </label>
                         }
@@ -76,15 +76,15 @@
                     }
                     @case (FieldType.Checkbox) {
                     <label class="checkbox-option">
-                        <input type="checkbox" [formControlName]="field.fieldKey">
+                        <input type="checkbox" [formControlName]="field.id">
                         <span>{{ field.placeholder || field.label }}</span>
                     </label>
                     }
                     @case (FieldType.Rating) {
                     <div class="rating-input">
                         @for (star of [1,2,3,4,5]; track star) {
-                        <button type="button" class="star-btn" [class.active]="form.get(field.fieldKey)?.value >= star"
-                            (click)="setRating(field.fieldKey, star)">
+                        <button type="button" class="star-btn" [class.active]="form.get(field.id)?.value >= star"
+                            (click)="setRating(field.id, star)">
                             ⭐
                         </button>
                         }
@@ -104,7 +104,32 @@
                     </div>
                     }
                     @case (FieldType.FileUpload) {
-                    <input type="file" (change)="onFileChange($event, field.fieldKey)" class="form-file">
+                    <input type="file" (change)="onFileChange($event, field.id)" class="form-file">
+                    }
+                    @case (FieldType.Tags) {
+                    <div class="mention-input-wrapper">
+                        <!-- Contenteditable div with inline tags -->
+                        <div class="mention-editor" #mentionEditor [id]="'mention-' + field.id"
+                            contenteditable="true" [attr.data-placeholder]="'Nhập text và gõ @ để chèn concept tag...'"
+                            (input)="onContentEditableInput(field, $event)"
+                            (keydown)="onContentEditableKeydown(field, $event)" (blur)="onMentionBlur(field.id)">
+                        </div>
+
+                        <!-- Mention dropdown -->
+                        @if (showMentionDropdown && activeMentionFieldKey === field.id) {
+                        <div class="mention-dropdown">
+                            @for (concept of mentionSearchResults; track concept.id) {
+                            <div class="mention-dropdown-item" (mousedown)="insertMentionTag(field.id, concept)">
+                                <span class="mention-code">{{ concept.code }}</span>
+                                <span class="mention-name">{{ concept.name }}</span>
+                            </div>
+                            }
+                            @if (mentionSearchResults.length === 0) {
+                            <div class="mention-dropdown-empty">Không tìm thấy concept</div>
+                            }
+                        </div>
+                        }
+                    </div>
                     }
                     }
 
@@ -112,7 +137,7 @@
                     <small class="help-text">{{ field.helpText }}</small>
                     }
 
-                    @if (hasError(field.fieldKey)) {
+                    @if (hasError(field.id)) {
                     <small class="error-text">Trường này là bắt buộc</small>
                     }
                 </div>

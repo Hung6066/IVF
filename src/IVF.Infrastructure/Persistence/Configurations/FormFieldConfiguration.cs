@@ -46,5 +46,8 @@ public class FormFieldConfiguration : IEntityTypeConfiguration<FormField>
             .WithOne(v => v.FormField)
             .HasForeignKey(v => v.FormFieldId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        // Soft delete filter
+        builder.HasQueryFilter(f => !f.IsDeleted);
     }
 }

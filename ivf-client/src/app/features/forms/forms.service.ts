@@ -188,7 +188,7 @@ export interface CreateFieldRequest {
 
 export interface SubmitResponseRequest {
     formTemplateId: string;
-    submittedByUserId: string;
+    submittedByUserId?: string | null;  // Made optional/nullable
     patientId?: string;
     cycleId?: string;
     fieldValues: FieldValueRequest[];
@@ -315,6 +315,10 @@ export class FormsService {
 
     submitResponse(request: SubmitResponseRequest): Observable<FormResponse> {
         return this.http.post<FormResponse>(`${this.baseUrl}/responses`, request);
+    }
+
+    updateResponse(responseId: string, request: SubmitResponseRequest): Observable<FormResponse> {
+        return this.http.put<FormResponse>(`${this.baseUrl}/responses/${responseId}`, request);
     }
 
     updateResponseStatus(id: string, newStatus: ResponseStatus, notes?: string): Observable<FormResponse> {

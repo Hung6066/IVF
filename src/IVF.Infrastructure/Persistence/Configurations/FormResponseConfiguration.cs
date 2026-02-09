@@ -37,7 +37,7 @@ public class FormResponseConfiguration : IEntityTypeConfiguration<FormResponse>
         builder.HasOne(r => r.SubmittedByUser)
             .WithMany()
             .HasForeignKey(r => r.SubmittedByUserId)
-            .OnDelete(DeleteBehavior.Restrict);
+            .OnDelete(DeleteBehavior.SetNull);  // Allow null
 
         builder.HasMany(r => r.FieldValues)
             .WithOne(v => v.FormResponse)

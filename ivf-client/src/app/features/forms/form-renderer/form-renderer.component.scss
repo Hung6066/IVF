@@ -159,6 +159,318 @@
             font-style: italic;
         }
 
+        // Tags field styling - search-based input
+        .tags-input-wrapper {
+            width: 100%;
+        }
+
+        .selected-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 10px;
+            min-height: 32px;
+        }
+
+        .selected-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 10px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 16px;
+            font-size: 13px;
+            animation: tagIn 0.2s ease;
+
+            .remove-tag {
+                background: rgba(255, 255, 255, 0.2);
+                border: none;
+                color: white;
+                width: 18px;
+                height: 18px;
+                border-radius: 50%;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 14px;
+                line-height: 1;
+                transition: background 0.2s;
+
+                &:hover {
+                    background: rgba(255, 255, 255, 0.4);
+                }
+            }
+        }
+
+        @keyframes tagIn {
+            from {
+                opacity: 0;
+                transform: scale(0.8);
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .tag-search-container {
+            position: relative;
+        }
+
+        .tag-search-input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 15px;
+            transition: all 0.2s;
+
+            &:focus {
+                outline: none;
+                border-color: #667eea;
+                box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+            }
+
+            &::placeholder {
+                color: #94a3b8;
+            }
+        }
+
+        .tag-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.12);
+            max-height: 250px;
+            overflow-y: auto;
+            z-index: 100;
+            margin-top: 4px;
+        }
+
+        .tag-dropdown-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 16px;
+            cursor: pointer;
+            transition: background 0.15s;
+
+            &:hover {
+                background: #f0f4ff;
+            }
+
+            &.already-selected {
+                background: #f8fafc;
+            }
+
+            .tag-code {
+                font-size: 12px;
+                color: #667eea;
+                font-weight: 500;
+                padding: 2px 8px;
+                background: #eff3ff;
+                border-radius: 4px;
+            }
+
+            .tag-name {
+                flex: 1;
+                color: #1e293b;
+            }
+
+            .check-mark {
+                color: #22c55e;
+                font-weight: bold;
+            }
+
+            .tag-plus {
+                font-size: 16px;
+            }
+
+            &.add-custom {
+                background: #f0fdf4;
+                border-top: 1px dashed #86efac;
+
+                .tag-name {
+                    color: #16a34a;
+                    font-style: italic;
+                }
+            }
+        }
+
+        // Custom tag styling (different color for user-typed tags)
+        .selected-tag.custom-tag {
+            background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+        }
+
+        // Mention-style input
+        .mention-input-wrapper {
+            width: 100%;
+            position: relative;
+        }
+
+        .mention-container {
+            position: relative;
+        }
+
+        .mention-display {
+            display: none; // Hidden for now, using textarea directly
+        }
+
+        // Contenteditable editor for inline tags
+        .mention-editor {
+            width: 100%;
+            min-height: 80px;
+            padding: 12px 16px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 15px;
+            font-family: inherit;
+            line-height: 1.8;
+            transition: all 0.2s;
+            background: white;
+
+            &:focus {
+                outline: none;
+                border-color: #667eea;
+                box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+            }
+
+            &:empty:before {
+                content: attr(data-placeholder);
+                color: #94a3b8;
+            }
+
+            // Inline tag badge styling
+            .inline-tag {
+                display: inline-flex;
+                align-items: center;
+                padding: 2px 10px;
+                margin: 0 2px;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                border-radius: 14px;
+                font-size: 13px;
+                font-weight: 500;
+                cursor: default;
+                user-select: none;
+                vertical-align: baseline;
+            }
+        }
+
+        .mention-textarea {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 15px;
+            font-family: inherit;
+            resize: vertical;
+            min-height: 80px;
+            transition: all 0.2s;
+
+            &:focus {
+                outline: none;
+                border-color: #667eea;
+                box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+            }
+
+            &::placeholder {
+                color: #94a3b8;
+            }
+        }
+
+        .mention-dropdown {
+            position: absolute;
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1000;
+            min-width: 250px;
+            margin-top: 4px;
+        }
+
+        .mention-dropdown-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 14px;
+            cursor: pointer;
+            transition: background 0.15s;
+
+            &:hover {
+                background: #f0f4ff;
+            }
+
+            .mention-code {
+                font-size: 11px;
+                color: #667eea;
+                font-weight: 600;
+                padding: 2px 6px;
+                background: #eff3ff;
+                border-radius: 4px;
+            }
+
+            .mention-name {
+                flex: 1;
+                color: #1e293b;
+                font-size: 14px;
+            }
+        }
+
+        .mention-dropdown-empty {
+            padding: 12px 14px;
+            color: #94a3b8;
+            font-size: 13px;
+            text-align: center;
+        }
+
+        .mention-tags-summary {
+            margin-top: 10px;
+            padding: 10px;
+            background: #f8fafc;
+            border-radius: 8px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 6px;
+
+            small {
+                color: #64748b;
+                font-size: 12px;
+            }
+        }
+
+        .mention-tag-badge {
+            display: inline-flex;
+            padding: 3px 8px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+
+        // Mention badge in display HTML
+        ::ng-deep .mention-badge {
+            display: inline;
+            padding: 2px 6px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
         .form-actions {
             display: flex;
             justify-content: flex-end;
@@ -264,5 +576,43 @@
 
             .btn {
                 width: 100%;
+            }
+        }
+
+        // Tags mention-style editor styling
+        .mention-input-wrapper {
+            position: relative;
+        }
+
+        .mention-editor {
+            min-height: 80px;
+            padding: 12px 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            background: white;
+            font-size: 14px;
+            line-height: 2.2;
+            transition: all 0.3s;
+
+            &:focus {
+                outline: none;
+                border-color: #667eea;
+                box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.15);
+            }
+
+            &:empty::before {
+                content: attr(data-placeholder);
+                color: #94a3b8;
+            }
+
+            // Styled inline tag - Facebook style
+            ::ng-deep .inline-tag,
+            .inline-tag {
+                background-color: #e7f3ff;
+                color: #1877f2;
+                padding: 0 4px;
+                border-radius: 3px;
+                font-weight: 500;
+                cursor: default;
             }
         }

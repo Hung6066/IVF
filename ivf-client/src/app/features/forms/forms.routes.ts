@@ -22,6 +22,10 @@ export const FORMS_ROUTES: Routes = [
         loadComponent: () => import('./form-renderer/form-renderer.component').then(m => m.FormRendererComponent)
     },
     {
+        path: 'edit/:responseId',
+        loadComponent: () => import('./form-renderer/form-renderer.component').then(m => m.FormRendererComponent)
+    },
+    {
         path: 'responses',
         loadComponent: () => import('./form-responses/form-responses.component').then(m => m.FormResponsesComponent)
     },

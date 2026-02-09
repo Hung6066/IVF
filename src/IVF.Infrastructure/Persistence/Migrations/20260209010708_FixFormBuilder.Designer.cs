@@ -3,18 +3,21 @@ using System;
 using IVF.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using NpgsqlTypes;
 
 #nullable disable
 
-namespace IVF.Infrastructure.Migrations
+namespace IVF.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(IvfDbContext))]
-    partial class IvfDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260209010708_FixFormBuilder")]
+    partial class FixFormBuilder
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -794,7 +797,7 @@ namespace IVF.Infrastructure.Migrations
                         .HasColumnType("boolean");
 
                     b.Property<string>("JsonValue")
-                        .HasColumnType("text");
+                        .HasColumnType("jsonb");
 
                     b.Property<decimal?>("NumericValue")
                         .HasPrecision(18, 6)

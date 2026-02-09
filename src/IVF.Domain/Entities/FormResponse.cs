@@ -11,7 +11,7 @@ public class FormResponse : BaseEntity
     public Guid FormTemplateId { get; private set; }
     public Guid? PatientId { get; private set; }
     public Guid? CycleId { get; private set; }
-    public Guid SubmittedByUserId { get; private set; }
+    public Guid? SubmittedByUserId { get; private set; }  // Made nullable
     public DateTime? SubmittedAt { get; private set; }
     public ResponseStatus Status { get; private set; }
     public string? Notes { get; private set; }
@@ -20,14 +20,14 @@ public class FormResponse : BaseEntity
     public FormTemplate FormTemplate { get; private set; } = null!;
     public Patient? Patient { get; private set; }
     public TreatmentCycle? Cycle { get; private set; }
-    public User SubmittedByUser { get; private set; } = null!;
+    public User? SubmittedByUser { get; private set; }  // Made nullable
     public ICollection<FormFieldValue> FieldValues { get; private set; } = new List<FormFieldValue>();
 
     private FormResponse() { }
 
     public static FormResponse Create(
         Guid formTemplateId,
-        Guid submittedByUserId,
+        Guid? submittedByUserId = null,  // Made nullable
         Guid? patientId = null,
         Guid? cycleId = null)
     {
@@ -95,5 +95,12 @@ public class FormResponse : BaseEntity
         FieldValues.Add(fieldValue);
         SetUpdated();
         return fieldValue;
+    }
+
+    public void ClearFieldValues()
+    {
+        // Simply clear the collection - EF Core will handle cascade delete
+        FieldValues.Clear();
+        SetUpdated();
     }
 }

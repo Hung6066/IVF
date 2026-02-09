@@ -140,6 +140,21 @@
     font-size: 15px;
     color: #1e293b;
     font-weight: 500;
+    line-height: 1.8;
+}
+
+// Inline tag styling for Tags fields - Facebook style
+.tags-value {
+    line-height: 1.8;
+
+    ::ng-deep .inline-tag {
+        background-color: #e7f3ff;
+        color: #1877f2;
+        padding: 0 2px;
+        border-radius: 3px;
+        font-weight: 500;
+        cursor: default;
+    }
 }
 
 .notes-card {

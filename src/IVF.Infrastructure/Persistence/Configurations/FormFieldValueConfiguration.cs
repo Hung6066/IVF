@@ -19,7 +19,7 @@ public class FormFieldValueConfiguration : IEntityTypeConfiguration<FormFieldVal
             .HasPrecision(18, 6);
 
         builder.Property(v => v.JsonValue)
-            .HasColumnType("jsonb");
+            .HasColumnType("text");  // Changed from jsonb to text to allow null/empty values
 
         builder.HasOne(v => v.FormResponse)
             .WithMany(r => r.FieldValues)

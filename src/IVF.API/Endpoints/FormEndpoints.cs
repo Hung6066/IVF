@@ -151,6 +151,16 @@ public static class FormEndpoints
             return r.IsSuccess ? Results.Created($"/api/forms/responses/{r.Value!.Id}", r.Value) : Results.BadRequest(r.Error);
         });
 
+        // Update existing response
+        group.MapPut("/responses/{id:guid}", async (Guid id, SubmitFormResponseRequest req, IMediator m) =>
+        {
+            var fieldValues = req.FieldValues.Select(v => new FormFieldValueDto(
+                null, v.FormFieldId, null, null, v.TextValue, v.NumericValue, v.DateValue, v.BooleanValue, v.JsonValue)).ToList();
+
+            var r = await m.Send(new UpdateFormResponseCommand(id, fieldValues));
+            return r.IsSuccess ? Results.Ok(r.Value) : Results.NotFound(r.Error);
+        });
+
         group.MapPut("/responses/{id:guid}/status", async (Guid id, UpdateResponseStatusRequest req, IMediator m) =>
         {
             var r = await m.Send(new UpdateFormResponseStatusCommand(id, req.NewStatus, req.Notes));
@@ -244,7 +254,7 @@ public record UpdateFormFieldRequest(
 public record ReorderFieldsRequest(List<Guid> FieldIds);
 
 public record SubmitFormResponseRequest(
-    Guid FormTemplateId, Guid SubmittedByUserId, Guid? PatientId, Guid? CycleId,
+    Guid FormTemplateId, Guid? SubmittedByUserId, Guid? PatientId, Guid? CycleId,
     List<FieldValueRequest> FieldValues);
 
 public record FieldValueRequest(
