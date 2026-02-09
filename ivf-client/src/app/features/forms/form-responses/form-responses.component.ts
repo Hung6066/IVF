@@ -55,6 +55,7 @@ export class FormResponsesComponent implements OnInit {
     loadResponses() {
         const from = this.filterFrom ? new Date(this.filterFrom) : undefined;
         const to = this.filterTo ? new Date(this.filterTo) : undefined;
+        const status = this.filterStatus ? parseInt(this.filterStatus) : undefined;
 
         this.formsService.getResponses(
             this.filterTemplateId || undefined,
@@ -62,7 +63,8 @@ export class FormResponsesComponent implements OnInit {
             from,
             to,
             this.currentPage,
-            this.pageSize
+            this.pageSize,
+            status
         ).subscribe(result => {
             this.responses = result.items;
             this.totalResponses = result.total;

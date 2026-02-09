@@ -16,6 +16,7 @@ public class FormField : BaseEntity
     public int DisplayOrder { get; private set; }
     public bool IsRequired { get; private set; }
     public string? ValidationRulesJson { get; private set; }
+    public string? LayoutJson { get; private set; }
     public string? OptionsJson { get; private set; }
     public string? DefaultValue { get; private set; }
     public string? HelpText { get; private set; }
@@ -44,7 +45,8 @@ public class FormField : BaseEntity
         string? validationRulesJson = null,
         string? defaultValue = null,
         string? helpText = null,
-        string? conditionalLogicJson = null)
+        string? conditionalLogicJson = null,
+        string? layoutJson = null)
     {
         return new FormField
         {
@@ -58,6 +60,7 @@ public class FormField : BaseEntity
             Placeholder = placeholder,
             OptionsJson = optionsJson,
             ValidationRulesJson = validationRulesJson,
+            LayoutJson = layoutJson,
             DefaultValue = defaultValue,
             HelpText = helpText,
             ConditionalLogicJson = conditionalLogicJson,
@@ -75,7 +78,8 @@ public class FormField : BaseEntity
         string? validationRulesJson,
         string? defaultValue,
         string? helpText,
-        string? conditionalLogicJson)
+        string? conditionalLogicJson,
+        string? layoutJson = null)
     {
         Label = label;
         Placeholder = placeholder;
@@ -84,6 +88,7 @@ public class FormField : BaseEntity
         IsRequired = isRequired;
         OptionsJson = optionsJson;
         ValidationRulesJson = validationRulesJson;
+        LayoutJson = layoutJson;
         DefaultValue = defaultValue;
         HelpText = helpText;
         ConditionalLogicJson = conditionalLogicJson;
@@ -130,7 +135,7 @@ public class FormField : BaseEntity
             displayOrder,
             conceptId
         );
-        
+
         Options.Add(option);
         SetUpdated();
         return option;

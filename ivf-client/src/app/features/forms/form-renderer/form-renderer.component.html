@@ -1,180 +1,338 @@
 <div class="form-renderer-container">
-    @if (template) {
+  @if (template) {
     <div class="form-card">
-        <div class="form-header">
-            <h1>{{ template.name }}</h1>
-            @if (template.description) {
-            <p class="description">{{ template.description }}</p>
+      <div class="form-header">
+        <h1>{{ template.name }}</h1>
+        @if (template.description) {
+          <p class="description">{{ template.description }}</p>
+        }
+      </div>
+
+      <form [formGroup]="form" (ngSubmit)="submit()">
+        <!-- Multi-page progress bar -->
+        @if (isMultiPage) {
+          <div class="page-progress">
+            <div class="progress-steps">
+              @for (page of pages; track $index) {
+                <button
+                  type="button"
+                  class="step-dot"
+                  [class.active]="$index === currentPageIndex"
+                  [class.completed]="$index < currentPageIndex"
+                  (click)="goToPage($index)"
+                  [title]="'Trang ' + ($index + 1)"
+                >
+                  {{ $index + 1 }}
+                </button>
+                @if ($index < pages.length - 1) {
+                  <div class="step-connector" [class.completed]="$index < currentPageIndex"></div>
+                }
+              }
+            </div>
+            <div class="progress-info">Trang {{ currentPageIndex + 1 }} / {{ totalPages }}</div>
+          </div>
+        }
+
+        <div class="form-fields-grid">
+          @for (field of isMultiPage ? currentPageFields : fields; track field.id) {
+            @if (isFieldVisible(field.id)) {
+              <div
+                class="field-wrapper"
+                [class.has-error]="hasError(field.id)"
+                [style.grid-column]="'span ' + getFieldColSpan(field)"
+              >
+                @if (field.fieldType !== FieldType.Section && field.fieldType !== FieldType.Label) {
+                  <label class="field-label">
+                    {{ field.label }}
+                    @if (field.isRequired) {
+                      <span class="required">*</span>
+                    }
+                  </label>
+                }
+
+                @switch (field.fieldType) {
+                  @case (FieldType.Text) {
+                    <input
+                      type="text"
+                      [formControlName]="field.id"
+                      [placeholder]="field.placeholder || ''"
+                      [style.height]="getFieldHeight(field)"
+                      class="form-input"
+                    />
+                  }
+                  @case (FieldType.TextArea) {
+                    <textarea
+                      [formControlName]="field.id"
+                      [placeholder]="field.placeholder || ''"
+                      [style.height]="getFieldHeight(field)"
+                      [style.min-height]="getFieldHeight(field)"
+                      class="form-textarea"
+                    ></textarea>
+                  }
+                  @case (FieldType.Number) {
+                    <input
+                      type="number"
+                      [formControlName]="field.id"
+                      [placeholder]="field.placeholder || ''"
+                      class="form-input"
+                    />
+                  }
+                  @case (FieldType.Decimal) {
+                    <input
+                      type="number"
+                      step="0.01"
+                      [formControlName]="field.id"
+                      [placeholder]="field.placeholder || ''"
+                      class="form-input"
+                    />
+                  }
+                  @case (FieldType.Date) {
+                    <input type="date" [formControlName]="field.id" class="form-input" />
+                  }
+                  @case (FieldType.DateTime) {
+                    <input type="datetime-local" [formControlName]="field.id" class="form-input" />
+                  }
+                  @case (FieldType.Time) {
+                    <input type="time" [formControlName]="field.id" class="form-input" />
+                  }
+                  @case (FieldType.Dropdown) {
+                    <select [formControlName]="field.id" class="form-select">
+                      <option value="">-- Chọn --</option>
+                      @for (opt of getOptions(field); track opt.value) {
+                        <option [value]="opt.value">{{ opt.label }}</option>
+                      }
+                    </select>
+                  }
+                  @case (FieldType.MultiSelect) {
+                    <select [formControlName]="field.id" class="form-select" multiple>
+                      @for (opt of getOptions(field); track opt.value) {
+                        <option [value]="opt.value">{{ opt.label }}</option>
+                      }
+                    </select>
+                  }
+                  @case (FieldType.Radio) {
+                    <div class="radio-group">
+                      @for (opt of getOptions(field); track opt.value) {
+                        <label class="radio-option">
+                          <input type="radio" [formControlName]="field.id" [value]="opt.value" />
+                          <span>{{ opt.label }}</span>
+                        </label>
+                      }
+                    </div>
+                  }
+                  @case (FieldType.Checkbox) {
+                    @if (getOptions(field).length > 0) {
+                      <!-- Checkbox group with multiple options -->
+                      <div class="checkbox-group">
+                        @for (opt of getOptions(field); track opt.value) {
+                          <label class="checkbox-option">
+                            <input
+                              type="checkbox"
+                              [checked]="isCheckboxChecked(field.id, opt.value)"
+                              (change)="onCheckboxChange(field.id, opt.value, $event)"
+                            />
+                            <span>{{ opt.label }}</span>
+                          </label>
+                        }
+                      </div>
+                    } @else {
+                      <!-- Single boolean checkbox -->
+                      <label class="checkbox-option">
+                        <input type="checkbox" [formControlName]="field.id" />
+                        <span>{{ field.placeholder || field.label }}</span>
+                      </label>
+                    }
+                  }
+                  @case (FieldType.Rating) {
+                    <div class="rating-input">
+                      @for (star of [1, 2, 3, 4, 5]; track star) {
+                        <button
+                          type="button"
+                          class="star-btn"
+                          [class.active]="form.get(field.id)?.value >= star"
+                          (click)="setRating(field.id, star)"
+                        >
+                          ⭐
+                        </button>
+                      }
+                    </div>
+                  }
+                  @case (FieldType.Section) {
+                    <div class="section-header">
+                      <h3>{{ field.label }}</h3>
+                      @if (field.helpText) {
+                        <p>{{ field.helpText }}</p>
+                      }
+                    </div>
+                  }
+                  @case (FieldType.Label) {
+                    <div class="label-field">
+                      <p>{{ field.label }}</p>
+                    </div>
+                  }
+                  @case (FieldType.FileUpload) {
+                    <input
+                      type="file"
+                      (change)="onFileChange($event, field.id)"
+                      class="form-file"
+                    />
+                  }
+                  @case (FieldType.Tags) {
+                    <div class="mention-input-wrapper">
+                      <!-- Contenteditable div with inline tags -->
+                      <div
+                        class="mention-editor"
+                        #mentionEditor
+                        [id]="'mention-' + field.id"
+                        contenteditable="true"
+                        [attr.data-placeholder]="'Nhập text và gõ @ để chèn concept tag...'"
+                        (input)="onContentEditableInput(field, $event)"
+                        (keydown)="onContentEditableKeydown(field, $event)"
+                        (blur)="onMentionBlur(field.id)"
+                      ></div>
+
+                      <!-- Mention dropdown -->
+                      @if (showMentionDropdown && activeMentionFieldKey === field.id) {
+                        <div class="mention-dropdown">
+                          @for (concept of mentionSearchResults; track concept.id) {
+                            <div
+                              class="mention-dropdown-item"
+                              (mousedown)="insertMentionTag(field.id, concept)"
+                            >
+                              <span class="mention-code">{{ concept.code }}</span>
+                              <span class="mention-name">{{ concept.name }}</span>
+                            </div>
+                          }
+                          @if (mentionSearchResults.length === 0) {
+                            <div class="mention-dropdown-empty">Không tìm thấy concept</div>
+                          }
+                        </div>
+                      }
+                    </div>
+                  }
+                  @case (FieldType.Address) {
+                    <div class="address-field" [formGroupName]="field.id">
+                      @for (sub of getAddressSubFields(field); track sub.key) {
+                        <div
+                          class="address-subfield"
+                          [style.flex]="'0 0 calc(' + (sub.width || 100) + '% - 8px)'"
+                        >
+                          <small
+                            >{{ sub.label }}
+                            @if (sub.required) {
+                              <span class="required">*</span>
+                            }
+                          </small>
+                          <input
+                            type="text"
+                            [formControlName]="sub.key"
+                            [placeholder]="sub.label"
+                            class="form-input"
+                          />
+                        </div>
+                      }
+                    </div>
+                  }
+                }
+
+                @if (field.helpText && field.fieldType !== FieldType.Section) {
+                  <small class="help-text">{{ field.helpText }}</small>
+                }
+
+                @if (hasError(field.id)) {
+                  @for (err of getFieldErrors(field.id); track err) {
+                    <small class="error-text">{{ err }}</small>
+                  }
+                }
+              </div>
             }
+          }
         </div>
 
-        <form [formGroup]="form" (ngSubmit)="submit()">
-            <div class="form-fields-grid">
-                @for (field of fields; track field.id) {
-                @if (isFieldVisible(field.id)) {
-                <div class="field-wrapper" [class.has-error]="hasError(field.id)"
-                    [style.grid-column]="'span ' + getFieldColSpan(field)">
-                    @if (field.fieldType !== FieldType.Section && field.fieldType !== FieldType.Label) {
-                    <label class="field-label">
-                        {{ field.label }}
-                        @if (field.isRequired) {
-                        <span class="required">*</span>
-                        }
-                    </label>
-                    }
-
-                    @switch (field.fieldType) {
-                    @case (FieldType.Text) {
-                    <input type="text" [formControlName]="field.id" [placeholder]="field.placeholder || ''"
-                        [style.height]="getFieldHeight(field)" class="form-input">
-                    }
-                    @case (FieldType.TextArea) {
-                    <textarea [formControlName]="field.id" [placeholder]="field.placeholder || ''"
-                        [style.height]="getFieldHeight(field)" [style.min-height]="getFieldHeight(field)"
-                        class="form-textarea"></textarea>
-                    }
-                    @case (FieldType.Number) {
-                    <input type="number" [formControlName]="field.id" [placeholder]="field.placeholder || ''"
-                        class="form-input">
-                    }
-                    @case (FieldType.Decimal) {
-                    <input type="number" step="0.01" [formControlName]="field.id"
-                        [placeholder]="field.placeholder || ''" class="form-input">
-                    }
-                    @case (FieldType.Date) {
-                    <input type="date" [formControlName]="field.id" class="form-input">
-                    }
-                    @case (FieldType.DateTime) {
-                    <input type="datetime-local" [formControlName]="field.id" class="form-input">
-                    }
-                    @case (FieldType.Time) {
-                    <input type="time" [formControlName]="field.id" class="form-input">
-                    }
-                    @case (FieldType.Dropdown) {
-                    <select [formControlName]="field.id" class="form-select">
-                        <option value="">-- Chọn --</option>
-                        @for (opt of getOptions(field); track opt.value) {
-                        <option [value]="opt.value">{{ opt.label }}</option>
-                        }
-                    </select>
-                    }
-                    @case (FieldType.MultiSelect) {
-                    <select [formControlName]="field.id" class="form-select" multiple>
-                        @for (opt of getOptions(field); track opt.value) {
-                        <option [value]="opt.value">{{ opt.label }}</option>
-                        }
-                    </select>
-                    }
-                    @case (FieldType.Radio) {
-                    <div class="radio-group">
-                        @for (opt of getOptions(field); track opt.value) {
-                        <label class="radio-option">
-                            <input type="radio" [formControlName]="field.id" [value]="opt.value">
-                            <span>{{ opt.label }}</span>
-                        </label>
-                        }
-                    </div>
-                    }
-                    @case (FieldType.Checkbox) {
-                    @if (getOptions(field).length > 0) {
-                    <!-- Checkbox group with multiple options -->
-                    <div class="checkbox-group">
-                        @for (opt of getOptions(field); track opt.value) {
-                        <label class="checkbox-option">
-                            <input type="checkbox" [checked]="isCheckboxChecked(field.id, opt.value)"
-                                (change)="onCheckboxChange(field.id, opt.value, $event)">
-                            <span>{{ opt.label }}</span>
-                        </label>
-                        }
-                    </div>
-                    } @else {
-                    <!-- Single boolean checkbox -->
-                    <label class="checkbox-option">
-                        <input type="checkbox" [formControlName]="field.id">
-                        <span>{{ field.placeholder || field.label }}</span>
-                    </label>
-                    }
-                    }
-                    @case (FieldType.Rating) {
-                    <div class="rating-input">
-                        @for (star of [1,2,3,4,5]; track star) {
-                        <button type="button" class="star-btn" [class.active]="form.get(field.id)?.value >= star"
-                            (click)="setRating(field.id, star)">
-                            ⭐
-                        </button>
-                        }
-                    </div>
-                    }
-                    @case (FieldType.Section) {
-                    <div class="section-header">
-                        <h3>{{ field.label }}</h3>
-                        @if (field.helpText) {
-                        <p>{{ field.helpText }}</p>
-                        }
-                    </div>
-                    }
-                    @case (FieldType.Label) {
-                    <div class="label-field">
-                        <p>{{ field.label }}</p>
-                    </div>
-                    }
-                    @case (FieldType.FileUpload) {
-                    <input type="file" (change)="onFileChange($event, field.id)" class="form-file">
-                    }
-                    @case (FieldType.Tags) {
-                    <div class="mention-input-wrapper">
-                        <!-- Contenteditable div with inline tags -->
-                        <div class="mention-editor" #mentionEditor [id]="'mention-' + field.id" contenteditable="true"
-                            [attr.data-placeholder]="'Nhập text và gõ @ để chèn concept tag...'"
-                            (input)="onContentEditableInput(field, $event)"
-                            (keydown)="onContentEditableKeydown(field, $event)" (blur)="onMentionBlur(field.id)">
-                        </div>
-
-                        <!-- Mention dropdown -->
-                        @if (showMentionDropdown && activeMentionFieldKey === field.id) {
-                        <div class="mention-dropdown">
-                            @for (concept of mentionSearchResults; track concept.id) {
-                            <div class="mention-dropdown-item" (mousedown)="insertMentionTag(field.id, concept)">
-                                <span class="mention-code">{{ concept.code }}</span>
-                                <span class="mention-name">{{ concept.name }}</span>
-                            </div>
-                            }
-                            @if (mentionSearchResults.length === 0) {
-                            <div class="mention-dropdown-empty">Không tìm thấy concept</div>
-                            }
-                        </div>
-                        }
-                    </div>
-                    }
-                    }
-
-                    @if (field.helpText && field.fieldType !== FieldType.Section) {
-                    <small class="help-text">{{ field.helpText }}</small>
-                    }
-
-                    @if (hasError(field.id)) {
-                    <small class="error-text">Trường này là bắt buộc</small>
-                    }
-                </div>
+        <div class="form-actions">
+          <!-- Auto-save status -->
+          <div class="auto-save-status">
+            @if (autoSaveEnabled && !isEditMode) {
+              @switch (autoSaveStatus) {
+                @case ('saving') {
+                  <span class="save-indicator saving">💾 Đang lưu...</span>
                 }
+                @case ('saved') {
+                  <span class="save-indicator saved">✅ Đã lưu nháp</span>
                 }
-            </div>
-
-            <div class="form-actions">
-                <button type="button" class="btn btn-secondary" (click)="cancel()">Hủy</button>
-                <button type="submit" class="btn btn-primary" [disabled]="isSubmitting">
-                    @if (isSubmitting) {
-                    <span class="spinner"></span>
-                    }
-                    Gửi phản hồi
+                @case ('error') {
+                  <span class="save-indicator error">⚠️ Lỗi lưu nháp</span>
+                }
+              }
+              @if (lastAutoSavedAt) {
+                <button
+                  type="button"
+                  class="btn-clear-draft"
+                  (click)="clearDraft()"
+                  title="Xóa bản nháp"
+                >
+                  🗑️ Xóa nháp
                 </button>
-            </div>
-        </form>
+              }
+            }
+          </div>
+
+          <!-- Multi-page navigation -->
+          @if (isMultiPage) {
+            <button type="button" class="btn btn-secondary" (click)="cancel()">Hủy</button>
+            @if (!isEditMode) {
+              <button
+                type="button"
+                class="btn btn-draft"
+                (click)="saveDraftToDb()"
+                [disabled]="isSubmitting"
+              >
+                💾 Lưu nháp
+              </button>
+            }
+            @if (!isFirstPage) {
+              <button type="button" class="btn btn-outline" (click)="prevPage()">
+                ← Trang trước
+              </button>
+            }
+            @if (!isLastPage) {
+              <button type="button" class="btn btn-primary" (click)="nextPage()">
+                Trang tiếp →
+              </button>
+            } @else {
+              <button type="submit" class="btn btn-primary" [disabled]="isSubmitting">
+                @if (isSubmitting) {
+                  <span class="spinner"></span>
+                }
+                Gửi phản hồi
+              </button>
+            }
+          } @else {
+            <button type="button" class="btn btn-secondary" (click)="cancel()">Hủy</button>
+            @if (!isEditMode) {
+              <button
+                type="button"
+                class="btn btn-draft"
+                (click)="saveDraftToDb()"
+                [disabled]="isSubmitting"
+              >
+                💾 Lưu nháp
+              </button>
+            }
+            <button type="submit" class="btn btn-primary" [disabled]="isSubmitting">
+              @if (isSubmitting) {
+                <span class="spinner"></span>
+              }
+              Gửi phản hồi
+            </button>
+          }
+        </div>
+      </form>
     </div>
-    } @else {
+  } @else {
     <div class="loading">
-        <div class="spinner-large"></div>
-        <p>Đang tải biểu mẫu...</p>
+      <div class="spinner-large"></div>
+      <p>Đang tải biểu mẫu...</p>
     </div>
-    }
+  }
 </div>

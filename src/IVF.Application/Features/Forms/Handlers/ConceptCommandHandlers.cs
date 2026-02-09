@@ -26,9 +26,9 @@ public class CreateConceptHandler : IRequestHandler<CreateConceptCommand, Concep
         );
 
         await _repository.AddAsync(concept, cancellationToken);
-        
+
         return new ConceptDto(
-            concept.Id, concept.Code, concept.Display, concept.Description, 
+            concept.Id, concept.Code, concept.Display, concept.Description,
             concept.System, (int)concept.ConceptType, new List<ConceptMappingDto>());
     }
 }
@@ -115,7 +115,7 @@ public class LinkFieldToConceptHandler : IRequestHandler<LinkFieldToConceptComma
 
         return new FormFieldDto(
             f.Id, f.FieldKey, f.Label, f.Placeholder, f.FieldType, f.DisplayOrder,
-            f.IsRequired, f.OptionsJson, f.ValidationRulesJson, f.DefaultValue,
+            f.IsRequired, f.OptionsJson, f.ValidationRulesJson, f.LayoutJson, f.DefaultValue,
             f.HelpText, f.ConditionalLogicJson, f.ConceptId);
     }
 }

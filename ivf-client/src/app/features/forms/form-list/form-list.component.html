@@ -1,143 +1,207 @@
 <div class="form-list-container">
-    <header class="page-header">
-        <div class="header-content">
-            <h1>📝 Quản lý Biểu mẫu</h1>
-            <p class="subtitle">Tạo và quản lý biểu mẫu động cho các phòng ban</p>
-        </div>
-        <div class="header-actions">
-            <button class="btn btn-primary" (click)="createTemplate()">
-                <span class="icon">➕</span>
-                Tạo biểu mẫu mới
-            </button>
-        </div>
-    </header>
-
-    <!-- Categories Section -->
-    <section class="categories-section">
-        <div class="section-header">
-            <h2>Danh mục</h2>
-            <button class="btn btn-sm btn-secondary" (click)="showCategoryModal = true">
-                Thêm danh mục
-            </button>
-        </div>
-        <div class="category-tabs">
-            <button class="category-tab" [class.active]="!selectedCategoryId" (click)="selectCategory(null)">
-                Tất cả
-            </button>
-            @for (category of categories; track category.id) {
-            <button class="category-tab" [class.active]="selectedCategoryId === category.id"
-                (click)="selectCategory(category.id)">
-                {{ category.iconName || '📁' }} {{ category.name }}
-                @if (category.templateCount) {
-                <span class="badge">{{ category.templateCount }}</span>
-                }
-            </button>
-            }
-        </div>
-    </section>
-
-    <!-- Templates Grid -->
-    <section class="templates-section">
-        <div class="templates-grid">
-            @for (template of filteredTemplates; track template.id) {
-            <div class="template-card" [class.published]="template.isPublished">
-                <div class="template-header">
-                    <div class="template-status" [class.published]="template.isPublished">
-                        {{ template.isPublished ? '✅ Đã xuất bản' : '📝 Bản nháp' }}
-                    </div>
-                    <div class="template-menu">
-                        <button class="menu-btn" (click)="toggleMenu(template.id)">⋮</button>
-                        @if (openMenuId === template.id) {
-                        <div class="dropdown-menu">
-                            <button (click)="editTemplate(template.id)">✏️ Chỉnh sửa</button>
-                            <button (click)="previewTemplate(template.id)">👁️ Xem trước</button>
-                            @if (!template.isPublished) {
-                            <button (click)="publishTemplate(template.id)">📤 Xuất bản</button>
-                            } @else {
-                            <button (click)="unpublishTemplate(template.id)">📥 Gỡ xuất bản</button>
-                            }
-                            <button class="danger" (click)="deleteTemplate(template.id)">🗑️ Xóa</button>
-                        </div>
-                        }
-                    </div>
-                </div>
-                <div class="template-body" (click)="editTemplate(template.id)">
-                    <h3>{{ template.name }}</h3>
-                    <p class="description">{{ template.description || 'Không có mô tả' }}</p>
-                    <div class="template-meta">
-                        <span class="category">{{ template.categoryName }}</span>
-                        <span class="version">v{{ template.version }}</span>
-                    </div>
-                </div>
-                <div class="template-footer">
-                    <span class="field-count">
-                        {{ template.fields?.length || 0 }} trường
-                    </span>
-                    <span class="created-date">
-                        {{ template.createdAt | date:'dd/MM/yyyy' }}
-                    </span>
-                </div>
-            </div>
-            }
-
-            <!-- Empty State -->
-            @if (filteredTemplates.length === 0) {
-            <div class="empty-state">
-                <div class="empty-icon">📄</div>
-                <h3>Chưa có biểu mẫu nào</h3>
-                <p>Bắt đầu bằng cách tạo một biểu mẫu mới</p>
-                <button class="btn btn-primary" (click)="createTemplate()">
-                    Tạo biểu mẫu đầu tiên
-                </button>
-            </div>
-            }
-        </div>
-    </section>
-
-    <!-- Quick Access -->
-    <section class="quick-access">
-        <h3>Truy cập nhanh</h3>
-        <div class="quick-links">
-            <a routerLink="/forms/responses" class="quick-link">
-                <span class="icon">📊</span>
-                <span>Xem phản hồi</span>
-            </a>
-            <a routerLink="/forms/reports" class="quick-link">
-                <span class="icon">📈</span>
-                <span>Báo cáo</span>
-            </a>
-        </div>
-    </section>
-
-    <!-- Category Modal -->
-    @if (showCategoryModal) {
-    <div class="modal-overlay" (click)="showCategoryModal = false">
-        <div class="modal" (click)="$event.stopPropagation()">
-            <div class="modal-header">
-                <h3>Thêm danh mục mới</h3>
-                <button class="close-btn" (click)="showCategoryModal = false">✕</button>
-            </div>
-            <div class="modal-body">
-                <div class="form-group">
-                    <label>Tên danh mục *</label>
-                    <input type="text" [(ngModel)]="newCategory.name" placeholder="VD: Phòng Xét nghiệm">
-                </div>
-                <div class="form-group">
-                    <label>Mô tả</label>
-                    <textarea [(ngModel)]="newCategory.description" placeholder="Mô tả danh mục..."></textarea>
-                </div>
-                <div class="form-group">
-                    <label>Icon (emoji)</label>
-                    <input type="text" [(ngModel)]="newCategory.iconName" placeholder="🧪">
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" (click)="showCategoryModal = false">Hủy</button>
-                <button class="btn btn-primary" (click)="saveCategory()" [disabled]="!newCategory.name">
-                    Lưu danh mục
-                </button>
-            </div>
-        </div>
+  <header class="page-header">
+    <div class="header-content">
+      <h1>📝 Quản lý Biểu mẫu</h1>
+      <p class="subtitle">Tạo và quản lý biểu mẫu động cho các phòng ban</p>
     </div>
-    }
+    <div class="header-actions">
+      <button class="btn btn-library" (click)="openLibrary()">
+        <span class="icon">📚</span>
+        Thư viện mẫu
+      </button>
+      <button class="btn btn-primary" (click)="createTemplate()">
+        <span class="icon">➕</span>
+        Tạo biểu mẫu mới
+      </button>
+    </div>
+  </header>
+
+  <!-- Categories Section -->
+  <section class="categories-section">
+    <div class="section-header">
+      <h2>Danh mục</h2>
+      <button class="btn btn-sm btn-secondary" (click)="showCategoryModal = true">
+        Thêm danh mục
+      </button>
+    </div>
+    <div class="category-tabs">
+      <button
+        class="category-tab"
+        [class.active]="!selectedCategoryId"
+        (click)="selectCategory(null)"
+      >
+        Tất cả
+      </button>
+      @for (category of categories; track category.id) {
+        <button
+          class="category-tab"
+          [class.active]="selectedCategoryId === category.id"
+          (click)="selectCategory(category.id)"
+        >
+          {{ category.iconName || '📁' }} {{ category.name }}
+          @if (category.templateCount) {
+            <span class="badge">{{ category.templateCount }}</span>
+          }
+        </button>
+      }
+    </div>
+  </section>
+
+  <!-- Templates Grid -->
+  <section class="templates-section">
+    <div class="templates-grid">
+      @for (template of filteredTemplates; track template.id) {
+        <div class="template-card" [class.published]="template.isPublished">
+          <div class="template-header">
+            <div class="template-status" [class.published]="template.isPublished">
+              {{ template.isPublished ? '✅ Đã xuất bản' : '📝 Bản nháp' }}
+            </div>
+            <div class="template-menu">
+              <button class="menu-btn" (click)="toggleMenu(template.id)">⋮</button>
+              @if (openMenuId === template.id) {
+                <div class="dropdown-menu">
+                  <button (click)="editTemplate(template.id)">✏️ Chỉnh sửa</button>
+                  <button (click)="previewTemplate(template.id)">👁️ Xem trước</button>
+                  <button (click)="chatMode(template.id)">💬 Chế độ Chat</button>
+                  @if (!template.isPublished) {
+                    <button (click)="publishTemplate(template.id)">📤 Xuất bản</button>
+                  } @else {
+                    <button (click)="unpublishTemplate(template.id)">📥 Gỡ xuất bản</button>
+                  }
+                  <button (click)="duplicateTemplate(template.id)">📋 Nhân bản</button>
+                  <button class="danger" (click)="deleteTemplate(template.id)">🗑️ Xóa</button>
+                </div>
+              }
+            </div>
+          </div>
+          <div class="template-body" (click)="editTemplate(template.id)">
+            <h3>{{ template.name }}</h3>
+            <p class="description">{{ template.description || 'Không có mô tả' }}</p>
+            <div class="template-meta">
+              <span class="category">{{ template.categoryName }}</span>
+              <span class="version">v{{ template.version }}</span>
+            </div>
+          </div>
+          <div class="template-footer">
+            <span class="field-count"> {{ template.fields?.length || 0 }} trường </span>
+            <span class="created-date">
+              {{ template.createdAt | date: 'dd/MM/yyyy' }}
+            </span>
+          </div>
+        </div>
+      }
+
+      <!-- Empty State -->
+      @if (filteredTemplates.length === 0) {
+        <div class="empty-state">
+          <div class="empty-icon">📄</div>
+          <h3>Chưa có biểu mẫu nào</h3>
+          <p>Bắt đầu bằng cách tạo một biểu mẫu mới</p>
+          <button class="btn btn-primary" (click)="createTemplate()">Tạo biểu mẫu đầu tiên</button>
+        </div>
+      }
+    </div>
+  </section>
+
+  <!-- Quick Access -->
+  <section class="quick-access">
+    <h3>Truy cập nhanh</h3>
+    <div class="quick-links">
+      <a routerLink="/forms/responses" class="quick-link">
+        <span class="icon">📊</span>
+        <span>Xem phản hồi</span>
+      </a>
+      <a routerLink="/forms/reports" class="quick-link">
+        <span class="icon">📈</span>
+        <span>Báo cáo</span>
+      </a>
+    </div>
+  </section>
+
+  <!-- Category Modal -->
+  @if (showCategoryModal) {
+    <div class="modal-overlay" (click)="showCategoryModal = false">
+      <div class="modal" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h3>Thêm danh mục mới</h3>
+          <button class="close-btn" (click)="showCategoryModal = false">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Tên danh mục *</label>
+            <input type="text" [(ngModel)]="newCategory.name" placeholder="VD: Phòng Xét nghiệm" />
+          </div>
+          <div class="form-group">
+            <label>Mô tả</label>
+            <textarea
+              [(ngModel)]="newCategory.description"
+              placeholder="Mô tả danh mục..."
+            ></textarea>
+          </div>
+          <div class="form-group">
+            <label>Icon (emoji)</label>
+            <input type="text" [(ngModel)]="newCategory.iconName" placeholder="🧪" />
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" (click)="showCategoryModal = false">Hủy</button>
+          <button class="btn btn-primary" (click)="saveCategory()" [disabled]="!newCategory.name">
+            Lưu danh mục
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- Template Library Modal -->
+  @if (showLibraryModal) {
+    <div class="modal-overlay" (click)="showLibraryModal = false">
+      <div class="modal modal-lg" (click)="$event.stopPropagation()">
+        <div class="modal-header library-header">
+          <h3>📚 Thư viện biểu mẫu IVF</h3>
+          <button class="close-btn" (click)="showLibraryModal = false">✕</button>
+        </div>
+        <div class="modal-body library-body">
+          <p class="library-subtitle">
+            Chọn mẫu biểu mẫu sẵn để bắt đầu nhanh. Mẫu sẽ được nhân bản vào danh sách của bạn.
+          </p>
+          @if (libraryTemplates.length === 0) {
+            <div class="library-empty">
+              <p>
+                Chưa có mẫu nào trong thư viện. Thư viện sẽ được tạo tự động khi khởi tạo hệ thống.
+              </p>
+            </div>
+          } @else {
+            <div class="library-grid">
+              @for (tpl of libraryTemplates; track tpl.id) {
+                <div class="library-card">
+                  <div class="library-card-body">
+                    <h4>{{ tpl.name }}</h4>
+                    <p class="library-desc">{{ tpl.description || 'Không có mô tả' }}</p>
+                    <div class="library-meta">
+                      <span class="field-count">{{ tpl.fields?.length || 0 }} trường</span>
+                      <span class="version">v{{ tpl.version }}</span>
+                    </div>
+                  </div>
+                  <div class="library-card-footer">
+                    <button
+                      class="btn btn-use"
+                      (click)="useTemplate(tpl.id)"
+                      [disabled]="duplicatingId === tpl.id"
+                    >
+                      @if (duplicatingId === tpl.id) {
+                        ⏳ Đang tạo...
+                      } @else {
+                        🚀 Sử dụng mẫu
+                      }
+                    </button>
+                  </div>
+                </div>
+              }
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+  }
 </div>

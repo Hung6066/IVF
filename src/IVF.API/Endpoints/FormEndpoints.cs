@@ -1,3 +1,5 @@
+using IVF.API.Services;
+using IVF.Application.Common.Interfaces;
 using IVF.Application.Features.Forms.Commands;
 using IVF.Application.Features.Forms.Queries;
 using IVF.Domain.Enums;
@@ -91,6 +93,12 @@ public static class FormEndpoints
             return r.IsSuccess ? Results.NoContent() : Results.NotFound();
         });
 
+        group.MapPost("/templates/{id:guid}/duplicate", async (Guid id, DuplicateFormTemplateRequest? req, IMediator m) =>
+        {
+            var r = await m.Send(new DuplicateFormTemplateCommand(id, req?.NewName));
+            return r.IsSuccess ? Results.Created($"/api/forms/templates/{r.Value!.Id}", r.Value) : Results.NotFound(r.Error);
+        });
+
         #endregion
 
         #region Fields
@@ -102,7 +110,7 @@ public static class FormEndpoints
         {
             var r = await m.Send(new AddFormFieldCommand(
                 templateId, req.FieldKey, req.Label, req.FieldType, req.DisplayOrder, req.IsRequired,
-                req.Placeholder, req.OptionsJson, req.ValidationRulesJson, req.DefaultValue, req.HelpText, req.ConditionalLogicJson));
+                req.Placeholder, req.OptionsJson, req.ValidationRulesJson, req.DefaultValue, req.HelpText, req.ConditionalLogicJson, req.LayoutJson));
             return r.IsSuccess ? Results.Created($"/api/forms/fields/{r.Value!.Id}", r.Value) : Results.BadRequest(r.Error);
         });
 
@@ -110,7 +118,7 @@ public static class FormEndpoints
         {
             var r = await m.Send(new UpdateFormFieldCommand(
                 id, req.Label, req.FieldType, req.DisplayOrder, req.IsRequired,
-                req.Placeholder, req.OptionsJson, req.ValidationRulesJson, req.DefaultValue, req.HelpText, req.ConditionalLogicJson));
+                req.Placeholder, req.OptionsJson, req.ValidationRulesJson, req.DefaultValue, req.HelpText, req.ConditionalLogicJson, req.LayoutJson));
             return r.IsSuccess ? Results.Ok(r.Value) : Results.NotFound(r.Error);
         });
 
@@ -130,9 +138,10 @@ public static class FormEndpoints
 
         #region Responses
 
-        group.MapGet("/responses", async (IMediator m, Guid? templateId = null, Guid? patientId = null, DateTime? from = null, DateTime? to = null, int page = 1, int pageSize = 20) =>
+        group.MapGet("/responses", async (IMediator m, Guid? templateId = null, Guid? patientId = null, DateTime? from = null, DateTime? to = null, int? status = null, int page = 1, int pageSize = 20) =>
         {
-            var (items, total) = await m.Send(new GetFormResponsesQuery(templateId, patientId, from, to, page, pageSize));
+            var statusFilter = status.HasValue ? (ResponseStatus)status.Value : (ResponseStatus?)null;
+            var (items, total) = await m.Send(new GetFormResponsesQuery(templateId, patientId, from, to, statusFilter, page, pageSize));
             return Results.Ok(new { Items = items, Total = total });
         });
 
@@ -148,7 +157,7 @@ public static class FormEndpoints
                 null, v.FormFieldId, null, null, v.TextValue, v.NumericValue, v.DateValue, v.BooleanValue, v.JsonValue,
                 v.Details?.Select(d => new FormFieldValueDetailDto(d.Value, d.Label, d.ConceptId)).ToList())).ToList();
 
-            var r = await m.Send(new SubmitFormResponseCommand(req.FormTemplateId, req.SubmittedByUserId, req.PatientId, req.CycleId, fieldValues));
+            var r = await m.Send(new SubmitFormResponseCommand(req.FormTemplateId, req.SubmittedByUserId, req.PatientId, req.CycleId, fieldValues, req.IsDraft));
             return r.IsSuccess ? Results.Created($"/api/forms/responses/{r.Value!.Id}", r.Value) : Results.BadRequest(r.Error);
         });
 
@@ -173,6 +182,19 @@ public static class FormEndpoints
         {
             var r = await m.Send(new DeleteFormResponseCommand(id));
             return r.IsSuccess ? Results.NoContent() : Results.NotFound();
+        });
+
+        group.MapGet("/responses/{id:guid}/export-pdf", async (Guid id, IMediator m) =>
+        {
+            var response = await m.Send(new GetFormResponseByIdQuery(id));
+            if (response == null) return Results.NotFound();
+
+            var template = await m.Send(new GetFormTemplateByIdQuery(response.FormTemplateId));
+            if (template == null) return Results.NotFound();
+
+            var pdfBytes = FormPdfService.GeneratePdf(response, template);
+            var fileName = $"{template.Name.Replace(" ", "_")}_{response.CreatedAt:yyyyMMdd}.pdf";
+            return Results.File(pdfBytes, "application/pdf", fileName);
         });
 
         #endregion
@@ -227,6 +249,44 @@ public static class FormEndpoints
         });
 
         #endregion
+
+        #region Files
+
+        group.MapPost("/files/upload", async (HttpRequest httpReq, IFileStorageService fileStorage) =>
+        {
+            if (!httpReq.HasFormContentType)
+                return Results.BadRequest("Expected multipart/form-data");
+
+            var form = await httpReq.ReadFormAsync();
+            var file = form.Files.FirstOrDefault();
+            if (file == null || file.Length == 0)
+                return Results.BadRequest("No file uploaded");
+
+            // Validate file size (max 10MB)
+            if (file.Length > 10 * 1024 * 1024)
+                return Results.BadRequest("File size exceeds 10MB limit");
+
+            using var stream = file.OpenReadStream();
+            var result = await fileStorage.UploadAsync(stream, file.FileName, file.ContentType, "forms");
+            return Results.Ok(result);
+        }).DisableAntiforgery();
+
+        group.MapGet("/files/{**filePath}", async (string filePath, IFileStorageService fileStorage) =>
+        {
+            var result = await fileStorage.GetAsync(filePath);
+            if (result == null) return Results.NotFound();
+
+            var (stream, contentType, fileName) = result.Value;
+            return Results.File(stream, contentType, fileName);
+        });
+
+        group.MapDelete("/files/{**filePath}", async (string filePath, IFileStorageService fileStorage) =>
+        {
+            var deleted = await fileStorage.DeleteAsync(filePath);
+            return deleted ? Results.NoContent() : Results.NotFound();
+        });
+
+        #endregion
     }
 }
 
@@ -237,27 +297,28 @@ public record UpdateFormCategoryRequest(string Name, string? Description, string
 
 public record CreateFormTemplateRequest(string? CategoryId, string Name, string? Description, string? CreatedByUserId, List<CreateFieldRequest>? Fields);
 public record UpdateFormTemplateRequest(string Name, string? Description, Guid? CategoryId);
+public record DuplicateFormTemplateRequest(string? NewName);
 
 public record CreateFieldRequest(
     string FieldKey, string Label, FieldType FieldType, int DisplayOrder, bool IsRequired = false,
     string? Placeholder = null, string? OptionsJson = null, string? ValidationRulesJson = null,
-    string? DefaultValue = null, string? HelpText = null, string? ConditionalLogicJson = null);
+    string? LayoutJson = null, string? DefaultValue = null, string? HelpText = null, string? ConditionalLogicJson = null);
 
 public record AddFormFieldRequest(
     string FieldKey, string Label, FieldType FieldType, int DisplayOrder, bool IsRequired = false,
     string? Placeholder = null, string? OptionsJson = null, string? ValidationRulesJson = null,
-    string? DefaultValue = null, string? HelpText = null, string? ConditionalLogicJson = null);
+    string? LayoutJson = null, string? DefaultValue = null, string? HelpText = null, string? ConditionalLogicJson = null);
 
 public record UpdateFormFieldRequest(
     string Label, FieldType FieldType, int DisplayOrder, bool IsRequired,
-    string? Placeholder, string? OptionsJson, string? ValidationRulesJson,
+    string? Placeholder, string? OptionsJson, string? ValidationRulesJson, string? LayoutJson,
     string? DefaultValue, string? HelpText, string? ConditionalLogicJson);
 
 public record ReorderFieldsRequest(List<Guid> FieldIds);
 
 public record SubmitFormResponseRequest(
     Guid FormTemplateId, Guid? SubmittedByUserId, Guid? PatientId, Guid? CycleId,
-    List<FieldValueRequest> FieldValues);
+    List<FieldValueRequest> FieldValues, bool IsDraft = false);
 
 public record FieldValueRequest(
     Guid FormFieldId, string? TextValue, decimal? NumericValue,

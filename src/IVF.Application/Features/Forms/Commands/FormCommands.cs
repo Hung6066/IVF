@@ -1,3 +1,5 @@
+using System.Text.Json;
+using System.Text.RegularExpressions;
 using IVF.Application.Common;
 using IVF.Application.Common.Interfaces;
 using IVF.Domain.Entities;
@@ -50,6 +52,8 @@ public record UnpublishFormTemplateCommand(Guid Id) : IRequest<Result<FormTempla
 
 public record DeleteFormTemplateCommand(Guid Id) : IRequest<Result<bool>>;
 
+public record DuplicateFormTemplateCommand(Guid SourceTemplateId, string? NewName = null) : IRequest<Result<FormTemplateDto>>;
+
 #endregion
 
 #region Form Fields
@@ -66,7 +70,8 @@ public record AddFormFieldCommand(
     string? ValidationRulesJson = null,
     string? DefaultValue = null,
     string? HelpText = null,
-    string? ConditionalLogicJson = null
+    string? ConditionalLogicJson = null,
+    string? LayoutJson = null
 ) : IRequest<Result<FormFieldDto>>;
 
 public record UpdateFormFieldCommand(
@@ -80,7 +85,8 @@ public record UpdateFormFieldCommand(
     string? ValidationRulesJson,
     string? DefaultValue,
     string? HelpText,
-    string? ConditionalLogicJson
+    string? ConditionalLogicJson,
+    string? LayoutJson = null
 ) : IRequest<Result<FormFieldDto>>;
 
 public record DeleteFormFieldCommand(Guid Id) : IRequest<Result<bool>>;
@@ -99,7 +105,8 @@ public record SubmitFormResponseCommand(
     Guid? SubmittedByUserId,  // Made nullable
     Guid? PatientId,
     Guid? CycleId,
-    List<FormFieldValueDto> FieldValues
+    List<FormFieldValueDto> FieldValues,
+    bool IsDraft = false
 ) : IRequest<Result<FormResponseDto>>;
 
 public record UpdateFormResponseStatusCommand(
@@ -176,6 +183,7 @@ public record FormFieldDto(
     bool IsRequired,
     string? OptionsJson,
     string? ValidationRulesJson,
+    string? LayoutJson,
     string? DefaultValue,
     string? HelpText,
     string? ConditionalLogicJson,
@@ -191,6 +199,7 @@ public record CreateFormFieldDto(
     string? Placeholder = null,
     string? OptionsJson = null,
     string? ValidationRulesJson = null,
+    string? LayoutJson = null,
     string? DefaultValue = null,
     string? HelpText = null,
     string? ConditionalLogicJson = null
@@ -204,6 +213,7 @@ public record FormResponseDto(
     string? PatientName,
     Guid? CycleId,
     ResponseStatus Status,
+    string? Notes,
     DateTime CreatedAt,
     DateTime? SubmittedAt,
     List<FormFieldValueDto>? FieldValues = null
@@ -296,7 +306,8 @@ public class FormTemplateCommandsHandler :
     IRequestHandler<UpdateFormTemplateCommand, Result<FormTemplateDto>>,
     IRequestHandler<PublishFormTemplateCommand, Result<FormTemplateDto>>,
     IRequestHandler<UnpublishFormTemplateCommand, Result<FormTemplateDto>>,
-    IRequestHandler<DeleteFormTemplateCommand, Result<bool>>
+    IRequestHandler<DeleteFormTemplateCommand, Result<bool>>,
+    IRequestHandler<DuplicateFormTemplateCommand, Result<FormTemplateDto>>
 {
     private readonly IFormRepository _repo;
 
@@ -347,7 +358,8 @@ public class FormTemplateCommandsHandler :
                     fieldDto.ValidationRulesJson,
                     fieldDto.DefaultValue,
                     fieldDto.HelpText,
-                    fieldDto.ConditionalLogicJson);
+                    fieldDto.ConditionalLogicJson,
+                    fieldDto.LayoutJson);
             }
         }
 
@@ -405,6 +417,46 @@ public class FormTemplateCommandsHandler :
         return Result<bool>.Success(true);
     }
 
+    public async Task<Result<FormTemplateDto>> Handle(DuplicateFormTemplateCommand request, CancellationToken ct)
+    {
+        var source = await _repo.GetTemplateByIdAsync(request.SourceTemplateId, true, ct);
+        if (source == null)
+            return Result<FormTemplateDto>.Failure("Source template not found");
+
+        var newName = request.NewName ?? $"{source.Name} (Bản sao)";
+
+        var duplicate = FormTemplate.Create(
+            source.CategoryId,
+            newName,
+            source.CreatedByUserId,
+            source.Description);
+
+        if (source.Fields != null)
+        {
+            foreach (var field in source.Fields.OrderBy(f => f.DisplayOrder))
+            {
+                duplicate.AddField(
+                    field.FieldKey,
+                    field.Label,
+                    field.FieldType,
+                    field.DisplayOrder,
+                    field.IsRequired,
+                    field.Placeholder,
+                    field.OptionsJson,
+                    field.ValidationRulesJson,
+                    field.DefaultValue,
+                    field.HelpText,
+                    field.ConditionalLogicJson,
+                    field.LayoutJson);
+            }
+        }
+
+        await _repo.AddTemplateAsync(duplicate, ct);
+
+        duplicate = await _repo.GetTemplateByIdAsync(duplicate.Id, true, ct);
+        return Result<FormTemplateDto>.Success(MapToDto(duplicate!));
+    }
+
     private static FormTemplateDto MapToDto(FormTemplate t) => new(
         t.Id,
         t.CategoryId,
@@ -416,7 +468,7 @@ public class FormTemplateCommandsHandler :
         t.CreatedAt,
         t.Fields?.Select(f => new FormFieldDto(
             f.Id, f.FieldKey, f.Label, f.Placeholder, f.FieldType, f.DisplayOrder,
-            f.IsRequired, f.OptionsJson, f.ValidationRulesJson, f.DefaultValue,
+            f.IsRequired, f.OptionsJson, f.ValidationRulesJson, f.LayoutJson, f.DefaultValue,
             f.HelpText, f.ConditionalLogicJson, f.ConceptId)).ToList());
 }
 
@@ -447,7 +499,8 @@ public class FormFieldCommandsHandler :
             request.ValidationRulesJson,
             request.DefaultValue,
             request.HelpText,
-            request.ConditionalLogicJson);
+            request.ConditionalLogicJson,
+            request.LayoutJson);
 
         await _repo.AddFieldAsync(field, ct);
 
@@ -470,7 +523,8 @@ public class FormFieldCommandsHandler :
             request.ValidationRulesJson,
             request.DefaultValue,
             request.HelpText,
-            request.ConditionalLogicJson);
+            request.ConditionalLogicJson,
+            request.LayoutJson);
 
         await _repo.UpdateFieldAsync(field, ct);
 
@@ -491,7 +545,7 @@ public class FormFieldCommandsHandler :
 
     private static FormFieldDto MapToDto(FormField f) => new(
         f.Id, f.FieldKey, f.Label, f.Placeholder, f.FieldType, f.DisplayOrder,
-        f.IsRequired, f.OptionsJson, f.ValidationRulesJson, f.DefaultValue,
+        f.IsRequired, f.OptionsJson, f.ValidationRulesJson, f.LayoutJson, f.DefaultValue,
         f.HelpText, f.ConditionalLogicJson, f.ConceptId);
 }
 
@@ -510,6 +564,19 @@ public class FormResponseCommandsHandler :
 
     public async Task<Result<FormResponseDto>> Handle(SubmitFormResponseCommand request, CancellationToken ct)
     {
+        // Load template with fields for validation
+        var template = await _repo.GetTemplateByIdAsync(request.FormTemplateId, true, ct);
+        if (template == null)
+            return Result<FormResponseDto>.Failure("Form template not found");
+
+        // Server-side validation (skip for drafts)
+        if (!request.IsDraft)
+        {
+            var validationErrors = ValidateFieldValues(template.Fields, request.FieldValues);
+            if (validationErrors.Count > 0)
+                return Result<FormResponseDto>.Failure(string.Join("; ", validationErrors));
+        }
+
         var response = FormResponse.Create(
             request.FormTemplateId,
             request.SubmittedByUserId,
@@ -538,7 +605,10 @@ public class FormResponseCommandsHandler :
             }
         }
 
-        response.Submit();
+        if (request.IsDraft)
+            response.AddNotes("Draft saved");
+        else
+            response.Submit();
 
         await _repo.AddResponseAsync(response, ct);
 
@@ -639,12 +709,106 @@ public class FormResponseCommandsHandler :
         r.Patient?.FullName,
         r.CycleId,
         r.Status,
+        r.Notes,
         r.CreatedAt,
         r.SubmittedAt,
         r.FieldValues?.Select(v => new FormFieldValueDto(
             v.Id, v.FormFieldId, v.FormField?.FieldKey, v.FormField?.Label,
             v.TextValue, v.NumericValue, v.DateValue, v.BooleanValue, v.JsonValue,
             v.Details?.Select(d => new FormFieldValueDetailDto(d.Value, d.Label, d.ConceptId)).ToList())).ToList());
+
+    private static List<string> ValidateFieldValues(ICollection<FormField>? templateFields, List<FormFieldValueDto> fieldValues)
+    {
+        var errors = new List<string>();
+        if (templateFields == null) return errors;
+
+        var valuesByFieldId = fieldValues.ToDictionary(fv => fv.FormFieldId);
+
+        foreach (var field in templateFields)
+        {
+            // Skip layout-only fields
+            if (field.FieldType is FieldType.Section or FieldType.Label or FieldType.PageBreak)
+                continue;
+
+            valuesByFieldId.TryGetValue(field.Id, out var fv);
+            var hasValue = fv != null && !IsEmpty(fv);
+
+            // Required check
+            if (field.IsRequired && !hasValue)
+            {
+                errors.Add($"Trường '{field.Label}' là bắt buộc");
+                continue;
+            }
+
+            if (!hasValue || string.IsNullOrEmpty(field.ValidationRulesJson))
+                continue;
+
+            // Parse validation rules
+            List<ValidationRuleEntry>? rules;
+            try
+            {
+                rules = JsonSerializer.Deserialize<List<ValidationRuleEntry>>(
+                    field.ValidationRulesJson,
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            }
+            catch { continue; }
+
+            if (rules == null) continue;
+
+            var textVal = fv!.TextValue ?? "";
+            var numVal = fv.NumericValue;
+
+            foreach (var rule in rules)
+            {
+                switch (rule.Type?.ToLowerInvariant())
+                {
+                    case "minlength":
+                        if (int.TryParse(rule.Value?.ToString(), out var minLen) && textVal.Length < minLen)
+                            errors.Add(rule.Message ?? $"Trường '{field.Label}' phải có ít nhất {minLen} ký tự");
+                        break;
+                    case "maxlength":
+                        if (int.TryParse(rule.Value?.ToString(), out var maxLen) && textVal.Length > maxLen)
+                            errors.Add(rule.Message ?? $"Trường '{field.Label}' không được quá {maxLen} ký tự");
+                        break;
+                    case "min":
+                        if (decimal.TryParse(rule.Value?.ToString(), out var min) && numVal.HasValue && numVal.Value < min)
+                            errors.Add(rule.Message ?? $"Trường '{field.Label}' phải lớn hơn hoặc bằng {min}");
+                        break;
+                    case "max":
+                        if (decimal.TryParse(rule.Value?.ToString(), out var max) && numVal.HasValue && numVal.Value > max)
+                            errors.Add(rule.Message ?? $"Trường '{field.Label}' phải nhỏ hơn hoặc bằng {max}");
+                        break;
+                    case "pattern":
+                        var pattern = rule.Value?.ToString();
+                        if (!string.IsNullOrEmpty(pattern) && !Regex.IsMatch(textVal, pattern))
+                            errors.Add(rule.Message ?? $"Trường '{field.Label}' không đúng định dạng");
+                        break;
+                    case "email":
+                        if (!string.IsNullOrEmpty(textVal) && !Regex.IsMatch(textVal, @"^[^@\s]+@[^@\s]+\.[^@\s]+$"))
+                            errors.Add(rule.Message ?? $"Trường '{field.Label}' phải là email hợp lệ");
+                        break;
+                }
+            }
+        }
+
+        return errors;
+    }
+
+    private static bool IsEmpty(FormFieldValueDto fv)
+    {
+        return string.IsNullOrWhiteSpace(fv.TextValue)
+            && !fv.NumericValue.HasValue
+            && !fv.DateValue.HasValue
+            && !fv.BooleanValue.HasValue
+            && string.IsNullOrWhiteSpace(fv.JsonValue);
+    }
+
+    private record ValidationRuleEntry
+    {
+        public string? Type { get; init; }
+        public object? Value { get; init; }
+        public string? Message { get; init; }
+    }
 }
 
 public class ReportTemplateCommandsHandler :

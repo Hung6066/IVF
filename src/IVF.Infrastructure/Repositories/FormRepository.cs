@@ -1,5 +1,6 @@
 using IVF.Application.Common.Interfaces;
 using IVF.Domain.Entities;
+using IVF.Domain.Enums;
 using IVF.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -191,6 +192,7 @@ public class FormRepository : IFormRepository
         Guid? patientId = null,
         DateTime? from = null,
         DateTime? to = null,
+        ResponseStatus? status = null,
         int page = 1,
         int pageSize = 20,
         CancellationToken ct = default)
@@ -212,6 +214,9 @@ public class FormRepository : IFormRepository
 
         if (to.HasValue)
             query = query.Where(r => r.CreatedAt <= to.Value);
+
+        if (status.HasValue)
+            query = query.Where(r => r.Status == status.Value);
 
         var total = await query.CountAsync(ct);
 

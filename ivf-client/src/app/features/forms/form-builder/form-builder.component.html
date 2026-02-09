@@ -1,413 +1,770 @@
 <div class="form-builder-container">
-    <!-- Header -->
-    <header class="builder-header">
-        <div class="header-left">
-            <button class="back-btn" (click)="goBack()">← Quay lại</button>
-            <input type="text" class="form-name-input" [(ngModel)]="formName" placeholder="Tên biểu mẫu..."
-                (blur)="saveFormSettings()">
-        </div>
-        <div class="header-right">
-            <button class="btn btn-secondary" (click)="preview()">👁️ Xem trước</button>
-            @if (templateId && !template?.isPublished) {
-            <button class="btn btn-success" (click)="publish()">📤 Xuất bản</button>
-            }
-            <button class="btn btn-primary" (click)="save()">💾 Lưu</button>
-        </div>
-    </header>
-
-    <div class="builder-content">
-        <!-- Field Palette -->
-        <aside class="field-palette">
-            <h3>Các loại trường</h3>
-            <div class="field-types">
-                @for (fieldType of fieldTypes; track fieldType.type) {
-                <button class="field-type-btn" draggable="true" (dragstart)="onDragStart($event, fieldType.type)"
-                    (click)="addField(fieldType.type)">
-                    <span class="field-icon">{{ fieldType.icon }}</span>
-                    <span>{{ fieldType.label }}</span>
-                </button>
-                }
-            </div>
-
-            <div class="palette-section">
-                <h4>Cài đặt biểu mẫu</h4>
-                <div class="form-group">
-                    <label>Danh mục</label>
-                    <select [(ngModel)]="selectedCategoryId" (change)="saveFormSettings()">
-                        @for (cat of categories; track cat.id) {
-                        <option [value]="cat.id">{{ cat.name }}</option>
-                        }
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Mô tả</label>
-                    <textarea [(ngModel)]="formDescription" placeholder="Mô tả biểu mẫu..."
-                        (blur)="saveFormSettings()"></textarea>
-                </div>
-            </div>
-        </aside>
-
-        <!-- Form Canvas -->
-        <main class="form-canvas">
-            <div class="canvas-header">
-                <h2>{{ formName || 'Biểu mẫu mới' }}</h2>
-                <p>{{ formDescription || 'Kéo thả các trường từ bên trái để xây dựng biểu mẫu' }}</p>
-            </div>
-
-            <div class="fields-container grid-layout" cdkDropList (cdkDropListDropped)="onDropField($event)"
-                (dragover)="onDragOver($event)" (drop)="onDrop($event)">
-
-                @if (fields.length === 0) {
-                <div class="empty-canvas">
-                    <div class="drop-zone">
-                        <span class="drop-icon">📥</span>
-                        <p>Kéo trường vào đây hoặc click vào loại trường bên trái</p>
-                    </div>
-                </div>
-                }
-
-                @for (field of fields; track field.id || field.fieldKey; let i = $index) {
-                <div class="field-item" cdkDrag [style.grid-column]="'span ' + getFieldColSpan(field)"
-                    [class.selected]="selectedField?.id === field.id || selectedField?.fieldKey === field.fieldKey"
-                    [class.col-1]="getFieldColSpan(field) === 1" [class.col-2]="getFieldColSpan(field) === 2"
-                    [class.col-3]="getFieldColSpan(field) === 3" [class.col-4]="getFieldColSpan(field) === 4"
-                    (click)="selectField(field)">
-                    <div class="field-header">
-                        <div class="drag-handle" cdkDragHandle>⋮⋮</div>
-                        <span class="col-indicator" title="Chiều rộng cột">{{ getFieldColSpan(field) }}/4</span>
-                        <button class="delete-btn" (click)="deleteField(field, $event)">🗑️</button>
-                    </div>
-                    <div class="field-preview">
-                        <label>
-                            {{ field.label }}
-                            @if (field.isRequired) {
-                            <span class="required">*</span>
-                            }
-                        </label>
-                        @switch (field.fieldType) {
-                        @case (FieldType.Text) {
-                        <input type="text" [placeholder]="field.placeholder || ''"
-                            [style.height]="getFieldHeight(field)" disabled>
-                        }
-                        @case (FieldType.TextArea) {
-                        <textarea [placeholder]="field.placeholder || ''" [style.height]="getFieldHeight(field)"
-                            disabled></textarea>
-                        }
-                        @case (FieldType.Number) {
-                        <input type="number" [placeholder]="field.placeholder || ''" disabled>
-                        }
-                        @case (FieldType.Date) {
-                        <input type="date" disabled>
-                        }
-                        @case (FieldType.Dropdown) {
-                        <select disabled>
-                            <option>-- Chọn --</option>
-                        </select>
-                        }
-                        @case (FieldType.Radio) {
-                        <div class="radio-preview">
-                            @for (opt of getOptions(field); track opt.value) {
-                            <label><input type="radio" disabled> {{ opt.label }}</label>
-                            }
-                        </div>
-                        }
-                        @case (FieldType.Checkbox) {
-                        <div class="checkbox-preview">
-                            @for (opt of getOptions(field); track opt.value) {
-                            <label><input type="checkbox" disabled> {{ opt.label }}</label>
-                            }
-                            @if (getOptions(field).length === 0) {
-                            <label><input type="checkbox" disabled> {{ field.placeholder || 'Checkbox' }}</label>
-                            }
-                        </div>
-                        }
-                        @case (FieldType.Tags) {
-                        <div class="tags-preview">
-                            @if (getOptions(field).length > 0) {
-                            @for (opt of getOptions(field); track opt.value) {
-                            <span class="tag-badge">🏷️ {{ opt.label }}</span>
-                            }
-                            } @else {
-                            <span class="tags-placeholder">🏷️ Chọn từ danh sách concepts...</span>
-                            }
-                        </div>
-                        }
-                        @case (FieldType.Rating) {
-                        <div class="rating-preview">⭐⭐⭐⭐⭐</div>
-                        }
-                        @case (FieldType.Section) {
-                        <hr class="section-divider">
-                        }
-                        @default {
-                        <input type="text" disabled [placeholder]="getFieldTypeLabel(field.fieldType)">
-                        }
-                        }
-                        @if (field.helpText) {
-                        <small class="help-text">{{ field.helpText }}</small>
-                        }
-                    </div>
-                </div>
-                }
-            </div>
-        </main>
-
-        <!-- Field Properties Panel -->
-        @if (selectedField) {
-        <aside class="properties-panel">
-            <div class="panel-header">
-                <h3>Thuộc tính trường</h3>
-                <button class="close-btn" (click)="selectedField = null">✕</button>
-            </div>
-
-            <div class="panel-body">
-                <div class="form-group">
-                    <label>Nhãn</label>
-                    <input type="text" [(ngModel)]="selectedField.label" (blur)="updateField()">
-
-                    <!-- Inline Concept Search -->
-                    <div class="concept-link-section">
-                        @if (selectedField.id && getLinkedConcept(selectedField.id)) {
-                        <div class="linked-concept-badge">
-                            <span class="concept-tag">
-                                🔗 {{ getLinkedConcept(selectedField.id)!.code }}
-                                <span class="concept-display">{{ getLinkedConcept(selectedField.id)!.display }}</span>
-                            </span>
-                            @for (mapping of getLinkedConcept(selectedField.id)!.mappings; track mapping.id) {
-                            @if (mapping.targetSystem === 'SNOMED CT') {
-                            <span class="snomed-tag">SNOMED: {{ mapping.targetCode }}</span>
-                            }
-                            }
-                            <button class="remove-concept-btn" (click)="unlinkConcept(selectedField)"
-                                title="Bỏ liên kết">✕</button>
-                        </div>
-                        } @else {
-                        <div class="concept-search-inline">
-                            <input type="text" class="concept-search-input" placeholder="🔍 Tìm concept y khoa..."
-                                [(ngModel)]="conceptSearchTerm" (input)="searchConcepts()"
-                                (focus)="showConceptDropdown = true">
-
-                            @if (showConceptDropdown && conceptSearchResults.length > 0) {
-                            <div class="concept-dropdown">
-                                @for (concept of conceptSearchResults; track concept.id) {
-                                <div class="concept-option" (click)="selectConcept(concept)">
-                                    <span class="concept-code">{{ concept.code }}</span>
-                                    <span class="concept-name">{{ concept.display }}</span>
-                                    @for (mapping of concept.mappings; track mapping.id) {
-                                    @if (mapping.targetSystem === 'SNOMED CT') {
-                                    <span class="snomed-mini">SNOMED</span>
-                                    }
-                                    }
-                                </div>
-                                }
-                            </div>
-                            }
-
-                            @if (showConceptDropdown && conceptSearchTerm && conceptSearchResults.length === 0 &&
-                            !isSearchingConcepts) {
-                            <div class="concept-dropdown">
-                                <div class="no-results">Không tìm thấy concept</div>
-                            </div>
-                            }
-                        </div>
-                        }
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label>Key (định danh)</label>
-                    <input type="text" [(ngModel)]="selectedField.fieldKey" (blur)="updateField()">
-                </div>
-
-                <div class="form-group">
-                    <label>Placeholder</label>
-                    <input type="text" [(ngModel)]="selectedField.placeholder" (blur)="updateField()">
-                </div>
-
-                <div class="form-group">
-                    <label>Gợi ý</label>
-                    <input type="text" [(ngModel)]="selectedField.helpText" (blur)="updateField()">
-                </div>
-
-                <div class="form-group">
-                    <label>Giá trị mặc định</label>
-                    <input type="text" [(ngModel)]="selectedField.defaultValue" (blur)="updateField()">
-                </div>
-
-                <div class="form-group checkbox-group">
-                    <label>
-                        <input type="checkbox" [(ngModel)]="selectedField.isRequired" (change)="updateField()">
-                        Bắt buộc
-                    </label>
-                </div>
-
-
-
-                @if (hasOptions(selectedField.fieldType)) {
-                <div class="options-section">
-                    <label>Các lựa chọn</label>
-                    <div class="options-list">
-                        @for (opt of editableOptions; track i; let i = $index) {
-                        <div class="option-row">
-                            <div class="option-inputs">
-                                <input type="text" [(ngModel)]="opt.value" placeholder="Value" (blur)="saveOptions()"
-                                    class="opt-value">
-                                <input type="text" [(ngModel)]="opt.label" placeholder="Label" (blur)="saveOptions()"
-                                    class="opt-label">
-                            </div>
-
-                            <!-- Concept Search for this option -->
-                            <div class="option-concept">
-                                @if (opt.conceptId) {
-                                <div class="linked-concept-info">
-                                    <span class="concept-badge" [title]="opt.conceptCode">
-                                        🔗 {{ opt.conceptDisplay || opt.conceptCode }}
-                                    </span>
-                                    <button type="button" class="unlink-btn" (click)="unlinkOptionConcept(i)"
-                                        title="Bỏ liên kết">✕</button>
-                                </div>
-                                } @else {
-                                <div class="concept-search-wrapper">
-                                    <input type="text" class="concept-search-input" placeholder="🔍 Tìm concept..."
-                                        [(ngModel)]="optionConceptSearch[i]" (input)="searchConceptsForOption(i)"
-                                        (focus)="activeOptionSearchIndex = i">
-                                    @if (activeOptionSearchIndex === i && optionConceptResults[i] &&
-                                    optionConceptResults[i].length > 0) {
-                                    <div class="concept-dropdown">
-                                        @for (concept of optionConceptResults[i] || []; track concept.id) {
-                                        <div class="concept-option" (click)="selectConceptForOption(i, concept)">
-                                            <span class="concept-code">{{ concept.code }}</span>
-                                            <span class="concept-name">{{ concept.display }}</span>
-                                        </div>
-                                        }
-                                    </div>
-                                    }
-                                </div>
-                                }
-                            </div>
-
-                            <button type="button" class="remove-option-btn" (click)="removeOption(i)"
-                                title="Xóa">🗑️</button>
-                        </div>
-                        }
-                    </div>
-                    <button type="button" class="add-option-btn" (click)="addOption()">+ Thêm lựa chọn</button>
-                    <small>Mỗi option có thể liên kết với Concept để phục vụ báo cáo/thống kê</small>
-                </div>
-                }
-
-                <div class="section-divider">
-                    <span>📐 Bố cục</span>
-                </div>
-
-                <div class="layout-controls">
-                    <div class="form-group">
-                        <label>Chiều rộng</label>
-                        <div class="width-buttons">
-                            <button type="button" [class.active]="selectedFieldColSpan === '1'"
-                                (click)="setColSpan('1')" title="25%">¼</button>
-                            <button type="button" [class.active]="selectedFieldColSpan === '2'"
-                                (click)="setColSpan('2')" title="50%">½</button>
-                            <button type="button" [class.active]="selectedFieldColSpan === '3'"
-                                (click)="setColSpan('3')" title="75%">¾</button>
-                            <button type="button" [class.active]="selectedFieldColSpan === '4'"
-                                (click)="setColSpan('4')" title="100%">1</button>
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label>Chiều cao</label>
-                        <select [(ngModel)]="selectedFieldHeight" (change)="updateFieldLayout()">
-                            <option value="auto">Tự động</option>
-                            <option value="small">Nhỏ (60px)</option>
-                            <option value="medium">Vừa (100px)</option>
-                            <option value="large">Lớn (150px)</option>
-                            <option value="xlarge">Rất lớn (200px)</option>
-                        </select>
-                    </div>
-
-                    <!-- Conditional Logic Section -->
-                    <div class="section-divider">
-                        <span>🔀 Logic hiển thị</span>
-                    </div>
-
-                    <div class="logic-controls">
-                        <button class="btn-logic-toggle" [class.active]="showLogicEditor" (click)="toggleLogicEditor()">
-                            {{ selectedField.conditionalLogicJson ? '✅ Đã thiết lập logic' : '+ Thêm điều kiện hiển thị'
-                            }}
-                        </button>
-
-                        @if (showLogicEditor) {
-                        <div class="logic-editor">
-                            <div class="logic-header">
-                                <select [(ngModel)]="currentLogic.action" (change)="saveLogic()">
-                                    <option value="show">Hiện</option>
-                                    <option value="hide">Ẩn</option>
-                                </select>
-                                <span>trường này khi:</span>
-                            </div>
-
-                            @if (currentLogic.conditions.length > 0) {
-                            <div class="logic-operator">
-                                <select [(ngModel)]="currentLogic.logic" (change)="saveLogic()">
-                                    <option value="AND">Tất cả (AND)</option>
-                                    <option value="OR">Bất kỳ (OR)</option>
-                                </select>
-                                <span>điều kiện sau đúng:</span>
-                            </div>
-                            }
-
-                            <div class="conditions-list">
-                                @for (cond of currentLogic.conditions; track $index) {
-                                <div class="condition-row">
-                                    <div class="condition-inputs">
-                                        <select [(ngModel)]="cond.fieldId" (change)="saveLogic()" class="cond-field">
-                                            <option value="" disabled>-- Chọn trường --</option>
-                                            @for (f of getAvailableTriggerFields(); track f.id) {
-                                            <option [value]="f.id">{{ f.label }}</option>
-                                            }
-                                        </select>
-
-                                        <select [(ngModel)]="cond.operator" (change)="saveLogic()" class="cond-op">
-                                            <option value="eq">Bằng</option>
-                                            <option value="neq">Khác</option>
-                                            <option value="gt">Lớn hơn</option>
-                                            <option value="lt">Nhỏ hơn</option>
-                                            <option value="contains">Chứa</option>
-                                        </select>
-
-                                        @if (getOptionsForCondition(cond.fieldId); as options) {
-                                        <select [(ngModel)]="cond.value" (change)="saveLogic()" class="cond-val">
-                                            <option value="" disabled>-- Chọn giá trị --</option>
-                                            @for (opt of options; track opt.value) {
-                                            <option [value]="opt.value">{{ opt.label }}</option>
-                                            }
-                                        </select>
-                                        } @else {
-                                        <input type="text" [(ngModel)]="cond.value" (blur)="saveLogic()"
-                                            placeholder="Giá trị" class="cond-val">
-                                        }
-                                    </div>
-                                    <button class="remove-cond-btn" (click)="removeCondition($index)">🗑️</button>
-                                </div>
-                                }
-                            </div>
-
-                            <button class="add-cond-btn" (click)="addCondition()">+ Thêm điều kiện</button>
-
-                            @if (getAvailableTriggerFields().length === 0) {
-                            <small class="warning-text">⚠️ Cần có trường phía trên để tạo điều kiện.</small>
-                            }
-                        </div>
-                        }
-                    </div>
-                </div>
-            </div>
-        </aside>
-        }
+  <!-- Header -->
+  <header class="builder-header">
+    <div class="header-left">
+      <button class="back-btn" (click)="goBack()">← Quay lại</button>
+      <input
+        type="text"
+        class="form-name-input"
+        [(ngModel)]="formName"
+        placeholder="Tên biểu mẫu..."
+        (blur)="saveFormSettings()"
+      />
     </div>
+    <div class="header-right">
+      <button class="btn btn-secondary" (click)="preview()">👁️ Xem trước</button>
+      @if (templateId && !template?.isPublished) {
+        <button class="btn btn-success" (click)="publish()">📤 Xuất bản</button>
+      }
+      <button class="btn btn-primary" (click)="save()">💾 Lưu</button>
+    </div>
+  </header>
 
-    <!-- Concept Picker Modal -->
-    <app-concept-picker [isOpen]="showConceptPicker" [fieldId]="selectedFieldForConcept?.id"
-        (conceptLinked)="onConceptLinked($event)" (closed)="showConceptPicker = false">
-    </app-concept-picker>
+  <div class="builder-content">
+    <!-- Field Palette -->
+    <aside class="field-palette">
+      <h3>Các loại trường</h3>
+      <div class="field-types">
+        @for (fieldType of fieldTypes; track fieldType.type) {
+          <button
+            class="field-type-btn"
+            draggable="true"
+            (dragstart)="onDragStart($event, fieldType.type)"
+            (click)="addField(fieldType.type)"
+          >
+            <span class="field-icon">{{ fieldType.icon }}</span>
+            <span>{{ fieldType.label }}</span>
+          </button>
+        }
+      </div>
+
+      <div class="palette-section">
+        <h4>Cài đặt biểu mẫu</h4>
+        <div class="form-group">
+          <label>Danh mục</label>
+          <select [(ngModel)]="selectedCategoryId" (change)="saveFormSettings()">
+            @for (cat of categories; track cat.id) {
+              <option [value]="cat.id">{{ cat.name }}</option>
+            }
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Mô tả</label>
+          <textarea
+            [(ngModel)]="formDescription"
+            placeholder="Mô tả biểu mẫu..."
+            (blur)="saveFormSettings()"
+          ></textarea>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Form Canvas -->
+    <main class="form-canvas">
+      <div class="canvas-header">
+        <h2>{{ formName || 'Biểu mẫu mới' }}</h2>
+        <p>{{ formDescription || 'Kéo thả các trường từ bên trái để xây dựng biểu mẫu' }}</p>
+      </div>
+
+      <div
+        class="fields-container grid-layout"
+        cdkDropList
+        (cdkDropListDropped)="onDropField($event)"
+        (dragover)="onDragOver($event)"
+        (drop)="onDrop($event)"
+      >
+        @if (fields.length === 0) {
+          <div class="empty-canvas">
+            <div class="drop-zone">
+              <span class="drop-icon">📥</span>
+              <p>Kéo trường vào đây hoặc click vào loại trường bên trái</p>
+            </div>
+          </div>
+        }
+
+        @for (field of fields; track field.id || field.fieldKey; let i = $index) {
+          <div
+            class="field-item"
+            cdkDrag
+            [style.grid-column]="'span ' + getFieldColSpan(field)"
+            [class.selected]="
+              selectedField?.id === field.id || selectedField?.fieldKey === field.fieldKey
+            "
+            [class.col-1]="getFieldColSpan(field) === 1"
+            [class.col-2]="getFieldColSpan(field) === 2"
+            [class.col-3]="getFieldColSpan(field) === 3"
+            [class.col-4]="getFieldColSpan(field) === 4"
+            (click)="selectField(field)"
+          >
+            <div class="field-header">
+              <div class="drag-handle" cdkDragHandle>⋮⋮</div>
+              <span class="col-indicator" title="Chiều rộng cột"
+                >{{ getFieldColSpan(field) }}/4</span
+              >
+              <button class="clone-btn" (click)="cloneField(field, $event)" title="Nhân bản">
+                📋
+              </button>
+              <button class="delete-btn" (click)="deleteField(field, $event)">🗑️</button>
+            </div>
+            <div class="field-preview">
+              <label>
+                {{ field.label }}
+                @if (field.isRequired) {
+                  <span class="required">*</span>
+                }
+              </label>
+              @switch (field.fieldType) {
+                @case (FieldType.Text) {
+                  <input
+                    type="text"
+                    [placeholder]="field.placeholder || ''"
+                    [style.height]="getFieldHeight(field)"
+                    disabled
+                  />
+                }
+                @case (FieldType.TextArea) {
+                  <textarea
+                    [placeholder]="field.placeholder || ''"
+                    [style.height]="getFieldHeight(field)"
+                    disabled
+                  ></textarea>
+                }
+                @case (FieldType.Number) {
+                  <input type="number" [placeholder]="field.placeholder || ''" disabled />
+                }
+                @case (FieldType.Decimal) {
+                  <input
+                    type="number"
+                    step="0.01"
+                    [placeholder]="field.placeholder || ''"
+                    disabled
+                  />
+                }
+                @case (FieldType.Date) {
+                  <input type="date" disabled />
+                }
+                @case (FieldType.DateTime) {
+                  <input type="datetime-local" disabled />
+                }
+                @case (FieldType.Time) {
+                  <input type="time" disabled />
+                }
+                @case (FieldType.Dropdown) {
+                  <select disabled>
+                    <option>-- Chọn --</option>
+                  </select>
+                }
+                @case (FieldType.Radio) {
+                  <div class="radio-preview">
+                    @for (opt of getOptions(field); track opt.value) {
+                      <label><input type="radio" disabled /> {{ opt.label }}</label>
+                    }
+                  </div>
+                }
+                @case (FieldType.Checkbox) {
+                  <div class="checkbox-preview">
+                    @for (opt of getOptions(field); track opt.value) {
+                      <label><input type="checkbox" disabled /> {{ opt.label }}</label>
+                    }
+                    @if (getOptions(field).length === 0) {
+                      <label
+                        ><input type="checkbox" disabled />
+                        {{ field.placeholder || 'Checkbox' }}</label
+                      >
+                    }
+                  </div>
+                }
+                @case (FieldType.Tags) {
+                  <div class="tags-preview">
+                    @if (getOptions(field).length > 0) {
+                      @for (opt of getOptions(field); track opt.value) {
+                        <span class="tag-badge">🏷️ {{ opt.label }}</span>
+                      }
+                    } @else {
+                      <span class="tags-placeholder">🏷️ Chọn từ danh sách concepts...</span>
+                    }
+                  </div>
+                }
+                @case (FieldType.Rating) {
+                  <div class="rating-preview">⭐⭐⭐⭐⭐</div>
+                }
+                @case (FieldType.MultiSelect) {
+                  <select multiple disabled style="min-height: 60px">
+                    @for (opt of getOptions(field); track opt.value) {
+                      <option>{{ opt.label }}</option>
+                    }
+                  </select>
+                }
+                @case (FieldType.Section) {
+                  <hr class="section-divider" />
+                }
+                @case (FieldType.Label) {
+                  <p class="label-text" style="color: #64748b; font-style: italic">
+                    {{ field.label }}
+                  </p>
+                }
+                @case (FieldType.PageBreak) {
+                  <div class="page-break-preview">
+                    <div class="page-break-line"></div>
+                    <span class="page-break-label">📄 Ngắt trang</span>
+                    <div class="page-break-line"></div>
+                  </div>
+                }
+                @case (FieldType.Address) {
+                  <div class="address-preview">
+                    @for (sub of getSubFields(field); track sub.key) {
+                      <div
+                        class="address-subfield"
+                        [style.flex]="'0 0 ' + (sub.width || 100) + '%'"
+                      >
+                        <small>{{ sub.label }}</small>
+                        <input type="text" disabled [placeholder]="sub.label" />
+                      </div>
+                    }
+                    @if (getSubFields(field).length === 0) {
+                      <div class="address-subfield" style="flex: 0 0 100%">
+                        <small>Đường</small>
+                        <input type="text" disabled placeholder="Đường / số nhà" />
+                      </div>
+                      <div class="address-subfield" style="flex: 0 0 50%">
+                        <small>Phường/Xã</small>
+                        <input type="text" disabled placeholder="Phường/Xã" />
+                      </div>
+                      <div class="address-subfield" style="flex: 0 0 50%">
+                        <small>Quận/Huyện</small>
+                        <input type="text" disabled placeholder="Quận/Huyện" />
+                      </div>
+                      <div class="address-subfield" style="flex: 0 0 50%">
+                        <small>Tỉnh/TP</small>
+                        <input type="text" disabled placeholder="Tỉnh/TP" />
+                      </div>
+                      <div class="address-subfield" style="flex: 0 0 50%">
+                        <small>Quốc gia</small>
+                        <input type="text" disabled placeholder="Quốc gia" />
+                      </div>
+                    }
+                  </div>
+                }
+                @default {
+                  <input type="text" disabled [placeholder]="getFieldTypeLabel(field.fieldType)" />
+                }
+              }
+              @if (field.helpText) {
+                <small class="help-text">{{ field.helpText }}</small>
+              }
+            </div>
+          </div>
+        }
+      </div>
+    </main>
+
+    <!-- Field Properties Panel -->
+    @if (selectedField) {
+      <aside class="properties-panel">
+        <div class="panel-header">
+          <h3>Thuộc tính trường</h3>
+          <button class="close-btn" (click)="selectedField = null">✕</button>
+        </div>
+
+        <div class="panel-body">
+          <div class="form-group">
+            <label>Nhãn</label>
+            <input type="text" [(ngModel)]="selectedField.label" (blur)="updateField()" />
+
+            <!-- Inline Concept Search -->
+            <div class="concept-link-section">
+              @if (selectedField.id && getLinkedConcept(selectedField.id)) {
+                <div class="linked-concept-badge">
+                  <span class="concept-tag">
+                    🔗 {{ getLinkedConcept(selectedField.id)!.code }}
+                    <span class="concept-display">{{
+                      getLinkedConcept(selectedField.id)!.display
+                    }}</span>
+                  </span>
+                  @for (mapping of getLinkedConcept(selectedField.id)!.mappings; track mapping.id) {
+                    @if (mapping.targetSystem === 'SNOMED CT') {
+                      <span class="snomed-tag">SNOMED: {{ mapping.targetCode }}</span>
+                    }
+                  }
+                  <button
+                    class="remove-concept-btn"
+                    (click)="unlinkConcept(selectedField)"
+                    title="Bỏ liên kết"
+                  >
+                    ✕
+                  </button>
+                </div>
+              } @else {
+                <div class="concept-search-inline">
+                  <input
+                    type="text"
+                    class="concept-search-input"
+                    placeholder="🔍 Tìm concept y khoa..."
+                    [(ngModel)]="conceptSearchTerm"
+                    (input)="searchConcepts()"
+                    (focus)="showConceptDropdown = true"
+                  />
+
+                  @if (showConceptDropdown && conceptSearchResults.length > 0) {
+                    <div class="concept-dropdown">
+                      @for (concept of conceptSearchResults; track concept.id) {
+                        <div class="concept-option" (click)="selectConcept(concept)">
+                          <span class="concept-code">{{ concept.code }}</span>
+                          <span class="concept-name">{{ concept.display }}</span>
+                          @for (mapping of concept.mappings; track mapping.id) {
+                            @if (mapping.targetSystem === 'SNOMED CT') {
+                              <span class="snomed-mini">SNOMED</span>
+                            }
+                          }
+                        </div>
+                      }
+                    </div>
+                  }
+
+                  @if (
+                    showConceptDropdown &&
+                    conceptSearchTerm &&
+                    conceptSearchResults.length === 0 &&
+                    !isSearchingConcepts
+                  ) {
+                    <div class="concept-dropdown">
+                      <div class="no-results">Không tìm thấy concept</div>
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Key (định danh)</label>
+            <input type="text" [(ngModel)]="selectedField.fieldKey" (blur)="updateField()" />
+          </div>
+
+          <div class="form-group">
+            <label>Placeholder</label>
+            <input type="text" [(ngModel)]="selectedField.placeholder" (blur)="updateField()" />
+          </div>
+
+          <div class="form-group">
+            <label>Gợi ý</label>
+            <input type="text" [(ngModel)]="selectedField.helpText" (blur)="updateField()" />
+          </div>
+
+          <div class="form-group">
+            <label>Giá trị mặc định</label>
+            <input type="text" [(ngModel)]="selectedField.defaultValue" (blur)="updateField()" />
+          </div>
+
+          <div class="form-group checkbox-group">
+            <label>
+              <input
+                type="checkbox"
+                [(ngModel)]="selectedField.isRequired"
+                (change)="updateField()"
+              />
+              Bắt buộc
+            </label>
+          </div>
+
+          <!-- Validation Rules Section -->
+          <div class="section-divider">
+            <span>✅ Quy tắc xác thực</span>
+          </div>
+
+          <div class="validation-rules">
+            @if (isValidationApplicable('minLength')) {
+              <div class="form-group">
+                <label>Độ dài tối thiểu</label>
+                <input
+                  type="number"
+                  min="0"
+                  [ngModel]="getValidationValue('minLength')"
+                  (blur)="setValidationRule('minLength', $any($event.target).value)"
+                  placeholder="Ví dụ: 3"
+                />
+              </div>
+            }
+            @if (isValidationApplicable('maxLength')) {
+              <div class="form-group">
+                <label>Độ dài tối đa</label>
+                <input
+                  type="number"
+                  min="0"
+                  [ngModel]="getValidationValue('maxLength')"
+                  (blur)="setValidationRule('maxLength', $any($event.target).value)"
+                  placeholder="Ví dụ: 255"
+                />
+              </div>
+            }
+            @if (isValidationApplicable('min')) {
+              <div class="form-group">
+                <label>Giá trị tối thiểu</label>
+                <input
+                  type="number"
+                  [ngModel]="getValidationValue('min')"
+                  (blur)="setValidationRule('min', $any($event.target).value)"
+                  placeholder="Ví dụ: 0"
+                />
+              </div>
+            }
+            @if (isValidationApplicable('max')) {
+              <div class="form-group">
+                <label>Giá trị tối đa</label>
+                <input
+                  type="number"
+                  [ngModel]="getValidationValue('max')"
+                  (blur)="setValidationRule('max', $any($event.target).value)"
+                  placeholder="Ví dụ: 100"
+                />
+              </div>
+            }
+            @if (isValidationApplicable('pattern')) {
+              <div class="form-group">
+                <label>Mẫu regex</label>
+                <input
+                  type="text"
+                  [ngModel]="getValidationValue('pattern')"
+                  (blur)="setValidationRule('pattern', $any($event.target).value)"
+                  placeholder="Ví dụ: ^[A-Z].*"
+                />
+                <small>Biểu thức chính quy để kiểm tra định dạng</small>
+              </div>
+            }
+            @if (isValidationApplicable('email')) {
+              <div class="form-group checkbox-group">
+                <label>
+                  <input
+                    type="checkbox"
+                    [ngModel]="!!getValidationRule('email')"
+                    (change)="setValidationRule('email', $any($event.target).checked || undefined)"
+                  />
+                  Kiểm tra email hợp lệ
+                </label>
+              </div>
+            }
+          </div>
+
+          @if (hasOptions(selectedField.fieldType)) {
+            <div class="options-section">
+              <label>Các lựa chọn</label>
+              <div class="options-list">
+                @for (opt of editableOptions; track i; let i = $index) {
+                  <div class="option-row">
+                    <div class="option-inputs">
+                      <input
+                        type="text"
+                        [(ngModel)]="opt.value"
+                        placeholder="Value"
+                        (blur)="saveOptions()"
+                        class="opt-value"
+                      />
+                      <input
+                        type="text"
+                        [(ngModel)]="opt.label"
+                        placeholder="Label"
+                        (blur)="saveOptions()"
+                        class="opt-label"
+                      />
+                    </div>
+
+                    <!-- Concept Search for this option -->
+                    <div class="option-concept">
+                      @if (opt.conceptId) {
+                        <div class="linked-concept-info">
+                          <span class="concept-badge" [title]="opt.conceptCode">
+                            🔗 {{ opt.conceptDisplay || opt.conceptCode }}
+                          </span>
+                          <button
+                            type="button"
+                            class="unlink-btn"
+                            (click)="unlinkOptionConcept(i)"
+                            title="Bỏ liên kết"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      } @else {
+                        <div class="concept-search-wrapper">
+                          <input
+                            type="text"
+                            class="concept-search-input"
+                            placeholder="🔍 Tìm concept..."
+                            [(ngModel)]="optionConceptSearch[i]"
+                            (input)="searchConceptsForOption(i)"
+                            (focus)="activeOptionSearchIndex = i"
+                          />
+                          @if (
+                            activeOptionSearchIndex === i &&
+                            optionConceptResults[i] &&
+                            optionConceptResults[i].length > 0
+                          ) {
+                            <div class="concept-dropdown">
+                              @for (concept of optionConceptResults[i] || []; track concept.id) {
+                                <div
+                                  class="concept-option"
+                                  (click)="selectConceptForOption(i, concept)"
+                                >
+                                  <span class="concept-code">{{ concept.code }}</span>
+                                  <span class="concept-name">{{ concept.display }}</span>
+                                </div>
+                              }
+                            </div>
+                          }
+                        </div>
+                      }
+                    </div>
+
+                    <button
+                      type="button"
+                      class="remove-option-btn"
+                      (click)="removeOption(i)"
+                      title="Xóa"
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                }
+              </div>
+              <button type="button" class="add-option-btn" (click)="addOption()">
+                + Thêm lựa chọn
+              </button>
+              <small>Mỗi option có thể liên kết với Concept để phục vụ báo cáo/thống kê</small>
+            </div>
+          }
+
+          @if (selectedField.fieldType === FieldType.Address) {
+            <div class="options-section">
+              <label>🏠 Các trường con (sub-fields)</label>
+              <div class="options-list">
+                @for (sub of editableSubFields; track i; let i = $index) {
+                  <div class="option-row">
+                    <div class="option-inputs">
+                      <input
+                        type="text"
+                        [(ngModel)]="sub.key"
+                        placeholder="Key (vd: street)"
+                        (blur)="saveSubFields()"
+                        class="opt-value"
+                      />
+                      <input
+                        type="text"
+                        [(ngModel)]="sub.label"
+                        placeholder="Nhãn"
+                        (blur)="saveSubFields()"
+                        class="opt-label"
+                      />
+                      <input
+                        type="number"
+                        [(ngModel)]="sub.width"
+                        placeholder="%"
+                        (blur)="saveSubFields()"
+                        style="width: 60px"
+                        min="10"
+                        max="100"
+                      />
+                    </div>
+                    <label style="font-size: 12px; margin-left: 8px">
+                      <input
+                        type="checkbox"
+                        [(ngModel)]="sub.required"
+                        (change)="saveSubFields()"
+                      />
+                      Bắt buộc
+                    </label>
+                    <button
+                      type="button"
+                      class="remove-option-btn"
+                      (click)="removeSubField(i)"
+                      title="Xóa"
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                }
+              </div>
+              <button type="button" class="add-option-btn" (click)="addSubField()">
+                + Thêm trường con
+              </button>
+              <button
+                type="button"
+                class="add-option-btn"
+                (click)="loadDefaultAddressFields()"
+                style="margin-left: 8px"
+              >
+                📋 Mặc định (Địa chỉ VN)
+              </button>
+              <small>Mỗi sub-field có key, nhãn, và độ rộng (%)</small>
+            </div>
+          }
+
+          <div class="section-divider">
+            <span>📐 Bố cục</span>
+          </div>
+
+          <div class="layout-controls">
+            <div class="form-group">
+              <label>Chiều rộng</label>
+              <div class="width-buttons">
+                <button
+                  type="button"
+                  [class.active]="selectedFieldColSpan === '1'"
+                  (click)="setColSpan('1')"
+                  title="25%"
+                >
+                  ¼
+                </button>
+                <button
+                  type="button"
+                  [class.active]="selectedFieldColSpan === '2'"
+                  (click)="setColSpan('2')"
+                  title="50%"
+                >
+                  ½
+                </button>
+                <button
+                  type="button"
+                  [class.active]="selectedFieldColSpan === '3'"
+                  (click)="setColSpan('3')"
+                  title="75%"
+                >
+                  ¾
+                </button>
+                <button
+                  type="button"
+                  [class.active]="selectedFieldColSpan === '4'"
+                  (click)="setColSpan('4')"
+                  title="100%"
+                >
+                  1
+                </button>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>Chiều cao</label>
+              <select [(ngModel)]="selectedFieldHeight" (change)="updateFieldLayout()">
+                <option value="auto">Tự động</option>
+                <option value="small">Nhỏ (60px)</option>
+                <option value="medium">Vừa (100px)</option>
+                <option value="large">Lớn (150px)</option>
+                <option value="xlarge">Rất lớn (200px)</option>
+              </select>
+            </div>
+
+            <!-- Conditional Logic Section -->
+            <div class="section-divider">
+              <span>🔀 Logic hiển thị</span>
+            </div>
+
+            <div class="logic-controls">
+              <button
+                class="btn-logic-toggle"
+                [class.active]="showLogicEditor"
+                (click)="toggleLogicEditor()"
+              >
+                {{
+                  selectedField.conditionalLogicJson
+                    ? '✅ Đã thiết lập logic'
+                    : '+ Thêm điều kiện hiển thị'
+                }}
+              </button>
+
+              @if (showLogicEditor) {
+                <div class="logic-editor">
+                  <div class="logic-header">
+                    <select [(ngModel)]="currentLogic.action" (change)="saveLogic()">
+                      <option value="show">Hiện</option>
+                      <option value="hide">Ẩn</option>
+                    </select>
+                    <span>trường này khi:</span>
+                  </div>
+
+                  @if (currentLogic.conditions.length > 0) {
+                    <div class="logic-operator">
+                      <select [(ngModel)]="currentLogic.logic" (change)="saveLogic()">
+                        <option value="AND">Tất cả (AND)</option>
+                        <option value="OR">Bất kỳ (OR)</option>
+                      </select>
+                      <span>điều kiện sau đúng:</span>
+                    </div>
+                  }
+
+                  <div class="conditions-list">
+                    @for (cond of currentLogic.conditions; track $index) {
+                      <div class="condition-row">
+                        <div class="condition-inputs">
+                          <select
+                            [(ngModel)]="cond.fieldId"
+                            (change)="saveLogic()"
+                            class="cond-field"
+                          >
+                            <option value="" disabled>-- Chọn trường --</option>
+                            @for (f of getAvailableTriggerFields(); track f.id) {
+                              <option [value]="f.id">{{ f.label }}</option>
+                            }
+                          </select>
+
+                          <select
+                            [(ngModel)]="cond.operator"
+                            (change)="saveLogic()"
+                            class="cond-op"
+                          >
+                            <option value="eq">Bằng</option>
+                            <option value="neq">Khác</option>
+                            <option value="gt">Lớn hơn</option>
+                            <option value="lt">Nhỏ hơn</option>
+                            <option value="contains">Chứa</option>
+                          </select>
+
+                          @if (getOptionsForCondition(cond.fieldId); as options) {
+                            <select
+                              [(ngModel)]="cond.value"
+                              (change)="saveLogic()"
+                              class="cond-val"
+                            >
+                              <option value="" disabled>-- Chọn giá trị --</option>
+                              @for (opt of options; track opt.value) {
+                                <option [value]="opt.value">{{ opt.label }}</option>
+                              }
+                            </select>
+                          } @else {
+                            <input
+                              type="text"
+                              [(ngModel)]="cond.value"
+                              (blur)="saveLogic()"
+                              placeholder="Giá trị"
+                              class="cond-val"
+                            />
+                          }
+                        </div>
+                        <button class="remove-cond-btn" (click)="removeCondition($index)">
+                          🗑️
+                        </button>
+                      </div>
+                    }
+                  </div>
+
+                  <button class="add-cond-btn" (click)="addCondition()">+ Thêm điều kiện</button>
+
+                  @if (getAvailableTriggerFields().length === 0) {
+                    <small class="warning-text">⚠️ Cần có trường phía trên để tạo điều kiện.</small>
+                  }
+                </div>
+              }
+            </div>
+          </div>
+        </div>
+      </aside>
+    }
+  </div>
+
+  <!-- Concept Picker Modal -->
+  <app-concept-picker
+    [isOpen]="showConceptPicker"
+    [fieldId]="selectedFieldForConcept?.id"
+    (conceptLinked)="onConceptLinked($event)"
+    (closed)="showConceptPicker = false"
+  >
+  </app-concept-picker>
 </div>

@@ -4,6 +4,8 @@ using IVF.API.Endpoints;
 using IVF.Application;
 using IVF.Infrastructure;
 using IVF.Infrastructure.Persistence;
+using IVF.Infrastructure.Seeding;
+using QuestPDF.Infrastructure;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Threading.RateLimiting;
@@ -63,22 +65,22 @@ builder.Services.AddAuthorization(options =>
 {
     // Admin policies
     options.AddPolicy("AdminOnly", policy => policy.RequireRole("Admin"));
-    
+
     // Medical staff policies
     options.AddPolicy("MedicalStaff", policy => policy.RequireRole("Admin", "Doctor", "Nurse", "LabTech", "Embryologist"));
     options.AddPolicy("DoctorOrAdmin", policy => policy.RequireRole("Admin", "Doctor", "Director"));
-    
+
     // Department-specific policies
     options.AddPolicy("LabAccess", policy => policy.RequireRole("Admin", "LabTech", "Doctor", "Embryologist"));
     options.AddPolicy("EmbryologyAccess", policy => policy.RequireRole("Admin", "Embryologist", "Doctor"));
     options.AddPolicy("AndrologyAccess", policy => policy.RequireRole("Admin", "LabTech", "Doctor"));
-    
+
     // Billing policies
     options.AddPolicy("BillingAccess", policy => policy.RequireRole("Admin", "Cashier", "Director", "Receptionist"));
-    
+
     // Queue management policies
     options.AddPolicy("QueueManagement", policy => policy.RequireRole("Admin", "Receptionist", "Nurse"));
-    
+
     // Reports policies
     options.AddPolicy("ReportsAccess", policy => policy.RequireRole("Admin", "Director", "Doctor"));
 });
@@ -155,7 +157,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-    // app.UseHttpsRedirection();
+// app.UseHttpsRedirection();
 
 // OWASP Secure Headers
 app.Use(async (context, next) =>
@@ -210,6 +212,10 @@ if (app.Environment.IsDevelopment())
     var db = scope.ServiceProvider.GetRequiredService<IvfDbContext>();
     await db.Database.MigrateAsync();
     await DatabaseSeeder.SeedAsync(app.Services);
+    await FormTemplateSeeder.SeedFormTemplatesAsync(app.Services);
 }
+
+// QuestPDF community license
+QuestPDF.Settings.License = LicenseType.Community;
 
 app.Run();

@@ -38,6 +38,7 @@ public record GetFormResponsesQuery(
     Guid? PatientId = null,
     DateTime? From = null,
     DateTime? To = null,
+    ResponseStatus? Status = null,
     int Page = 1,
     int PageSize = 20
 ) : IRequest<(List<FormResponseDto> Items, int Total)>;
@@ -89,7 +90,7 @@ public class FormCategoriesQueryHandler :
     public async Task<List<FormCategoryDto>> Handle(GetFormCategoriesQuery request, CancellationToken ct)
     {
         var categories = await _repo.GetAllCategoriesAsync(ct);
-        
+
         if (request.ActiveOnly)
             categories = categories.Where(c => c.IsActive).ToList();
 
@@ -137,7 +138,7 @@ public class FormTemplatesQueryHandler :
             t.CreatedAt,
             request.IncludeFields ? t.Fields?.Select(f => new FormFieldDto(
                 f.Id, f.FieldKey, f.Label, f.Placeholder, f.FieldType, f.DisplayOrder,
-                f.IsRequired, f.OptionsJson, f.ValidationRulesJson, f.DefaultValue,
+                f.IsRequired, f.OptionsJson, f.ValidationRulesJson, f.LayoutJson, f.DefaultValue,
                 f.HelpText, f.ConditionalLogicJson, f.ConceptId)).ToList() : null)).ToList();
     }
 
@@ -157,7 +158,7 @@ public class FormTemplatesQueryHandler :
             template.CreatedAt,
             template.Fields?.Select(f => new FormFieldDto(
                 f.Id, f.FieldKey, f.Label, f.Placeholder, f.FieldType, f.DisplayOrder,
-                f.IsRequired, f.OptionsJson, f.ValidationRulesJson, f.DefaultValue,
+                f.IsRequired, f.OptionsJson, f.ValidationRulesJson, f.LayoutJson, f.DefaultValue,
                 f.HelpText, f.ConditionalLogicJson, f.ConceptId)).ToList());
     }
 }
@@ -174,10 +175,10 @@ public class FormFieldsQueryHandler : IRequestHandler<GetFormFieldsByTemplateQue
     public async Task<List<FormFieldDto>> Handle(GetFormFieldsByTemplateQuery request, CancellationToken ct)
     {
         var fields = await _repo.GetFieldsByTemplateIdAsync(request.FormTemplateId, ct);
-        
+
         return fields.Select(f => new FormFieldDto(
             f.Id, f.FieldKey, f.Label, f.Placeholder, f.FieldType, f.DisplayOrder,
-            f.IsRequired, f.OptionsJson, f.ValidationRulesJson, f.DefaultValue,
+            f.IsRequired, f.OptionsJson, f.ValidationRulesJson, f.LayoutJson, f.DefaultValue,
             f.HelpText, f.ConditionalLogicJson, f.ConceptId)).ToList();
     }
 }
@@ -200,6 +201,7 @@ public class FormResponsesQueryHandler :
             request.PatientId,
             request.From,
             request.To,
+            request.Status,
             request.Page,
             request.PageSize,
             ct);
@@ -212,6 +214,7 @@ public class FormResponsesQueryHandler :
             r.Patient?.FullName,
             r.CycleId,
             r.Status,
+            r.Notes,
             r.CreatedAt,
             r.SubmittedAt)).ToList();
 
@@ -231,6 +234,7 @@ public class FormResponsesQueryHandler :
             response.Patient?.FullName,
             response.CycleId,
             response.Status,
+            response.Notes,
             response.CreatedAt,
             response.SubmittedAt,
             response.FieldValues?.Select(v => new FormFieldValueDto(
@@ -255,7 +259,7 @@ public class ReportQueriesHandler :
     public async Task<List<ReportTemplateDto>> Handle(GetReportTemplatesQuery request, CancellationToken ct)
     {
         var templates = await _repo.GetReportTemplatesByFormAsync(request.FormTemplateId, ct);
-        
+
         return templates.Select(r => new ReportTemplateDto(
             r.Id,
             r.FormTemplateId,
@@ -296,6 +300,7 @@ public class ReportQueriesHandler :
             request.PatientId,
             request.From,
             request.To,
+            null, // no status filter for reports
             1,
             1000, // Get more for report
             ct);

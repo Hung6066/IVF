@@ -1,4 +1,5 @@
 using IVF.Domain.Entities;
+using IVF.Domain.Enums;
 
 namespace IVF.Application.Common.Interfaces;
 
@@ -33,6 +34,7 @@ public interface IFormRepository
         Guid? patientId = null,
         DateTime? from = null,
         DateTime? to = null,
+        ResponseStatus? status = null,
         int page = 1,
         int pageSize = 20,
         CancellationToken ct = default);

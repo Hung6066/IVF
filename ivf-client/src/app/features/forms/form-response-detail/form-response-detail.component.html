@@ -1,57 +1,148 @@
 <div class="response-detail-container">
-    @if (response && template) {
+  @if (response && template) {
     <header class="detail-header">
-        <div class="header-info">
-            <a routerLink="/forms/responses" class="back-link">← Quay lại</a>
-            <h1>{{ response.formTemplateName }}</h1>
-            <div class="meta-info">
-                <span class="status-badge" [class]="getStatusClass(response.status)">
-                    {{ getStatusLabel(response.status) }}
-                </span>
-                <span>📅 Gửi: {{ response.submittedAt | date:'dd/MM/yyyy HH:mm' }}</span>
-                @if (response.patientName) {
-                <span>👤 {{ response.patientName }}</span>
-                }
-            </div>
+      <div class="header-info">
+        <a routerLink="/forms/responses" class="back-link">← Quay lại</a>
+        <h1>{{ response.formTemplateName }}</h1>
+        <div class="meta-info">
+          <span class="status-badge" [class]="getStatusClass(response.status)">
+            {{ getStatusLabel(response.status) }}
+          </span>
+          <span
+            >📅
+            {{
+              response.submittedAt
+                ? 'Gửi: ' + (response.submittedAt | date: 'dd/MM/yyyy HH:mm')
+                : 'Tạo: ' + (response.createdAt | date: 'dd/MM/yyyy HH:mm')
+            }}</span
+          >
+          @if (response.patientName) {
+            <span>👤 {{ response.patientName }}</span>
+          }
         </div>
-        <div class="header-actions">
-            <a class="btn btn-primary" [routerLink]="['/forms/edit', response.id]">✏️ Sửa</a>
-            <button class="btn btn-secondary" (click)="print()">🖨️ In</button>
-        </div>
+      </div>
+      <div class="header-actions">
+        @if (response.status === ResponseStatus.Draft) {
+          <a class="btn btn-primary" [routerLink]="['/forms/edit', response.id]"
+            >📝 Tiếp tục điền</a
+          >
+        } @else {
+          <a class="btn btn-primary" [routerLink]="['/forms/edit', response.id]">✏️ Sửa</a>
+        }
+        <button class="btn btn-secondary" (click)="print()">🖨️ In</button>
+        <button class="btn btn-secondary" (click)="exportPdf()">📄 PDF</button>
+        <button class="btn btn-danger-outline" (click)="deleteResponse()">🗑️ Xóa</button>
+      </div>
     </header>
 
-    <div class="response-content">
-        <div class="form-preview-card">
-            <h2>Nội dung phản hồi</h2>
-            <div class="values-grid">
-                @for (field of template.fields; track field.id) {
-                <div class="value-item" [style.grid-column]="'span ' + getFieldColSpan(field)"
-                    [class.col-1]="getFieldColSpan(field) === 1" [class.col-2]="getFieldColSpan(field) === 2"
-                    [class.col-3]="getFieldColSpan(field) === 3" [class.col-4]="getFieldColSpan(field) === 4">
-                    <label>
-                        {{ field.label }}
-                        @if (field.isRequired) {
-                        <span class="required">*</span>
-                        }
-                    </label>
-                    @if (isTagsField(field)) {
-                    <div class="value tags-value" [innerHTML]="getTagsDisplayHtml(field)"></div>
-                    } @else {
-                    <div class="value" [innerHTML]="getFieldDisplayValue(field)"></div>
-                    }
-                </div>
-                }
-
-                @if (!template.fields?.length) {
-                <p class="no-data">Không có trường nào</p>
-                }
+    <!-- Workflow Progress -->
+    @if (response.status !== ResponseStatus.Rejected) {
+      <div class="workflow-progress">
+        <div class="workflow-steps">
+          @for (step of workflowSteps; track step.status; let i = $index) {
+            <div
+              class="workflow-step"
+              [class.completed]="isStepCompleted(i)"
+              [class.active]="isStepActive(i)"
+            >
+              <div class="step-icon">{{ step.icon }}</div>
+              <div class="step-label">{{ step.label }}</div>
             </div>
+            @if (i < workflowSteps.length - 1) {
+              <div class="workflow-connector" [class.completed]="isStepCompleted(i + 1)"></div>
+            }
+          }
         </div>
-    </div>
+      </div>
     } @else {
-    <div class="loading">
-        <div class="spinner"></div>
-        <p>Đang tải...</p>
-    </div>
+      <div class="workflow-rejected">
+        <span class="rejected-icon">❌</span>
+        <span class="rejected-text">Phản hồi đã bị từ chối</span>
+        @if (response.notes) {
+          <span class="rejected-reason">Lý do: {{ response.notes }}</span>
+        }
+      </div>
     }
+
+    <!-- Review Actions -->
+    @if (
+      response.status === ResponseStatus.Submitted || response.status === ResponseStatus.Reviewed
+    ) {
+      <div class="review-actions-bar">
+        <span class="review-label">Hành động xét duyệt:</span>
+        @if (response.status === ResponseStatus.Submitted) {
+          <button class="btn btn-info" (click)="markAsReviewed()" [disabled]="isProcessing">
+            👁️ Đánh dấu đã xem
+          </button>
+        }
+        <button class="btn btn-success" (click)="approve()" [disabled]="isProcessing">
+          ✅ Duyệt
+        </button>
+        <button class="btn btn-danger" (click)="openRejectDialog()" [disabled]="isProcessing">
+          ❌ Từ chối
+        </button>
+      </div>
+    }
+
+    <div class="response-content">
+      <div class="form-preview-card">
+        <h2>Nội dung phản hồi</h2>
+        <div class="values-grid">
+          @for (field of template.fields; track field.id) {
+            <div
+              class="value-item"
+              [style.grid-column]="'span ' + getFieldColSpan(field)"
+              [class.col-1]="getFieldColSpan(field) === 1"
+              [class.col-2]="getFieldColSpan(field) === 2"
+              [class.col-3]="getFieldColSpan(field) === 3"
+              [class.col-4]="getFieldColSpan(field) === 4"
+            >
+              <label>
+                {{ field.label }}
+                @if (field.isRequired) {
+                  <span class="required">*</span>
+                }
+              </label>
+              @if (isTagsField(field)) {
+                <div class="value tags-value" [innerHTML]="getTagsDisplayHtml(field)"></div>
+              } @else {
+                <div class="value" [innerHTML]="getFieldDisplayValue(field)"></div>
+              }
+            </div>
+          }
+
+          @if (!template.fields?.length) {
+            <p class="no-data">Không có trường nào</p>
+          }
+        </div>
+      </div>
+    </div>
+
+    <!-- Reject Dialog Modal -->
+    @if (showRejectDialog) {
+      <div class="modal-backdrop" (click)="cancelReject()">
+        <div class="modal-dialog" (click)="$event.stopPropagation()">
+          <h3>❌ Từ chối phản hồi</h3>
+          <p>Vui lòng nhập lý do từ chối:</p>
+          <textarea
+            [(ngModel)]="rejectNotes"
+            placeholder="Lý do từ chối..."
+            rows="4"
+            class="reject-textarea"
+          ></textarea>
+          <div class="modal-actions">
+            <button class="btn btn-secondary" (click)="cancelReject()">Hủy</button>
+            <button class="btn btn-danger" (click)="confirmReject()" [disabled]="isProcessing">
+              Xác nhận từ chối
+            </button>
+          </div>
+        </div>
+      </div>
+    }
+  } @else {
+    <div class="loading">
+      <div class="spinner"></div>
+      <p>Đang tải...</p>
+    </div>
+  }
 </div>

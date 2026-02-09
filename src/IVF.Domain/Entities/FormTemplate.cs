@@ -92,7 +92,8 @@ public class FormTemplate : BaseEntity
         string? validationRulesJson = null,
         string? defaultValue = null,
         string? helpText = null,
-        string? conditionalLogicJson = null)
+        string? conditionalLogicJson = null,
+        string? layoutJson = null)
     {
         var field = FormField.Create(
             Id,
@@ -106,7 +107,8 @@ public class FormTemplate : BaseEntity
             validationRulesJson,
             defaultValue,
             helpText,
-            conditionalLogicJson);
+            conditionalLogicJson,
+            layoutJson);
 
         Fields.Add(field);
         SetUpdated();

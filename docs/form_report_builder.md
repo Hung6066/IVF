@@ -387,3 +387,140 @@ After implementation, I will use the browser subagent to:
 9. **Frontend service + models**
 10. **Frontend components**
 11. **Tests**
+
+
+Phân Tích Tính Năng WordPress Form Builder Áp Dụng Cho IVF FormBuilder
+Hiện Trạng Hệ Thống (16 FieldTypes, 11 exposed in palette)
+Có rồi	Chưa có trong palette
+Text, TextArea, Number, Date, Dropdown, Radio, Checkbox, Tags, Rating, Section, FileUpload	Decimal, DateTime, Time, MultiSelect, Label
+TIER 1 — Ưu Tiên Cao (Impact trực tiếp đến UX y tế)
+1. Repeater Field (WPForms Repeater)
+Mô tả: Cho phép user thêm nhóm field lặp lại (ví dụ: nhiều thuốc, nhiều lần xét nghiệm)
+Use case IVF: Kê đơn thuốc (Tên + Liều + Tần suất) × N, Tiền sử phẫu thuật × N, Danh sách phôi × N
+Implementation:
+Thêm FieldType.Repeater = 17
+Domain: RepeatConfig { minRows, maxRows, fields: FormField[] } lưu trong OptionsJson
+Renderer: Render group fields + nút "Thêm dòng" / "Xóa dòng"
+Value storage: JsonValue = [{field1: val, field2: val}, ...]
+Effort: Lớn — cần nested form groups trong Angular ReactiveFormsModule
+2. Multi-Step Forms / Page Break (WPForms Multi-Page)
+Mô tả: Chia form dài thành nhiều bước/trang với progress indicator
+Use case IVF: Form khám ban đầu (Thông tin cá nhân → Tiền sử → Xét nghiệm → Kết luận), Protocol IVF nhiều giai đoạn
+Implementation:
+Thêm FieldType.PageBreak = 18 hoặc mở rộng Section thành page separator
+Renderer: Step navigation, progress bar, validate per-step trước khi chuyển
+Builder: Visual page divider trong canvas
+Effort: Trung bình — chủ yếu UI trong form-renderer
+3. Calculated Fields (WPForms Calculations)
+Mô tả: Field tự động tính toán từ giá trị các field khác
+Use case IVF: BMI = Cân nặng / (Chiều cao²), Tổng motile sperm count = Volume × Concentration × Motility%, AFC (antral follicle count), Conversion rates
+Implementation:
+Thêm FieldType.Calculated = 19
+FormulaJson: "({weight} / ({height}/100)^2)" — reference by fieldKey
+Renderer: Reactive calculation trên valueChanges, display kết quả (read-only)
+Precision config: decimalPlaces, unit (kg, ml, etc.)
+Effort: Trung bình — cần formula parser (có thể dùng math.js)
+4. Rich Text Editor (WPForms Rich Text)
+Mô tả: WYSIWYG editor cho ghi chú lâm sàng
+Use case IVF: Ghi chú bác sĩ, Kết luận siêu âm, Mô tả phôi chi tiết
+Implementation:
+Thêm FieldType.RichText = 20
+Angular: Tích hợp ngx-quill hoặc @ckeditor/ckeditor5-angular
+Value storage: TextValue = HTML string
+Effort: Nhỏ — chỉ cần thêm component + package
+5. Address / Composite Field (WPForms Address)
+Mô tả: Field phức hợp gồm nhiều sub-field (Address: Street + Ward + District + Province + Country)
+Use case IVF: Địa chỉ bệnh nhân, Thông tin BHYT, Thông tin liên hệ khẩn cấp (Tên + SĐT + Quan hệ)
+Implementation:
+Thêm FieldType.Composite = 21
+OptionsJson mô tả sub-fields: [{key, label, type, required, width}]
+Value storage: JsonValue = {street: "...", district: "...", ...}
+Effort: Trung bình
+TIER 2 — Ưu Tiên Trung Bình (Cải thiện UX đáng kể)
+6. Save & Resume (Draft)
+Mô tả: Tự động lưu draft, cho phép quay lại hoàn thành sau
+Hiện trạng: Đã có ResponseStatus.Draft nhưng chưa auto-save
+Implementation: Auto-save debounce (mỗi 30s), API PUT /responses/{id} với status=Draft, danh sách "Continue filling" trên dashboard
+Effort: Nhỏ — chỉ cần thêm debounceTime auto-save trong renderer
+7. Entry Preview / Review Step
+Mô tả: Bước xem lại tất cả câu trả lời trước khi submit
+Use case IVF: Bác sĩ review toàn bộ form trước khi xác nhận
+Implementation: Thêm review step cuối trong form-renderer, read-only display tất cả values
+Effort: Nhỏ
+8. Hidden Field
+Mô tả: Field ẩn chứa giá trị tự động (user ID, timestamp, source URL, cycle phase)
+Use case IVF: Auto-fill CycleId, DoctorId, ClinicBranch, ProtocolPhase
+Implementation: FieldType.Hidden = 22, default value supports dynamic tokens {currentUser}, {currentCycle}
+Effort: Nhỏ
+9. Validation Rules — Hoàn thiện
+Hiện trạng: Interface có minLength, maxLength, min, max, pattern, email nhưng buildForm() CHỈ dùng Validators.required
+Cần làm: Wire tất cả validators vào buildForm(), hiển thị error messages tùy chỉnh, thêm builder UI cho từng rule
+Effort: Nhỏ — code đã có interface, chỉ cần kết nối
+10. Digital Signature (WPForms Signature)
+Mô tả: Canvas vẽ chữ ký điện tử
+Use case IVF: Cam kết đồng ý IVF, Phiếu đồng ý phẫu thuật, Xác nhận bệnh nhân
+Implementation: FieldType.Signature = 23, dùng signature_pad library, save as Base64 PNG
+Effort: Nhỏ-Trung bình
+11. Number Slider / Range
+Mô tả: Thanh trượt chọn giá trị số trong khoảng
+Use case IVF: Pain scale (0-10), Satisfaction score, Dosage selection
+Implementation: FieldType.Slider = 24, config: {min, max, step, unit}
+Effort: Nhỏ
+12. Lookup / Data Source Field
+Mô tả: Dropdown động lấy dữ liệu từ API (danh sách bệnh nhân, bác sĩ, thuốc)
+Use case IVF: Chọn bệnh nhân (autocomplete), Chọn bác sĩ, Chọn thuốc từ ServiceCatalog
+Implementation: FieldType.Lookup = 25, config: {dataSource: 'patients'|'users'|'services', displayField, valueField}
+Effort: Trung bình — cần generic API + typeahead search
+TIER 3 — Ưu Tiên Thấp (Nice-to-have)
+13. PDF Export (WPForms PDF)
+Mô tả: Xuất form response thành PDF (phiếu kết quả, đơn thuốc)
+Use case IVF: In phiếu kết quả xét nghiệm, Phiếu đồng ý, Tóm tắt điều trị
+Implementation: Backend: QuestPDF hoặc DinkToPdf, endpoint GET /responses/{id}/pdf
+Effort: Trung bình
+14. Conversational Forms (WPForms Conversational)
+Mô tả: Form hiển thị từng câu hỏi một (chat-like), tăng completion rate
+Use case IVF: Form khảo sát bệnh nhân trên mobile
+Implementation: Chế độ render thay thế trong form-renderer, 1 field/screen + animation
+Effort: Trung bình
+15. Form Templates Library
+Mô tả: Thư viện form mẫu cho IVF (Semen Analysis, IVF Protocol, Egg Retrieval, etc.)
+Implementation: Seed data với pre-built form templates, "Use Template" button
+Effort: Nhỏ — chủ yếu là tạo dữ liệu mẫu
+16. Geolocation Auto-fill
+Mô tả: Tự động điền địa chỉ từ GPS
+Effort: Nhỏ — sử dụng browser Geolocation API
+17. Email / Phone / URL Fields (Typed input)
+Mô tả: Field input chuyên biệt với validation
+Implementation: Thêm FieldType.Email = 26, FieldType.Phone = 27, FieldType.Url = 28 — hoặc mở rộng Text field với inputType config
+Effort: Rất nhỏ
+Quick Wins — Sửa ngay với effort nhỏ
+#	Feature	Mô tả	Effort
+A	Expose missing palette items	Thêm Decimal, DateTime, Time, MultiSelect, Label vào builder palette	5 dòng code
+B	Wire validation rules	Kết nối minLength/maxLength/min/max/pattern/email trong buildForm()	~30 dòng
+C	Validation rules UI in builder	Thêm panel builder để config min/max/pattern per field type	~100 dòng
+D	Separate layout from validation	Tách colSpan/height ra khỏi validationRulesJson vào layoutJson riêng	Refactor nhỏ
+E	Auto-save draft	debounceTime(30000) trên form.valueChanges → auto PUT draft	~20 dòng
+Roadmap Đề Xuất
+Domain Changes Summary
+Bảng So Sánh với WordPress Form Builders
+Feature	WPForms	Gravity Forms	IVF Hiện Tại	Đề Xuất
+Drag & Drop Builder	✅	✅	✅	—
+Conditional Logic	✅	✅	✅	—
+Multi-Step Forms	✅	✅	❌	Phase 2
+Repeater Fields	✅	✅ (List)	❌	Phase 2
+Calculated Fields	✅	✅	❌	Phase 2
+File Upload	✅	✅	✅ (basic)	Enhance
+Rich Text	✅	✅	❌	Phase 3
+Digital Signature	✅	✅	❌	Phase 3
+Save & Resume	✅	✅ (Save & Continue)	❌ (Draft exists)	Phase 1
+Entry Preview	✅	✅	❌	Phase 1
+Hidden Fields	✅	✅	❌	Phase 2
+Address/Composite	✅	✅	❌	Phase 4
+Lookup/Dynamic	❌	✅ (Dynamic)	❌	Phase 3
+Number Slider	✅	✅	❌	Phase 3
+PDF Export	✅	✅	❌	Phase 4
+Form Templates	✅ (2000+)	✅	❌	Phase 4
+Conversational	✅	❌	❌	Phase 5
+Medical Concepts	❌	❌	✅ (SNOMED/HL7)	Unique advantage
+Tags/Mentions	❌	❌	✅	Unique advantage
+Report Builder	❌	❌	✅ (5 types)	Unique advantage

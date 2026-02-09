@@ -61,6 +61,7 @@ public static class DependencyInjection
         // Register Services
         services.AddScoped<INotificationService, Services.NotificationService>();
         services.AddScoped<IFlowSeeder, FlowSeeder>();
+        services.AddSingleton<IFileStorageService, LocalFileStorageService>();
 
         // Partition Maintenance (auto-creates future partitions)
         services.AddHostedService<PartitionMaintenanceService>();

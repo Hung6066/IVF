@@ -20,7 +20,9 @@ public enum FieldType
     Rating = 13,
     Section = 14,
     Label = 15,
-    Tags = 16
+    Tags = 16,
+    PageBreak = 17,
+    Address = 18
 }
 
 /// <summary>
