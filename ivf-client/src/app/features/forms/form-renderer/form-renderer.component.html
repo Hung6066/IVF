@@ -11,6 +11,7 @@
         <form [formGroup]="form" (ngSubmit)="submit()">
             <div class="form-fields-grid">
                 @for (field of fields; track field.id) {
+                @if (isFieldVisible(field.id)) {
                 <div class="field-wrapper" [class.has-error]="hasError(field.id)"
                     [style.grid-column]="'span ' + getFieldColSpan(field)">
                     @if (field.fieldType !== FieldType.Section && field.fieldType !== FieldType.Label) {
@@ -75,10 +76,24 @@
                     </div>
                     }
                     @case (FieldType.Checkbox) {
+                    @if (getOptions(field).length > 0) {
+                    <!-- Checkbox group with multiple options -->
+                    <div class="checkbox-group">
+                        @for (opt of getOptions(field); track opt.value) {
+                        <label class="checkbox-option">
+                            <input type="checkbox" [checked]="isCheckboxChecked(field.id, opt.value)"
+                                (change)="onCheckboxChange(field.id, opt.value, $event)">
+                            <span>{{ opt.label }}</span>
+                        </label>
+                        }
+                    </div>
+                    } @else {
+                    <!-- Single boolean checkbox -->
                     <label class="checkbox-option">
                         <input type="checkbox" [formControlName]="field.id">
                         <span>{{ field.placeholder || field.label }}</span>
                     </label>
+                    }
                     }
                     @case (FieldType.Rating) {
                     <div class="rating-input">
@@ -109,8 +124,8 @@
                     @case (FieldType.Tags) {
                     <div class="mention-input-wrapper">
                         <!-- Contenteditable div with inline tags -->
-                        <div class="mention-editor" #mentionEditor [id]="'mention-' + field.id"
-                            contenteditable="true" [attr.data-placeholder]="'Nhập text và gõ @ để chèn concept tag...'"
+                        <div class="mention-editor" #mentionEditor [id]="'mention-' + field.id" contenteditable="true"
+                            [attr.data-placeholder]="'Nhập text và gõ @ để chèn concept tag...'"
                             (input)="onContentEditableInput(field, $event)"
                             (keydown)="onContentEditableKeydown(field, $event)" (blur)="onMentionBlur(field.id)">
                         </div>
@@ -141,6 +156,7 @@
                     <small class="error-text">Trường này là bắt buộc</small>
                     }
                 </div>
+                }
                 }
             </div>
 

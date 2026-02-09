@@ -1,8 +1,8 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, OnDestroy, Input, Output, EventEmitter, inject, AfterViewInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators, FormControl } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
-import { FormsService, FormTemplate, FormField, FieldType, FormFieldValue, FieldValueRequest } from '../forms.service';
+import { FormsService, FormTemplate, FormField, FieldType, FormFieldValue, FieldValueRequest, FieldValueDetailRequest, ConditionalLogic, Condition } from '../forms.service';
 import { ConceptService } from '../services/concept.service';
 
 @Component({
@@ -12,7 +12,7 @@ import { ConceptService } from '../services/concept.service';
     templateUrl: './form-renderer.component.html',
     styleUrls: ['./form-renderer.component.scss']
 })
-export class FormRendererComponent implements OnInit {
+export class FormRendererComponent implements OnInit, OnDestroy, AfterViewInit {
     private readonly formsService = inject(FormsService);
     private readonly conceptService = inject(ConceptService);
     private readonly router = inject(Router);
@@ -29,6 +29,9 @@ export class FormRendererComponent implements OnInit {
     isSubmitting = false;
     fileValues: { [key: string]: File } = {};
     existingResponse: any = null;  // Store loaded response for edit
+    visibleFields: Set<string> = new Set();
+
+    private valueChangesSubscription: any;
 
     ngOnInit() {
         this.route.params.subscribe(params => {
@@ -43,6 +46,12 @@ export class FormRendererComponent implements OnInit {
                 this.loadTemplate();
             }
         });
+    }
+
+    ngOnDestroy() {
+        if (this.valueChangesSubscription) {
+            this.valueChangesSubscription.unsubscribe();
+        }
     }
 
     loadResponseForEdit() {
@@ -68,9 +77,21 @@ export class FormRendererComponent implements OnInit {
 
     // Convert string field type from API to numeric enum value
     normalizeFieldType(type: FieldType | string): FieldType {
+        // Handle 0 or invalid numbers immediately
+        if ((type as any) === 0 || type === '0') {
+            console.warn(`FieldType is 0 (Invalid), defaulting to Text`);
+            return FieldType.Text;
+        }
+
         if (typeof type === 'number') {
             return type;
         }
+        // Handle numeric string
+        const parsed = Number(type);
+        if (!isNaN(parsed) && parsed !== 0) {
+            return parsed as FieldType;
+        }
+
         const typeMap: { [key: string]: FieldType } = {
             'Text': FieldType.Text,
             'TextArea': FieldType.TextArea,
@@ -89,13 +110,47 @@ export class FormRendererComponent implements OnInit {
             'Label': FieldType.Label,
             'Tags': FieldType.Tags
         };
-        return typeMap[type] ?? FieldType.Text;
+        const mapped = typeMap[type];
+        if (mapped === undefined) {
+            console.warn(`Unknown FieldType: ${type}, defaulting to Text`);
+            return FieldType.Text;
+        }
+        return mapped;
     }
 
     buildForm() {
         const formConfig: { [key: string]: FormControl } = {};
 
+        // Normalize fieldType - backend may return string name or number
+        const fieldTypeMap: { [key: string]: number } = {
+            'Text': FieldType.Text,
+            'TextArea': FieldType.TextArea,
+            'Number': FieldType.Number,
+            'Decimal': FieldType.Decimal,
+            'Date': FieldType.Date,
+            'DateTime': FieldType.DateTime,
+            'Time': FieldType.Time,
+            'Dropdown': FieldType.Dropdown,
+            'MultiSelect': FieldType.MultiSelect,
+            'Radio': FieldType.Radio,
+            'Checkbox': FieldType.Checkbox,
+            'FileUpload': FieldType.FileUpload,
+            'Rating': FieldType.Rating,
+            'Section': FieldType.Section,
+            'Label': FieldType.Label,
+            'Tags': FieldType.Tags
+        };
+
         for (const field of this.fields) {
+            // Normalize fieldType
+            if (typeof field.fieldType === 'number') {
+                // Already a number, keep it
+            } else if (typeof field.fieldType === 'string') {
+                field.fieldType = fieldTypeMap[field.fieldType] ?? (Number(field.fieldType) || FieldType.Text);
+            } else {
+                field.fieldType = FieldType.Text;
+            }
+
             if (field.fieldType === FieldType.Section || field.fieldType === FieldType.Label) {
                 continue;
             }
@@ -110,12 +165,203 @@ export class FormRendererComponent implements OnInit {
                 defaultValue = field.defaultValue === 'true';
             } else if (field.fieldType === FieldType.Number || field.fieldType === FieldType.Decimal) {
                 defaultValue = field.defaultValue ? parseFloat(field.defaultValue) : null;
+            } else if (field.fieldType === FieldType.Tags || field.fieldType === FieldType.MultiSelect) {
+                try {
+                    defaultValue = field.defaultValue ? JSON.parse(field.defaultValue) : [];
+                    if (!Array.isArray(defaultValue)) {
+                        // If parsing succeeded but not array (e.g. number), wrap it
+                        defaultValue = [defaultValue];
+                    }
+                } catch {
+                    // If parsing failed (plain string), wrap it
+                    defaultValue = field.defaultValue ? [field.defaultValue] : [];
+                }
             }
 
             formConfig[field.id] = new FormControl(defaultValue, validators);
+            // console.log(`Built field: ${field.label} (${field.id}), Type: ${field.fieldType} (Normalized)`);
         }
 
         this.form = this.fb.group(formConfig);
+
+        // Initial evaluation
+        this.evaluateConditions();
+
+        // Subscribe to changes
+        this.valueChangesSubscription = this.form.valueChanges.subscribe(() => {
+            this.evaluateConditions();
+        });
+    }
+
+    ngAfterViewInit() {
+        // Initialize tags fields content
+        setTimeout(() => {
+            this.initTagsFields();
+        });
+    }
+
+    initTagsFields() {
+        this.fields.forEach(field => {
+            if (field.fieldType === FieldType.Tags && this.isFieldVisible(field.id)) {
+                this.updateTagsEditorFromValue(field.id);
+            }
+        });
+    }
+
+    updateTagsEditorFromValue(fieldId: string) {
+        const control = this.form.get(fieldId);
+        if (!control) return;
+
+        const editor = document.getElementById('mention-' + fieldId);
+        if (!editor) return;
+
+        const val = control.value;
+        if (!val) {
+            editor.innerHTML = '';
+            return;
+        }
+
+        try {
+            // Try parsing as JSON
+            const data = typeof val === 'string' ? JSON.parse(val) : val;
+
+            if (data && data.html) {
+                // Format: { text, html, mentions }
+                editor.innerHTML = data.html;
+                if (data.mentions) {
+                    this.mentionData[fieldId] = {
+                        text: data.text,
+                        mentions: data.mentions
+                    };
+                }
+            } else if (Array.isArray(data)) {
+                // Format: Array of tag values or objects
+                // Reconstruct HTML with badges
+                const field = this.fields.find(f => f.id === fieldId);
+                const options = field ? this.getOptions(field) : [];
+
+                let html = '';
+                data.forEach((item: any) => {
+                    const tagValue = typeof item === 'string' ? item : item.value;
+                    const opt = options.find(o => o.value === tagValue);
+                    const label = opt?.label || tagValue;
+                    const conceptId = (opt as any)?.conceptId || (typeof item === 'object' ? item.conceptId : null);
+
+                    // Create badge HTML similar to what insertMentionTag creates
+                    html += `<span class="mention-tag" contenteditable="false" data-concept-id="${conceptId || ''}" data-value="${tagValue}">${label}</span> `;
+                });
+
+                editor.innerHTML = html;
+            } else {
+                // Plain text fallback - but avoid showing "undefined"
+                editor.innerText = (val && val !== 'undefined') ? String(val) : '';
+            }
+        } catch {
+            // Plain text fallback - but avoid showing "undefined"
+            editor.innerText = (val && val !== 'undefined') ? String(val) : '';
+        }
+    }
+
+    isFieldVisible(fieldId: string): boolean {
+        return this.visibleFields.has(fieldId);
+    }
+
+    evaluateConditions() {
+        const newVisibleFields = new Set<string>();
+        const formValues = this.form.getRawValue(); // Use getRawValue to get values even from disabled fields
+
+        // Iterate fields in order (assuming this.fields is sorted by displayOrder)
+        for (const field of this.fields) {
+            if (!field.conditionalLogicJson) {
+                newVisibleFields.add(field.id);
+                this.enableField(field.id);
+                continue;
+            }
+
+            try {
+                const logic: ConditionalLogic = JSON.parse(field.conditionalLogicJson);
+                let isMatch = false;
+
+                // Evaluate all conditions
+                if (logic.conditions && Array.isArray(logic.conditions)) {
+                    const results = logic.conditions.map(cond => {
+                        const triggerValue = formValues[cond.fieldId];
+                        return this.checkCondition(triggerValue, cond.operator, cond.value);
+                    });
+
+                    if (logic.logic === 'AND') {
+                        isMatch = results.every(r => r);
+                    } else { // OR
+                        isMatch = results.some(r => r);
+                    }
+                }
+
+                // Determine visibility based on Action + Match
+                let shouldShow = true;
+                if (logic.action === 'show') {
+                    shouldShow = isMatch;
+                } else { // hide
+                    shouldShow = !isMatch;
+                }
+
+                if (shouldShow) {
+                    newVisibleFields.add(field.id);
+                    this.enableField(field.id);
+                } else {
+                    this.disableField(field.id);
+                }
+
+            } catch (err) {
+                console.error('Error evaluating logic for field', field.id, err);
+                newVisibleFields.add(field.id); // Fallback to visible
+                this.enableField(field.id);
+            }
+        }
+
+        // Check for visibility changes to re-init tags
+        const prevSize = this.visibleFields.size;
+        this.visibleFields = newVisibleFields;
+
+        // If visibility changed, we might need to init tags for newly visible fields
+        // Since DOM update happens after this, use setTimeout
+        if (this.visibleFields.size !== prevSize) {
+            setTimeout(() => this.initTagsFields());
+        }
+    }
+
+    checkCondition(triggerValue: any, operator: string, targetValue: any): boolean {
+        // Handle null/undefined
+        if (triggerValue === null || triggerValue === undefined) triggerValue = '';
+        if (targetValue === null || targetValue === undefined) targetValue = '';
+
+        // Convert to strings for comparison usually, or basic types
+        const tStr = String(triggerValue).toLowerCase();
+        const vStr = String(targetValue).toLowerCase();
+
+        switch (operator) {
+            case 'eq': return tStr === vStr;
+            case 'neq': return tStr !== vStr;
+            case 'gt': return parseFloat(triggerValue) > parseFloat(targetValue);
+            case 'lt': return parseFloat(triggerValue) < parseFloat(targetValue);
+            case 'contains': return tStr.includes(vStr);
+            default: return false;
+        }
+    }
+
+    enableField(fieldId: string) {
+        const control = this.form.get(fieldId);
+        if (control && control.disabled) {
+            control.enable({ emitEvent: false }); // Prevent infinite loop
+        }
+    }
+
+    disableField(fieldId: string) {
+        const control = this.form.get(fieldId);
+        if (control && control.enabled) {
+            control.disable({ emitEvent: false }); // Prevent infinite loop
+            // Optional: Clear value when hidden? 
+            // control.setValue(null, { emitEvent: false });
+        }
     }
 
     // Populate form with existing response data for edit mode
@@ -157,6 +403,18 @@ export class FormRendererComponent implements OnInit {
                         break;
 
                     case FieldType.Checkbox:
+                        // Check if this is a checkbox group or single boolean
+                        if (fv.jsonValue) {
+                            try {
+                                const parsed = JSON.parse(fv.jsonValue);
+                                if (Array.isArray(parsed)) {
+                                    control.setValue(parsed);
+                                    break;
+                                }
+                            } catch {
+                                // Not JSON, fall through to boolean
+                            }
+                        }
                         control.setValue(fv.booleanValue);
                         break;
 
@@ -171,10 +429,14 @@ export class FormRendererComponent implements OnInit {
                         break;
 
                     case FieldType.Tags:
-                        // Set form control value
-                        control.setValue(fv.jsonValue || fv.textValue || '');
-                        // Populate contenteditable editor with HTML
-                        this.populateTagsEditor(field.id, fv.jsonValue || fv.textValue);
+                        // Set form control value from jsonValue
+                        if (fv.jsonValue) {
+                            control.setValue(fv.jsonValue);
+                        } else if (fv.textValue) {
+                            control.setValue(fv.textValue);
+                        }
+                        // Update the Tags editor display
+                        this.updateTagsEditorFromValue(field.id);
                         break;
 
                     case FieldType.Radio:
@@ -273,6 +535,33 @@ export class FormRendererComponent implements OnInit {
         this.form.get(fieldKey)?.setValue(value);
     }
 
+    isCheckboxChecked(fieldId: string, optionValue: string): boolean {
+        const control = this.form.get(fieldId);
+        const value = control?.value;
+        return Array.isArray(value) && value.includes(optionValue);
+    }
+
+    onCheckboxChange(fieldId: string, optionValue: string, event: Event) {
+        const checkbox = event.target as HTMLInputElement;
+        const control = this.form.get(fieldId);
+        if (!control) return;
+
+        let currentValue = control.value || [];
+        if (!Array.isArray(currentValue)) {
+            currentValue = [];
+        }
+
+        if (checkbox.checked) {
+            // Add value if not already present
+            if (!currentValue.includes(optionValue)) {
+                control.setValue([...currentValue, optionValue]);
+            }
+        } else {
+            // Remove value
+            control.setValue(currentValue.filter((v: string) => v !== optionValue));
+        }
+    }
+
     onFileChange(event: Event, fieldKey: string) {
         const input = event.target as HTMLInputElement;
         if (input.files?.[0]) {
@@ -301,6 +590,7 @@ export class FormRendererComponent implements OnInit {
 
             const value = this.form.get(field.id)?.value;
             const fieldValue: FieldValueRequest = { formFieldId: field.id };
+            const details: FieldValueDetailRequest[] = [];
 
             switch (field.fieldType) {
                 case FieldType.Number:
@@ -313,17 +603,133 @@ export class FormRendererComponent implements OnInit {
                     fieldValue.dateValue = value ? new Date(value) : undefined;
                     break;
                 case FieldType.Checkbox:
-                    fieldValue.booleanValue = value;
+                    // Check if this checkbox has options (checkbox group) or is a single boolean
+                    const checkboxOptions = this.getOptions(field);
+                    if (checkboxOptions && checkboxOptions.length > 0) {
+                        // Checkbox group with multiple options - treat like MultiSelect
+                        fieldValue.jsonValue = JSON.stringify(value || []);
+                        if (Array.isArray(value)) {
+                            value.forEach((v: string) => {
+                                const opt = checkboxOptions.find(o => o.value === v);
+                                if (opt) {
+                                    details.push({
+                                        value: opt.value,
+                                        label: opt.label,
+                                        conceptId: (opt as any).conceptId
+                                    });
+                                } else {
+                                    details.push({ value: v, label: v });
+                                }
+                            });
+                        }
+                    } else {
+                        // Single boolean checkbox
+                        fieldValue.booleanValue = value;
+                        if (value === true && field.conceptId) {
+                            details.push({
+                                value: 'true',
+                                label: field.label,
+                                conceptId: field.conceptId
+                            });
+                        }
+                    }
                     break;
                 case FieldType.MultiSelect:
                     fieldValue.jsonValue = JSON.stringify(value || []);
+                    if (Array.isArray(value)) {
+                        const options = this.getOptions(field);
+                        value.forEach((v: string) => {
+                            const opt = options.find(o => o.value === v);
+                            if (opt) {
+                                details.push({
+                                    value: opt.value,
+                                    label: opt.label,
+                                    conceptId: (opt as any).conceptId
+                                });
+                            } else {
+                                details.push({ value: v, label: v });
+                            }
+                        });
+                    }
                     break;
                 case FieldType.Tags:
-                    // Tags value is already a JSON string from updateContentEditableFormValue
-                    fieldValue.jsonValue = typeof value === 'string' ? value : JSON.stringify(value || {});
+                    // Tags value is stored as JSON: {text, tagIds, mentions} or just an array
+                    let tags: string[] = [];
+                    try {
+                        const parsed = typeof value === 'string' ? JSON.parse(value) : value;
+
+                        console.log('Tags field parsed value:', parsed);
+
+                        if (Array.isArray(parsed)) {
+                            // Simple array format
+                            tags = parsed;
+                        } else if (parsed && parsed.tagIds && Array.isArray(parsed.tagIds)) {
+                            // Mention data format: {text, tagIds, mentions}
+                            tags = parsed.tagIds;
+                        } else if (parsed) {
+                            // Single value
+                            tags = [parsed];
+                        }
+                    } catch (e) {
+                        console.error('Error parsing Tags value:', e);
+                        tags = [];
+                    }
+
+                    // Ensure tags is always an array before using forEach
+                    if (!Array.isArray(tags)) {
+                        tags = [];
+                    }
+
+                    console.log('Tags array:', tags);
+
+                    const tagOptions = this.getOptions(field);
+                    console.log('Tag options:', tagOptions);
+                    console.log('Tag options detailed:', JSON.stringify(tagOptions, null, 2));
+
+                    // Tags array contains concept IDs, not option values
+                    // We need to look up by conceptId to get the option value and label
+                    tags.forEach(tagConceptId => {
+                        const opt = tagOptions.find(o => (o as any).conceptId === tagConceptId);
+                        console.log(`Looking for conceptId "${tagConceptId}", found:`, opt);
+                        if (opt) {
+                            details.push({
+                                value: opt.value,
+                                label: opt.label,
+                                conceptId: (opt as any).conceptId
+                            });
+                        } else {
+                            // Fallback if concept not found in options
+                            details.push({ value: tagConceptId, label: tagConceptId });
+                        }
+                    });
+
+                    // Store the option values (not concept IDs) in jsonValue
+                    const optionValues = details.map(d => d.value);
+                    fieldValue.jsonValue = JSON.stringify(optionValues);
+
+                    console.log('Tags details:', details);
+                    break;
+                case FieldType.Dropdown:
+                case FieldType.Radio:
+                    fieldValue.textValue = value?.toString() || '';
+                    if (value) {
+                        const options = this.getOptions(field);
+                        const opt = options.find(o => o.value === value);
+                        if (opt) {
+                            details.push({
+                                value: opt.value,
+                                label: opt.label,
+                                conceptId: (opt as any).conceptId
+                            });
+                        }
+                    }
                     break;
                 default:
                     fieldValue.textValue = value?.toString() || '';
+            }
+
+            if (details.length > 0) {
+                fieldValue.details = details;
             }
 
             // Debug log each field
@@ -688,7 +1094,30 @@ export class FormRendererComponent implements OnInit {
     getMentionTagIds(fieldKey: string): string[] {
         const data = this.mentionData[fieldKey];
         if (!data) return [];
-        return [...new Set(data.mentions.map(m => m.conceptId))];
+
+        // Get the field to access its options
+        const field = this.fields.find(f => f.id === fieldKey);
+        if (!field) return [];
+
+        const options = this.getOptions(field);
+
+        console.log('getMentionTagIds - field:', field.label);
+        console.log('getMentionTagIds - options:', options);
+        console.log('getMentionTagIds - mentions:', data.mentions);
+
+        // Map concept IDs to option values
+        const optionValues: string[] = [];
+        data.mentions.forEach(m => {
+            console.log(`Looking for conceptId ${m.conceptId} in options`);
+            const opt = options.find(o => (o as any).conceptId === m.conceptId);
+            console.log('Found option:', opt);
+            if (opt) {
+                optionValues.push(opt.value);
+            }
+        });
+
+        console.log('getMentionTagIds - returning:', optionValues);
+        return [...new Set(optionValues)]; // Remove duplicates
     }
 
     getConceptName(conceptId: string): string {
@@ -906,4 +1335,5 @@ export class FormRendererComponent implements OnInit {
             opt.label.toLowerCase() === query.toLowerCase()
         );
     }
+
 }

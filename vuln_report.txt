@@ -1,0 +1,13 @@
+  Determining projects to restore...
+D:\Pr.Net\IVF\src\IVF.Domain\IVF.Domain.csproj : warning NU1903: Package 'Microsoft.Extensions.Caching.Memory' 8.0.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-qj66-m88j-hmgj [D:\Pr.Net\IVF\src\IVF.Infrastructure\IVF.Infrastructure.csproj]
+D:\Pr.Net\IVF\src\IVF.Application\IVF.Application.csproj : warning NU1903: Package 'Microsoft.Extensions.Caching.Memory' 8.0.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-qj66-m88j-hmgj [D:\Pr.Net\IVF\src\IVF.Infrastructure\IVF.Infrastructure.csproj]
+D:\Pr.Net\IVF\src\IVF.Domain\IVF.Domain.csproj : warning NU1903: Package 'Npgsql' 8.0.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-x9vc-6hfv-hg8c [D:\Pr.Net\IVF\src\IVF.Infrastructure\IVF.Infrastructure.csproj]
+D:\Pr.Net\IVF\src\IVF.Application\IVF.Application.csproj : warning NU1903: Package 'Npgsql' 8.0.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-x9vc-6hfv-hg8c [D:\Pr.Net\IVF\src\IVF.Infrastructure\IVF.Infrastructure.csproj]
+  All projects are up-to-date for restore.
+
+The following sources were used:
+   https://api.nuget.org/v3/index.json
+   C:\Program Files (x86)\Microsoft SDKs\NuGetPackages\
+   C:\Program Files\DevExpress 24.1\Components\System\Components\Packages
+
+The given project `IVF.Infrastructure` has no vulnerable packages given the current sources.

@@ -235,7 +235,8 @@ public class FormResponsesQueryHandler :
             response.SubmittedAt,
             response.FieldValues?.Select(v => new FormFieldValueDto(
                 v.Id, v.FormFieldId, v.FormField?.FieldKey, v.FormField?.Label,
-                v.TextValue, v.NumericValue, v.DateValue, v.BooleanValue, v.JsonValue)).ToList());
+                v.TextValue, v.NumericValue, v.DateValue, v.BooleanValue, v.JsonValue,
+                v.Details?.Select(d => new FormFieldValueDetailDto(d.Value, d.Label, d.ConceptId)).ToList())).ToList());
     }
 }
 

@@ -235,7 +235,9 @@ public class FormRepository : IFormRepository
         if (includeFieldValues)
         {
             query = query.Include(r => r.FieldValues)
-                .ThenInclude(v => v.FormField);
+                .ThenInclude(v => v.FormField)
+                .Include(r => r.FieldValues)
+                .ThenInclude(v => v.Details);
         }
 
         return await query.FirstOrDefaultAsync(r => r.Id == id, ct);
@@ -244,6 +246,16 @@ public class FormRepository : IFormRepository
     public async Task<FormResponse> AddResponseAsync(FormResponse response, CancellationToken ct = default)
     {
         _context.FormResponses.Add(response);
+        
+        // Explicitly ensure Details are tracked by EF Core
+        foreach (var fieldValue in response.FieldValues)
+        {
+            foreach (var detail in fieldValue.Details)
+            {
+                _context.Entry(detail).State = EntityState.Added;
+            }
+        }
+        
         await _context.SaveChangesAsync(ct);
         return response;
     }

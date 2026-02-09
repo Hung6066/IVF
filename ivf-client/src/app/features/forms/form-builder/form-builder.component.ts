@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
-import { FormsService, FormCategory, FormTemplate, FormField, FieldType, FieldTypeLabels, CreateFieldRequest } from '../forms.service';
+import { FormsService, FormCategory, FormTemplate, FormField, FieldType, FieldTypeLabels, CreateFieldRequest, ConditionalLogic, Condition } from '../forms.service';
 import { ConceptPickerComponent } from '../concept-picker/concept-picker.component';
 import { ConceptService, Concept } from '../services/concept.service';
 
@@ -69,7 +69,42 @@ export class FormBuilderComponent implements OnInit {
             this.formName = template.name;
             this.formDescription = template.description || '';
             this.selectedCategoryId = template.categoryId;
-            this.fields = template.fields || [];
+            // Normalize fieldType - backend may return string name or number
+            const fieldTypeMap: { [key: string]: number } = {
+                'Text': FieldType.Text,
+                'TextArea': FieldType.TextArea,
+                'Number': FieldType.Number,
+                'Decimal': FieldType.Decimal,
+                'Date': FieldType.Date,
+                'DateTime': FieldType.DateTime,
+                'Time': FieldType.Time,
+                'Dropdown': FieldType.Dropdown,
+                'MultiSelect': FieldType.MultiSelect,
+                'Radio': FieldType.Radio,
+                'Checkbox': FieldType.Checkbox,
+                'FileUpload': FieldType.FileUpload,
+                'Rating': FieldType.Rating,
+                'Section': FieldType.Section,
+                'Label': FieldType.Label,
+                'Tags': FieldType.Tags
+            };
+
+            this.fields = (template.fields || []).map(f => {
+                let numericType: number;
+                if (typeof f.fieldType === 'number') {
+                    numericType = f.fieldType;
+                } else if (typeof f.fieldType === 'string') {
+                    // Try to map string name to enum value
+                    numericType = fieldTypeMap[f.fieldType] ?? (Number(f.fieldType) || FieldType.Text);
+                } else {
+                    numericType = FieldType.Text;
+                }
+                return { ...f, fieldType: numericType };
+            });
+
+            // DEBUG: Log field types
+            console.log('Loaded fields with types:', this.fields.map(f => ({ label: f.label, fieldType: f.fieldType, typeOf: typeof f.fieldType })));
+            console.log('FieldType enum values:', { Radio: FieldType.Radio, Checkbox: FieldType.Checkbox, Dropdown: FieldType.Dropdown, Tags: FieldType.Tags });
 
             // Load linked concepts for fields that have conceptId
             this.loadLinkedConcepts();
@@ -163,19 +198,38 @@ export class FormBuilderComponent implements OnInit {
         }
     }
 
-    addField(type: FieldType) {
+    addField(type: FieldType | string) {
+        let numericType: number;
+
+        if (typeof type === 'number') {
+            numericType = type;
+        } else {
+            const parsed = Number(type);
+            if (!isNaN(parsed) && parsed !== 0) {
+                numericType = parsed;
+            } else {
+                // Try to find enum value by string key
+                // Note: This relies on FieldType having string keys matching the input
+                // But since we don't have a reverse map easily accessible here without iterating
+                // Let's assume input is valid number or numeric string.
+                // Fallback to Text (1) if invalid
+                console.warn(`Invalid FieldType input: ${type}, defaulting to Text`);
+                numericType = FieldType.Text;
+            }
+        }
         const newField: FormField = {
             id: '',
             fieldKey: `field_${this.fields.length + 1}`,
-            label: this.getFieldTypeLabel(type),
-            fieldType: type,
+            label: this.getFieldTypeLabel(numericType),
+            fieldType: numericType,
             displayOrder: this.fields.length,
             isRequired: false,
             placeholder: '',
-            optionsJson: this.hasOptions(type) ? JSON.stringify([
+            optionsJson: this.hasOptions(numericType) ? JSON.stringify([
                 { value: 'opt1', label: 'Lựa chọn 1' },
                 { value: 'opt2', label: 'Lựa chọn 2' }
-            ]) : undefined
+            ]) : undefined,
+            conditionalLogicJson: undefined // Ensure no logic is set by default
         };
 
         this.fields.push(newField);
@@ -188,7 +242,8 @@ export class FormBuilderComponent implements OnInit {
                 displayOrder: newField.displayOrder,
                 isRequired: newField.isRequired,
                 placeholder: newField.placeholder,
-                optionsJson: newField.optionsJson
+                optionsJson: newField.optionsJson,
+                conditionalLogicJson: newField.conditionalLogicJson
             }).subscribe(field => {
                 const index = this.fields.findIndex(f => f.fieldKey === newField.fieldKey);
                 if (index >= 0) this.fields[index] = field;
@@ -197,6 +252,7 @@ export class FormBuilderComponent implements OnInit {
     }
 
     selectField(field: FormField) {
+        console.log('Selected field:', { label: field.label, fieldType: field.fieldType, typeOf: typeof field.fieldType, hasOptions: this.hasOptions(field.fieldType) });
         this.selectedField = field;
         console.log('selectField:', field.label, 'fieldType:', field.fieldType, 'hasOptions:', this.hasOptions(field.fieldType));
         // Get colSpan and height from field's validation rules
@@ -216,8 +272,16 @@ export class FormBuilderComponent implements OnInit {
     }
 
     updateField() {
-        if (this.selectedField?.id && this.templateId) {
-            this.formsService.updateField(this.selectedField.id, this.selectedField).subscribe();
+        if (this.selectedField?.id) {
+            this.formsService.updateField(this.selectedField.id, {
+                label: this.selectedField.label,
+                isRequired: this.selectedField.isRequired,
+                placeholder: this.selectedField.placeholder,
+                optionsJson: this.selectedField.optionsJson,
+                validationRulesJson: this.selectedField.validationRulesJson,
+                conditionalLogicJson: this.selectedField.conditionalLogicJson,
+                displayOrder: this.selectedField.displayOrder
+            }).subscribe();
         }
     }
 
@@ -310,15 +374,20 @@ export class FormBuilderComponent implements OnInit {
         return FieldTypeLabels[type] || 'Trường mới';
     }
 
-    hasOptions(type: FieldType | string): boolean {
+    hasOptions(type: FieldType | string | number): boolean {
         // Handle both numeric enum values and string names from API
         const optionTypes = [FieldType.Dropdown, FieldType.MultiSelect, FieldType.Radio, FieldType.Checkbox, FieldType.Tags];
         const optionTypeNames = ['Dropdown', 'MultiSelect', 'Radio', 'Checkbox', 'Tags'];
 
         if (typeof type === 'string') {
+            // Check if it's a number string like "10"
+            const num = Number(type);
+            if (!isNaN(num)) {
+                return optionTypes.includes(num);
+            }
             return optionTypeNames.includes(type);
         }
-        return optionTypes.includes(type);
+        return optionTypes.includes(type as number);
     }
 
     getOptions(field: FormField): { value: string; label: string }[] {
@@ -474,7 +543,10 @@ export class FormBuilderComponent implements OnInit {
         if (this.selectedField) {
             const options = this.editableOptions.map(o => ({
                 value: o.value,
-                label: o.label
+                label: o.label,
+                conceptId: o.conceptId,
+                conceptCode: o.conceptCode,
+                conceptDisplay: o.conceptDisplay
             }));
             this.selectedField.optionsJson = JSON.stringify(options);
             this.updateField();
@@ -552,6 +624,104 @@ export class FormBuilderComponent implements OnInit {
         this.optionConceptSearch[index] = '';
         this.optionConceptResults[index] = [];
         this.activeOptionSearchIndex = -1;
+        this.activeOptionSearchIndex = -1;
+    }
+
+    // ===== Conditional Logic =====
+    showLogicEditor = false;
+    currentLogic: ConditionalLogic = { action: 'show', logic: 'AND', conditions: [] };
+
+    toggleLogicEditor() {
+        if (!this.selectedField) return;
+
+        this.showLogicEditor = !this.showLogicEditor;
+        if (this.showLogicEditor) {
+            try {
+                this.currentLogic = this.selectedField.conditionalLogicJson
+                    ? JSON.parse(this.selectedField.conditionalLogicJson)
+                    : { action: 'show', logic: 'AND', conditions: [] };
+            } catch {
+                this.currentLogic = { action: 'show', logic: 'AND', conditions: [] };
+            }
+        }
+    }
+
+    addCondition() {
+        this.currentLogic.conditions.push({
+            fieldId: '',
+            operator: 'eq',
+            value: ''
+        });
+    }
+
+    removeCondition(index: number) {
+        this.currentLogic.conditions.splice(index, 1);
+        this.saveLogic();
+    }
+
+    saveLogic() {
+        if (!this.selectedField) return;
+
+        // Filter out empty conditions
+        const validConditions = this.currentLogic.conditions.filter(c => c.fieldId);
+
+        if (validConditions.length > 0) {
+            // Update logic object with valid conditions
+            const logicToSave = { ...this.currentLogic, conditions: validConditions };
+            this.selectedField.conditionalLogicJson = JSON.stringify(logicToSave);
+        } else {
+            this.selectedField.conditionalLogicJson = undefined;
+        }
+
+        this.updateField();
+    }
+
+    getAvailableTriggerFields(): FormField[] {
+        if (!this.selectedField) return [];
+        // Only allow fields that appear BEFORE the current field to avoid circular dependency
+        // and ensure the DOM is rendered linearly
+        const currentIndex = this.fields.indexOf(this.selectedField);
+        if (currentIndex <= 0) return [];
+
+        return this.fields.slice(0, currentIndex).filter(f =>
+            f.fieldType !== FieldType.Section &&
+            f.fieldType !== FieldType.Label
+        );
+    }
+
+    getFlagLabel(fieldType: FieldType): string {
+        return this.fieldTypes.find(t => t.type === fieldType)?.label || '';
+    }
+
+    getOptionsForCondition(fieldId: string): { value: any; label: string }[] | null {
+        if (!fieldId) return null;
+        const field = this.fields.find(f => f.id === fieldId);
+        if (!field) return null;
+
+        // Ensure fieldType is treated as number
+        const type = Number(field.fieldType);
+
+        // Handle Checkbox (Boolean)
+        if (type === FieldType.Checkbox) {
+            return [
+                { value: 'true', label: 'Đã chọn (Có)' },
+                { value: 'false', label: 'Không chọn (Không)' }
+            ];
+        }
+
+        // Handle types with Options (Radio, Dropdown, MultiSelect, Tags)
+        if (this.hasOptions(type) || type === FieldType.Tags) {
+            try {
+                if (field.optionsJson) {
+                    const opts = JSON.parse(field.optionsJson);
+                    return opts.map((o: any) => ({ value: o.value, label: o.label }));
+                }
+            } catch {
+                return null;
+            }
+        }
+
+        return null;
     }
 }
 

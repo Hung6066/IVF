@@ -65,6 +65,13 @@ export interface FormFieldValue {
     dateValue?: Date;
     booleanValue?: boolean;
     jsonValue?: string;
+    details?: FormFieldValueDetail[];
+}
+
+export interface FormFieldValueDetail {
+    value: string;
+    label?: string;
+    conceptId?: string;
 }
 
 export interface ReportTemplate {
@@ -94,12 +101,27 @@ export interface ReportSummary {
 export interface FieldOption {
     value: string;
     label: string;
+    conceptId?: string;
+    conceptCode?: string;
+    conceptDisplay?: string;
 }
 
 export interface ValidationRule {
     type: 'required' | 'minLength' | 'maxLength' | 'min' | 'max' | 'pattern' | 'email';
     value?: any;
     message?: string;
+}
+
+export interface ConditionalLogic {
+    action: 'show' | 'hide';
+    logic: 'AND' | 'OR';
+    conditions: Condition[];
+}
+
+export interface Condition {
+    fieldId: string;
+    operator: 'eq' | 'neq' | 'gt' | 'lt' | 'contains';
+    value: any;
 }
 
 export enum FieldType {
@@ -194,6 +216,16 @@ export interface SubmitResponseRequest {
     fieldValues: FieldValueRequest[];
 }
 
+export interface UpdateFieldRequest {
+    label?: string;
+    displayOrder?: number;
+    isRequired?: boolean;
+    placeholder?: string;
+    optionsJson?: string;
+    validationRulesJson?: string;
+    conditionalLogicJson?: string;
+}
+
 export interface FieldValueRequest {
     formFieldId: string;
     textValue?: string;
@@ -201,6 +233,13 @@ export interface FieldValueRequest {
     dateValue?: Date;
     booleanValue?: boolean;
     jsonValue?: string;
+    details?: FieldValueDetailRequest[];
+}
+
+export interface FieldValueDetailRequest {
+    value: string;
+    label?: string;
+    conceptId?: string;
 }
 
 @Injectable({

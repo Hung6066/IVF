@@ -246,7 +246,7 @@
                 <div class="options-section">
                     <label>Các lựa chọn</label>
                     <div class="options-list">
-                        @for (opt of editableOptions; track opt.value; let i = $index) {
+                        @for (opt of editableOptions; track i; let i = $index) {
                         <div class="option-row">
                             <div class="option-inputs">
                                 <input type="text" [(ngModel)]="opt.value" placeholder="Value" (blur)="saveOptions()"
@@ -323,6 +323,82 @@
                             <option value="large">Lớn (150px)</option>
                             <option value="xlarge">Rất lớn (200px)</option>
                         </select>
+                    </div>
+
+                    <!-- Conditional Logic Section -->
+                    <div class="section-divider">
+                        <span>🔀 Logic hiển thị</span>
+                    </div>
+
+                    <div class="logic-controls">
+                        <button class="btn-logic-toggle" [class.active]="showLogicEditor" (click)="toggleLogicEditor()">
+                            {{ selectedField.conditionalLogicJson ? '✅ Đã thiết lập logic' : '+ Thêm điều kiện hiển thị'
+                            }}
+                        </button>
+
+                        @if (showLogicEditor) {
+                        <div class="logic-editor">
+                            <div class="logic-header">
+                                <select [(ngModel)]="currentLogic.action" (change)="saveLogic()">
+                                    <option value="show">Hiện</option>
+                                    <option value="hide">Ẩn</option>
+                                </select>
+                                <span>trường này khi:</span>
+                            </div>
+
+                            @if (currentLogic.conditions.length > 0) {
+                            <div class="logic-operator">
+                                <select [(ngModel)]="currentLogic.logic" (change)="saveLogic()">
+                                    <option value="AND">Tất cả (AND)</option>
+                                    <option value="OR">Bất kỳ (OR)</option>
+                                </select>
+                                <span>điều kiện sau đúng:</span>
+                            </div>
+                            }
+
+                            <div class="conditions-list">
+                                @for (cond of currentLogic.conditions; track $index) {
+                                <div class="condition-row">
+                                    <div class="condition-inputs">
+                                        <select [(ngModel)]="cond.fieldId" (change)="saveLogic()" class="cond-field">
+                                            <option value="" disabled>-- Chọn trường --</option>
+                                            @for (f of getAvailableTriggerFields(); track f.id) {
+                                            <option [value]="f.id">{{ f.label }}</option>
+                                            }
+                                        </select>
+
+                                        <select [(ngModel)]="cond.operator" (change)="saveLogic()" class="cond-op">
+                                            <option value="eq">Bằng</option>
+                                            <option value="neq">Khác</option>
+                                            <option value="gt">Lớn hơn</option>
+                                            <option value="lt">Nhỏ hơn</option>
+                                            <option value="contains">Chứa</option>
+                                        </select>
+
+                                        @if (getOptionsForCondition(cond.fieldId); as options) {
+                                        <select [(ngModel)]="cond.value" (change)="saveLogic()" class="cond-val">
+                                            <option value="" disabled>-- Chọn giá trị --</option>
+                                            @for (opt of options; track opt.value) {
+                                            <option [value]="opt.value">{{ opt.label }}</option>
+                                            }
+                                        </select>
+                                        } @else {
+                                        <input type="text" [(ngModel)]="cond.value" (blur)="saveLogic()"
+                                            placeholder="Giá trị" class="cond-val">
+                                        }
+                                    </div>
+                                    <button class="remove-cond-btn" (click)="removeCondition($index)">🗑️</button>
+                                </div>
+                                }
+                            </div>
+
+                            <button class="add-cond-btn" (click)="addCondition()">+ Thêm điều kiện</button>
+
+                            @if (getAvailableTriggerFields().length === 0) {
+                            <small class="warning-text">⚠️ Cần có trường phía trên để tạo điều kiện.</small>
+                            }
+                        </div>
+                        }
                     </div>
                 </div>
             </div>

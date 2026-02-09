@@ -37,7 +37,7 @@
                     @if (isTagsField(field)) {
                     <div class="value tags-value" [innerHTML]="getTagsDisplayHtml(field)"></div>
                     } @else {
-                    <div class="value">{{ getFieldDisplayValue(field) }}</div>
+                    <div class="value" [innerHTML]="getFieldDisplayValue(field)"></div>
                     }
                 </div>
                 }

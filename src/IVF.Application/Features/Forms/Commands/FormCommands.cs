@@ -218,7 +218,14 @@ public record FormFieldValueDto(
     decimal? NumericValue,
     DateTime? DateValue,
     bool? BooleanValue,
-    string? JsonValue
+    string? JsonValue,
+    List<FormFieldValueDetailDto>? Details = null
+);
+
+public record FormFieldValueDetailDto(
+    string Value,
+    string? Label,
+    Guid? ConceptId
 );
 
 public record ReportTemplateDto(
@@ -519,6 +526,16 @@ public class FormResponseCommandsHandler :
                 fv.DateValue,
                 fv.BooleanValue,
                 fv.JsonValue);
+
+            // Add details if provided
+            if (fv.Details != null && fv.Details.Any())
+            {
+                var fieldValue = response.FieldValues.Last(); // The one we just added
+                foreach (var detail in fv.Details)
+                {
+                    fieldValue.AddDetail(detail.Value, detail.Label, detail.ConceptId);
+                }
+            }
         }
 
         response.Submit();
@@ -545,6 +562,16 @@ public class FormResponseCommandsHandler :
             {
                 // Update existing value
                 existing.Update(fv.TextValue, fv.NumericValue, fv.DateValue, fv.BooleanValue, fv.JsonValue);
+                
+                // Update details: Clear and re-add (simpler than syncing)
+                existing.ClearDetails();
+                if (fv.Details != null && fv.Details.Any())
+                {
+                    foreach (var detail in fv.Details)
+                    {
+                        existing.AddDetail(detail.Value, detail.Label, detail.ConceptId);
+                    }
+                }
             }
             else
             {
@@ -556,6 +583,16 @@ public class FormResponseCommandsHandler :
                     fv.DateValue,
                     fv.BooleanValue,
                     fv.JsonValue);
+
+                // Add details if provided
+                if (fv.Details != null && fv.Details.Any())
+                {
+                    var fieldValue = response.FieldValues.Last();
+                    foreach (var detail in fv.Details)
+                    {
+                        fieldValue.AddDetail(detail.Value, detail.Label, detail.ConceptId);
+                    }
+                }
             }
         }
 

@@ -18,6 +18,7 @@ public class FormFieldValue : BaseEntity
     // Navigation
     public FormResponse FormResponse { get; private set; } = null!;
     public FormField FormField { get; private set; } = null!;
+    public ICollection<FormFieldValueDetail> Details { get; private set; } = new List<FormFieldValueDetail>();
 
     private FormFieldValue() { }
 
@@ -56,7 +57,19 @@ public class FormFieldValue : BaseEntity
         DateValue = dateValue;
         BooleanValue = booleanValue;
         JsonValue = jsonValue;
+        JsonValue = jsonValue;
         SetUpdated();
+    }
+
+    public void AddDetail(string value, string? label = null, Guid? conceptId = null)
+    {
+        var detail = FormFieldValueDetail.Create(this.Id, value, label, conceptId);
+        Details.Add(detail);
+    }
+
+    public void ClearDetails()
+    {
+        Details.Clear();
     }
 
     /// <summary>

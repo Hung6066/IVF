@@ -31,6 +31,12 @@ public class FormFieldValueConfiguration : IEntityTypeConfiguration<FormFieldVal
             .HasForeignKey(v => v.FormFieldId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        // Configure Details collection navigation
+        builder.HasMany(v => v.Details)
+            .WithOne(d => d.FormFieldValue)
+            .HasForeignKey(d => d.FormFieldValueId)
+            .OnDelete(DeleteBehavior.Cascade);
+
         builder.HasIndex(v => new { v.FormResponseId, v.FormFieldId }).IsUnique();
 
         builder.HasQueryFilter(v => !v.IsDeleted);

@@ -1054,3 +1054,161 @@
                 width: 100px;
             }
         }
+
+        // ===== Conditional Logic Editor =====
+        .logic-controls {
+            margin-top: 12px;
+        }
+
+        .btn-logic-toggle {
+            width: 100%;
+            padding: 8px 12px;
+            background: #f1f5f9;
+            border: 1px dashed #cbd5e1;
+            color: #64748b;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.2s;
+            text-align: left;
+        }
+
+        .btn-logic-toggle:hover {
+            background: #e2e8f0;
+            color: #475569;
+        }
+
+        .btn-logic-toggle.active {
+            border-style: solid;
+            border-color: #667eea;
+            background: #eff6ff;
+            color: #1e40af;
+        }
+
+        .logic-editor {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 12px;
+            margin-top: 8px;
+            animation: fadeIn 0.2s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-5px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .logic-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+            font-size: 13px;
+            color: #334155;
+
+            select {
+                width: auto;
+                padding: 4px 8px;
+                border: 1px solid #cbd5e1;
+                border-radius: 4px;
+                background: white;
+                font-weight: 600;
+                color: #0f172a;
+            }
+        }
+
+        .logic-operator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+            font-size: 13px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #e2e8f0;
+
+            select {
+                width: auto;
+                padding: 4px 8px;
+                border: 1px solid #cbd5e1;
+                border-radius: 4px;
+                background: white;
+            }
+        }
+
+        .conditions-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .condition-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 6px;
+        }
+
+        .condition-inputs {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .cond-field,
+        .cond-op,
+        .cond-val {
+            width: 100%;
+            padding: 6px;
+            border: 1px solid #cbd5e1;
+            border-radius: 4px;
+            font-size: 12px;
+            background: white;
+        }
+
+        .remove-cond-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 4px;
+            opacity: 0.6;
+            margin-top: 4px;
+        }
+
+        .remove-cond-btn:hover {
+            opacity: 1;
+        }
+
+        .add-cond-btn {
+            width: 100%;
+            padding: 6px;
+            background: white;
+            border: 1px dashed #cbd5e1;
+            color: #667eea;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .add-cond-btn:hover {
+            border-color: #667eea;
+            background: #eff6ff;
+        }
+
+        .warning-text {
+            display: block;
+            margin-top: 8px;
+            color: #fbbf24;
+            font-size: 11px;
+            font-style: italic;
+        }

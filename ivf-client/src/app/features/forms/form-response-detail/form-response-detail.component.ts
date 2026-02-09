@@ -103,14 +103,36 @@ export class FormResponseDetailComponent implements OnInit {
         switch (field.fieldType) {
             case 10: // Radio
             case 8:  // Dropdown
+                // Prioritize Details (Normalized Data)
+                if (fv.details && fv.details.length > 0) {
+                    const detail = fv.details[0];
+                    if (detail.conceptId) {
+                        // We don't have code/display in detail yet, just label. 
+                        // If we want code, we'd need to fetch concept or store it in detail.
+                        // For now, just label is better than nothing.
+                        return detail.label || detail.value;
+                    }
+                    return detail.label || detail.value;
+                }
+
                 const val = fv.textValue;
                 if (!val) return '-';
                 // Try to find label for the value
                 const options = getOptions();
                 const option = options.find(o => o.value === val);
-                return option ? option.label : val;
+                const label = option ? option.label : val;
+
+                const conceptInfo = this.getConceptInfo(field, val);
+                if (conceptInfo?.code) {
+                    return `${label} <span class="concept-badge-small" title="${conceptInfo.display || ''}">[${conceptInfo.code}]</span>`;
+                }
+                return label;
 
             case 9: // MultiSelect
+                if (fv.details && fv.details.length > 0) {
+                    return fv.details.map(d => d.label || d.value).join(', ');
+                }
+
                 if (fv.jsonValue) {
                     try {
                         const selectedValues = JSON.parse(fv.jsonValue);
@@ -130,22 +152,63 @@ export class FormResponseDetailComponent implements OnInit {
                 return '-';
 
             case 11: // Checkbox
+                // Check if this is a checkbox group (has details or jsonValue array)
+                if (fv.details && fv.details.length > 0) {
+                    return fv.details.map(d => d.label || d.value).join(', ');
+                }
+
+                if (fv.jsonValue) {
+                    try {
+                        const selectedValues = JSON.parse(fv.jsonValue);
+                        if (Array.isArray(selectedValues) && selectedValues.length > 0) {
+                            const opts = getOptions();
+                            const labels = selectedValues.map(v => {
+                                const opt = opts.find(o => o.value === v);
+                                return opt ? opt.label : v;
+                            });
+                            return labels.join(', ');
+                        }
+                    } catch {
+                        // Not JSON, fall through to boolean
+                    }
+                }
+
+                // Single boolean checkbox
                 if (fv.booleanValue !== null && fv.booleanValue !== undefined) {
                     return fv.booleanValue ? 'Có' : 'Không';
                 }
                 return '-';
 
             case 16: // Tags
-                // Allow fallback to text if HTML rendering fails or is not used
-                if (fv.textValue) return fv.textValue;
+                // Prioritize details (normalized data with concept info)
+                if (fv.details && fv.details.length > 0) {
+                    return fv.details.map(d => {
+                        const label = d.label || d.value;
+                        if (d.conceptId) {
+                            return `🏷️ ${label}`;
+                        }
+                        return `🏷️ ${label}`;
+                    }).join(' ');
+                }
+
+                // Fallback to jsonValue
                 if (fv.jsonValue) {
                     try {
-                        const data = JSON.parse(fv.jsonValue);
-                        return data.text || fv.jsonValue;
+                        const tagValues = JSON.parse(fv.jsonValue);
+                        if (Array.isArray(tagValues) && tagValues.length > 0) {
+                            const opts = getOptions();
+                            const labels = tagValues.map(v => {
+                                const opt = opts.find(o => o.value === v);
+                                return opt ? opt.label : v;
+                            });
+                            return labels.map(l => `🏷️ ${l}`).join(' ');
+                        }
                     } catch {
                         return fv.jsonValue;
                     }
                 }
+
+                if (fv.textValue) return fv.textValue;
                 return '-';
 
             case 5: // Date
@@ -173,13 +236,29 @@ export class FormResponseDetailComponent implements OnInit {
         const fv = this.fieldValuesMap.get(field.id);
         if (!fv) return '-';
 
+        // Use Normalized Details if available
+        if (fv.details && fv.details.length > 0) {
+            return fv.details.map(d => `<span class="tag-badge">🏷️ ${d.label || d.value}</span>`).join(' ');
+        }
+
         // Check jsonValue (structure: { text, tagIds, html })
         // Check textValue (fallback for older submissions or if jsonValue failed)
         let jsonData = fv.jsonValue || fv.textValue;
 
         if (!jsonData) return '-';
 
-        // If it looks like JSON, parse it
+        // If it looks like JSON array (old logic might result in array string)
+        if (jsonData.trim().startsWith('[')) {
+            try {
+                const arr = JSON.parse(jsonData);
+                if (Array.isArray(arr)) {
+                    // It's a string array of tags
+                    return arr.map(t => `<span class="tag-badge">🏷️ ${t}</span>`).join(' ');
+                }
+            } catch { }
+        }
+
+        // If it looks like JSON object (legacy implementation reference?)
         if (jsonData.trim().startsWith('{')) {
             try {
                 const data = JSON.parse(jsonData);
@@ -217,5 +296,21 @@ export class FormResponseDetailComponent implements OnInit {
 
     print() {
         window.print();
+    }
+
+    getConceptInfo(field: FormField, value: string): { code?: string; display?: string } | null {
+        try {
+            const options = field.optionsJson ? JSON.parse(field.optionsJson) : [];
+            const option = options.find((o: any) => o.value === value);
+            if (option && option.conceptCode) {
+                return {
+                    code: option.conceptCode,
+                    display: option.conceptDisplay
+                };
+            }
+            return null;
+        } catch {
+            return null;
+        }
     }
 }
