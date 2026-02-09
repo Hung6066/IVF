@@ -1,6 +1,7 @@
 using IVF.Application.Common.Interfaces;
 using IVF.Infrastructure.Persistence;
 using IVF.Infrastructure.Repositories;
+using IVF.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -61,16 +62,19 @@ public static class DependencyInjection
         services.AddScoped<INotificationService, Services.NotificationService>();
         services.AddScoped<IFlowSeeder, FlowSeeder>();
 
+        // Partition Maintenance (auto-creates future partitions)
+        services.AddHostedService<PartitionMaintenanceService>();
+
         // Redis Configuration (High-Performance Matcher Cache)
         var redisConnectionString = configuration.GetConnectionString("Redis") ?? "localhost:6379";
-        
+
         // Ensure abortConnect=false so app starts even if Redis is down
         if (!redisConnectionString.Contains("abortConnect=", StringComparison.OrdinalIgnoreCase))
         {
             redisConnectionString += ",abortConnect=false";
         }
 
-        try 
+        try
         {
             var multiplexer = StackExchange.Redis.ConnectionMultiplexer.Connect(redisConnectionString);
             services.AddSingleton<StackExchange.Redis.IConnectionMultiplexer>(multiplexer);

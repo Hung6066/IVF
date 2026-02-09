@@ -22,7 +22,7 @@ public class FormFieldValueDetailConfiguration : IEntityTypeConfiguration<FormFi
         builder.HasOne(d => d.FormFieldValue)
             .WithMany(p => p.Details)
             .HasForeignKey(d => d.FormFieldValueId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .OnDelete(DeleteBehavior.Restrict);
 
         // Optional relationship to Concept
         // assuming Concept entity exists and has Id

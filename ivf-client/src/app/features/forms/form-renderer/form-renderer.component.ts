@@ -243,7 +243,7 @@ export class FormRendererComponent implements OnInit, OnDestroy, AfterViewInit {
                 let html = '';
                 data.forEach((item: any) => {
                     const tagValue = typeof item === 'string' ? item : item.value;
-                    const opt = options.find(o => o.value === tagValue);
+                    const opt = options.find(o => o.value === tagValue) || options.find(o => (o as any).conceptId === tagValue);
                     const label = opt?.label || tagValue;
                     const conceptId = (opt as any)?.conceptId || (typeof item === 'object' ? item.conceptId : null);
 
@@ -654,25 +654,32 @@ export class FormRendererComponent implements OnInit, OnDestroy, AfterViewInit {
                     break;
                 case FieldType.Tags:
                     // Tags value is stored as JSON: {text, tagIds, mentions} or just an array
+                    let parsed: any = null;
                     let tags: string[] = [];
-                    try {
-                        const parsed = typeof value === 'string' ? JSON.parse(value) : value;
 
-                        console.log('Tags field parsed value:', parsed);
+                    try {
+                        parsed = typeof value === 'string' ? JSON.parse(value) : value;
 
                         if (Array.isArray(parsed)) {
-                            // Simple array format
                             tags = parsed;
+                            // If it's a simple array, we construct a simple JSON value
+                            fieldValue.jsonValue = JSON.stringify(tags);
                         } else if (parsed && parsed.tagIds && Array.isArray(parsed.tagIds)) {
-                            // Mention data format: {text, tagIds, mentions}
                             tags = parsed.tagIds;
+                            // Critical: Save the FULL object to preserve text/html context (remark)
+                            fieldValue.jsonValue = typeof value === 'string' ? value : JSON.stringify(parsed);
+
+                            // Also save plain text to TextValue for searchability
+                            if (parsed.text) {
+                                fieldValue.textValue = parsed.text;
+                            }
                         } else if (parsed) {
-                            // Single value
                             tags = [parsed];
+                            fieldValue.jsonValue = JSON.stringify(tags);
                         }
                     } catch (e) {
                         console.error('Error parsing Tags value:', e);
-                        tags = [];
+                        fieldValue.jsonValue = JSON.stringify([]);
                     }
 
                     // Ensure tags is always an array before using forEach
@@ -680,17 +687,12 @@ export class FormRendererComponent implements OnInit, OnDestroy, AfterViewInit {
                         tags = [];
                     }
 
-                    console.log('Tags array:', tags);
-
                     const tagOptions = this.getOptions(field);
-                    console.log('Tag options:', tagOptions);
-                    console.log('Tag options detailed:', JSON.stringify(tagOptions, null, 2));
 
-                    // Tags array contains concept IDs, not option values
-                    // We need to look up by conceptId to get the option value and label
-                    tags.forEach(tagConceptId => {
-                        const opt = tagOptions.find(o => (o as any).conceptId === tagConceptId);
-                        console.log(`Looking for conceptId "${tagConceptId}", found:`, opt);
+                    tags.forEach(t => {
+                        // Look up by VALUE or CONCEPT ID (to handle legacy data)
+                        const opt = tagOptions.find(o => o.value === t) || tagOptions.find(o => (o as any).conceptId === t);
+
                         if (opt) {
                             details.push({
                                 value: opt.value,
@@ -698,16 +700,11 @@ export class FormRendererComponent implements OnInit, OnDestroy, AfterViewInit {
                                 conceptId: (opt as any).conceptId
                             });
                         } else {
-                            // Fallback if concept not found in options
-                            details.push({ value: tagConceptId, label: tagConceptId });
+                            // Fallback for values not in options (or if tag is raw text/guid)
+                            details.push({ value: t, label: t });
                         }
                     });
 
-                    // Store the option values (not concept IDs) in jsonValue
-                    const optionValues = details.map(d => d.value);
-                    fieldValue.jsonValue = JSON.stringify(optionValues);
-
-                    console.log('Tags details:', details);
                     break;
                 case FieldType.Dropdown:
                 case FieldType.Radio:

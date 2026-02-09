@@ -69,7 +69,10 @@ public class FormFieldValue : BaseEntity
 
     public void ClearDetails()
     {
-        Details.Clear();
+        foreach (var detail in Details)
+        {
+            detail.MarkAsDeleted();
+        }
     }
 
     /// <summary>

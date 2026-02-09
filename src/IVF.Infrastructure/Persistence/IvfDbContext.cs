@@ -50,9 +50,10 @@ public class IvfDbContext : DbContext
     public DbSet<FormField> FormFields => Set<FormField>();
     public DbSet<FormResponse> FormResponses => Set<FormResponse>();
     public DbSet<FormFieldValue> FormFieldValues => Set<FormFieldValue>();
+    public DbSet<FormFieldValueDetail> FormFieldValueDetails => Set<FormFieldValueDetail>();
     public DbSet<FormFieldOption> FormFieldOptions => Set<FormFieldOption>();
     public DbSet<ReportTemplate> ReportTemplates => Set<ReportTemplate>();
-    
+
     // Medical Concept Library
     public DbSet<Concept> Concepts => Set<Concept>();
     public DbSet<ConceptMapping> ConceptMappings => Set<ConceptMapping>();

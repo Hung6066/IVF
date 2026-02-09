@@ -555,14 +555,14 @@ public class FormResponseCommandsHandler :
 
         // Update existing field values or add new ones
         var existingValues = response.FieldValues.ToDictionary(fv => fv.FormFieldId);
-        
+
         foreach (var fv in request.FieldValues)
         {
             if (existingValues.TryGetValue(fv.FormFieldId, out var existing))
             {
                 // Update existing value
                 existing.Update(fv.TextValue, fv.NumericValue, fv.DateValue, fv.BooleanValue, fv.JsonValue);
-                
+
                 // Update details: Clear and re-add (simpler than syncing)
                 existing.ClearDetails();
                 if (fv.Details != null && fv.Details.Any())
@@ -643,7 +643,8 @@ public class FormResponseCommandsHandler :
         r.SubmittedAt,
         r.FieldValues?.Select(v => new FormFieldValueDto(
             v.Id, v.FormFieldId, v.FormField?.FieldKey, v.FormField?.Label,
-            v.TextValue, v.NumericValue, v.DateValue, v.BooleanValue, v.JsonValue)).ToList());
+            v.TextValue, v.NumericValue, v.DateValue, v.BooleanValue, v.JsonValue,
+            v.Details?.Select(d => new FormFieldValueDetailDto(d.Value, d.Label, d.ConceptId)).ToList())).ToList());
 }
 
 public class ReportTemplateCommandsHandler :

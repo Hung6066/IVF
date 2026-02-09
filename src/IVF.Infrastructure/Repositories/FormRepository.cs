@@ -246,7 +246,7 @@ public class FormRepository : IFormRepository
     public async Task<FormResponse> AddResponseAsync(FormResponse response, CancellationToken ct = default)
     {
         _context.FormResponses.Add(response);
-        
+
         // Explicitly ensure Details are tracked by EF Core
         foreach (var fieldValue in response.FieldValues)
         {
@@ -255,7 +255,7 @@ public class FormRepository : IFormRepository
                 _context.Entry(detail).State = EntityState.Added;
             }
         }
-        
+
         await _context.SaveChangesAsync(ct);
         return response;
     }
@@ -263,14 +263,54 @@ public class FormRepository : IFormRepository
     public async Task UpdateResponseAsync(FormResponse response, CancellationToken ct = default)
     {
         _context.FormResponses.Update(response);
+
+        // Handle details: soft-deleted ones stay Modified, new ones must be Added
+        foreach (var fieldValue in response.FieldValues)
+        {
+            if (fieldValue.Details != null)
+            {
+                foreach (var detail in fieldValue.Details)
+                {
+                    var entry = _context.Entry(detail);
+                    if (detail.IsDeleted)
+                    {
+                        // Existing detail that was soft-deleted — mark as Modified
+                        entry.State = EntityState.Modified;
+                    }
+                    else if (entry.State == EntityState.Detached || entry.State == EntityState.Modified)
+                    {
+                        // New detail added after ClearDetails — mark as Added
+                        // Check if it already exists in the database
+                        var existsInDb = await _context.FormFieldValueDetails
+                            .IgnoreQueryFilters()
+                            .AnyAsync(d => d.Id == detail.Id, ct);
+                        entry.State = existsInDb ? EntityState.Modified : EntityState.Added;
+                    }
+                }
+            }
+        }
+
         await _context.SaveChangesAsync(ct);
     }
 
     public async Task DeleteResponseAsync(Guid id, CancellationToken ct = default)
     {
-        var response = await _context.FormResponses.FindAsync(new object[] { id }, ct);
+        var response = await _context.FormResponses
+            .Include(r => r.FieldValues)
+                .ThenInclude(v => v.Details)
+            .FirstOrDefaultAsync(r => r.Id == id, ct);
+
         if (response != null)
         {
+            // Cascade soft delete to field values and their details
+            foreach (var fieldValue in response.FieldValues)
+            {
+                foreach (var detail in fieldValue.Details)
+                {
+                    detail.MarkAsDeleted();
+                }
+                fieldValue.MarkAsDeleted();
+            }
             response.MarkAsDeleted();
             await _context.SaveChangesAsync(ct);
         }

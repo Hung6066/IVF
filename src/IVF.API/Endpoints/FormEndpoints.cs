@@ -145,7 +145,8 @@ public static class FormEndpoints
         group.MapPost("/responses", async (SubmitFormResponseRequest req, IMediator m) =>
         {
             var fieldValues = req.FieldValues.Select(v => new FormFieldValueDto(
-                null, v.FormFieldId, null, null, v.TextValue, v.NumericValue, v.DateValue, v.BooleanValue, v.JsonValue)).ToList();
+                null, v.FormFieldId, null, null, v.TextValue, v.NumericValue, v.DateValue, v.BooleanValue, v.JsonValue,
+                v.Details?.Select(d => new FormFieldValueDetailDto(d.Value, d.Label, d.ConceptId)).ToList())).ToList();
 
             var r = await m.Send(new SubmitFormResponseCommand(req.FormTemplateId, req.SubmittedByUserId, req.PatientId, req.CycleId, fieldValues));
             return r.IsSuccess ? Results.Created($"/api/forms/responses/{r.Value!.Id}", r.Value) : Results.BadRequest(r.Error);
@@ -155,7 +156,8 @@ public static class FormEndpoints
         group.MapPut("/responses/{id:guid}", async (Guid id, SubmitFormResponseRequest req, IMediator m) =>
         {
             var fieldValues = req.FieldValues.Select(v => new FormFieldValueDto(
-                null, v.FormFieldId, null, null, v.TextValue, v.NumericValue, v.DateValue, v.BooleanValue, v.JsonValue)).ToList();
+                null, v.FormFieldId, null, null, v.TextValue, v.NumericValue, v.DateValue, v.BooleanValue, v.JsonValue,
+                v.Details?.Select(d => new FormFieldValueDetailDto(d.Value, d.Label, d.ConceptId)).ToList())).ToList();
 
             var r = await m.Send(new UpdateFormResponseCommand(id, fieldValues));
             return r.IsSuccess ? Results.Ok(r.Value) : Results.NotFound(r.Error);
@@ -259,7 +261,11 @@ public record SubmitFormResponseRequest(
 
 public record FieldValueRequest(
     Guid FormFieldId, string? TextValue, decimal? NumericValue,
-    DateTime? DateValue, bool? BooleanValue, string? JsonValue);
+    DateTime? DateValue, bool? BooleanValue, string? JsonValue,
+    List<FieldValueDetailRequest>? Details = null);
+
+public record FieldValueDetailRequest(
+    string Value, string? Label = null, Guid? ConceptId = null);
 
 public record UpdateResponseStatusRequest(ResponseStatus NewStatus, string? Notes);
 
