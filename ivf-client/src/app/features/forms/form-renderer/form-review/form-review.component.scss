@@ -1,0 +1,145 @@
+:host {
+  display: block;
+}
+
+.review-section {
+  padding: 24px;
+
+  .review-header {
+    text-align: center;
+    margin-bottom: 24px;
+
+    h3 {
+      font-size: 22px;
+      font-weight: 700;
+      color: #1e293b;
+      margin: 0 0 4px;
+    }
+
+    p {
+      font-size: 14px;
+      color: #64748b;
+      margin: 0;
+    }
+  }
+
+  .review-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+
+    .review-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      padding: 14px 16px;
+      border-bottom: 1px solid #f1f5f9;
+      gap: 16px;
+
+      &:last-child {
+        border-bottom: none;
+      }
+
+      .review-label {
+        font-size: 13px;
+        font-weight: 600;
+        color: #64748b;
+        min-width: 140px;
+        flex-shrink: 0;
+      }
+
+      .review-value {
+        font-size: 14px;
+        color: #1e293b;
+        text-align: right;
+        word-break: break-word;
+        flex: 1;
+      }
+    }
+  }
+
+  .review-actions {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 1px solid #e2e8f0;
+  }
+}
+
+.btn {
+  padding: 12px 32px;
+  border: none;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s;
+}
+
+.btn-outline {
+  background: white;
+  color: #667eea;
+  border: 1px solid #667eea;
+
+  &:hover {
+    background: #eff3ff;
+  }
+}
+
+// ===== Responsive =====
+@media (max-width: 768px) {
+  .review-section {
+    padding: 16px;
+
+    .review-header {
+      margin-bottom: 16px;
+
+      h3 {
+        font-size: 18px;
+      }
+
+      p {
+        font-size: 13px;
+      }
+    }
+
+    .review-list .review-item {
+      flex-direction: column;
+      gap: 4px;
+      padding: 12px;
+
+      .review-label {
+        min-width: 0;
+        font-size: 12px;
+      }
+
+      .review-value {
+        text-align: left;
+        font-size: 13px;
+      }
+    }
+
+    .review-actions {
+      flex-direction: column;
+
+      .btn {
+        width: 100%;
+        justify-content: center;
+      }
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .review-section {
+    padding: 12px;
+
+    .review-list .review-item {
+      padding: 10px 8px;
+    }
+  }
+}

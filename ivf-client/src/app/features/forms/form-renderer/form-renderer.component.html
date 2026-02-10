@@ -9,46 +9,17 @@
       </div>
 
       <!-- Patient context bar -->
-      <div class="patient-context-bar">
-        @if (selectedPatient) {
-          <div class="patient-selected">
-            <span class="patient-icon">👤</span>
-            <div class="patient-info">
-              <strong>{{ selectedPatient.fullName }}</strong>
-              <span class="patient-code">{{ selectedPatient.patientCode }}</span>
-            </div>
-            @if (linkedData.length > 0) {
-              <span class="linked-count" title="Số trường được tự động điền từ form khác">
-                🔗 {{ linkedData.length }} liên kết
-              </span>
-            }
-            <button type="button" class="btn-change-patient" (click)="clearPatient()">Đổi BN</button>
-          </div>
-        } @else {
-          <div class="patient-search">
-            <span class="search-icon">🔍</span>
-            <input
-              type="text"
-              class="patient-search-input"
-              [value]="patientSearchQuery"
-              (input)="onPatientSearchInput($any($event.target).value)"
-              (blur)="hidePatientDropdown()"
-              placeholder="Tìm bệnh nhân (mã, tên, SĐT)..."
-            />
-            @if (showPatientDropdown && patientSearchResults.length > 0) {
-              <div class="patient-dropdown">
-                @for (p of patientSearchResults; track p.id) {
-                  <div class="patient-option" (mousedown)="selectPatient(p)">
-                    <span class="option-name">{{ p.fullName }}</span>
-                    <span class="option-code">{{ p.patientCode }}</span>
-                  </div>
-                }
-              </div>
-            }
-          </div>
-          <span class="patient-hint">Chọn bệnh nhân để tự động liên kết dữ liệu từ các form khác</span>
-        }
-      </div>
+      <app-patient-context-bar
+        [selectedPatient]="selectedPatient"
+        [linkedData]="linkedData"
+        [patientSearchQuery]="patientSearchQuery"
+        [patientSearchResults]="patientSearchResults"
+        [showPatientDropdown]="showPatientDropdown"
+        (searchInput)="onPatientSearchInput($event)"
+        (patientSelected)="selectPatient($event)"
+        (patientCleared)="clearPatient()"
+        (dropdownHidden)="hidePatientDropdown()"
+      />
 
       <form [formGroup]="form" (ngSubmit)="submit()">
         <!-- Multi-page progress bar -->
@@ -78,535 +49,46 @@
         <div class="form-fields-grid">
           @for (field of isMultiPage ? currentPageFields : fields; track field.id) {
             @if (isFieldVisible(field.id)) {
-              <div
-                class="field-wrapper"
-                [class.has-error]="hasError(field.id)"
-                [style.grid-column]="'span ' + getFieldColSpan(field)"
-              >
-                @if (field.fieldType !== FieldType.Section && field.fieldType !== FieldType.Label) {
-                  <label class="field-label">
-                    {{ field.label }}
-                    @if (field.isRequired) {
-                      <span class="required">*</span>
-                    }
-                    @if (isLinkedField(field.id)) {
-                      <span
-                        class="linked-data-badge"
-                        [class.concept-link]="
-                          getLinkedDataInfo(field.id)?.conceptId &&
-                          getLinkedDataInfo(field.id)?.conceptId !==
-                            '00000000-0000-0000-0000-000000000000'
-                        "
-                        [class.config-link]="
-                          !getLinkedDataInfo(field.id)?.conceptId ||
-                          getLinkedDataInfo(field.id)?.conceptId ===
-                            '00000000-0000-0000-0000-000000000000'
-                        "
-                        [title]="
-                          (getLinkedDataInfo(field.id)?.conceptId &&
-                          getLinkedDataInfo(field.id)?.conceptId !==
-                            '00000000-0000-0000-0000-000000000000'
-                            ? '🧬 Auto-link (cùng concept) từ: '
-                            : '⚙️ Config-link từ: ') +
-                          getLinkedDataInfo(field.id)?.sourceFormName +
-                          ' (' +
-                          (getLinkedDataInfo(field.id)?.capturedAt | date: 'dd/MM/yyyy') +
-                          ')'
-                        "
-                      >
-                        {{
-                          getLinkedDataInfo(field.id)?.conceptId &&
-                          getLinkedDataInfo(field.id)?.conceptId !==
-                            '00000000-0000-0000-0000-000000000000'
-                            ? '🧬'
-                            : '⚙️'
-                        }}
-                        {{ getLinkedDataInfo(field.id)?.sourceFormName }}
-                        <button
-                          type="button"
-                          class="linked-clear-btn"
-                          (click)="clearLinkedValue(field.id)"
-                          title="Xóa giá trị liên kết"
-                        >
-                          ✕
-                        </button>
-                      </span>
-                    }
-                  </label>
-                }
-
-                @switch (field.fieldType) {
-                  @case (FieldType.Text) {
-                    <input
-                      type="text"
-                      [formControlName]="field.id"
-                      [placeholder]="field.placeholder || ''"
-                      [style.height]="getFieldHeight(field)"
-                      class="form-input"
-                    />
-                  }
-                  @case (FieldType.TextArea) {
-                    <textarea
-                      [formControlName]="field.id"
-                      [placeholder]="field.placeholder || ''"
-                      [style.height]="getFieldHeight(field)"
-                      [style.min-height]="getFieldHeight(field)"
-                      class="form-textarea"
-                    ></textarea>
-                  }
-                  @case (FieldType.Number) {
-                    <input
-                      type="number"
-                      [formControlName]="field.id"
-                      [placeholder]="field.placeholder || ''"
-                      class="form-input"
-                    />
-                  }
-                  @case (FieldType.Decimal) {
-                    <input
-                      type="number"
-                      step="0.01"
-                      [formControlName]="field.id"
-                      [placeholder]="field.placeholder || ''"
-                      class="form-input"
-                    />
-                  }
-                  @case (FieldType.Date) {
-                    <input type="date" [formControlName]="field.id" class="form-input" />
-                  }
-                  @case (FieldType.DateTime) {
-                    <input type="datetime-local" [formControlName]="field.id" class="form-input" />
-                  }
-                  @case (FieldType.Time) {
-                    <input type="time" [formControlName]="field.id" class="form-input" />
-                  }
-                  @case (FieldType.Dropdown) {
-                    <select [formControlName]="field.id" class="form-select">
-                      <option value="">-- Chọn --</option>
-                      @for (opt of getOptions(field); track opt.value) {
-                        <option [value]="opt.value">{{ opt.label }}</option>
-                      }
-                    </select>
-                  }
-                  @case (FieldType.MultiSelect) {
-                    <select [formControlName]="field.id" class="form-select" multiple>
-                      @for (opt of getOptions(field); track opt.value) {
-                        <option [value]="opt.value">{{ opt.label }}</option>
-                      }
-                    </select>
-                  }
-                  @case (FieldType.Radio) {
-                    <div class="radio-group">
-                      @for (opt of getOptions(field); track opt.value) {
-                        <label class="radio-option">
-                          <input type="radio" [formControlName]="field.id" [value]="opt.value" />
-                          <span>{{ opt.label }}</span>
-                        </label>
-                      }
-                    </div>
-                  }
-                  @case (FieldType.Checkbox) {
-                    @if (getOptions(field).length > 0) {
-                      <!-- Checkbox group with multiple options -->
-                      <div class="checkbox-group">
-                        @for (opt of getOptions(field); track opt.value) {
-                          <label class="checkbox-option">
-                            <input
-                              type="checkbox"
-                              [checked]="isCheckboxChecked(field.id, opt.value)"
-                              (change)="onCheckboxChange(field.id, opt.value, $event)"
-                            />
-                            <span>{{ opt.label }}</span>
-                          </label>
-                        }
-                      </div>
-                    } @else {
-                      <!-- Single boolean checkbox -->
-                      <label class="checkbox-option">
-                        <input type="checkbox" [formControlName]="field.id" />
-                        <span>{{ field.placeholder || field.label }}</span>
-                      </label>
-                    }
-                  }
-                  @case (FieldType.Rating) {
-                    <div class="rating-input">
-                      @for (star of [1, 2, 3, 4, 5]; track star) {
-                        <button
-                          type="button"
-                          class="star-btn"
-                          [class.active]="form.get(field.id)?.value >= star"
-                          (click)="setRating(field.id, star)"
-                        >
-                          ⭐
-                        </button>
-                      }
-                    </div>
-                  }
-                  @case (FieldType.Section) {
-                    <div class="section-header">
-                      <h3>{{ field.label }}</h3>
-                      @if (field.helpText) {
-                        <p>{{ field.helpText }}</p>
-                      }
-                    </div>
-                  }
-                  @case (FieldType.Label) {
-                    <div class="label-field">
-                      <p>{{ field.label }}</p>
-                    </div>
-                  }
-                  @case (FieldType.FileUpload) {
-                    <input
-                      type="file"
-                      (change)="onFileChange($event, field.id)"
-                      class="form-file"
-                    />
-                  }
-                  @case (FieldType.Tags) {
-                    <div class="mention-input-wrapper">
-                      <!-- Contenteditable div with inline tags -->
-                      <div
-                        class="mention-editor"
-                        #mentionEditor
-                        [id]="'mention-' + field.id"
-                        contenteditable="true"
-                        [attr.data-placeholder]="'Nhập text và gõ @ để chèn concept tag...'"
-                        (input)="onContentEditableInput(field, $event)"
-                        (keydown)="onContentEditableKeydown(field, $event)"
-                        (blur)="onMentionBlur(field.id)"
-                      ></div>
-
-                      <!-- Mention dropdown -->
-                      @if (showMentionDropdown && activeMentionFieldKey === field.id) {
-                        <div class="mention-dropdown">
-                          @for (concept of mentionSearchResults; track concept.id) {
-                            <div
-                              class="mention-dropdown-item"
-                              (mousedown)="insertMentionTag(field.id, concept)"
-                            >
-                              <span class="mention-code">{{ concept.code }}</span>
-                              <span class="mention-name">{{ concept.name }}</span>
-                            </div>
-                          }
-                          @if (mentionSearchResults.length === 0) {
-                            <div class="mention-dropdown-empty">Không tìm thấy concept</div>
-                          }
-                        </div>
-                      }
-                    </div>
-                  }
-                  @case (FieldType.Address) {
-                    <div class="address-field" [formGroupName]="field.id">
-                      @for (sub of getAddressSubFields(field); track sub.key) {
-                        <div
-                          class="address-subfield"
-                          [style.flex]="'0 0 calc(' + (sub.width || 100) + '% - 8px)'"
-                        >
-                          <small
-                            >{{ sub.label }}
-                            @if (sub.required) {
-                              <span class="required">*</span>
-                            }
-                          </small>
-                          <input
-                            type="text"
-                            [formControlName]="sub.key"
-                            [placeholder]="sub.label"
-                            class="form-input"
-                          />
-                        </div>
-                      }
-                    </div>
-                  }
-                  @case (FieldType.Hidden) {
-                    <!-- Hidden field: not visible to user -->
-                  }
-                  @case (FieldType.Slider) {
-                    <div class="slider-field">
-                      <input
-                        type="range"
-                        [formControlName]="field.id"
-                        [min]="getSliderConfig(field).min"
-                        [max]="getSliderConfig(field).max"
-                        [step]="getSliderConfig(field).step"
-                        class="form-slider"
-                        (input)="onSliderChange(field.id, $event)"
-                      />
-                      <div class="slider-labels">
-                        <span>{{ getSliderConfig(field).min }}</span>
-                        <strong class="slider-value">{{
-                          getSliderDisplayValue(field.id, field)
-                        }}</strong>
-                        <span>{{ getSliderConfig(field).max }}</span>
-                      </div>
-                    </div>
-                  }
-                  @case (FieldType.Calculated) {
-                    <div class="calculated-field">
-                      <div class="calculated-value">
-                        🧮 {{ form.get(field.id)?.value || 'Đang tính...' }}
-                      </div>
-                    </div>
-                  }
-                  @case (FieldType.RichText) {
-                    <div
-                      class="richtext-field"
-                      contenteditable="true"
-                      [innerHTML]="form.get(field.id)?.value || ''"
-                      (input)="form.get(field.id)?.setValue($any($event.target).innerHTML)"
-                      [attr.data-placeholder]="field.placeholder || 'Nhập nội dung...'"
-                      class="form-richtext"
-                    ></div>
-                  }
-                  @case (FieldType.Signature) {
-                    <div class="signature-field">
-                      <canvas
-                        [id]="'sig-' + field.id"
-                        width="400"
-                        height="150"
-                        class="signature-canvas"
-                        (mousedown)="initSignatureCanvas(field.id)"
-                      ></canvas>
-                      <div class="signature-actions">
-                        <button
-                          type="button"
-                          class="btn-clear-sig"
-                          (click)="clearSignature(field.id)"
-                        >
-                          🗑️ Xóa chữ ký
-                        </button>
-                        @if (form.get(field.id)?.value) {
-                          <span class="sig-status">✅ Đã ký</span>
-                        }
-                      </div>
-                    </div>
-                  }
-                  @case (FieldType.Lookup) {
-                    <div class="lookup-field">
-                      <div class="lookup-input-wrapper">
-                        <input
-                          type="text"
-                          class="form-input"
-                          [(ngModel)]="lookupSearchQueries[field.id]"
-                          [ngModelOptions]="{ standalone: true }"
-                          (input)="searchLookupOptions(field)"
-                          (focus)="activeLookupFieldId = field.id; searchLookupOptions(field)"
-                          (blur)="activeLookupFieldId = ''"
-                          [placeholder]="field.placeholder || '🔍 Tìm kiếm...'"
-                        />
-                        @if (
-                          activeLookupFieldId === field.id && lookupSearchResults[field.id]?.length
-                        ) {
-                          <div class="lookup-dropdown">
-                            @for (opt of lookupSearchResults[field.id]; track opt.value) {
-                              <div
-                                class="lookup-option"
-                                (mousedown)="selectLookupOption(field.id, opt)"
-                              >
-                                {{ opt.label }}
-                              </div>
-                            }
-                          </div>
-                        }
-                      </div>
-                      @if (form.get(field.id)?.value) {
-                        <div class="lookup-selected">✅ {{ getLookupDisplayLabel(field) }}</div>
-                      }
-                    </div>
-                  }
-                  @case (FieldType.Repeater) {
-                    <div class="repeater-field" [attr.data-init]="initRepeater(field)">
-                      <table class="repeater-table">
-                        <thead>
-                          <tr>
-                            @for (col of getRepeaterConfig(field).fields; track col.key) {
-                              <th>{{ col.label }}</th>
-                            }
-                            <th style="width: 40px"></th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          @for (
-                            row of repeaterRows[field.id] || [];
-                            track $index;
-                            let ri = $index
-                          ) {
-                            <tr>
-                              @for (col of getRepeaterConfig(field).fields; track col.key) {
-                                <td>
-                                  @if (col.type === 'number') {
-                                    <input
-                                      type="number"
-                                      [(ngModel)]="$any(row)[col.key]"
-                                      [ngModelOptions]="{ standalone: true }"
-                                      (input)="onRepeaterCellChange(field.id)"
-                                      class="form-input"
-                                    />
-                                  } @else if (col.type === 'date') {
-                                    <input
-                                      type="date"
-                                      [(ngModel)]="$any(row)[col.key]"
-                                      [ngModelOptions]="{ standalone: true }"
-                                      (input)="onRepeaterCellChange(field.id)"
-                                      class="form-input"
-                                    />
-                                  } @else {
-                                    <input
-                                      type="text"
-                                      [(ngModel)]="$any(row)[col.key]"
-                                      [ngModelOptions]="{ standalone: true }"
-                                      (input)="onRepeaterCellChange(field.id)"
-                                      class="form-input"
-                                    />
-                                  }
-                                </td>
-                              }
-                              <td>
-                                <button
-                                  type="button"
-                                  class="btn-remove-row"
-                                  (click)="removeRepeaterRow(field, ri)"
-                                  title="Xóa dòng"
-                                >
-                                  🗑️
-                                </button>
-                              </td>
-                            </tr>
-                          }
-                        </tbody>
-                      </table>
-                      @if (
-                        (repeaterRows[field.id]?.length || 0) < getRepeaterConfig(field).maxRows
-                      ) {
-                        <button type="button" class="btn-add-row" (click)="addRepeaterRow(field)">
-                          + Thêm dòng
-                        </button>
-                      }
-                    </div>
-                  }
-                }
-
-                @if (field.helpText && field.fieldType !== FieldType.Section) {
-                  <small class="help-text">{{ field.helpText }}</small>
-                }
-
-                @if (hasError(field.id)) {
-                  @for (err of getFieldErrors(field.id); track err) {
-                    <small class="error-text">{{ err }}</small>
-                  }
-                }
-              </div>
+              <app-field-input
+                [field]="field"
+                [form]="form"
+                [isLinked]="isLinkedField(field.id)"
+                [linkedDataInfo]="getLinkedDataInfo(field.id)"
+                (fileChanged)="onFieldFileChanged($event)"
+                (linkedValueCleared)="clearLinkedValue($event)"
+              />
             }
           }
         </div>
 
         <!-- Entry Preview / Review Step -->
         @if (showReview) {
-          <div class="review-section">
-            <div class="review-header">
-              <h3>📋 Xem lại câu trả lời</h3>
-              <p>Kiểm tra lại trước khi gửi</p>
-            </div>
-            <div class="review-list">
-              @for (field of getReviewFields(); track field.id) {
-                <div class="review-item">
-                  <div class="review-label">{{ field.label }}</div>
-                  <div class="review-value">{{ getReviewDisplayValue(field) }}</div>
-                </div>
-              }
-            </div>
-            <div class="review-actions">
-              <button type="button" class="btn btn-outline" (click)="showReview = false">
-                ← Chỉnh sửa
-              </button>
-            </div>
-          </div>
+          <app-form-review
+            [fields]="fields"
+            [form]="form"
+            [fileValues]="fileValues"
+            (editClicked)="showReview = false"
+          />
         }
 
-        <div class="form-actions">
-          <!-- Auto-save status -->
-          <div class="auto-save-status">
-            @if (autoSaveEnabled && !isEditMode) {
-              @switch (autoSaveStatus) {
-                @case ('saving') {
-                  <span class="save-indicator saving">💾 Đang lưu...</span>
-                }
-                @case ('saved') {
-                  <span class="save-indicator saved">✅ Đã lưu nháp</span>
-                }
-                @case ('error') {
-                  <span class="save-indicator error">⚠️ Lỗi lưu nháp</span>
-                }
-              }
-              @if (lastAutoSavedAt) {
-                <button
-                  type="button"
-                  class="btn-clear-draft"
-                  (click)="clearDraft()"
-                  title="Xóa bản nháp"
-                >
-                  🗑️ Xóa nháp
-                </button>
-              }
-            }
-          </div>
-
-          <!-- Multi-page navigation -->
-          @if (isMultiPage) {
-            <button type="button" class="btn btn-secondary" (click)="cancel()">Hủy</button>
-            @if (!isEditMode) {
-              <button
-                type="button"
-                class="btn btn-draft"
-                (click)="saveDraftToDb()"
-                [disabled]="isSubmitting"
-              >
-                💾 Lưu nháp
-              </button>
-            }
-            @if (!isFirstPage) {
-              <button type="button" class="btn btn-outline" (click)="prevPage()">
-                ← Trang trước
-              </button>
-            }
-            @if (!isLastPage) {
-              <button type="button" class="btn btn-primary" (click)="nextPage()">
-                Trang tiếp →
-              </button>
-            } @else {
-              <button type="button" class="btn btn-info" (click)="toggleReview()">
-                {{ showReview ? '← Chỉnh sửa' : '📋 Xem lại' }}
-              </button>
-              <button type="submit" class="btn btn-primary" [disabled]="isSubmitting">
-                @if (isSubmitting) {
-                  <span class="spinner"></span>
-                }
-                Gửi phản hồi
-              </button>
-            }
-          } @else {
-            <button type="button" class="btn btn-secondary" (click)="cancel()">Hủy</button>
-            @if (!isEditMode) {
-              <button
-                type="button"
-                class="btn btn-draft"
-                (click)="saveDraftToDb()"
-                [disabled]="isSubmitting"
-              >
-                💾 Lưu nháp
-              </button>
-            }
-            <button type="button" class="btn btn-info" (click)="toggleReview()">
-              {{ showReview ? '← Chỉnh sửa' : '📋 Xem lại' }}
-            </button>
-            <button type="submit" class="btn btn-primary" [disabled]="isSubmitting">
-              @if (isSubmitting) {
-                <span class="spinner"></span>
-              }
-              Gửi phản hồi
-            </button>
-          }
-        </div>
+        <app-form-actions-bar
+          [isMultiPage]="isMultiPage"
+          [isFirstPage]="isFirstPage"
+          [isLastPage]="isLastPage"
+          [isEditMode]="isEditMode"
+          [isSubmitting]="isSubmitting"
+          [showReview]="showReview"
+          [autoSaveEnabled]="autoSaveEnabled"
+          [autoSaveStatus]="autoSaveStatus"
+          [lastAutoSavedAt]="lastAutoSavedAt"
+          (cancelClicked)="cancel()"
+          (saveDraftClicked)="saveDraftToDb()"
+          (prevPageClicked)="prevPage()"
+          (nextPageClicked)="nextPage()"
+          (toggleReviewClicked)="toggleReview()"
+          (clearDraftClicked)="clearDraft()"
+          (submitClicked)="submit()"
+        />
       </form>
     </div>
   } @else {

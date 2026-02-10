@@ -1,0 +1,94 @@
+<div class="form-actions">
+  <!-- Auto-save status -->
+  <div class="auto-save-status">
+    @if (autoSaveEnabled && !isEditMode) {
+      @switch (autoSaveStatus) {
+        @case ('saving') {
+          <span class="save-indicator saving">💾 Đang lưu...</span>
+        }
+        @case ('saved') {
+          <span class="save-indicator saved">✅ Đã lưu nháp</span>
+        }
+        @case ('error') {
+          <span class="save-indicator error">⚠️ Lỗi lưu nháp</span>
+        }
+      }
+      @if (lastAutoSavedAt) {
+        <button
+          type="button"
+          class="btn-clear-draft"
+          (click)="clearDraftClicked.emit()"
+          title="Xóa bản nháp"
+        >
+          🗑️ Xóa nháp
+        </button>
+      }
+    }
+  </div>
+
+  <!-- Multi-page navigation -->
+  @if (isMultiPage) {
+    <button type="button" class="btn btn-secondary" (click)="cancelClicked.emit()">Hủy</button>
+    @if (!isEditMode) {
+      <button
+        type="button"
+        class="btn btn-draft"
+        (click)="saveDraftClicked.emit()"
+        [disabled]="isSubmitting"
+      >
+        💾 Lưu nháp
+      </button>
+    }
+    @if (!isFirstPage) {
+      <button type="button" class="btn btn-outline" (click)="prevPageClicked.emit()">
+        ← Trang trước
+      </button>
+    }
+    @if (!isLastPage) {
+      <button type="button" class="btn btn-primary" (click)="nextPageClicked.emit()">
+        Trang tiếp →
+      </button>
+    } @else {
+      <button type="button" class="btn btn-info" (click)="toggleReviewClicked.emit()">
+        {{ showReview ? '← Chỉnh sửa' : '📋 Xem lại' }}
+      </button>
+      <button
+        type="submit"
+        class="btn btn-primary"
+        [disabled]="isSubmitting"
+        (click)="submitClicked.emit()"
+      >
+        @if (isSubmitting) {
+          <span class="spinner"></span>
+        }
+        Gửi phản hồi
+      </button>
+    }
+  } @else {
+    <button type="button" class="btn btn-secondary" (click)="cancelClicked.emit()">Hủy</button>
+    @if (!isEditMode) {
+      <button
+        type="button"
+        class="btn btn-draft"
+        (click)="saveDraftClicked.emit()"
+        [disabled]="isSubmitting"
+      >
+        💾 Lưu nháp
+      </button>
+    }
+    <button type="button" class="btn btn-info" (click)="toggleReviewClicked.emit()">
+      {{ showReview ? '← Chỉnh sửa' : '📋 Xem lại' }}
+    </button>
+    <button
+      type="submit"
+      class="btn btn-primary"
+      [disabled]="isSubmitting"
+      (click)="submitClicked.emit()"
+    >
+      @if (isSubmitting) {
+        <span class="spinner"></span>
+      }
+      Gửi phản hồi
+    </button>
+  }
+</div>

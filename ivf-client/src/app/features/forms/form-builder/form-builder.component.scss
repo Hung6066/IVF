@@ -3,12 +3,26 @@
   display: flex;
   flex-direction: column;
   background: #f1f5f9;
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 
   // Global box-sizing to prevent overflow from padding
   *,
   *::before,
   *::after {
     box-sizing: border-box;
+  }
+
+  // Ensure all form elements inherit global font
+  input,
+  button,
+  select,
+  textarea,
+  label,
+  small,
+  span,
+  p,
+  h1, h2, h3, h4, h5, h6 {
+    font-family: inherit;
   }
 }
 
@@ -94,14 +108,16 @@
   display: flex;
   flex: 1;
   overflow: hidden;
+  min-height: 0;
 }
 
 .field-palette {
   width: 280px;
+  min-width: 280px;
   background: white;
   border-right: 1px solid #e2e8f0;
-  padding: 20px;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .field-palette h3 {
@@ -146,8 +162,12 @@
 }
 
 .palette-section {
-  padding-top: 20px;
+  padding: 0 20px 20px;
   border-top: 1px solid #e2e8f0;
+
+  &:first-of-type {
+    padding-top: 20px;
+  }
 }
 
 .palette-section h4 {
@@ -160,6 +180,8 @@
   flex: 1;
   padding: 24px;
   overflow-y: auto;
+  overflow-x: hidden;
+  min-width: 0;
 }
 
 .canvas-header {
@@ -181,6 +203,7 @@
   max-width: 900px;
   margin: 0 auto;
   min-height: 400px;
+  width: 100%;
 }
 
 .fields-container.grid-layout {
@@ -188,6 +211,7 @@
   grid-template-columns: repeat(4, 1fr);
   gap: 12px;
   align-items: start;
+  overflow: hidden;
 }
 
 .empty-canvas {
@@ -504,12 +528,15 @@
 .logic-section-divider {
   display: flex;
   align-items: center;
-  margin: 16px 0 12px;
-  padding-top: 12px;
-  border-top: 1px solid #e2e8f0;
+  gap: 10px;
+  margin: 20px 0 12px;
+  padding: 12px;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
 
   span {
-    font-size: 12px;
+    font-size: 14px;
     font-weight: 600;
     color: #1e293b;
     white-space: nowrap;
@@ -725,6 +752,7 @@
 
   .field-palette {
     width: 100%;
+    min-width: 100%;
     border-right: none;
     border-bottom: 1px solid #e2e8f0;
     max-height: 200px;
@@ -761,7 +789,6 @@
 
   .field-palette {
     max-height: 160px;
-    padding: 12px;
   }
 
   .field-types {

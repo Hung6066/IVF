@@ -1,0 +1,169 @@
+<div class="field-header">
+  <div class="drag-handle" cdkDragHandle>⋮⋮</div>
+  <span class="col-indicator" title="Chiều rộng cột">{{ colSpan }}/4</span>
+  <button class="clone-btn" (click)="onClone($event)" title="Nhân bản">📋</button>
+  <button class="delete-btn" (click)="onDelete($event)">🗑️</button>
+</div>
+
+<div class="field-preview">
+  <label>
+    {{ field.label }}
+    @if (field.isRequired) {
+      <span class="required">*</span>
+    }
+  </label>
+
+  @switch (field.fieldType) {
+    @case (FieldType.Text) {
+      <input
+        type="text"
+        [placeholder]="field.placeholder || ''"
+        [style.height]="fieldHeight"
+        disabled
+      />
+    }
+    @case (FieldType.TextArea) {
+      <textarea
+        [placeholder]="field.placeholder || ''"
+        [style.height]="fieldHeight"
+        disabled
+      ></textarea>
+    }
+    @case (FieldType.Number) {
+      <input type="number" [placeholder]="field.placeholder || ''" disabled />
+    }
+    @case (FieldType.Decimal) {
+      <input type="number" step="0.01" [placeholder]="field.placeholder || ''" disabled />
+    }
+    @case (FieldType.Date) {
+      <input type="date" disabled />
+    }
+    @case (FieldType.DateTime) {
+      <input type="datetime-local" disabled />
+    }
+    @case (FieldType.Time) {
+      <input type="time" disabled />
+    }
+    @case (FieldType.Dropdown) {
+      <select disabled>
+        <option>-- Chọn --</option>
+      </select>
+    }
+    @case (FieldType.Radio) {
+      <div class="radio-preview">
+        @for (opt of getOptions(); track opt.value) {
+          <label><input type="radio" disabled /> {{ opt.label }}</label>
+        }
+      </div>
+    }
+    @case (FieldType.Checkbox) {
+      <div class="checkbox-preview">
+        @for (opt of getOptions(); track opt.value) {
+          <label><input type="checkbox" disabled /> {{ opt.label }}</label>
+        }
+        @if (getOptions().length === 0) {
+          <label><input type="checkbox" disabled /> {{ field.placeholder || 'Checkbox' }}</label>
+        }
+      </div>
+    }
+    @case (FieldType.Tags) {
+      <div class="tags-preview">
+        @if (getOptions().length > 0) {
+          @for (opt of getOptions(); track opt.value) {
+            <span class="tag-badge">🏷️ {{ opt.label }}</span>
+          }
+        } @else {
+          <span class="tags-placeholder">🏷️ Chọn từ danh sách concepts...</span>
+        }
+      </div>
+    }
+    @case (FieldType.Rating) {
+      <div class="rating-preview">⭐⭐⭐⭐⭐</div>
+    }
+    @case (FieldType.MultiSelect) {
+      <select multiple disabled style="min-height: 60px">
+        @for (opt of getOptions(); track opt.value) {
+          <option>{{ opt.label }}</option>
+        }
+      </select>
+    }
+    @case (FieldType.Section) {
+      <hr class="section-divider" />
+    }
+    @case (FieldType.Label) {
+      <p class="label-text" style="color: #64748b; font-style: italic">{{ field.label }}</p>
+    }
+    @case (FieldType.PageBreak) {
+      <div class="page-break-preview">
+        <div class="page-break-line"></div>
+        <span class="page-break-label">📄 Ngắt trang</span>
+        <div class="page-break-line"></div>
+      </div>
+    }
+    @case (FieldType.Address) {
+      <div class="address-preview">
+        @for (sub of getSubFields(); track sub.key) {
+          <div class="address-subfield" [style.flex]="'0 0 ' + (sub.width || 100) + '%'">
+            <small>{{ sub.label }}</small>
+            <input type="text" disabled [placeholder]="sub.label" />
+          </div>
+        }
+        @if (getSubFields().length === 0) {
+          <div class="address-subfield" style="flex: 0 0 100%">
+            <small>Đường</small><input type="text" disabled placeholder="Đường / số nhà" />
+          </div>
+          <div class="address-subfield" style="flex: 0 0 50%">
+            <small>Phường/Xã</small><input type="text" disabled placeholder="Phường/Xã" />
+          </div>
+          <div class="address-subfield" style="flex: 0 0 50%">
+            <small>Quận/Huyện</small><input type="text" disabled placeholder="Quận/Huyện" />
+          </div>
+          <div class="address-subfield" style="flex: 0 0 50%">
+            <small>Tỉnh/TP</small><input type="text" disabled placeholder="Tỉnh/TP" />
+          </div>
+          <div class="address-subfield" style="flex: 0 0 50%">
+            <small>Quốc gia</small><input type="text" disabled placeholder="Quốc gia" />
+          </div>
+        }
+      </div>
+    }
+    @case (FieldType.Hidden) {
+      <div class="hidden-preview">👁️‍🗨️ Trường ẩn — không hiển thị cho người dùng</div>
+    }
+    @case (FieldType.Slider) {
+      <input type="range" min="0" max="100" disabled style="width: 100%" />
+    }
+    @case (FieldType.Calculated) {
+      <div class="calculated-preview">🧮 Giá trị tự động = <em>công thức tính</em></div>
+    }
+    @case (FieldType.RichText) {
+      <div class="richtext-preview">📝 Trình soạn thảo văn bản phong phú (WYSIWYG)</div>
+    }
+    @case (FieldType.Signature) {
+      <div class="signature-preview">✍️ Vùng ký tên</div>
+    }
+    @case (FieldType.Lookup) {
+      <div style="position: relative">
+        <input type="text" disabled placeholder="🔍 Tìm kiếm..." style="width: 100%" />
+      </div>
+    }
+    @case (FieldType.Repeater) {
+      <div class="repeater-preview">
+        <div style="display: flex; gap: 8px; margin-bottom: 4px">
+          <input type="text" disabled placeholder="Cột 1" style="flex: 1" />
+          <input type="text" disabled placeholder="Cột 2" style="flex: 1" />
+        </div>
+        <button disabled style="font-size: 12px; color: #3b82f6; background: none; border: none">
+          🔁 + Thêm dòng
+        </button>
+      </div>
+    }
+    @default {
+      <input type="text" disabled placeholder="Trường mới" />
+    }
+  }
+
+  @if (field.helpText) {
+    <small class="help-text">{{ field.helpText }}</small>
+  }
+</div>

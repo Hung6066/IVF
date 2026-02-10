@@ -10,19 +10,28 @@ import {
   FormField,
   FieldType,
   FieldTypeLabels,
-  CreateFieldRequest,
-  ConditionalLogic,
-  Condition,
-  ValidationRule,
 } from '../forms.service';
 import { ConceptPickerComponent } from '../concept-picker/concept-picker.component';
 import { LinkedFieldConfigComponent } from '../linked-field-config/linked-field-config.component';
 import { ConceptService, Concept } from '../services/concept.service';
+import { FieldPaletteComponent } from './field-palette/field-palette.component';
+import { FieldPropertiesPanelComponent } from './field-properties-panel/field-properties-panel.component';
+import { FieldPreviewComponent } from './field-preview/field-preview.component';
+import { normalizeFieldType, getFieldColSpan, hasOptions } from '../shared/form-field.utils';
 
 @Component({
   selector: 'app-form-builder',
   standalone: true,
-  imports: [CommonModule, FormsModule, DragDropModule, ConceptPickerComponent, LinkedFieldConfigComponent],
+  imports: [
+    CommonModule,
+    FormsModule,
+    DragDropModule,
+    ConceptPickerComponent,
+    LinkedFieldConfigComponent,
+    FieldPaletteComponent,
+    FieldPropertiesPanelComponent,
+    FieldPreviewComponent,
+  ],
   templateUrl: './form-builder.component.html',
   styleUrls: ['./form-builder.component.scss'],
 })
@@ -30,6 +39,7 @@ export class FormBuilderComponent implements OnInit {
   private readonly formsService = inject(FormsService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+  private readonly conceptService = inject(ConceptService);
 
   FieldType = FieldType;
   templateId: string | null = null;
@@ -41,37 +51,6 @@ export class FormBuilderComponent implements OnInit {
   formName = '';
   formDescription = '';
   selectedCategoryId = '';
-  selectedFieldColSpan = '4';
-  selectedFieldHeight = 'auto';
-  activePropertiesTab: 'basic' | 'validation' | 'layout' = 'basic';
-
-  fieldTypes = [
-    { type: FieldType.Text, icon: '📝', label: 'Văn bản' },
-    { type: FieldType.TextArea, icon: '📄', label: 'Văn bản dài' },
-    { type: FieldType.Number, icon: '🔢', label: 'Số nguyên' },
-    { type: FieldType.Decimal, icon: '🔣', label: 'Số thập phân' },
-    { type: FieldType.Date, icon: '📅', label: 'Ngày' },
-    { type: FieldType.DateTime, icon: '📅⏰', label: 'Ngày giờ' },
-    { type: FieldType.Time, icon: '⏰', label: 'Giờ' },
-    { type: FieldType.Dropdown, icon: '📋', label: 'Dropdown' },
-    { type: FieldType.MultiSelect, icon: '☑📋', label: 'Chọn nhiều' },
-    { type: FieldType.Radio, icon: '⭕', label: 'Radio' },
-    { type: FieldType.Checkbox, icon: '☑️', label: 'Checkbox' },
-    { type: FieldType.Tags, icon: '🏷️', label: 'Tags' },
-    { type: FieldType.Rating, icon: '⭐', label: 'Đánh giá' },
-    { type: FieldType.Section, icon: '➖', label: 'Phân đoạn' },
-    { type: FieldType.Label, icon: '🏷', label: 'Nhãn' },
-    { type: FieldType.FileUpload, icon: '📎', label: 'Tải file' },
-    { type: FieldType.PageBreak, icon: '📄', label: 'Ngắt trang' },
-    { type: FieldType.Address, icon: '🏠', label: 'Địa chỉ' },
-    { type: FieldType.Hidden, icon: '👁️‍🗨️', label: 'Ẩn' },
-    { type: FieldType.Slider, icon: '🖊️', label: 'Thanh trượt' },
-    { type: FieldType.Calculated, icon: '🧮', label: 'Tính toán' },
-    { type: FieldType.RichText, icon: '📝', label: 'Rich Text' },
-    { type: FieldType.Signature, icon: '✍️', label: 'Chữ ký' },
-    { type: FieldType.Lookup, icon: '🔍', label: 'Tra cứu' },
-    { type: FieldType.Repeater, icon: '🔁', label: 'Lặp nhóm' },
-  ];
 
   ngOnInit() {
     this.formsService.getCategories().subscribe((cats) => {
@@ -96,65 +75,12 @@ export class FormBuilderComponent implements OnInit {
       this.formName = template.name;
       this.formDescription = template.description || '';
       this.selectedCategoryId = template.categoryId;
-      // Normalize fieldType - backend may return string name or number
-      const fieldTypeMap: { [key: string]: number } = {
-        Text: FieldType.Text,
-        TextArea: FieldType.TextArea,
-        Number: FieldType.Number,
-        Decimal: FieldType.Decimal,
-        Date: FieldType.Date,
-        DateTime: FieldType.DateTime,
-        Time: FieldType.Time,
-        Dropdown: FieldType.Dropdown,
-        MultiSelect: FieldType.MultiSelect,
-        Radio: FieldType.Radio,
-        Checkbox: FieldType.Checkbox,
-        FileUpload: FieldType.FileUpload,
-        Rating: FieldType.Rating,
-        Section: FieldType.Section,
-        Label: FieldType.Label,
-        Tags: FieldType.Tags,
-        PageBreak: FieldType.PageBreak,
-      Address: FieldType.Address,
-      Hidden: FieldType.Hidden,
-      Slider: FieldType.Slider,
-      Calculated: FieldType.Calculated,
-      RichText: FieldType.RichText,
-      Signature: FieldType.Signature,
-      Lookup: FieldType.Lookup,
-      Repeater: FieldType.Repeater,
-    };
 
-      this.fields = (template.fields || []).map((f) => {
-        let numericType: number;
-        if (typeof f.fieldType === 'number') {
-          numericType = f.fieldType;
-        } else if (typeof f.fieldType === 'string') {
-          // Try to map string name to enum value
-          numericType = fieldTypeMap[f.fieldType] ?? (Number(f.fieldType) || FieldType.Text);
-        } else {
-          numericType = FieldType.Text;
-        }
-        return { ...f, fieldType: numericType };
-      });
+      this.fields = (template.fields || []).map((f) => ({
+        ...f,
+        fieldType: normalizeFieldType(f.fieldType),
+      }));
 
-      // DEBUG: Log field types
-      console.log(
-        'Loaded fields with types:',
-        this.fields.map((f) => ({
-          label: f.label,
-          fieldType: f.fieldType,
-          typeOf: typeof f.fieldType,
-        })),
-      );
-      console.log('FieldType enum values:', {
-        Radio: FieldType.Radio,
-        Checkbox: FieldType.Checkbox,
-        Dropdown: FieldType.Dropdown,
-        Tags: FieldType.Tags,
-      });
-
-      // Load linked concepts for fields that have conceptId
       this.loadLinkedConcepts();
     });
   }
@@ -254,33 +180,16 @@ export class FormBuilderComponent implements OnInit {
   }
 
   addField(type: FieldType | string) {
-    let numericType: number;
-
-    if (typeof type === 'number') {
-      numericType = type;
-    } else {
-      const parsed = Number(type);
-      if (!isNaN(parsed) && parsed !== 0) {
-        numericType = parsed;
-      } else {
-        // Try to find enum value by string key
-        // Note: This relies on FieldType having string keys matching the input
-        // But since we don't have a reverse map easily accessible here without iterating
-        // Let's assume input is valid number or numeric string.
-        // Fallback to Text (1) if invalid
-        console.warn(`Invalid FieldType input: ${type}, defaulting to Text`);
-        numericType = FieldType.Text;
-      }
-    }
+    const numericType = normalizeFieldType(type);
     const newField: FormField = {
       id: '',
       fieldKey: `field_${this.fields.length + 1}`,
-      label: this.getFieldTypeLabel(numericType),
+      label: FieldTypeLabels[numericType] || 'Trường mới',
       fieldType: numericType,
       displayOrder: this.fields.length,
       isRequired: false,
       placeholder: '',
-      optionsJson: this.hasOptions(numericType)
+      optionsJson: hasOptions(numericType)
         ? JSON.stringify([
             { value: 'opt1', label: 'Lựa chọn 1' },
             { value: 'opt2', label: 'Lựa chọn 2' },
@@ -322,107 +231,32 @@ export class FormBuilderComponent implements OnInit {
   }
 
   selectField(field: FormField) {
-    console.log('Selected field:', {
-      label: field.label,
-      fieldType: field.fieldType,
-      typeOf: typeof field.fieldType,
-      hasOptions: this.hasOptions(field.fieldType),
-    });
     this.selectedField = field;
-    console.log(
-      'selectField:',
-      field.label,
-      'fieldType:',
-      field.fieldType,
-      'hasOptions:',
-      this.hasOptions(field.fieldType),
-    );
-    // Get colSpan and height — read layoutJson first, fallback to validationRulesJson (matches getFieldColSpan logic)
-    try {
-      const json = field.layoutJson || field.validationRulesJson;
-      const data = json ? JSON.parse(json) : {};
-      this.selectedFieldColSpan = data.colSpan?.toString() || '4';
-      this.selectedFieldHeight = data.height || 'auto';
-    } catch {
-      this.selectedFieldColSpan = '4';
-      this.selectedFieldHeight = 'auto';
-    }
-    // Load options for structured editing
-    if (this.hasOptions(field.fieldType)) {
-      this.loadOptionsForField(field);
-      console.log('editableOptions loaded:', this.editableOptions);
-    }
-    // Load sub-fields for Address type
-    this.loadSubFieldsForField(field);
-    // Load validation rules
-    this.loadValidationRules();
   }
 
-  updateField() {
-    if (this.selectedField?.id) {
+  updateField(field?: FormField) {
+    const target = field || this.selectedField;
+    if (target?.id) {
       this.formsService
-        .updateField(this.selectedField.id, {
-          label: this.selectedField.label,
-          isRequired: this.selectedField.isRequired,
-          placeholder: this.selectedField.placeholder,
-          optionsJson: this.selectedField.optionsJson,
-          validationRulesJson: this.selectedField.validationRulesJson,
-          layoutJson: this.selectedField.layoutJson,
-          conditionalLogicJson: this.selectedField.conditionalLogicJson,
-          displayOrder: this.selectedField.displayOrder,
+        .updateField(target.id, {
+          label: target.label,
+          isRequired: target.isRequired,
+          placeholder: target.placeholder,
+          optionsJson: target.optionsJson,
+          validationRulesJson: target.validationRulesJson,
+          layoutJson: target.layoutJson,
+          conditionalLogicJson: target.conditionalLogicJson,
+          displayOrder: target.displayOrder,
         })
         .subscribe();
     }
   }
 
-  setColSpan(span: string) {
-    this.selectedFieldColSpan = span;
-    this.updateFieldLayout();
-  }
-
-  updateFieldLayout() {
-    if (this.selectedField) {
-      // Store colSpan and height in layoutJson (separated from validationRulesJson)
-      const layout = {
-        colSpan: parseInt(this.selectedFieldColSpan),
-        height: this.selectedFieldHeight,
-      };
-      this.selectedField.layoutJson = JSON.stringify(layout);
-      this.updateField();
-    }
-  }
-
   getFieldColSpan(field: FormField): number {
-    try {
-      // Read from layoutJson first, then fallback to validationRulesJson
-      const json = field.layoutJson || field.validationRulesJson;
-      const data = json ? JSON.parse(json) : {};
-      return data.colSpan || 4;
-    } catch {
-      return 4;
-    }
+    return getFieldColSpan(field);
   }
 
-  getFieldHeight(field: FormField): string {
-    try {
-      const json = field.layoutJson || field.validationRulesJson;
-      const data = json ? JSON.parse(json) : {};
-      const height = data.height || 'auto';
-      const heightMap: { [key: string]: string } = {
-        auto: 'auto',
-        small: '60px',
-        medium: '100px',
-        large: '150px',
-        xlarge: '200px',
-      };
-      return heightMap[height] || 'auto';
-    } catch {
-      return 'auto';
-    }
-  }
-
-  deleteField(field: FormField, event: Event) {
-    event.stopPropagation();
+  deleteField(field: FormField) {
     if (confirm('Xóa trường này?')) {
       this.fields = this.fields.filter((f) => f !== field);
       if (field.id) {
@@ -434,8 +268,7 @@ export class FormBuilderComponent implements OnInit {
     }
   }
 
-  cloneField(field: FormField, event: Event) {
-    event.stopPropagation();
+  cloneField(field: FormField) {
     const fieldIndex = this.fields.indexOf(field);
     const cloned: FormField = {
       id: '',
@@ -453,10 +286,8 @@ export class FormBuilderComponent implements OnInit {
       conditionalLogicJson: field.conditionalLogicJson,
     };
 
-    // Insert after the original field
     this.fields.splice(fieldIndex + 1, 0, cloned);
 
-    // Persist to backend if template exists
     if (this.templateId) {
       this.formsService
         .addField(this.templateId, {
@@ -504,632 +335,30 @@ export class FormBuilderComponent implements OnInit {
     }
   }
 
-  getFieldTypeLabel(type: FieldType): string {
-    return FieldTypeLabels[type] || 'Trường mới';
-  }
-
-  hasOptions(type: FieldType | string | number): boolean {
-    // Handle both numeric enum values and string names from API
-    const optionTypes = [
-      FieldType.Dropdown,
-      FieldType.MultiSelect,
-      FieldType.Radio,
-      FieldType.Checkbox,
-      FieldType.Tags,
-      FieldType.Lookup,
-    ];
-    const optionTypeNames = ['Dropdown', 'MultiSelect', 'Radio', 'Checkbox', 'Tags', 'Lookup'];
-
-    if (typeof type === 'string') {
-      // Check if it's a number string like "10"
-      const num = Number(type);
-      if (!isNaN(num)) {
-        return optionTypes.includes(num);
-      }
-      return optionTypeNames.includes(type);
-    }
-    return optionTypes.includes(type as number);
-  }
-
-  getOptions(field: FormField): { value: string; label: string }[] {
-    return this.formsService.parseOptions(field.optionsJson);
-  }
-
-  getSubFields(
-    field: FormField,
-  ): { key: string; label: string; type: string; required: boolean; width: number }[] {
-    try {
-      const subs = field.optionsJson ? JSON.parse(field.optionsJson) : [];
-      return Array.isArray(subs) && subs.length > 0 && subs[0].key ? subs : [];
-    } catch {
-      return [];
-    }
-  }
-
-  getOptionsText(field: FormField): string {
-    const options = this.getOptions(field);
-    return options.map((o) => `${o.value}|${o.label}`).join('\n');
-  }
-
-  setOptionsFromText(event: Event, field: FormField) {
-    const text = (event.target as HTMLTextAreaElement).value;
-    const options = text
-      .split('\n')
-      .filter((line) => line.trim())
-      .map((line) => {
-        const parts = line.split('|');
-        return {
-          value: parts[0]?.trim() || parts[0],
-          label: parts[1]?.trim() || parts[0],
-        };
-      });
-    field.optionsJson = JSON.stringify(options);
-    this.updateField();
-  }
-
   // ===== Concept Picker Integration =====
   showConceptPicker = false;
   selectedFieldForConcept?: FormField;
   linkedConcepts = new Map<string, Concept>();
-  private conceptService = inject(ConceptService);
 
-  // ===== Linked Field Config =====
   showLinkedFieldConfig = false;
 
   openLinkedFieldConfig() {
     this.showLinkedFieldConfig = true;
   }
 
-  // Inline concept search
-  conceptSearchTerm = '';
-  conceptSearchResults: Concept[] = [];
-  showConceptDropdown = false;
-  isSearchingConcepts = false;
-  private searchTimeout: any;
-
-  openConceptPicker(field: FormField) {
-    this.selectedFieldForConcept = field;
-    this.showConceptPicker = true;
+  onConceptLinked(event: { fieldId: string; concept: Concept }) {
+    this.linkedConcepts.set(event.fieldId, event.concept);
   }
 
-  onConceptLinked(concept: Concept) {
-    // Route to option linking if we're linking an option
-    if (this.selectedOptionIndex >= 0) {
-      this.onConceptSelectedForOption(concept);
-      return;
-    }
-
-    if (this.selectedFieldForConcept) {
-      // Store concept for display
-      this.linkedConcepts.set(this.selectedFieldForConcept.id || '', concept);
-
-      // Reload form to get updated field data
-      if (this.templateId) {
-        this.loadTemplate();
-      }
-    }
-    this.showConceptPicker = false;
+  onConceptUnlinked(fieldId: string) {
+    this.linkedConcepts.delete(fieldId);
   }
 
-  getLinkedConcept(fieldId: string): Concept | undefined {
-    return this.linkedConcepts.get(fieldId);
+  onFieldPropertiesUpdated(field: FormField) {
+    this.updateField(field);
   }
 
-  // Inline concept search methods
-  searchConcepts() {
-    clearTimeout(this.searchTimeout);
-
-    if (!this.conceptSearchTerm || this.conceptSearchTerm.length < 2) {
-      this.conceptSearchResults = [];
-      return;
-    }
-
-    this.isSearchingConcepts = true;
-    this.searchTimeout = setTimeout(() => {
-      this.conceptService.searchConcepts(this.conceptSearchTerm).subscribe({
-        next: (result) => {
-          this.conceptSearchResults = result.concepts;
-          this.isSearchingConcepts = false;
-        },
-        error: () => {
-          this.conceptSearchResults = [];
-          this.isSearchingConcepts = false;
-        },
-      });
-    }, 300);
+  deselectField() {
+    this.selectedField = null;
   }
-
-  selectConcept(concept: Concept) {
-    if (this.selectedField?.id) {
-      // Link the concept to the field via API
-      this.conceptService.linkFieldToConcept(this.selectedField.id, concept.id).subscribe({
-        next: () => {
-          this.linkedConcepts.set(this.selectedField!.id || '', concept);
-
-          // Set field label to concept display name
-          this.selectedField!.label = concept.display;
-          this.updateField();
-
-          this.conceptSearchTerm = '';
-          this.conceptSearchResults = [];
-          this.showConceptDropdown = false;
-        },
-        error: (err) => {
-          console.error('Failed to link concept:', err);
-        },
-      });
-    }
-  }
-
-  unlinkConcept(field: FormField) {
-    if (field.id) {
-      this.linkedConcepts.delete(field.id);
-      // Note: API call to unlink could be added here if needed
-    }
-  }
-
-  // ===== Structured Options Editor =====
-  editableOptions: EditableOption[] = [];
-  selectedOptionIndex: number = -1;
-
-  // Called when a field is selected to load its options
-  loadOptionsForField(field: FormField) {
-    const opts = this.formsService.parseOptions(field.optionsJson);
-    this.editableOptions = opts.map((o) => ({
-      value: o.value,
-      label: o.label,
-      conceptId: undefined,
-      conceptCode: undefined,
-      conceptDisplay: undefined,
-    }));
-  }
-
-  addOption() {
-    const newOpt: EditableOption = {
-      value: `opt${this.editableOptions.length + 1}`,
-      label: `Lựa chọn ${this.editableOptions.length + 1}`,
-      conceptId: undefined,
-      conceptCode: undefined,
-      conceptDisplay: undefined,
-    };
-    this.editableOptions.push(newOpt);
-    this.saveOptions();
-  }
-
-  removeOption(index: number) {
-    this.editableOptions.splice(index, 1);
-    this.saveOptions();
-  }
-
-  saveOptions() {
-    if (this.selectedField) {
-      const options = this.editableOptions.map((o) => ({
-        value: o.value,
-        label: o.label,
-        conceptId: o.conceptId,
-        conceptCode: o.conceptCode,
-        conceptDisplay: o.conceptDisplay,
-      }));
-      this.selectedField.optionsJson = JSON.stringify(options);
-      this.updateField();
-    }
-  }
-
-  openConceptPickerForOption(index: number) {
-    this.selectedOptionIndex = index;
-    this.showConceptPicker = true;
-  }
-
-  onConceptSelectedForOption(concept: Concept) {
-    if (this.selectedOptionIndex >= 0 && this.selectedOptionIndex < this.editableOptions.length) {
-      const opt = this.editableOptions[this.selectedOptionIndex];
-      opt.conceptId = concept.id;
-      opt.conceptCode = concept.code;
-      opt.conceptDisplay = concept.display;
-
-      // TODO: API call to link option to concept when options are stored in DB
-      // this.conceptService.linkOptionToConcept(opt.dbId, concept.id).subscribe();
-    }
-    this.showConceptPicker = false;
-    this.selectedOptionIndex = -1;
-  }
-
-  unlinkOptionConcept(index: number) {
-    if (index >= 0 && index < this.editableOptions.length) {
-      const opt = this.editableOptions[index];
-      opt.conceptId = undefined;
-      opt.conceptCode = undefined;
-      opt.conceptDisplay = undefined;
-    }
-  }
-
-  // ===== Address/Composite Sub-Fields Editor =====
-  editableSubFields: {
-    key: string;
-    label: string;
-    type: string;
-    required: boolean;
-    width: number;
-  }[] = [];
-
-  loadSubFieldsForField(field: FormField) {
-    if (field.fieldType !== FieldType.Address) {
-      this.editableSubFields = [];
-      return;
-    }
-    try {
-      const subs = field.optionsJson ? JSON.parse(field.optionsJson) : [];
-      if (Array.isArray(subs) && subs.length > 0 && subs[0].key) {
-        this.editableSubFields = subs;
-      } else {
-        this.editableSubFields = [];
-      }
-    } catch {
-      this.editableSubFields = [];
-    }
-  }
-
-  addSubField() {
-    this.editableSubFields.push({
-      key: `field${this.editableSubFields.length + 1}`,
-      label: '',
-      type: 'text',
-      required: false,
-      width: 50,
-    });
-    this.saveSubFields();
-  }
-
-  removeSubField(index: number) {
-    this.editableSubFields.splice(index, 1);
-    this.saveSubFields();
-  }
-
-  saveSubFields() {
-    if (this.selectedField) {
-      this.selectedField.optionsJson = JSON.stringify(this.editableSubFields);
-      this.updateField();
-    }
-  }
-
-  loadDefaultAddressFields() {
-    this.editableSubFields = [
-      { key: 'street', label: 'Đường / Số nhà', type: 'text', required: true, width: 100 },
-      { key: 'ward', label: 'Phường/Xã', type: 'text', required: false, width: 50 },
-      { key: 'district', label: 'Quận/Huyện', type: 'text', required: false, width: 50 },
-      { key: 'province', label: 'Tỉnh/Thành phố', type: 'text', required: true, width: 50 },
-      { key: 'country', label: 'Quốc gia', type: 'text', required: false, width: 50 },
-    ];
-    this.saveSubFields();
-  }
-
-  // ===== Inline Concept Search for Options =====
-  optionConceptSearch: { [key: number]: string } = {};
-  optionConceptResults: { [key: number]: Concept[] } = {};
-  activeOptionSearchIndex: number = -1;
-  private optionSearchTimeout: any;
-
-  searchConceptsForOption(index: number) {
-    clearTimeout(this.optionSearchTimeout);
-    const query = this.optionConceptSearch[index];
-
-    if (!query || query.length < 2) {
-      this.optionConceptResults[index] = [];
-      return;
-    }
-
-    this.optionSearchTimeout = setTimeout(() => {
-      this.conceptService.searchConcepts(query, undefined, 10).subscribe({
-        next: (result) => {
-          this.optionConceptResults[index] = result.concepts;
-        },
-        error: (err) => {
-          console.error('Concept search error:', err);
-          this.optionConceptResults[index] = [];
-        },
-      });
-    }, 300);
-  }
-
-  selectConceptForOption(index: number, concept: Concept) {
-    if (index >= 0 && index < this.editableOptions.length) {
-      const opt = this.editableOptions[index];
-      opt.conceptId = concept.id;
-      opt.conceptCode = concept.code;
-      opt.conceptDisplay = concept.display;
-      // Auto-fill label with concept display name
-      opt.label = concept.display;
-      // Save the options
-      this.saveOptions();
-    }
-    // Clear search
-    this.optionConceptSearch[index] = '';
-    this.optionConceptResults[index] = [];
-    this.activeOptionSearchIndex = -1;
-    this.activeOptionSearchIndex = -1;
-  }
-
-  // ===== Conditional Logic =====
-  showLogicEditor = false;
-  currentLogic: ConditionalLogic = { action: 'show', logic: 'AND', conditions: [] };
-
-  // ===== Validation Rules =====
-  currentValidationRules: ValidationRule[] = [];
-
-  loadValidationRules() {
-    if (!this.selectedField) {
-      this.currentValidationRules = [];
-      return;
-    }
-    this.currentValidationRules = this.formsService.parseValidationRules(
-      this.selectedField.validationRulesJson,
-    );
-  }
-
-  getValidationRule(type: string): ValidationRule | undefined {
-    return this.currentValidationRules.find((r) => r.type === type);
-  }
-
-  getValidationValue(type: string): any {
-    return this.getValidationRule(type)?.value ?? '';
-  }
-
-  setValidationRule(type: string, value: any, message?: string) {
-    const existing = this.currentValidationRules.findIndex((r) => r.type === type);
-    if (value === '' || value === null || value === undefined || value === false) {
-      // Remove rule
-      if (existing >= 0) this.currentValidationRules.splice(existing, 1);
-    } else {
-      const rule: ValidationRule = { type: type as any, value, message };
-      if (existing >= 0) {
-        this.currentValidationRules[existing] = rule;
-      } else {
-        this.currentValidationRules.push(rule);
-      }
-    }
-    this.saveValidationRules();
-  }
-
-  saveValidationRules() {
-    if (!this.selectedField) return;
-    // Preserve layout data (colSpan, height) in validationRulesJson
-    try {
-      const existing = this.selectedField.validationRulesJson
-        ? JSON.parse(this.selectedField.validationRulesJson)
-        : {};
-      const layoutData: any = {};
-      if (existing.colSpan) layoutData.colSpan = existing.colSpan;
-      if (existing.height) layoutData.height = existing.height;
-
-      // Merge layout + validation rules
-      const merged = { ...layoutData, rules: this.currentValidationRules };
-      this.selectedField.validationRulesJson = JSON.stringify(merged);
-      this.updateField();
-    } catch {
-      const merged = { rules: this.currentValidationRules };
-      this.selectedField.validationRulesJson = JSON.stringify(merged);
-      this.updateField();
-    }
-  }
-
-  /** Check if a validation type is applicable for the current field type */
-  isValidationApplicable(validationType: string): boolean {
-    if (!this.selectedField) return false;
-    const ft = this.selectedField.fieldType;
-    switch (validationType) {
-      case 'minLength':
-      case 'maxLength':
-        return ft === FieldType.Text || ft === FieldType.TextArea;
-      case 'min':
-      case 'max':
-        return ft === FieldType.Number || ft === FieldType.Decimal || ft === FieldType.Rating || ft === FieldType.Slider;
-      case 'pattern':
-        return ft === FieldType.Text || ft === FieldType.TextArea || ft === FieldType.RichText;
-      case 'email':
-        return ft === FieldType.Text;
-      default:
-        return false;
-    }
-  }
-
-  toggleLogicEditor() {
-    if (!this.selectedField) return;
-
-    this.showLogicEditor = !this.showLogicEditor;
-    if (this.showLogicEditor) {
-      try {
-        this.currentLogic = this.selectedField.conditionalLogicJson
-          ? JSON.parse(this.selectedField.conditionalLogicJson)
-          : { action: 'show', logic: 'AND', conditions: [] };
-      } catch {
-        this.currentLogic = { action: 'show', logic: 'AND', conditions: [] };
-      }
-    }
-  }
-
-  addCondition() {
-    this.currentLogic.conditions.push({
-      fieldId: '',
-      operator: 'eq',
-      value: '',
-    });
-  }
-
-  removeCondition(index: number) {
-    this.currentLogic.conditions.splice(index, 1);
-    this.saveLogic();
-  }
-
-  saveLogic() {
-    if (!this.selectedField) return;
-
-    // Filter out empty conditions
-    const validConditions = this.currentLogic.conditions.filter((c) => c.fieldId);
-
-    if (validConditions.length > 0) {
-      // Update logic object with valid conditions
-      const logicToSave = { ...this.currentLogic, conditions: validConditions };
-      this.selectedField.conditionalLogicJson = JSON.stringify(logicToSave);
-    } else {
-      this.selectedField.conditionalLogicJson = undefined;
-    }
-
-    this.updateField();
-  }
-
-  getAvailableTriggerFields(): FormField[] {
-    if (!this.selectedField) return [];
-    // Only allow fields that appear BEFORE the current field to avoid circular dependency
-    // and ensure the DOM is rendered linearly
-    const currentIndex = this.fields.indexOf(this.selectedField);
-    if (currentIndex <= 0) return [];
-
-    return this.fields
-      .slice(0, currentIndex)
-      .filter((f) => f.fieldType !== FieldType.Section && f.fieldType !== FieldType.Label);
-  }
-
-  getFlagLabel(fieldType: FieldType): string {
-    return this.fieldTypes.find((t) => t.type === fieldType)?.label || '';
-  }
-
-  getOptionsForCondition(fieldId: string): { value: any; label: string }[] | null {
-    if (!fieldId) return null;
-    const field = this.fields.find((f) => f.id === fieldId);
-    if (!field) return null;
-
-    // Ensure fieldType is treated as number
-    const type = Number(field.fieldType);
-
-    // Handle Checkbox (Boolean)
-    if (type === FieldType.Checkbox) {
-      return [
-        { value: 'true', label: 'Đã chọn (Có)' },
-        { value: 'false', label: 'Không chọn (Không)' },
-      ];
-    }
-
-    // Handle types with Options (Radio, Dropdown, MultiSelect, Tags)
-    if (this.hasOptions(type) || type === FieldType.Tags) {
-      try {
-        if (field.optionsJson) {
-          const opts = JSON.parse(field.optionsJson);
-          return opts.map((o: any) => ({ value: o.value, label: o.label }));
-        }
-      } catch {
-        return null;
-      }
-    }
-
-    return null;
-  }
-
-  // ===== Slider Config Helpers =====
-  getSliderConfig(key: string): any {
-    if (!this.selectedField) return '';
-    try {
-      const config = this.selectedField.optionsJson ? JSON.parse(this.selectedField.optionsJson) : {};
-      return config[key] ?? '';
-    } catch { return ''; }
-  }
-
-  setSliderConfig(key: string, value: any) {
-    if (!this.selectedField) return;
-    try {
-      const config = this.selectedField.optionsJson ? JSON.parse(this.selectedField.optionsJson) : {};
-      config[key] = key === 'unit' ? value : Number(value);
-      this.selectedField.optionsJson = JSON.stringify(config);
-      this.updateField();
-    } catch {}
-  }
-
-  // ===== Calculated Field Config Helpers =====
-  getCalcConfig(key: string): any {
-    if (!this.selectedField) return '';
-    try {
-      const config = this.selectedField.optionsJson ? JSON.parse(this.selectedField.optionsJson) : {};
-      return config[key] ?? '';
-    } catch { return ''; }
-  }
-
-  setCalcConfig(key: string, value: any) {
-    if (!this.selectedField) return;
-    try {
-      const config = this.selectedField.optionsJson ? JSON.parse(this.selectedField.optionsJson) : {};
-      config[key] = key === 'formula' || key === 'unit' ? value : Number(value);
-      this.selectedField.optionsJson = JSON.stringify(config);
-      this.updateField();
-    } catch {}
-  }
-
-  // ===== Repeater Config Helpers =====
-  getRepeaterConfig(key: string): any {
-    if (!this.selectedField) return '';
-    try {
-      const config = this.selectedField.optionsJson ? JSON.parse(this.selectedField.optionsJson) : {};
-      return config[key] ?? '';
-    } catch { return ''; }
-  }
-
-  setRepeaterConfig(key: string, value: any) {
-    if (!this.selectedField) return;
-    try {
-      const config = this.selectedField.optionsJson ? JSON.parse(this.selectedField.optionsJson) : {};
-      config[key] = Number(value);
-      this.selectedField.optionsJson = JSON.stringify(config);
-      this.updateField();
-    } catch {}
-  }
-
-  getRepeaterFields(): { key: string; label: string; type: string }[] {
-    if (!this.selectedField) return [];
-    try {
-      const config = this.selectedField.optionsJson ? JSON.parse(this.selectedField.optionsJson) : {};
-      return config.fields || [];
-    } catch { return []; }
-  }
-
-  addRepeaterField() {
-    if (!this.selectedField) return;
-    try {
-      const config = this.selectedField.optionsJson ? JSON.parse(this.selectedField.optionsJson) : { minRows: 1, maxRows: 10, fields: [] };
-      if (!config.fields) config.fields = [];
-      config.fields.push({ key: `col${config.fields.length + 1}`, label: `Cột ${config.fields.length + 1}`, type: 'text' });
-      this.selectedField.optionsJson = JSON.stringify(config);
-      this.updateField();
-    } catch {}
-  }
-
-  removeRepeaterField(index: number) {
-    if (!this.selectedField) return;
-    try {
-      const config = JSON.parse(this.selectedField.optionsJson || '{}');
-      if (config.fields) {
-        config.fields.splice(index, 1);
-        this.selectedField.optionsJson = JSON.stringify(config);
-        this.updateField();
-      }
-    } catch {}
-  }
-
-  updateRepeaterField(index: number, key: string, value: string) {
-    if (!this.selectedField) return;
-    try {
-      const config = JSON.parse(this.selectedField.optionsJson || '{}');
-      if (config.fields && config.fields[index]) {
-        config.fields[index][key] = value;
-        this.selectedField.optionsJson = JSON.stringify(config);
-        this.updateField();
-      }
-    } catch {}
-  }
-}
-
-// Interface for editable options with concept linking
-interface EditableOption {
-  value: string;
-  label: string;
-  conceptId?: string;
-  conceptCode?: string;
-  conceptDisplay?: string;
 }

@@ -1,0 +1,27 @@
+<div class="field-palette">
+  <h3>Trường dữ liệu</h3>
+  <div class="field-types">
+    @for (ft of fieldTypes; track ft.type) {
+      <button
+        class="field-type-btn"
+        (click)="onAddField(ft.type)"
+        draggable="true"
+        (dragstart)="onDragStart($event, ft.type)"
+      >
+        <span class="field-icon">{{ ft.icon }}</span>
+        <span>{{ ft.label }}</span>
+      </button>
+    }
+  </div>
+
+  @if (categories.length > 0) {
+    <div class="palette-section">
+      <h4>Danh mục</h4>
+      <select [value]="selectedCategoryId" (change)="onCategoryChange($event)">
+        @for (cat of categories; track cat.id) {
+          <option [value]="cat.id">{{ cat.name }}</option>
+        }
+      </select>
+    </div>
+  }
+</div>

@@ -1,0 +1,17 @@
+<div class="review-section">
+  <div class="review-header">
+    <h3>📋 Xem lại câu trả lời</h3>
+    <p>Kiểm tra lại trước khi gửi</p>
+  </div>
+  <div class="review-list">
+    @for (field of getReviewFields(); track field.id) {
+      <div class="review-item">
+        <div class="review-label">{{ field.label }}</div>
+        <div class="review-value">{{ getReviewDisplayValue(field) }}</div>
+      </div>
+    }
+  </div>
+  <div class="review-actions">
+    <button type="button" class="btn btn-outline" (click)="onEdit()">← Chỉnh sửa</button>
+  </div>
+</div>
