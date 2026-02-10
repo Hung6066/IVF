@@ -90,7 +90,7 @@ public class GetLabScheduleHandler : IRequestHandler<GetLabScheduleQuery, Result
     public async Task<Result<List<LabScheduleItemDto>>> Handle(GetLabScheduleQuery request, CancellationToken ct)
     {
         var schedule = await _cycleRepo.GetLabScheduleAsync(request.Date, ct);
-        
+
         // Map Repository DTO to Public API DTO
         var list = schedule.Select(s => new LabScheduleItemDto
         {
@@ -154,7 +154,7 @@ public class GetCryoLocationsHandler : IRequestHandler<GetCryoLocationsQuery, Re
     public async Task<Result<List<CryoLocationDto>>> Handle(GetCryoLocationsQuery request, CancellationToken ct)
     {
         var stats = await _cryoRepo.GetStorageStatsAsync(ct);
-        
+
         return Result<List<CryoLocationDto>>.Success(stats.Select(s => new CryoLocationDto
         {
             Tank = s.Tank,
@@ -189,27 +189,23 @@ public class EmbryoReportDto
 public class GetEmbryoReportHandler : IRequestHandler<GetEmbryoReportQuery, Result<List<EmbryoReportDto>>>
 {
     private readonly ITreatmentCycleRepository _cycleRepo;
-    private readonly IEmbryoRepository _embryoRepo;
 
-    public GetEmbryoReportHandler(ITreatmentCycleRepository cycleRepo, IEmbryoRepository embryoRepo)
+    public GetEmbryoReportHandler(ITreatmentCycleRepository cycleRepo)
     {
         _cycleRepo = cycleRepo;
-        _embryoRepo = embryoRepo;
     }
 
     public async Task<Result<List<EmbryoReportDto>>> Handle(GetEmbryoReportQuery request, CancellationToken ct)
     {
-        // Get all cycles with embryos
+        // Single query loads all cycles with embryos + stimulation data — eliminates N+1
         var cycles = await _cycleRepo.GetAllWithDetailsAsync(ct);
         var result = new List<EmbryoReportDto>();
 
-        // Define date range for filtering (show cycles from the entire month or all if no specific filtering needed)
-        // For now, we'll show all cycles that have embryos, but you can filter by request.Date if needed
-        
         foreach (var cycle in cycles)
         {
-            var embryos = await _embryoRepo.GetByCycleIdAsync(cycle.Id, ct);
-            if (!embryos.Any()) continue;
+            // Use already-included embryos instead of re-fetching per cycle
+            var embryos = cycle.Embryos?.ToList() ?? [];
+            if (embryos.Count == 0) continue;
 
             var stimData = cycle.Stimulation;
             var aspirationDate = stimData?.AspirationDate;
@@ -247,7 +243,7 @@ public class GetEmbryoReportHandler : IRequestHandler<GetEmbryoReportQuery, Resu
             }
 
             // D5/D6 embryos with grades
-            var d5d6Text = d5d6.Any() 
+            var d5d6Text = d5d6.Any()
                 ? $"{d5d6.Count} ({string.Join(", ", d5d6.Take(3).Select(e => e.Grade))}...)"
                 : "—";
 

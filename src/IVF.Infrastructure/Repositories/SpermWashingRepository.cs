@@ -72,7 +72,9 @@ public class SpermWashingRepository : ISpermWashingRepository
 
     public async Task<int> GetCountByDateAsync(DateTime date, CancellationToken ct = default)
     {
+        var startOfDay = date.Date;
+        var nextDay = startOfDay.AddDays(1);
         return await _context.SpermWashings
-            .CountAsync(w => w.WashDate.Date == date.Date, ct);
+            .CountAsync(w => w.WashDate >= startOfDay && w.WashDate < nextDay, ct);
     }
 }

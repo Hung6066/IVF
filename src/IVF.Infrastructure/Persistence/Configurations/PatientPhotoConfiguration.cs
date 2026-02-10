@@ -8,7 +8,7 @@ public class PatientPhotoConfiguration : IEntityTypeConfiguration<PatientPhoto>
 {
     public void Configure(EntityTypeBuilder<PatientPhoto> builder)
     {
-        builder.ToTable("PatientPhotos");
+        builder.ToTable("patient_photos");
 
         builder.HasKey(p => p.Id);
 
@@ -36,5 +36,7 @@ public class PatientPhotoConfiguration : IEntityTypeConfiguration<PatientPhoto>
             .WithOne(p => p.Photo)
             .HasForeignKey<PatientPhoto>(p => p.PatientId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasQueryFilter(p => !p.IsDeleted);
     }
 }

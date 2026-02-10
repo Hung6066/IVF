@@ -37,6 +37,9 @@ public class ReportTemplateConfiguration : IEntityTypeConfiguration<ReportTempla
             .HasForeignKey(r => r.CreatedByUserId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.HasIndex(r => r.FormTemplateId);
+        builder.HasIndex(r => r.CreatedByUserId);
+
         builder.HasQueryFilter(r => !r.IsDeleted);
     }
 }

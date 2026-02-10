@@ -28,6 +28,8 @@ public class TreatmentIndicationConfiguration : IEntityTypeConfiguration<Treatme
             .HasForeignKey<TreatmentIndication>(t => t.CycleId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        builder.HasIndex(t => t.CycleId);
+
         builder.HasQueryFilter(t => !t.IsDeleted);
     }
 }

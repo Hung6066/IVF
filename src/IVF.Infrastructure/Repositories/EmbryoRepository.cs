@@ -17,6 +17,7 @@ public class EmbryoRepository : IEmbryoRepository
 
     public async Task<IReadOnlyList<Embryo>> GetByCycleIdAsync(Guid cycleId, CancellationToken ct = default)
         => await _context.Embryos
+            .AsNoTracking()
             .Where(e => e.CycleId == cycleId)
             .OrderBy(e => e.EmbryoNumber)
             .ToListAsync(ct);

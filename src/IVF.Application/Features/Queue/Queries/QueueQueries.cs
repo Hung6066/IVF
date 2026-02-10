@@ -78,14 +78,9 @@ public class GetPatientPendingTicketHandler : IRequestHandler<GetPatientPendingT
 
         foreach (var t in relevantTickets)
         {
-            if (!string.IsNullOrEmpty(t.ServiceIndications))
+            if (t.Services != null)
             {
-                try 
-                {
-                    var ids = System.Text.Json.JsonSerializer.Deserialize<List<Guid>>(t.ServiceIndications);
-                    if (ids != null) allServiceIds.AddRange(ids);
-                } 
-                catch { }
+                allServiceIds.AddRange(t.Services.Select(s => s.ServiceCatalogId));
             }
             ticketNumbers.Add(t.TicketNumber);
         }

@@ -8,7 +8,7 @@ public class FormFieldOptionConfiguration : IEntityTypeConfiguration<FormFieldOp
 {
     public void Configure(EntityTypeBuilder<FormFieldOption> builder)
     {
-        builder.ToTable("FormFieldOptions");
+        builder.ToTable("form_field_options");
 
         builder.HasKey(o => o.Id);
 
@@ -35,7 +35,9 @@ public class FormFieldOptionConfiguration : IEntityTypeConfiguration<FormFieldOp
             .HasForeignKey(o => o.ConceptId)
             .OnDelete(DeleteBehavior.SetNull);
 
-        // Index for faster lookups
+        // Indexes
         builder.HasIndex(o => new { o.FormFieldId, o.DisplayOrder });
+
+        builder.HasQueryFilter(o => !o.IsDeleted);
     }
 }

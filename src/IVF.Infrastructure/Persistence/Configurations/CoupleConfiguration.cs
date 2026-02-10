@@ -27,6 +27,10 @@ public class CoupleConfiguration : IEntityTypeConfiguration<Couple>
             .HasForeignKey(c => c.SpermDonorId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.HasIndex(c => c.WifeId);
+        builder.HasIndex(c => c.HusbandId);
+        builder.HasIndex(c => c.SpermDonorId);
+
         builder.HasQueryFilter(c => !c.IsDeleted);
     }
 }

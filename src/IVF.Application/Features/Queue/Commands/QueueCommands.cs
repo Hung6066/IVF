@@ -51,13 +51,10 @@ public class IssueTicketHandler : IRequestHandler<IssueTicketCommand, Result<Que
             return Result<QueueTicketDto>.Failure("Patient not found");
 
         var ticketNumber = await _queueRepo.GenerateTicketNumberAsync(request.DepartmentCode, ct);
-        var serviceIndications = request.ServiceIds != null && request.ServiceIds.Count > 0 
-            ? System.Text.Json.JsonSerializer.Serialize(request.ServiceIds) 
-            : null;
 
         var queueType = GetQueueType(request.DepartmentCode);
         
-        var ticket = QueueTicket.Create(ticketNumber, queueType, request.Priority, request.PatientId, request.DepartmentCode, request.CycleId, serviceIndications);
+        var ticket = QueueTicket.Create(ticketNumber, queueType, request.Priority, request.PatientId, request.DepartmentCode, request.CycleId, request.ServiceIds);
         
         await _queueRepo.AddAsync(ticket, ct);
         await _unitOfWork.SaveChangesAsync(ct);
@@ -215,12 +212,7 @@ public record QueueTicketDto(
 {
     public static QueueTicketDto FromEntity(QueueTicket t, string patientName, string? patientCode = null)
     {
-        List<Guid>? serviceIds = null;
-        if (!string.IsNullOrEmpty(t.ServiceIndications))
-        {
-            try { serviceIds = System.Text.Json.JsonSerializer.Deserialize<List<Guid>>(t.ServiceIndications); }
-            catch { }
-        }
+        var serviceIds = t.Services?.Select(s => s.ServiceCatalogId).ToList();
         return new(
             t.Id, t.TicketNumber, t.PatientId, patientCode ?? "", patientName,
             t.QueueType.ToString(), t.DepartmentCode, t.Status.ToString(),

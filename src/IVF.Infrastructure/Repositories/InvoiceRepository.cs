@@ -14,14 +14,14 @@ public class InvoiceRepository : IInvoiceRepository
         => await _context.Invoices.FirstOrDefaultAsync(i => i.Id == id, ct);
 
     public async Task<Invoice?> GetByIdWithItemsAsync(Guid id, CancellationToken ct = default)
-        => await _context.Invoices.Include(i => i.Items).Include(i => i.Patient).FirstOrDefaultAsync(i => i.Id == id, ct);
+        => await _context.Invoices.AsNoTracking().Include(i => i.Items).Include(i => i.Patient).FirstOrDefaultAsync(i => i.Id == id, ct);
 
     public async Task<IReadOnlyList<Invoice>> GetByPatientIdAsync(Guid patientId, CancellationToken ct = default)
-        => await _context.Invoices.Include(i => i.Patient).Where(i => i.PatientId == patientId).OrderByDescending(i => i.InvoiceDate).ToListAsync(ct);
+        => await _context.Invoices.AsNoTracking().Include(i => i.Patient).Where(i => i.PatientId == patientId).OrderByDescending(i => i.InvoiceDate).ToListAsync(ct);
 
     public async Task<(IReadOnlyList<Invoice> Items, int Total)> SearchAsync(string? query, int page, int pageSize, CancellationToken ct = default)
     {
-        var q = _context.Invoices.Include(i => i.Patient).AsQueryable();
+        var q = _context.Invoices.AsNoTracking().Include(i => i.Patient).AsQueryable();
         if (!string.IsNullOrEmpty(query))
             q = q.Where(i => i.InvoiceNumber.Contains(query) || i.Patient.FullName.Contains(query));
         var total = await q.CountAsync(ct);
@@ -43,8 +43,25 @@ public class InvoiceRepository : IInvoiceRepository
 
     public async Task<decimal> GetMonthlyRevenueAsync(int month, int year, CancellationToken ct = default)
     {
+        // Use date range instead of .Month/.Year extraction to enable index usage
+        var start = new DateTime(year, month, 1, 0, 0, 0, DateTimeKind.Utc);
+        var end = start.AddMonths(1);
         return await _context.Invoices
-            .Where(i => i.InvoiceDate.Month == month && i.InvoiceDate.Year == year && i.Status != Domain.Enums.InvoiceStatus.Cancelled)
+            .Where(i => i.InvoiceDate >= start && i.InvoiceDate < end && i.Status != Domain.Enums.InvoiceStatus.Cancelled)
             .SumAsync(i => i.PaidAmount, ct);
+    }
+
+    public async Task<Dictionary<int, decimal>> GetYearlyRevenueByMonthAsync(int year, CancellationToken ct = default)
+    {
+        var start = new DateTime(year, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var end = new DateTime(year + 1, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        var revenue = await _context.Invoices
+            .Where(i => i.InvoiceDate >= start && i.InvoiceDate < end && i.Status != Domain.Enums.InvoiceStatus.Cancelled)
+            .GroupBy(i => i.InvoiceDate.Month)
+            .Select(g => new { Month = g.Key, Total = g.Sum(i => i.PaidAmount) })
+            .ToDictionaryAsync(x => x.Month, x => x.Total, ct);
+
+        return revenue;
     }
 }

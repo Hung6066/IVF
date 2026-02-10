@@ -47,6 +47,8 @@ public class FormResponseConfiguration : IEntityTypeConfiguration<FormResponse>
         builder.HasIndex(r => r.FormTemplateId);
         builder.HasIndex(r => r.PatientId);
         builder.HasIndex(r => r.SubmittedAt);
+        builder.HasIndex(r => r.CycleId);
+        builder.HasIndex(r => new { r.PatientId, r.FormTemplateId });
 
         builder.HasQueryFilter(r => !r.IsDeleted);
     }

@@ -29,29 +29,29 @@ public class ServiceCatalogRepository : IServiceCatalogRepository
     public async Task<IReadOnlyList<ServiceCatalog>> GetAllAsync(ServiceCategory? category = null, bool? isActive = null, CancellationToken ct = default)
     {
         var query = _context.Set<ServiceCatalog>().AsQueryable();
-        
+
         if (category.HasValue)
             query = query.Where(s => s.Category == category.Value);
-        
+
         if (isActive.HasValue)
             query = query.Where(s => s.IsActive == isActive.Value);
-        
+
         return await query.OrderBy(s => s.Category).ThenBy(s => s.Code).ToListAsync(ct);
     }
 
     public async Task<IReadOnlyList<ServiceCatalog>> SearchAsync(string? searchQuery, ServiceCategory? category = null, int page = 1, int pageSize = 50, CancellationToken ct = default)
     {
         var query = _context.Set<ServiceCatalog>().AsQueryable();
-        
+
         if (!string.IsNullOrWhiteSpace(searchQuery))
         {
-            var q = searchQuery.ToLower();
-            query = query.Where(s => s.Code.ToLower().Contains(q) || s.Name.ToLower().Contains(q));
+            var pattern = $"%{searchQuery}%";
+            query = query.Where(s => EF.Functions.ILike(s.Code, pattern) || EF.Functions.ILike(s.Name, pattern));
         }
-        
+
         if (category.HasValue)
             query = query.Where(s => s.Category == category.Value);
-        
+
         return await query
             .OrderBy(s => s.Category).ThenBy(s => s.Code)
             .Skip((page - 1) * pageSize)
@@ -62,16 +62,16 @@ public class ServiceCatalogRepository : IServiceCatalogRepository
     public async Task<int> CountAsync(string? searchQuery, ServiceCategory? category = null, CancellationToken ct = default)
     {
         var query = _context.Set<ServiceCatalog>().AsQueryable();
-        
+
         if (!string.IsNullOrWhiteSpace(searchQuery))
         {
-            var q = searchQuery.ToLower();
-            query = query.Where(s => s.Code.ToLower().Contains(q) || s.Name.ToLower().Contains(q));
+            var pattern = $"%{searchQuery}%";
+            query = query.Where(s => EF.Functions.ILike(s.Code, pattern) || EF.Functions.ILike(s.Name, pattern));
         }
-        
+
         if (category.HasValue)
             query = query.Where(s => s.Category == category.Value);
-        
+
         return await query.CountAsync(ct);
     }
 

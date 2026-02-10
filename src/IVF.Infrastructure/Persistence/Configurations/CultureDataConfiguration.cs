@@ -16,6 +16,8 @@ public class CultureDataConfiguration : IEntityTypeConfiguration<CultureData>
             .HasForeignKey<CultureData>(t => t.CycleId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        builder.HasIndex(t => t.CycleId);
+
         builder.HasQueryFilter(t => !t.IsDeleted);
     }
 }

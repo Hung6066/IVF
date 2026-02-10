@@ -8,13 +8,14 @@ namespace IVF.Domain.Entities;
 public class LutealPhaseData : BaseEntity
 {
     public Guid CycleId { get; private set; }
-    public string? LutealDrug1 { get; private set; }
-    public string? LutealDrug2 { get; private set; }
-    public string? EndometriumDrug1 { get; private set; }
-    public string? EndometriumDrug2 { get; private set; }
 
     // Navigation
     public virtual TreatmentCycle Cycle { get; private set; } = null!;
+
+    /// <summary>
+    /// Normalized child collection — replaces LutealDrug1/2 and EndometriumDrug1/2 repeated columns.
+    /// </summary>
+    public virtual ICollection<LutealPhaseDrug> Drugs { get; private set; } = new List<LutealPhaseDrug>();
 
     private LutealPhaseData() { }
 
@@ -23,16 +24,13 @@ public class LutealPhaseData : BaseEntity
         return new LutealPhaseData { CycleId = cycleId };
     }
 
-    public void Update(
-        string? lutealDrug1,
-        string? lutealDrug2,
-        string? endometriumDrug1,
-        string? endometriumDrug2)
+    public void Update() => SetUpdated();
+
+    public void SetDrugs(IEnumerable<LutealPhaseDrug> drugs)
     {
-        LutealDrug1 = lutealDrug1;
-        LutealDrug2 = lutealDrug2;
-        EndometriumDrug1 = endometriumDrug1;
-        EndometriumDrug2 = endometriumDrug2;
+        Drugs.Clear();
+        foreach (var drug in drugs)
+            Drugs.Add(drug);
         SetUpdated();
     }
 }

@@ -14,10 +14,10 @@ public class SemenAnalysisRepository : ISemenAnalysisRepository
         => await _context.SemenAnalyses.FirstOrDefaultAsync(s => s.Id == id, ct);
 
     public async Task<IReadOnlyList<SemenAnalysis>> GetByPatientIdAsync(Guid patientId, CancellationToken ct = default)
-        => await _context.SemenAnalyses.Where(s => s.PatientId == patientId).OrderByDescending(s => s.AnalysisDate).ToListAsync(ct);
+        => await _context.SemenAnalyses.AsNoTracking().Where(s => s.PatientId == patientId).OrderByDescending(s => s.AnalysisDate).ToListAsync(ct);
 
     public async Task<IReadOnlyList<SemenAnalysis>> GetByCycleIdAsync(Guid cycleId, CancellationToken ct = default)
-        => await _context.SemenAnalyses.Where(s => s.CycleId == cycleId).OrderByDescending(s => s.AnalysisDate).ToListAsync(ct);
+        => await _context.SemenAnalyses.AsNoTracking().Where(s => s.CycleId == cycleId).OrderByDescending(s => s.AnalysisDate).ToListAsync(ct);
 
     public async Task<(IReadOnlyList<SemenAnalysis> Items, int Total)> SearchAsync(string? query, DateTime? fromDate, DateTime? toDate, string? status, int page, int pageSize, CancellationToken ct = default)
     {
@@ -40,13 +40,13 @@ public class SemenAnalysisRepository : ISemenAnalysisRepository
         {
             q = q.Where(s => s.AnalysisDate <= toDate.Value);
         }
-        
+
         if (!string.IsNullOrEmpty(status))
         {
-             if (status == "Pending")
-                 q = q.Where(s => s.Concentration == null);
-             else if (status == "Completed")
-                 q = q.Where(s => s.Concentration != null);
+            if (status == "Pending")
+                q = q.Where(s => s.Concentration == null);
+            else if (status == "Completed")
+                q = q.Where(s => s.Concentration != null);
         }
 
         var total = await q.CountAsync(ct);
@@ -55,35 +55,38 @@ public class SemenAnalysisRepository : ISemenAnalysisRepository
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(ct);
-            
+
         return (items, total);
     }
 
     public async Task<int> GetCountByDateAsync(DateTime date, CancellationToken ct = default)
     {
-        return await _context.SemenAnalyses.CountAsync(s => s.AnalysisDate.Date == date.Date, ct);
+        // Use range comparison instead of .Date extraction to enable index usage
+        var start = date.Date;
+        var end = start.AddDays(1);
+        return await _context.SemenAnalyses.CountAsync(s => s.AnalysisDate >= start && s.AnalysisDate < end, ct);
     }
 
     public async Task<decimal?> GetAverageConcentrationAsync(CancellationToken ct = default)
     {
-        // AverageAsync can throw if no elements, handle carefully or use AverageAsync on nullable?
-        // Actually AverageAsync on decimal? works and returns null if empty? No, standard LINQ behavior.
-        // Let's check if any exists first or catch exception?
-        // Safe way:
-        var concentrations = await _context.SemenAnalyses
+        // Compute average server-side — eliminates loading all values to memory
+        return await _context.SemenAnalyses
             .Where(s => s.Concentration.HasValue)
-            .Select(s => s.Concentration!.Value)
-            .ToListAsync(ct);
-            
-        if (!concentrations.Any()) return null;
-        return concentrations.Average();
+            .Select(s => (decimal?)s.Concentration!.Value)
+            .DefaultIfEmpty()
+            .AverageAsync(ct);
     }
 
     public async Task<Dictionary<string, int>> GetConcentrationDistributionAsync(CancellationToken ct = default)
     {
-        var concentrations = await _context.SemenAnalyses
+        // Server-side categorization — eliminates loading all concentrations to memory
+        var groups = await _context.SemenAnalyses
             .Where(s => s.Concentration.HasValue)
-            .Select(s => s.Concentration!.Value)
+            .GroupBy(s =>
+                s.Concentration >= 15 ? "Normozoospermia" :
+                s.Concentration >= 5 ? "Oligozoospermia" :
+                s.Concentration > 0 ? "Severe Oligo" : "Azoospermia")
+            .Select(g => new { Category = g.Key, Count = g.Count() })
             .ToListAsync(ct);
 
         var dist = new Dictionary<string, int>
@@ -94,13 +97,8 @@ public class SemenAnalysisRepository : ISemenAnalysisRepository
             { "Azoospermia", 0 }
         };
 
-        foreach (var c in concentrations)
-        {
-            if (c >= 15) dist["Normozoospermia"]++;
-            else if (c >= 5) dist["Oligozoospermia"]++;
-            else if (c > 0) dist["Severe Oligo"]++;
-            else dist["Azoospermia"]++; // 0
-        }
+        foreach (var g in groups)
+            dist[g.Category] = g.Count;
 
         return dist;
     }

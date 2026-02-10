@@ -19,6 +19,8 @@ public class PregnancyDataConfiguration : IEntityTypeConfiguration<PregnancyData
             .HasForeignKey<PregnancyData>(t => t.CycleId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        builder.HasIndex(t => t.CycleId);
+
         builder.HasQueryFilter(t => !t.IsDeleted);
     }
 }

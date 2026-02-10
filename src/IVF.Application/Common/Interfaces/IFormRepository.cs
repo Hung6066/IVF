@@ -39,6 +39,9 @@ public interface IFormRepository
         int pageSize = 20,
         CancellationToken ct = default);
     Task<FormResponse?> GetResponseByIdAsync(Guid id, bool includeFieldValues = true, CancellationToken ct = default);
+    Task<(List<FormResponse> Items, int Total)> GetResponsesWithFieldValuesAsync(
+        Guid templateId, Guid? patientId = null, DateTime? from = null, DateTime? to = null,
+        CancellationToken ct = default);
     Task<FormResponse> AddResponseAsync(FormResponse response, CancellationToken ct = default);
     Task UpdateResponseAsync(FormResponse response, CancellationToken ct = default);
     Task DeleteResponseAsync(Guid id, CancellationToken ct = default);
@@ -49,6 +52,14 @@ public interface IFormRepository
     Task<ReportTemplate> AddReportTemplateAsync(ReportTemplate reportTemplate, CancellationToken ct = default);
     Task UpdateReportTemplateAsync(ReportTemplate reportTemplate, CancellationToken ct = default);
     Task DeleteReportTemplateAsync(Guid id, CancellationToken ct = default);
+
+    // Linked Field Sources (Explicit field-to-field links)
+    Task<List<LinkedFieldSource>> GetLinkedFieldSourcesByTargetTemplateAsync(Guid targetTemplateId, CancellationToken ct = default);
+    Task<List<LinkedFieldSource>> GetLinkedFieldSourcesByTargetFieldAsync(Guid targetFieldId, CancellationToken ct = default);
+    Task<LinkedFieldSource?> GetLinkedFieldSourceByIdAsync(Guid id, CancellationToken ct = default);
+    Task<LinkedFieldSource> AddLinkedFieldSourceAsync(LinkedFieldSource source, CancellationToken ct = default);
+    Task UpdateLinkedFieldSourceAsync(LinkedFieldSource source, CancellationToken ct = default);
+    Task DeleteLinkedFieldSourceAsync(Guid id, CancellationToken ct = default);
 
     // Patient Concept Snapshots (Cross-Form Linked Data)
     Task<List<PatientConceptSnapshot>> GetSnapshotsByPatientAsync(Guid patientId, Guid? cycleId = null, CancellationToken ct = default);

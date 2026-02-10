@@ -11,14 +11,6 @@ public class StimulationDataConfiguration : IEntityTypeConfiguration<Stimulation
         builder.ToTable("stimulation_data");
         builder.HasKey(t => t.Id);
 
-        builder.Property(t => t.Drug1).HasMaxLength(100);
-        builder.Property(t => t.Drug1Posology).HasMaxLength(50);
-        builder.Property(t => t.Drug2).HasMaxLength(100);
-        builder.Property(t => t.Drug2Posology).HasMaxLength(50);
-        builder.Property(t => t.Drug3).HasMaxLength(100);
-        builder.Property(t => t.Drug3Posology).HasMaxLength(50);
-        builder.Property(t => t.Drug4).HasMaxLength(100);
-        builder.Property(t => t.Drug4Posology).HasMaxLength(50);
         builder.Property(t => t.TriggerDrug).HasMaxLength(100);
         builder.Property(t => t.TriggerDrug2).HasMaxLength(100);
         builder.Property(t => t.ProcedureType).HasMaxLength(50);
@@ -33,6 +25,8 @@ public class StimulationDataConfiguration : IEntityTypeConfiguration<Stimulation
             .WithOne(c => c.Stimulation)
             .HasForeignKey<StimulationData>(t => t.CycleId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasIndex(t => t.CycleId);
 
         builder.HasQueryFilter(t => !t.IsDeleted);
     }

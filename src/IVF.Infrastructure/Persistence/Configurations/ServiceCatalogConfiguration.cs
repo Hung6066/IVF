@@ -8,7 +8,7 @@ public class ServiceCatalogConfiguration : IEntityTypeConfiguration<ServiceCatal
 {
     public void Configure(EntityTypeBuilder<ServiceCatalog> builder)
     {
-        builder.ToTable("ServiceCatalogs");
+        builder.ToTable("service_catalogs");
 
         builder.HasKey(s => s.Id);
 
@@ -40,5 +40,7 @@ public class ServiceCatalogConfiguration : IEntityTypeConfiguration<ServiceCatal
         // Index for filtering
         builder.HasIndex(s => s.Category);
         builder.HasIndex(s => s.IsActive);
+
+        builder.HasQueryFilter(s => !s.IsDeleted);
     }
 }

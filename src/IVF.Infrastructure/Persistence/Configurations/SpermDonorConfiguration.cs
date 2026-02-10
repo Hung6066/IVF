@@ -22,9 +22,10 @@ public class SpermDonorConfiguration : IEntityTypeConfiguration<SpermDonor>
         builder.Property(d => d.Education).HasMaxLength(100);
         builder.Property(d => d.Occupation).HasMaxLength(100);
 
-        builder.HasOne(d => d.Patient).WithMany().HasForeignKey(d => d.PatientId);
+        builder.HasOne(d => d.Patient).WithMany().HasForeignKey(d => d.PatientId).OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(d => d.DonorCode).IsUnique();
+        builder.HasIndex(d => d.PatientId);
         builder.HasIndex(d => d.Status);
         builder.HasQueryFilter(d => !d.IsDeleted);
     }

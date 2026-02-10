@@ -17,6 +17,7 @@ public class TreatmentCycleRepository : ITreatmentCycleRepository
 
     public async Task<TreatmentCycle?> GetByIdWithDetailsAsync(Guid id, CancellationToken ct = default)
         => await _context.TreatmentCycles
+            .AsNoTracking()
             .Include(c => c.Couple).ThenInclude(c => c.Wife)
             .Include(c => c.Couple).ThenInclude(c => c.Husband)
             .Include(c => c.Ultrasounds)
@@ -25,6 +26,7 @@ public class TreatmentCycleRepository : ITreatmentCycleRepository
 
     public async Task<IReadOnlyList<TreatmentCycle>> GetByCoupleIdAsync(Guid coupleId, CancellationToken ct = default)
         => await _context.TreatmentCycles
+            .AsNoTracking()
             .Where(c => c.CoupleId == coupleId)
             .OrderByDescending(c => c.StartDate)
             .ToListAsync(ct);
@@ -123,6 +125,7 @@ public class TreatmentCycleRepository : ITreatmentCycleRepository
     public async Task<IReadOnlyList<TreatmentCycle>> GetActiveCyclesAsync(CancellationToken ct = default)
     {
         return await _context.TreatmentCycles
+            .AsNoTracking()
             .Include(c => c.Couple).ThenInclude(cp => cp.Wife)
             .Include(c => c.Couple).ThenInclude(cp => cp.Husband)
             .Where(c => c.Outcome == Domain.Enums.CycleOutcome.Ongoing)
@@ -133,18 +136,19 @@ public class TreatmentCycleRepository : ITreatmentCycleRepository
     public async Task<IReadOnlyList<TreatmentCycle>> GetAllWithDetailsAsync(CancellationToken ct = default)
     {
         return await _context.TreatmentCycles
+            .AsNoTracking()
             .Include(c => c.Couple).ThenInclude(cp => cp.Wife)
             .Include(c => c.Couple).ThenInclude(cp => cp.Husband)
             .Include(c => c.Stimulation)
-            .Include(c => c.Stimulation)
+            .Include(c => c.Embryos)
             .OrderByDescending(c => c.StartDate)
             .ToListAsync(ct);
     }
 
     public async Task<IReadOnlyList<TreatmentCycle>> SearchAsync(string query, Guid? patientId = null, CancellationToken ct = default)
     {
-        var q = (query ?? "").ToLower();
         var baseQuery = _context.TreatmentCycles
+            .AsNoTracking()
             .Include(c => c.Couple).ThenInclude(cp => cp.Wife)
             .Include(c => c.Couple).ThenInclude(cp => cp.Husband)
             .AsQueryable();
@@ -154,10 +158,10 @@ public class TreatmentCycleRepository : ITreatmentCycleRepository
             baseQuery = baseQuery.Where(c => c.Couple.WifeId == patientId || c.Couple.HusbandId == patientId);
         }
 
-        if (!string.IsNullOrWhiteSpace(q))
+        if (!string.IsNullOrWhiteSpace(query))
         {
-            baseQuery = baseQuery.Where(c => c.CycleCode.ToLower().Contains(q) || 
-                        (c.Couple != null && (c.Couple.Wife.FullName.ToLower().Contains(q) || c.Couple.Husband.FullName.ToLower().Contains(q))));
+            baseQuery = baseQuery.Where(c => EF.Functions.ILike(c.CycleCode, $"%{query}%") ||
+                        (c.Couple != null && (EF.Functions.ILike(c.Couple.Wife.FullName, $"%{query}%") || EF.Functions.ILike(c.Couple.Husband.FullName, $"%{query}%"))));
         }
 
         return await baseQuery

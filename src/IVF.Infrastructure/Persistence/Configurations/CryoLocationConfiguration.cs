@@ -32,5 +32,7 @@ public class CryoLocationConfiguration : IEntityTypeConfiguration<CryoLocation>
             .HasMaxLength(20);
 
         builder.HasIndex(c => new { c.Tank, c.Canister, c.Cane, c.Goblet, c.Straw }).IsUnique();
+
+        builder.HasQueryFilter(c => !c.IsDeleted);
     }
 }

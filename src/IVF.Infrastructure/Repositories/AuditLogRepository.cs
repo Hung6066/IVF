@@ -8,17 +8,19 @@ namespace IVF.Infrastructure.Repositories;
 public class AuditLogRepository : IAuditLogRepository
 {
     private readonly IvfDbContext _context;
-    
+
     public AuditLogRepository(IvfDbContext context) => _context = context;
 
     public async Task<IReadOnlyList<AuditLog>> GetByEntityAsync(string entityType, Guid entityId, CancellationToken ct = default)
         => await _context.AuditLogs
+            .AsNoTracking()
             .Where(a => a.EntityType == entityType && a.EntityId == entityId)
             .OrderByDescending(a => a.CreatedAt)
             .ToListAsync(ct);
 
     public async Task<IReadOnlyList<AuditLog>> GetByUserAsync(Guid userId, int take = 100, CancellationToken ct = default)
         => await _context.AuditLogs
+            .AsNoTracking()
             .Where(a => a.UserId == userId)
             .OrderByDescending(a => a.CreatedAt)
             .Take(take)
@@ -26,6 +28,7 @@ public class AuditLogRepository : IAuditLogRepository
 
     public async Task<IReadOnlyList<AuditLog>> GetRecentAsync(int take = 100, CancellationToken ct = default)
         => await _context.AuditLogs
+            .AsNoTracking()
             .OrderByDescending(a => a.CreatedAt)
             .Take(take)
             .ToListAsync(ct);
@@ -44,16 +47,16 @@ public class AuditLogRepository : IAuditLogRepository
 
         if (!string.IsNullOrEmpty(entityType))
             query = query.Where(a => a.EntityType == entityType);
-        
+
         if (!string.IsNullOrEmpty(action))
             query = query.Where(a => a.Action == action);
-        
+
         if (userId.HasValue)
             query = query.Where(a => a.UserId == userId);
-        
+
         if (from.HasValue)
             query = query.Where(a => a.CreatedAt >= from);
-        
+
         if (to.HasValue)
             query = query.Where(a => a.CreatedAt <= to);
 

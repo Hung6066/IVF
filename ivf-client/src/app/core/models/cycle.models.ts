@@ -72,24 +72,20 @@ export interface TreatmentIndication {
     previousTreatmentsOther: number;
 }
 
+export interface StimulationDrug {
+    drugName: string;
+    duration: number;
+    posology?: string;
+    sortOrder: number;
+}
+
 export interface StimulationData {
     id: string;
     cycleId: string;
     lastMenstruation?: string;
     startDate?: string;
     startDay?: number;
-    drug1?: string;
-    drug1Duration: number;
-    drug1Posology?: string;
-    drug2?: string;
-    drug2Duration: number;
-    drug2Posology?: string;
-    drug3?: string;
-    drug3Duration: number;
-    drug3Posology?: string;
-    drug4?: string;
-    drug4Duration: number;
-    drug4Posology?: string;
+    drugs: StimulationDrug[];
     size12Follicle?: number;
     size14Follicle?: number;
     endometriumThickness?: number;
@@ -128,13 +124,16 @@ export interface TransferData {
     labNote?: string;
 }
 
+export interface LutealPhaseDrug {
+    drugName: string;
+    category: 'Luteal' | 'Endometrium';
+    sortOrder: number;
+}
+
 export interface LutealPhaseData {
     id: string;
     cycleId: string;
-    lutealDrug1?: string;
-    lutealDrug2?: string;
-    endometriumDrug1?: string;
-    endometriumDrug2?: string;
+    drugs: LutealPhaseDrug[];
 }
 
 export interface PregnancyData {
@@ -149,6 +148,13 @@ export interface PregnancyData {
     notes?: string;
 }
 
+export interface BirthOutcome {
+    gender: string;
+    weight?: number;
+    isLiveBirth: boolean;
+    sortOrder: number;
+}
+
 export interface BirthData {
     id: string;
     cycleId: string;
@@ -157,8 +163,7 @@ export interface BirthData {
     deliveryMethod?: string;
     liveBirths: number;
     stillbirths: number;
-    babyGenders?: string;
-    birthWeights?: string;
+    outcomes: BirthOutcome[];
     complications?: string;
 }
 

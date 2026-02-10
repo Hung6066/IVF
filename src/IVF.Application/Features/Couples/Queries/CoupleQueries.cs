@@ -28,75 +28,54 @@ public record PatientDto(
 );
 
 // ==================== Handlers ====================
-public class GetCoupleByIdHandler(ICoupleRepository repo, IPatientRepository patientRepo) 
+public class GetCoupleByIdHandler(ICoupleRepository repo)
     : IRequestHandler<GetCoupleByIdQuery, Result<CoupleDto>>
 {
     public async Task<Result<CoupleDto>> Handle(GetCoupleByIdQuery request, CancellationToken ct)
     {
-        var couple = await repo.GetByIdAsync(request.Id);
+        // GetByIdAsync already includes Wife + Husband — no extra queries needed
+        var couple = await repo.GetByIdAsync(request.Id, ct);
         if (couple == null)
             return Result<CoupleDto>.Failure("Couple not found");
 
-        var wife = await patientRepo.GetByIdAsync(couple.WifeId);
-        var husband = await patientRepo.GetByIdAsync(couple.HusbandId);
-
-        return Result<CoupleDto>.Success(new CoupleDto(
-            couple.Id,
-            new PatientDto(wife!.Id, wife.PatientCode, wife.FullName),
-            new PatientDto(husband!.Id, husband.PatientCode, husband.FullName),
-            couple.MarriageDate,
-            couple.InfertilityYears,
-            couple.SpermDonorId
-        ));
+        return Result<CoupleDto>.Success(CoupleMapper.MapToDto(couple));
     }
 }
 
-public class GetAllCouplesHandler(ICoupleRepository repo, IPatientRepository patientRepo) 
+public class GetAllCouplesHandler(ICoupleRepository repo)
     : IRequestHandler<GetAllCouplesQuery, IEnumerable<CoupleDto>>
 {
     public async Task<IEnumerable<CoupleDto>> Handle(GetAllCouplesQuery request, CancellationToken ct)
     {
-        var couples = await repo.GetAllAsync();
-        var result = new List<CoupleDto>();
-
-        foreach (var couple in couples)
-        {
-            var wife = await patientRepo.GetByIdAsync(couple.WifeId);
-            var husband = await patientRepo.GetByIdAsync(couple.HusbandId);
-
-            result.Add(new CoupleDto(
-                couple.Id,
-                new PatientDto(wife!.Id, wife.PatientCode, wife.FullName),
-                new PatientDto(husband!.Id, husband.PatientCode, husband.FullName),
-                couple.MarriageDate,
-                couple.InfertilityYears,
-                couple.SpermDonorId
-            ));
-        }
-
-        return result;
+        // Single query with Include — eliminates N+1 (was 2N+1 queries)
+        var couples = await repo.GetAllAsync(ct);
+        return couples.Select(CoupleMapper.MapToDto);
     }
 }
 
-public class GetCoupleByPatientIdHandler(ICoupleRepository repo, IPatientRepository patientRepo) 
+public class GetCoupleByPatientIdHandler(ICoupleRepository repo)
     : IRequestHandler<GetCoupleByPatientIdQuery, Result<CoupleDto>>
 {
     public async Task<Result<CoupleDto>> Handle(GetCoupleByPatientIdQuery request, CancellationToken ct)
     {
+        // GetByPatientIdAsync already includes Wife + Husband — no extra queries needed
         var couple = await repo.GetByPatientIdAsync(request.PatientId, ct);
         if (couple == null)
             return Result<CoupleDto>.Failure("Couple not found for this patient");
 
-        var wife = await patientRepo.GetByIdAsync(couple.WifeId, ct);
-        var husband = await patientRepo.GetByIdAsync(couple.HusbandId, ct);
-
-        return Result<CoupleDto>.Success(new CoupleDto(
-            couple.Id,
-            new PatientDto(wife!.Id, wife.PatientCode, wife.FullName),
-            new PatientDto(husband!.Id, husband.PatientCode, husband.FullName),
-            couple.MarriageDate,
-            couple.InfertilityYears,
-            couple.SpermDonorId
-        ));
+        return Result<CoupleDto>.Success(CoupleMapper.MapToDto(couple));
     }
+}
+
+// Shared mapping to avoid N+1 re-fetches — uses already-loaded navigations
+internal static class CoupleMapper
+{
+    public static CoupleDto MapToDto(Couple couple) => new(
+        couple.Id,
+        new PatientDto(couple.Wife!.Id, couple.Wife.PatientCode, couple.Wife.FullName),
+        new PatientDto(couple.Husband!.Id, couple.Husband.PatientCode, couple.Husband.FullName),
+        couple.MarriageDate,
+        couple.InfertilityYears,
+        couple.SpermDonorId
+    );
 }

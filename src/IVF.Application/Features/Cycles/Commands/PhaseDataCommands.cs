@@ -85,15 +85,14 @@ public class UpdateTreatmentIndicationHandler : IRequestHandler<UpdateTreatmentI
 }
 
 // ==================== UPDATE STIMULATION DATA ====================
+public record StimulationDrugInput(string DrugName, int Duration, string? Posology);
+
 public record UpdateStimulationDataCommand(
     Guid CycleId,
     DateTime? LastMenstruation,
     DateTime? StartDate,
     int? StartDay,
-    string? Drug1, int Drug1Duration, string? Drug1Posology,
-    string? Drug2, int Drug2Duration, string? Drug2Posology,
-    string? Drug3, int Drug3Duration, string? Drug3Posology,
-    string? Drug4, int Drug4Duration, string? Drug4Posology,
+    List<StimulationDrugInput>? Drugs,
     int? Size12Follicle,
     int? Size14Follicle,
     decimal? EndometriumThickness,
@@ -145,16 +144,19 @@ public class UpdateStimulationDataHandler : IRequestHandler<UpdateStimulationDat
 
         data.Update(
             r.LastMenstruation, r.StartDate, r.StartDay,
-            r.Drug1, r.Drug1Duration, r.Drug1Posology,
-            r.Drug2, r.Drug2Duration, r.Drug2Posology,
-            r.Drug3, r.Drug3Duration, r.Drug3Posology,
-            r.Drug4, r.Drug4Duration, r.Drug4Posology,
             r.Size12Follicle, r.Size14Follicle, r.EndometriumThickness,
             r.TriggerDrug, r.TriggerDrug2,
             r.HcgDate, r.HcgDate2, r.HcgTime, r.HcgTime2,
             r.LhLab, r.E2Lab, r.P4Lab,
             r.ProcedureType, r.AspirationDate, r.ProcedureDate, r.AspirationNo,
             r.TechniqueWife, r.TechniqueHusband);
+
+        // Update normalized drug collection
+        if (r.Drugs != null)
+        {
+            var drugEntities = r.Drugs.Select((d, i) => StimulationDrug.Create(data.Id, i + 1, d.DrugName, d.Duration, d.Posology));
+            data.SetDrugs(drugEntities);
+        }
 
         // Auto-advance logic
         if (r.AspirationDate.HasValue && cycle.CurrentPhase < CyclePhase.EggRetrieval)
@@ -274,12 +276,11 @@ public class UpdateTransferDataHandler : IRequestHandler<UpdateTransferDataComma
 }
 
 // ==================== UPDATE LUTEAL PHASE DATA ====================
+public record LutealPhaseDrugInput(string DrugName, string Category);
+
 public record UpdateLutealPhaseDataCommand(
     Guid CycleId,
-    string? LutealDrug1,
-    string? LutealDrug2,
-    string? EndometriumDrug1,
-    string? EndometriumDrug2
+    List<LutealPhaseDrugInput>? Drugs
 ) : IRequest<Result<LutealPhaseDataDto>>;
 
 public class UpdateLutealPhaseDataHandler : IRequestHandler<UpdateLutealPhaseDataCommand, Result<LutealPhaseDataDto>>
@@ -311,7 +312,14 @@ public class UpdateLutealPhaseDataHandler : IRequestHandler<UpdateLutealPhaseDat
             await _phaseRepo.AddLutealPhaseAsync(data, ct);
         }
 
-        data.Update(r.LutealDrug1, r.LutealDrug2, r.EndometriumDrug1, r.EndometriumDrug2);
+        data.Update();
+
+        // Update normalized drug collection
+        if (r.Drugs != null)
+        {
+            var drugEntities = r.Drugs.Select((d, i) => LutealPhaseDrug.Create(data.Id, i + 1, d.DrugName, d.Category));
+            data.SetDrugs(drugEntities);
+        }
 
         // Auto-advance
         if (cycle.CurrentPhase < CyclePhase.LutealSupport)
@@ -378,6 +386,8 @@ public class UpdatePregnancyDataHandler : IRequestHandler<UpdatePregnancyDataCom
 }
 
 // ==================== UPDATE BIRTH DATA ====================
+public record BirthOutcomeInput(string Gender, decimal? Weight, bool IsLiveBirth = true);
+
 public record UpdateBirthDataCommand(
     Guid CycleId,
     DateTime? DeliveryDate,
@@ -385,8 +395,7 @@ public record UpdateBirthDataCommand(
     string? DeliveryMethod,
     int LiveBirths,
     int Stillbirths,
-    string? BabyGenders,
-    string? BirthWeights,
+    List<BirthOutcomeInput>? Outcomes,
     string? Complications
 ) : IRequest<Result<BirthDataDto>>;
 
@@ -419,7 +428,15 @@ public class UpdateBirthDataHandler : IRequestHandler<UpdateBirthDataCommand, Re
             await _phaseRepo.AddBirthAsync(data, ct);
         }
 
-        data.Update(r.DeliveryDate, r.GestationalWeeks, r.DeliveryMethod, r.LiveBirths, r.Stillbirths, r.BabyGenders, r.BirthWeights, r.Complications);
+        data.Update(r.DeliveryDate, r.GestationalWeeks, r.DeliveryMethod, r.LiveBirths, r.Stillbirths, r.Complications);
+
+        // Update normalized outcomes collection
+        if (r.Outcomes != null)
+        {
+            var outcomeEntities = r.Outcomes.Select((o, i) => BirthOutcome.Create(data.Id, i + 1, o.Gender, o.Weight, o.IsLiveBirth));
+            data.SetOutcomes(outcomeEntities);
+        }
+
         await _unitOfWork.SaveChangesAsync(ct);
         return Result<BirthDataDto>.Success(BirthDataDto.FromEntity(data));
     }
@@ -482,10 +499,11 @@ public record TreatmentIndicationDto(
         e.SubType, e.Source, e.ProcedurePlace);
 }
 
+public record StimulationDrugDto(string DrugName, int Duration, string? Posology, int SortOrder);
+
 public record StimulationDataDto(
     Guid Id, Guid CycleId, DateTime? LastMenstruation, DateTime? StartDate, int? StartDay,
-    string? Drug1, int Drug1Duration, string? Drug1Posology,
-    string? Drug2, int Drug2Duration, string? Drug2Posology,
+    List<StimulationDrugDto> Drugs,
     int? Size12Follicle, int? Size14Follicle, decimal? EndometriumThickness,
     string? TriggerDrug, DateTime? HcgDate, TimeSpan? HcgTime,
     DateTime? AspirationDate, int? AspirationNo
@@ -493,8 +511,7 @@ public record StimulationDataDto(
 {
     public static StimulationDataDto FromEntity(StimulationData e) => new(
         e.Id, e.CycleId, e.LastMenstruation, e.StartDate, e.StartDay,
-        e.Drug1, e.Drug1Duration, e.Drug1Posology,
-        e.Drug2, e.Drug2Duration, e.Drug2Posology,
+        e.Drugs.OrderBy(d => d.SortOrder).Select(d => new StimulationDrugDto(d.DrugName, d.Duration, d.Posology, d.SortOrder)).ToList(),
         e.Size12Follicle, e.Size14Follicle, e.EndometriumThickness,
         e.TriggerDrug, e.HcgDate, e.HcgTime,
         e.AspirationDate, e.AspirationNo);
@@ -519,13 +536,15 @@ public record TransferDataDto(
         e.Id, e.CycleId, e.TransferDate, e.ThawingDate, e.DayOfTransfered, e.LabNote);
 }
 
+public record LutealPhaseDrugDto(string DrugName, string Category, int SortOrder);
+
 public record LutealPhaseDataDto(
-    Guid Id, Guid CycleId, string? LutealDrug1, string? LutealDrug2,
-    string? EndometriumDrug1, string? EndometriumDrug2
+    Guid Id, Guid CycleId, List<LutealPhaseDrugDto> Drugs
 )
 {
     public static LutealPhaseDataDto FromEntity(LutealPhaseData e) => new(
-        e.Id, e.CycleId, e.LutealDrug1, e.LutealDrug2, e.EndometriumDrug1, e.EndometriumDrug2);
+        e.Id, e.CycleId,
+        e.Drugs.OrderBy(d => d.SortOrder).Select(d => new LutealPhaseDrugDto(d.DrugName, d.Category, d.SortOrder)).ToList());
 }
 
 public record PregnancyDataDto(
@@ -538,14 +557,18 @@ public record PregnancyDataDto(
         e.GestationalSacs, e.FetalHeartbeats, e.DueDate, e.Notes);
 }
 
+public record BirthOutcomeDto(string Gender, decimal? Weight, bool IsLiveBirth, int SortOrder);
+
 public record BirthDataDto(
     Guid Id, Guid CycleId, DateTime? DeliveryDate, int GestationalWeeks, string? DeliveryMethod,
-    int LiveBirths, int Stillbirths, string? BabyGenders, string? BirthWeights, string? Complications
+    int LiveBirths, int Stillbirths, List<BirthOutcomeDto> Outcomes, string? Complications
 )
 {
     public static BirthDataDto FromEntity(BirthData e) => new(
         e.Id, e.CycleId, e.DeliveryDate, e.GestationalWeeks, e.DeliveryMethod,
-        e.LiveBirths, e.Stillbirths, e.BabyGenders, e.BirthWeights, e.Complications);
+        e.LiveBirths, e.Stillbirths,
+        e.Outcomes.OrderBy(o => o.SortOrder).Select(o => new BirthOutcomeDto(o.Gender, o.Weight, o.IsLiveBirth, o.SortOrder)).ToList(),
+        e.Complications);
 }
 
 public record AdverseEventDataDto(

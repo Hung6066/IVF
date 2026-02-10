@@ -16,12 +16,13 @@ import {
   ValidationRule,
 } from '../forms.service';
 import { ConceptPickerComponent } from '../concept-picker/concept-picker.component';
+import { LinkedFieldConfigComponent } from '../linked-field-config/linked-field-config.component';
 import { ConceptService, Concept } from '../services/concept.service';
 
 @Component({
   selector: 'app-form-builder',
   standalone: true,
-  imports: [CommonModule, FormsModule, DragDropModule, ConceptPickerComponent],
+  imports: [CommonModule, FormsModule, DragDropModule, ConceptPickerComponent, LinkedFieldConfigComponent],
   templateUrl: './form-builder.component.html',
   styleUrls: ['./form-builder.component.scss'],
 })
@@ -569,6 +570,13 @@ export class FormBuilderComponent implements OnInit {
   selectedFieldForConcept?: FormField;
   linkedConcepts = new Map<string, Concept>();
   private conceptService = inject(ConceptService);
+
+  // ===== Linked Field Config =====
+  showLinkedFieldConfig = false;
+
+  openLinkedFieldConfig() {
+    this.showLinkedFieldConfig = true;
+  }
 
   // Inline concept search
   conceptSearchTerm = '';

@@ -8,7 +8,7 @@ public class ConceptConfiguration : IEntityTypeConfiguration<Concept>
 {
     public void Configure(EntityTypeBuilder<Concept> builder)
     {
-        builder.ToTable("Concepts");
+        builder.ToTable("concepts");
 
         builder.HasKey(c => c.Id);
 
@@ -29,6 +29,8 @@ public class ConceptConfiguration : IEntityTypeConfiguration<Concept>
             .HasDefaultValue("LOCAL");
 
         builder.Property(c => c.ConceptType)
+            .HasConversion<string>()
+            .HasMaxLength(30)
             .IsRequired();
 
         // PostgreSQL Full-Text Search (TsVector)
@@ -40,7 +42,7 @@ public class ConceptConfiguration : IEntityTypeConfiguration<Concept>
                     coalesce(""Code"", '') || ' ' || 
                     coalesce(""Display"", '') || ' ' ||
                     coalesce(""Description"", '')
-                )", 
+                )",
                 stored: true);
 
         // GIN index for fast full-text search
@@ -67,5 +69,7 @@ public class ConceptConfiguration : IEntityTypeConfiguration<Concept>
         builder.HasIndex(c => c.Code).IsUnique();
         builder.HasIndex(c => new { c.System, c.Code });
         builder.HasIndex(c => c.ConceptType);
+
+        builder.HasQueryFilter(c => !c.IsDeleted);
     }
 }

@@ -43,6 +43,13 @@ public class QueueTicketConfiguration : IEntityTypeConfiguration<QueueTicket>
             .HasForeignKey(q => q.CalledByUserId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        // Composite: queue display queries (active tickets by dept)
         builder.HasIndex(q => new { q.DepartmentCode, q.IssuedAt });
+        builder.HasIndex(q => q.PatientId);
+        builder.HasIndex(q => q.CycleId);
+        builder.HasIndex(q => q.Status);
+        builder.HasIndex(q => new { q.Status, q.DepartmentCode, q.IssuedAt });
+
+        builder.HasQueryFilter(q => !q.IsDeleted);
     }
 }

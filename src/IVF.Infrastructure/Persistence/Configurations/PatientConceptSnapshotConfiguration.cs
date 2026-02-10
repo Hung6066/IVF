@@ -45,15 +45,20 @@ public class PatientConceptSnapshotConfiguration : IEntityTypeConfiguration<Pati
         // Use COALESCE to handle null CycleId
         builder.HasIndex(s => new { s.PatientId, s.ConceptId, s.CycleId })
             .IsUnique()
-            .HasFilter("is_deleted = false");
+            .HasFilter("\"IsDeleted\" = false");
 
         // Fast lookup: all known data for a patient
         builder.HasIndex(s => s.PatientId)
-            .HasFilter("is_deleted = false");
+            .HasFilter("\"IsDeleted\" = false");
 
         // Fast lookup: concept timeline across patients
         builder.HasIndex(s => new { s.ConceptId, s.PatientId })
-            .HasFilter("is_deleted = false");
+            .HasFilter("\"IsDeleted\" = false");
+
+        // FK lookup indexes
+        builder.HasIndex(s => s.FormResponseId);
+        builder.HasIndex(s => s.FormFieldId);
+        builder.HasIndex(s => s.CycleId);
 
         builder.HasQueryFilter(s => !s.IsDeleted);
     }

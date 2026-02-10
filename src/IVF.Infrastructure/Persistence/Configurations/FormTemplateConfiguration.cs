@@ -28,6 +28,9 @@ public class FormTemplateConfiguration : IEntityTypeConfiguration<FormTemplate>
             .HasForeignKey(t => t.CategoryId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.HasIndex(t => t.CategoryId);
+        builder.HasIndex(t => t.CreatedByUserId);
+
         builder.HasOne(t => t.CreatedByUser)
             .WithMany()
             .HasForeignKey(t => t.CreatedByUserId)

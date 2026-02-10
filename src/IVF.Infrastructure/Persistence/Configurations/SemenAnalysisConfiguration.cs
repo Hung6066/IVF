@@ -24,8 +24,8 @@ public class SemenAnalysisConfiguration : IEntityTypeConfiguration<SemenAnalysis
         builder.Property(s => s.PostWashConcentration).HasPrecision(10, 2);
         builder.Property(s => s.PostWashMotility).HasPrecision(5, 2);
 
-        builder.HasOne(s => s.Patient).WithMany().HasForeignKey(s => s.PatientId);
-        builder.HasOne(s => s.Cycle).WithMany().HasForeignKey(s => s.CycleId);
+        builder.HasOne(s => s.Patient).WithMany().HasForeignKey(s => s.PatientId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(s => s.Cycle).WithMany().HasForeignKey(s => s.CycleId).OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(s => s.PatientId);
         builder.HasIndex(s => s.CycleId);

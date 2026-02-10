@@ -27,6 +27,8 @@ public class PatientConfiguration : IEntityTypeConfiguration<Patient>
 
         builder.HasIndex(p => p.IdentityNumber);
 
+        builder.HasIndex(p => p.FullName);
+
         builder.Property(p => p.Phone)
             .HasMaxLength(20);
 

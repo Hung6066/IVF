@@ -129,6 +129,8 @@ namespace IVF.Infrastructure.Migrations
 
                     b.HasIndex("ScheduledAt");
 
+                    b.HasIndex("DoctorId", "ScheduledAt");
+
                     b.HasIndex("ScheduledAt", "Status");
 
                     b.ToTable("appointments", (string)null);
@@ -208,14 +210,6 @@ namespace IVF.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<string>("BabyGenders")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<string>("BirthWeights")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
                     b.Property<string>("Complications")
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)");
@@ -256,6 +250,46 @@ namespace IVF.Infrastructure.Migrations
                     b.ToTable("birth_data", (string)null);
                 });
 
+            modelBuilder.Entity("IVF.Domain.Entities.BirthOutcome", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BirthDataId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Gender")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsLiveBirth")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal?>("Weight")
+                        .HasPrecision(7, 2)
+                        .HasColumnType("numeric(7,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BirthDataId");
+
+                    b.ToTable("birth_outcomes", (string)null);
+                });
+
             modelBuilder.Entity("IVF.Domain.Entities.Concept", b =>
                 {
                     b.Property<Guid>("Id")
@@ -267,8 +301,10 @@ namespace IVF.Infrastructure.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
-                    b.Property<int>("ConceptType")
-                        .HasColumnType("integer");
+                    b.Property<string>("ConceptType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -313,7 +349,7 @@ namespace IVF.Infrastructure.Migrations
 
                     b.HasIndex("System", "Code");
 
-                    b.ToTable("Concepts", (string)null);
+                    b.ToTable("concepts", (string)null);
                 });
 
             modelBuilder.Entity("IVF.Domain.Entities.ConceptMapping", b =>
@@ -366,7 +402,7 @@ namespace IVF.Infrastructure.Migrations
 
                     b.HasIndex("TargetSystem", "TargetCode");
 
-                    b.ToTable("ConceptMappings", (string)null);
+                    b.ToTable("concept_mappings", (string)null);
                 });
 
             modelBuilder.Entity("IVF.Domain.Entities.Couple", b =>
@@ -683,8 +719,10 @@ namespace IVF.Infrastructure.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
-                    b.Property<int>("FieldType")
-                        .HasColumnType("integer");
+                    b.Property<string>("FieldType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
 
                     b.Property<Guid>("FormTemplateId")
                         .HasColumnType("uuid");
@@ -726,7 +764,9 @@ namespace IVF.Infrastructure.Migrations
 
                     b.HasIndex("FormTemplateId");
 
-                    b.ToTable("FormFields", (string)null);
+                    b.HasIndex("FormTemplateId", "DisplayOrder");
+
+                    b.ToTable("form_fields", (string)null);
                 });
 
             modelBuilder.Entity("IVF.Domain.Entities.FormFieldOption", b =>
@@ -769,7 +809,7 @@ namespace IVF.Infrastructure.Migrations
 
                     b.HasIndex("FormFieldId", "DisplayOrder");
 
-                    b.ToTable("FormFieldOptions", (string)null);
+                    b.ToTable("form_field_options", (string)null);
                 });
 
             modelBuilder.Entity("IVF.Domain.Entities.FormFieldValue", b =>
@@ -856,7 +896,7 @@ namespace IVF.Infrastructure.Migrations
 
                     b.HasIndex("FormFieldValueId");
 
-                    b.ToTable("FormFieldValueDetails", (string)null);
+                    b.ToTable("form_field_value_details", (string)null);
                 });
 
             modelBuilder.Entity("IVF.Domain.Entities.FormResponse", b =>
@@ -909,6 +949,8 @@ namespace IVF.Infrastructure.Migrations
                     b.HasIndex("SubmittedAt");
 
                     b.HasIndex("SubmittedByUserId");
+
+                    b.HasIndex("PatientId", "FormTemplateId");
 
                     b.ToTable("form_responses", (string)null);
                 });
@@ -1091,6 +1133,64 @@ namespace IVF.Infrastructure.Migrations
                     b.ToTable("invoice_items", (string)null);
                 });
 
+            modelBuilder.Entity("IVF.Domain.Entities.LinkedFieldSource", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("FlowType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("Priority")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
+                    b.Property<Guid>("SourceFieldId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SourceTemplateId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TargetFieldId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SourceFieldId");
+
+                    b.HasIndex("SourceTemplateId");
+
+                    b.HasIndex("TargetFieldId");
+
+                    b.HasIndex("TargetFieldId", "SourceFieldId")
+                        .IsUnique()
+                        .HasFilter("\"IsDeleted\" = false");
+
+                    b.ToTable("linked_field_sources", (string)null);
+                });
+
             modelBuilder.Entity("IVF.Domain.Entities.LutealPhaseData", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1103,24 +1203,8 @@ namespace IVF.Infrastructure.Migrations
                     b.Property<Guid>("CycleId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("EndometriumDrug1")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<string>("EndometriumDrug2")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
-
-                    b.Property<string>("LutealDrug1")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<string>("LutealDrug2")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -1131,6 +1215,44 @@ namespace IVF.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("luteal_phase_data", (string)null);
+                });
+
+            modelBuilder.Entity("IVF.Domain.Entities.LutealPhaseDrug", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DrugName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("LutealPhaseDataId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LutealPhaseDataId");
+
+                    b.ToTable("luteal_phase_drugs", (string)null);
                 });
 
             modelBuilder.Entity("IVF.Domain.Entities.Notification", b =>
@@ -1184,6 +1306,8 @@ namespace IVF.Infrastructure.Migrations
                     b.HasIndex("CreatedAt");
 
                     b.HasIndex("UserId");
+
+                    b.HasIndex("EntityType", "EntityId");
 
                     b.HasIndex("UserId", "IsRead");
 
@@ -1241,6 +1365,8 @@ namespace IVF.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("FullName");
 
                     b.HasIndex("IdentityNumber");
 
@@ -1309,14 +1435,14 @@ namespace IVF.Infrastructure.Migrations
                     b.HasIndex("FormResponseId");
 
                     b.HasIndex("PatientId")
-                        .HasFilter("is_deleted = false");
+                        .HasFilter("\"IsDeleted\" = false");
 
                     b.HasIndex("ConceptId", "PatientId")
-                        .HasFilter("is_deleted = false");
+                        .HasFilter("\"IsDeleted\" = false");
 
                     b.HasIndex("PatientId", "ConceptId", "CycleId")
                         .IsUnique()
-                        .HasFilter("is_deleted = false");
+                        .HasFilter("\"IsDeleted\" = false");
 
                     b.ToTable("patient_concept_snapshots", (string)null);
                 });
@@ -1333,8 +1459,10 @@ namespace IVF.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<int>("FingerType")
-                        .HasColumnType("integer");
+                    b.Property<string>("FingerType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
 
                     b.Property<byte[]>("FingerprintData")
                         .IsRequired()
@@ -1349,8 +1477,10 @@ namespace IVF.Infrastructure.Migrations
                     b.Property<int>("Quality")
                         .HasColumnType("integer");
 
-                    b.Property<int>("SdkType")
-                        .HasColumnType("integer");
+                    b.Property<string>("SdkType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -1360,7 +1490,7 @@ namespace IVF.Infrastructure.Migrations
                     b.HasIndex("PatientId", "FingerType")
                         .IsUnique();
 
-                    b.ToTable("PatientFingerprints", (string)null);
+                    b.ToTable("patient_fingerprints", (string)null);
                 });
 
             modelBuilder.Entity("IVF.Domain.Entities.PatientPhoto", b =>
@@ -1402,7 +1532,7 @@ namespace IVF.Infrastructure.Migrations
                     b.HasIndex("PatientId")
                         .IsUnique();
 
-                    b.ToTable("PatientPhotos", (string)null);
+                    b.ToTable("patient_photos", (string)null);
                 });
 
             modelBuilder.Entity("IVF.Domain.Entities.Payment", b =>
@@ -1663,9 +1793,6 @@ namespace IVF.Infrastructure.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
-                    b.Property<string>("ServiceIndications")
-                        .HasColumnType("text");
-
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -1687,9 +1814,46 @@ namespace IVF.Infrastructure.Migrations
 
                     b.HasIndex("PatientId");
 
+                    b.HasIndex("Status");
+
                     b.HasIndex("DepartmentCode", "IssuedAt");
 
+                    b.HasIndex("Status", "DepartmentCode", "IssuedAt");
+
                     b.ToTable("queue_tickets", (string)null);
+                });
+
+            modelBuilder.Entity("IVF.Domain.Entities.QueueTicketService", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("QueueTicketId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ServiceCatalogId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("QueueTicketId");
+
+                    b.HasIndex("ServiceCatalogId");
+
+                    b.HasIndex("QueueTicketId", "ServiceCatalogId")
+                        .IsUnique();
+
+                    b.ToTable("queue_ticket_services", (string)null);
                 });
 
             modelBuilder.Entity("IVF.Domain.Entities.ReportTemplate", b =>
@@ -1896,7 +2060,7 @@ namespace IVF.Infrastructure.Migrations
 
                     b.HasIndex("IsActive");
 
-                    b.ToTable("ServiceCatalogs", (string)null);
+                    b.ToTable("service_catalogs", (string)null);
                 });
 
             modelBuilder.Entity("IVF.Domain.Entities.SpermDonor", b =>
@@ -2140,50 +2304,6 @@ namespace IVF.Infrastructure.Migrations
                     b.Property<Guid>("CycleId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("Drug1")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<int>("Drug1Duration")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Drug1Posology")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<string>("Drug2")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<int>("Drug2Duration")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Drug2Posology")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<string>("Drug3")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<int>("Drug3Duration")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Drug3Posology")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<string>("Drug4")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<int>("Drug4Duration")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Drug4Posology")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
                     b.Property<decimal?>("E2Lab")
                         .HasPrecision(10, 2)
                         .HasColumnType("numeric(10,2)");
@@ -2262,6 +2382,46 @@ namespace IVF.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("stimulation_data", (string)null);
+                });
+
+            modelBuilder.Entity("IVF.Domain.Entities.StimulationDrug", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DrugName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int>("Duration")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Posology")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("StimulationDataId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StimulationDataId");
+
+                    b.ToTable("stimulation_drugs", (string)null);
                 });
 
             modelBuilder.Entity("IVF.Domain.Entities.TransferData", b =>
@@ -2389,8 +2549,12 @@ namespace IVF.Infrastructure.Migrations
 
                     b.HasIndex("CoupleId");
 
+                    b.HasIndex("CurrentPhase");
+
                     b.HasIndex("CycleCode")
                         .IsUnique();
+
+                    b.HasIndex("StartDate");
 
                     b.ToTable("treatment_cycles", (string)null);
                 });
@@ -2706,6 +2870,17 @@ namespace IVF.Infrastructure.Migrations
                     b.Navigation("Cycle");
                 });
 
+            modelBuilder.Entity("IVF.Domain.Entities.BirthOutcome", b =>
+                {
+                    b.HasOne("IVF.Domain.Entities.BirthData", "BirthData")
+                        .WithMany("Outcomes")
+                        .HasForeignKey("BirthDataId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("BirthData");
+                });
+
             modelBuilder.Entity("IVF.Domain.Entities.ConceptMapping", b =>
                 {
                     b.HasOne("IVF.Domain.Entities.Concept", "Concept")
@@ -2848,7 +3023,7 @@ namespace IVF.Infrastructure.Migrations
                     b.HasOne("IVF.Domain.Entities.FormFieldValue", "FormFieldValue")
                         .WithMany("Details")
                         .HasForeignKey("FormFieldValueId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("Concept");
@@ -2910,12 +3085,13 @@ namespace IVF.Infrastructure.Migrations
                 {
                     b.HasOne("IVF.Domain.Entities.TreatmentCycle", "Cycle")
                         .WithMany()
-                        .HasForeignKey("CycleId");
+                        .HasForeignKey("CycleId")
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("IVF.Domain.Entities.Patient", "Patient")
                         .WithMany()
                         .HasForeignKey("PatientId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("Cycle");
@@ -2934,6 +3110,33 @@ namespace IVF.Infrastructure.Migrations
                     b.Navigation("Invoice");
                 });
 
+            modelBuilder.Entity("IVF.Domain.Entities.LinkedFieldSource", b =>
+                {
+                    b.HasOne("IVF.Domain.Entities.FormField", "SourceField")
+                        .WithMany()
+                        .HasForeignKey("SourceFieldId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("IVF.Domain.Entities.FormTemplate", "SourceTemplate")
+                        .WithMany()
+                        .HasForeignKey("SourceTemplateId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("IVF.Domain.Entities.FormField", "TargetField")
+                        .WithMany()
+                        .HasForeignKey("TargetFieldId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("SourceField");
+
+                    b.Navigation("SourceTemplate");
+
+                    b.Navigation("TargetField");
+                });
+
             modelBuilder.Entity("IVF.Domain.Entities.LutealPhaseData", b =>
                 {
                     b.HasOne("IVF.Domain.Entities.TreatmentCycle", "Cycle")
@@ -2943,6 +3146,17 @@ namespace IVF.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Cycle");
+                });
+
+            modelBuilder.Entity("IVF.Domain.Entities.LutealPhaseDrug", b =>
+                {
+                    b.HasOne("IVF.Domain.Entities.LutealPhaseData", "LutealPhaseData")
+                        .WithMany("Drugs")
+                        .HasForeignKey("LutealPhaseDataId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("LutealPhaseData");
                 });
 
             modelBuilder.Entity("IVF.Domain.Entities.Notification", b =>
@@ -3046,18 +3260,19 @@ namespace IVF.Infrastructure.Migrations
                 {
                     b.HasOne("IVF.Domain.Entities.TreatmentCycle", "Cycle")
                         .WithMany()
-                        .HasForeignKey("CycleId");
+                        .HasForeignKey("CycleId")
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("IVF.Domain.Entities.User", "Doctor")
                         .WithMany()
                         .HasForeignKey("DoctorId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("IVF.Domain.Entities.Patient", "Patient")
                         .WithMany()
                         .HasForeignKey("PatientId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("IVF.Domain.Entities.TreatmentCycle", null)
@@ -3107,6 +3322,25 @@ namespace IVF.Infrastructure.Migrations
                     b.Navigation("Patient");
                 });
 
+            modelBuilder.Entity("IVF.Domain.Entities.QueueTicketService", b =>
+                {
+                    b.HasOne("IVF.Domain.Entities.QueueTicket", "QueueTicket")
+                        .WithMany("Services")
+                        .HasForeignKey("QueueTicketId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("IVF.Domain.Entities.ServiceCatalog", "ServiceCatalog")
+                        .WithMany()
+                        .HasForeignKey("ServiceCatalogId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("QueueTicket");
+
+                    b.Navigation("ServiceCatalog");
+                });
+
             modelBuilder.Entity("IVF.Domain.Entities.ReportTemplate", b =>
                 {
                     b.HasOne("IVF.Domain.Entities.User", "CreatedByUser")
@@ -3130,12 +3364,13 @@ namespace IVF.Infrastructure.Migrations
                 {
                     b.HasOne("IVF.Domain.Entities.TreatmentCycle", "Cycle")
                         .WithMany()
-                        .HasForeignKey("CycleId");
+                        .HasForeignKey("CycleId")
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("IVF.Domain.Entities.Patient", "Patient")
                         .WithMany()
                         .HasForeignKey("PatientId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("Cycle");
@@ -3148,7 +3383,7 @@ namespace IVF.Infrastructure.Migrations
                     b.HasOne("IVF.Domain.Entities.Patient", "Patient")
                         .WithMany()
                         .HasForeignKey("PatientId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("Patient");
@@ -3176,13 +3411,13 @@ namespace IVF.Infrastructure.Migrations
                     b.HasOne("IVF.Domain.Entities.TreatmentCycle", "Cycle")
                         .WithMany()
                         .HasForeignKey("CycleId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("IVF.Domain.Entities.Patient", "Patient")
                         .WithMany()
                         .HasForeignKey("PatientId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("Cycle");
@@ -3199,6 +3434,17 @@ namespace IVF.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Cycle");
+                });
+
+            modelBuilder.Entity("IVF.Domain.Entities.StimulationDrug", b =>
+                {
+                    b.HasOne("IVF.Domain.Entities.StimulationData", "StimulationData")
+                        .WithMany("Drugs")
+                        .HasForeignKey("StimulationDataId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("StimulationData");
                 });
 
             modelBuilder.Entity("IVF.Domain.Entities.TransferData", b =>
@@ -3263,6 +3509,11 @@ namespace IVF.Infrastructure.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("IVF.Domain.Entities.BirthData", b =>
+                {
+                    b.Navigation("Outcomes");
+                });
+
             modelBuilder.Entity("IVF.Domain.Entities.Concept", b =>
                 {
                     b.Navigation("FormFieldOptions");
@@ -3315,6 +3566,11 @@ namespace IVF.Infrastructure.Migrations
                     b.Navigation("Payments");
                 });
 
+            modelBuilder.Entity("IVF.Domain.Entities.LutealPhaseData", b =>
+                {
+                    b.Navigation("Drugs");
+                });
+
             modelBuilder.Entity("IVF.Domain.Entities.Patient", b =>
                 {
                     b.Navigation("AsHusband");
@@ -3333,9 +3589,19 @@ namespace IVF.Infrastructure.Migrations
                     b.Navigation("Items");
                 });
 
+            modelBuilder.Entity("IVF.Domain.Entities.QueueTicket", b =>
+                {
+                    b.Navigation("Services");
+                });
+
             modelBuilder.Entity("IVF.Domain.Entities.SpermDonor", b =>
                 {
                     b.Navigation("SpermSamples");
+                });
+
+            modelBuilder.Entity("IVF.Domain.Entities.StimulationData", b =>
+                {
+                    b.Navigation("Drugs");
                 });
 
             modelBuilder.Entity("IVF.Domain.Entities.TreatmentCycle", b =>

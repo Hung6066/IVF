@@ -33,5 +33,10 @@ public class UltrasoundConfiguration : IEntityTypeConfiguration<Ultrasound>
             .WithMany()
             .HasForeignKey(u => u.DoctorId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasIndex(u => u.CycleId);
+        builder.HasIndex(u => u.DoctorId);
+
+        builder.HasQueryFilter(u => !u.IsDeleted);
     }
 }

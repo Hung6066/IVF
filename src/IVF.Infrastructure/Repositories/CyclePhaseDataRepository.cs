@@ -23,7 +23,9 @@ public class CyclePhaseDataRepository : ICyclePhaseDataRepository
 
     // Stimulation Data
     public async Task<StimulationData?> GetStimulationByCycleIdAsync(Guid cycleId, CancellationToken ct = default)
-        => await _context.StimulationData.FirstOrDefaultAsync(x => x.CycleId == cycleId, ct);
+        => await _context.StimulationData
+            .Include(s => s.Drugs.OrderBy(d => d.SortOrder))
+            .FirstOrDefaultAsync(x => x.CycleId == cycleId, ct);
 
     public async Task AddStimulationAsync(StimulationData data, CancellationToken ct = default)
         => await _context.StimulationData.AddAsync(data, ct);
@@ -44,7 +46,9 @@ public class CyclePhaseDataRepository : ICyclePhaseDataRepository
 
     // Luteal Phase Data
     public async Task<LutealPhaseData?> GetLutealPhaseByCycleIdAsync(Guid cycleId, CancellationToken ct = default)
-        => await _context.LutealPhaseData.FirstOrDefaultAsync(x => x.CycleId == cycleId, ct);
+        => await _context.LutealPhaseData
+            .Include(l => l.Drugs.OrderBy(d => d.SortOrder))
+            .FirstOrDefaultAsync(x => x.CycleId == cycleId, ct);
 
     public async Task AddLutealPhaseAsync(LutealPhaseData data, CancellationToken ct = default)
         => await _context.LutealPhaseData.AddAsync(data, ct);
@@ -58,7 +62,9 @@ public class CyclePhaseDataRepository : ICyclePhaseDataRepository
 
     // Birth Data
     public async Task<BirthData?> GetBirthByCycleIdAsync(Guid cycleId, CancellationToken ct = default)
-        => await _context.BirthData.FirstOrDefaultAsync(x => x.CycleId == cycleId, ct);
+        => await _context.BirthData
+            .Include(b => b.Outcomes.OrderBy(o => o.SortOrder))
+            .FirstOrDefaultAsync(x => x.CycleId == cycleId, ct);
 
     public async Task AddBirthAsync(BirthData data, CancellationToken ct = default)
         => await _context.BirthData.AddAsync(data, ct);

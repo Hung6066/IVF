@@ -12,23 +12,23 @@ public class PatientRepository : IPatientRepository
     public PatientRepository(IvfDbContext context) => _context = context;
 
     public async Task<Patient?> GetByIdAsync(Guid id, CancellationToken ct = default)
-        => await _context.Patients.FirstOrDefaultAsync(p => p.Id == id, ct);
+        => await _context.Patients.AsNoTracking().FirstOrDefaultAsync(p => p.Id == id, ct);
 
     public async Task<Patient?> GetByCodeAsync(string code, CancellationToken ct = default)
-        => await _context.Patients.FirstOrDefaultAsync(p => p.PatientCode == code, ct);
+        => await _context.Patients.AsNoTracking().FirstOrDefaultAsync(p => p.PatientCode == code, ct);
 
     public async Task<(IReadOnlyList<Patient> Items, int Total)> SearchAsync(
         string? query, string? gender, int page, int pageSize, CancellationToken ct = default)
     {
-        var q = _context.Patients.AsQueryable();
-        
+        var q = _context.Patients.AsNoTracking().AsQueryable();
+
         if (!string.IsNullOrEmpty(gender) && Enum.TryParse<IVF.Domain.Enums.Gender>(gender, true, out var genderEnum))
         {
             q = q.Where(p => p.Gender == genderEnum);
         }
 
         if (!string.IsNullOrEmpty(query))
-            q = q.Where(p => p.FullName.Contains(query) || p.PatientCode.Contains(query) || 
+            q = q.Where(p => p.FullName.Contains(query) || p.PatientCode.Contains(query) ||
                 (p.Phone != null && p.Phone.Contains(query)));
 
         var total = await q.CountAsync(ct);

@@ -106,6 +106,11 @@ public record LinkedDataValueDto(
     DataFlowType FlowType
 );
 
+/// <summary>
+/// Get all configured linked field sources for a template.
+/// </summary>
+public record GetLinkedFieldSourcesQuery(Guid TemplateId) : IRequest<List<LinkedFieldSourceDto>>;
+
 #endregion
 
 #region Handlers
@@ -329,14 +334,12 @@ public class ReportQueriesHandler :
         if (reportTemplate == null)
             throw new ArgumentException("Report template not found");
 
-        var (responses, total) = await _repo.GetResponsesAsync(
+        // Single query with full includes — eliminates N+1 (was N+1 per response)
+        var (responses, total) = await _repo.GetResponsesWithFieldValuesAsync(
             reportTemplate.FormTemplateId,
             request.PatientId,
             request.From,
             request.To,
-            null, // no status filter for reports
-            1,
-            1000, // Get more for report
             ct);
 
         // Build report data from responses
@@ -346,18 +349,17 @@ public class ReportQueriesHandler :
 
         foreach (var response in responses)
         {
-            var fullResponse = await _repo.GetResponseByIdAsync(response.Id, true, ct);
-            if (fullResponse?.FieldValues == null) continue;
+            if (response.FieldValues == null) continue;
 
             var row = new Dictionary<string, object?>
             {
-                ["responseId"] = fullResponse.Id,
-                ["patientName"] = fullResponse.Patient?.FullName,
-                ["submittedAt"] = fullResponse.SubmittedAt,
-                ["status"] = fullResponse.Status.ToString()
+                ["responseId"] = response.Id,
+                ["patientName"] = response.Patient?.FullName,
+                ["submittedAt"] = response.SubmittedAt,
+                ["status"] = response.Status.ToString()
             };
 
-            foreach (var fv in fullResponse.FieldValues)
+            foreach (var fv in response.FieldValues)
             {
                 var key = fv.FormField?.FieldKey ?? fv.FormFieldId.ToString();
                 var displayValue = fv.GetDisplayValue();
@@ -413,54 +415,137 @@ public class LinkedDataQueryHandler : IRequestHandler<GetLinkedDataQuery, List<L
 
     public async Task<List<LinkedDataValueDto>> Handle(GetLinkedDataQuery request, CancellationToken ct)
     {
-        // Load template fields that have ConceptId
         var template = await _repo.GetTemplateByIdAsync(request.TemplateId, true, ct);
         if (template?.Fields == null)
             return [];
 
+        var results = new List<LinkedDataValueDto>();
+        var resolvedFieldIds = new HashSet<Guid>();
+
+        // === Priority 1: Same ConceptId auto-link ===
+        // Fields that share the same ConceptId across forms are automatically linked
+        // via PatientConceptSnapshot (materialized on each form submission).
         var fieldsWithConcept = template.Fields
             .Where(f => f.ConceptId.HasValue)
             .ToList();
 
-        if (fieldsWithConcept.Count == 0)
-            return [];
-
-        // Get all snapshots for this patient (optionally scoped to cycle)
-        var snapshots = await _repo.GetSnapshotsByPatientAsync(
-            request.PatientId, request.CycleId, ct);
-
-        // Build lookup by ConceptId
-        var snapshotByConceptId = snapshots
-            .GroupBy(s => s.ConceptId)
-            .ToDictionary(g => g.Key, g => g.First()); // latest first (ordered by CapturedAt desc in repo)
-
-        var results = new List<LinkedDataValueDto>();
-
-        foreach (var field in fieldsWithConcept)
+        if (fieldsWithConcept.Count > 0)
         {
-            if (!snapshotByConceptId.TryGetValue(field.ConceptId!.Value, out var snapshot))
+            var snapshots = await _repo.GetSnapshotsByPatientAsync(
+                request.PatientId, request.CycleId, ct);
+
+            // Only keep snapshots from OTHER templates (≠ current)
+            var externalSnapshots = snapshots
+                .Where(s => s.FormField?.FormTemplateId != request.TemplateId)
+                .ToList();
+
+            var snapshotByConceptId = externalSnapshots
+                .GroupBy(s => s.ConceptId)
+                .ToDictionary(g => g.Key, g => g.OrderByDescending(s => s.CapturedAt).First());
+
+            foreach (var field in fieldsWithConcept)
+            {
+                if (!snapshotByConceptId.TryGetValue(field.ConceptId!.Value, out var snapshot))
+                    continue;
+
+                results.Add(new LinkedDataValueDto(
+                    FieldId: field.Id,
+                    FieldLabel: field.Label,
+                    ConceptId: snapshot.ConceptId,
+                    ConceptDisplay: snapshot.Concept?.Display ?? snapshot.ConceptId.ToString(),
+                    TextValue: snapshot.TextValue,
+                    NumericValue: snapshot.NumericValue,
+                    DateValue: snapshot.DateValue,
+                    BooleanValue: snapshot.BooleanValue,
+                    JsonValue: snapshot.JsonValue,
+                    DisplayValue: snapshot.GetDisplayValue(),
+                    SourceFormName: snapshot.FormResponse?.FormTemplate?.Name ?? "",
+                    CapturedAt: snapshot.CapturedAt,
+                    FlowType: DataFlowType.AutoFill
+                ));
+
+                resolvedFieldIds.Add(field.Id);
+            }
+        }
+
+        // === Priority 2: Explicit LinkedFieldSource configuration ===
+        // For fields NOT resolved by concept matching, use manual field-to-field links.
+        var explicitLinks = await _repo.GetLinkedFieldSourcesByTargetTemplateAsync(request.TemplateId, ct);
+        foreach (var link in explicitLinks.Where(l => l.IsActive))
+        {
+            if (resolvedFieldIds.Contains(link.TargetFieldId))
                 continue;
 
-            // Don't suggest if the snapshot came from this same template's latest response
-            // (user is likely re-filling the same form)
+            // Get latest submitted response for this source template + patient
+            var (sourceResponses, _) = await _repo.GetResponsesAsync(
+                templateId: link.SourceTemplateId,
+                patientId: request.PatientId,
+                status: ResponseStatus.Submitted,
+                page: 1, pageSize: 1, ct: ct);
+
+            if (sourceResponses.Count == 0) continue;
+
+            var sourceResponse = await _repo.GetResponseByIdAsync(sourceResponses[0].Id, true, ct);
+            if (sourceResponse?.FieldValues == null) continue;
+
+            var sourceFieldValue = sourceResponse.FieldValues
+                .FirstOrDefault(fv => fv.FormFieldId == link.SourceFieldId);
+
+            if (sourceFieldValue == null) continue;
+
+            var displayValue = sourceFieldValue.GetDisplayValue();
+            if (string.IsNullOrEmpty(displayValue)) continue;
+
             results.Add(new LinkedDataValueDto(
-                FieldId: field.Id,
-                FieldLabel: field.Label,
-                ConceptId: snapshot.ConceptId,
-                ConceptDisplay: snapshot.Concept?.Display ?? snapshot.ConceptId.ToString(),
-                TextValue: snapshot.TextValue,
-                NumericValue: snapshot.NumericValue,
-                DateValue: snapshot.DateValue,
-                BooleanValue: snapshot.BooleanValue,
-                JsonValue: snapshot.JsonValue,
-                DisplayValue: snapshot.GetDisplayValue(),
-                SourceFormName: snapshot.FormResponse?.FormTemplate?.Name ?? "",
-                CapturedAt: snapshot.CapturedAt,
-                FlowType: DataFlowType.Suggest
+                FieldId: link.TargetFieldId,
+                FieldLabel: link.TargetField?.Label ?? "",
+                ConceptId: Guid.Empty,
+                ConceptDisplay: link.Description ?? "Liên kết cấu hình",
+                TextValue: sourceFieldValue.TextValue,
+                NumericValue: sourceFieldValue.NumericValue,
+                DateValue: sourceFieldValue.DateValue,
+                BooleanValue: sourceFieldValue.BooleanValue,
+                JsonValue: sourceFieldValue.JsonValue,
+                DisplayValue: displayValue,
+                SourceFormName: link.SourceTemplate?.Name ?? "",
+                CapturedAt: sourceResponse.SubmittedAt ?? sourceResponse.CreatedAt,
+                FlowType: link.FlowType
             ));
+
+            resolvedFieldIds.Add(link.TargetFieldId);
         }
 
         return results;
+    }
+}
+
+public class LinkedFieldSourcesQueryHandler :
+    IRequestHandler<GetLinkedFieldSourcesQuery, List<LinkedFieldSourceDto>>
+{
+    private readonly IFormRepository _repo;
+
+    public LinkedFieldSourcesQueryHandler(IFormRepository repo)
+    {
+        _repo = repo;
+    }
+
+    public async Task<List<LinkedFieldSourceDto>> Handle(GetLinkedFieldSourcesQuery request, CancellationToken ct)
+    {
+        var sources = await _repo.GetLinkedFieldSourcesByTargetTemplateAsync(request.TemplateId, ct);
+
+        return sources.Select(s => new LinkedFieldSourceDto(
+            s.Id,
+            s.TargetFieldId,
+            s.TargetField?.Label ?? "",
+            s.SourceTemplateId,
+            s.SourceTemplate?.Name ?? "",
+            s.SourceFieldId,
+            s.SourceField?.Label ?? "",
+            s.FlowType,
+            s.Priority,
+            s.IsActive,
+            s.Description,
+            s.CreatedAt)).ToList();
     }
 }
 

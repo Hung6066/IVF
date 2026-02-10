@@ -13,4 +13,5 @@ public interface IInvoiceRepository
     Task<string> GenerateInvoiceNumberAsync(CancellationToken ct = default);
     // Reporting
     Task<decimal> GetMonthlyRevenueAsync(int month, int year, CancellationToken ct = default);
+    Task<Dictionary<int, decimal>> GetYearlyRevenueByMonthAsync(int year, CancellationToken ct = default);
 }

@@ -43,7 +43,9 @@ public class AppointmentConfiguration : IEntityTypeConfiguration<Appointment>
         builder.HasIndex(a => a.ScheduledAt);
         builder.HasIndex(a => a.PatientId);
         builder.HasIndex(a => a.DoctorId);
+        builder.HasIndex(a => a.CycleId);
         builder.HasIndex(a => new { a.ScheduledAt, a.Status });
+        builder.HasIndex(a => new { a.DoctorId, a.ScheduledAt });
         builder.HasQueryFilter(a => !a.IsDeleted);
     }
 }

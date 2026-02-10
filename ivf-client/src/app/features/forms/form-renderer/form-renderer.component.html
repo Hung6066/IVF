@@ -48,9 +48,46 @@
                       <span class="required">*</span>
                     }
                     @if (isLinkedField(field.id)) {
-                      <span class="linked-data-badge" [title]="'Dữ liệu từ: ' + getLinkedDataInfo(field.id)?.sourceFormName + ' (' + (getLinkedDataInfo(field.id)?.capturedAt | date:'dd/MM/yyyy') + ')'">
-                        🔗 {{ getLinkedDataInfo(field.id)?.sourceFormName }}
-                        <button type="button" class="linked-clear-btn" (click)="clearLinkedValue(field.id)" title="Xóa giá trị liên kết">✕</button>
+                      <span
+                        class="linked-data-badge"
+                        [class.concept-link]="
+                          getLinkedDataInfo(field.id)?.conceptId &&
+                          getLinkedDataInfo(field.id)?.conceptId !==
+                            '00000000-0000-0000-0000-000000000000'
+                        "
+                        [class.config-link]="
+                          !getLinkedDataInfo(field.id)?.conceptId ||
+                          getLinkedDataInfo(field.id)?.conceptId ===
+                            '00000000-0000-0000-0000-000000000000'
+                        "
+                        [title]="
+                          (getLinkedDataInfo(field.id)?.conceptId &&
+                          getLinkedDataInfo(field.id)?.conceptId !==
+                            '00000000-0000-0000-0000-000000000000'
+                            ? '🧬 Auto-link (cùng concept) từ: '
+                            : '⚙️ Config-link từ: ') +
+                          getLinkedDataInfo(field.id)?.sourceFormName +
+                          ' (' +
+                          (getLinkedDataInfo(field.id)?.capturedAt | date: 'dd/MM/yyyy') +
+                          ')'
+                        "
+                      >
+                        {{
+                          getLinkedDataInfo(field.id)?.conceptId &&
+                          getLinkedDataInfo(field.id)?.conceptId !==
+                            '00000000-0000-0000-0000-000000000000'
+                            ? '🧬'
+                            : '⚙️'
+                        }}
+                        {{ getLinkedDataInfo(field.id)?.sourceFormName }}
+                        <button
+                          type="button"
+                          class="linked-clear-btn"
+                          (click)="clearLinkedValue(field.id)"
+                          title="Xóa giá trị liên kết"
+                        >
+                          ✕
+                        </button>
                       </span>
                     }
                   </label>
@@ -255,7 +292,9 @@
                       />
                       <div class="slider-labels">
                         <span>{{ getSliderConfig(field).min }}</span>
-                        <strong class="slider-value">{{ getSliderDisplayValue(field.id, field) }}</strong>
+                        <strong class="slider-value">{{
+                          getSliderDisplayValue(field.id, field)
+                        }}</strong>
                         <span>{{ getSliderConfig(field).max }}</span>
                       </div>
                     </div>
@@ -268,18 +307,32 @@
                     </div>
                   }
                   @case (FieldType.RichText) {
-                    <div class="richtext-field" contenteditable="true"
+                    <div
+                      class="richtext-field"
+                      contenteditable="true"
                       [innerHTML]="form.get(field.id)?.value || ''"
                       (input)="form.get(field.id)?.setValue($any($event.target).innerHTML)"
                       [attr.data-placeholder]="field.placeholder || 'Nhập nội dung...'"
-                      class="form-richtext"></div>
+                      class="form-richtext"
+                    ></div>
                   }
                   @case (FieldType.Signature) {
                     <div class="signature-field">
-                      <canvas [id]="'sig-' + field.id" width="400" height="150" class="signature-canvas"
-                        (mousedown)="initSignatureCanvas(field.id)"></canvas>
+                      <canvas
+                        [id]="'sig-' + field.id"
+                        width="400"
+                        height="150"
+                        class="signature-canvas"
+                        (mousedown)="initSignatureCanvas(field.id)"
+                      ></canvas>
                       <div class="signature-actions">
-                        <button type="button" class="btn-clear-sig" (click)="clearSignature(field.id)">🗑️ Xóa chữ ký</button>
+                        <button
+                          type="button"
+                          class="btn-clear-sig"
+                          (click)="clearSignature(field.id)"
+                        >
+                          🗑️ Xóa chữ ký
+                        </button>
                         @if (form.get(field.id)?.value) {
                           <span class="sig-status">✅ Đã ký</span>
                         }
@@ -293,16 +346,21 @@
                           type="text"
                           class="form-input"
                           [(ngModel)]="lookupSearchQueries[field.id]"
-                          [ngModelOptions]="{standalone: true}"
+                          [ngModelOptions]="{ standalone: true }"
                           (input)="searchLookupOptions(field)"
                           (focus)="activeLookupFieldId = field.id; searchLookupOptions(field)"
                           (blur)="activeLookupFieldId = ''"
                           [placeholder]="field.placeholder || '🔍 Tìm kiếm...'"
                         />
-                        @if (activeLookupFieldId === field.id && lookupSearchResults[field.id]?.length) {
+                        @if (
+                          activeLookupFieldId === field.id && lookupSearchResults[field.id]?.length
+                        ) {
                           <div class="lookup-dropdown">
                             @for (opt of lookupSearchResults[field.id]; track opt.value) {
-                              <div class="lookup-option" (mousedown)="selectLookupOption(field.id, opt)">
+                              <div
+                                class="lookup-option"
+                                (mousedown)="selectLookupOption(field.id, opt)"
+                              >
                                 {{ opt.label }}
                               </div>
                             }
@@ -322,32 +380,65 @@
                             @for (col of getRepeaterConfig(field).fields; track col.key) {
                               <th>{{ col.label }}</th>
                             }
-                            <th style="width:40px"></th>
+                            <th style="width: 40px"></th>
                           </tr>
                         </thead>
                         <tbody>
-                          @for (row of repeaterRows[field.id] || []; track $index; let ri = $index) {
+                          @for (
+                            row of repeaterRows[field.id] || [];
+                            track $index;
+                            let ri = $index
+                          ) {
                             <tr>
                               @for (col of getRepeaterConfig(field).fields; track col.key) {
                                 <td>
                                   @if (col.type === 'number') {
-                                    <input type="number" [(ngModel)]="$any(row)[col.key]" [ngModelOptions]="{standalone: true}" (input)="onRepeaterCellChange(field.id)" class="form-input" />
+                                    <input
+                                      type="number"
+                                      [(ngModel)]="$any(row)[col.key]"
+                                      [ngModelOptions]="{ standalone: true }"
+                                      (input)="onRepeaterCellChange(field.id)"
+                                      class="form-input"
+                                    />
                                   } @else if (col.type === 'date') {
-                                    <input type="date" [(ngModel)]="$any(row)[col.key]" [ngModelOptions]="{standalone: true}" (input)="onRepeaterCellChange(field.id)" class="form-input" />
+                                    <input
+                                      type="date"
+                                      [(ngModel)]="$any(row)[col.key]"
+                                      [ngModelOptions]="{ standalone: true }"
+                                      (input)="onRepeaterCellChange(field.id)"
+                                      class="form-input"
+                                    />
                                   } @else {
-                                    <input type="text" [(ngModel)]="$any(row)[col.key]" [ngModelOptions]="{standalone: true}" (input)="onRepeaterCellChange(field.id)" class="form-input" />
+                                    <input
+                                      type="text"
+                                      [(ngModel)]="$any(row)[col.key]"
+                                      [ngModelOptions]="{ standalone: true }"
+                                      (input)="onRepeaterCellChange(field.id)"
+                                      class="form-input"
+                                    />
                                   }
                                 </td>
                               }
                               <td>
-                                <button type="button" class="btn-remove-row" (click)="removeRepeaterRow(field, ri)" title="Xóa dòng">🗑️</button>
+                                <button
+                                  type="button"
+                                  class="btn-remove-row"
+                                  (click)="removeRepeaterRow(field, ri)"
+                                  title="Xóa dòng"
+                                >
+                                  🗑️
+                                </button>
                               </td>
                             </tr>
                           }
                         </tbody>
                       </table>
-                      @if ((repeaterRows[field.id]?.length || 0) < getRepeaterConfig(field).maxRows) {
-                        <button type="button" class="btn-add-row" (click)="addRepeaterRow(field)">+ Thêm dòng</button>
+                      @if (
+                        (repeaterRows[field.id]?.length || 0) < getRepeaterConfig(field).maxRows
+                      ) {
+                        <button type="button" class="btn-add-row" (click)="addRepeaterRow(field)">
+                          + Thêm dòng
+                        </button>
                       }
                     </div>
                   }
@@ -383,7 +474,9 @@
               }
             </div>
             <div class="review-actions">
-              <button type="button" class="btn btn-outline" (click)="showReview = false">← Chỉnh sửa</button>
+              <button type="button" class="btn btn-outline" (click)="showReview = false">
+                ← Chỉnh sửa
+              </button>
             </div>
           </div>
         }

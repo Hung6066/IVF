@@ -1,0 +1,200 @@
+<div class="linked-field-config-overlay" *ngIf="isOpen" (click)="close()">
+  <div class="linked-field-config-panel" (click)="$event.stopPropagation()">
+    <!-- Header -->
+    <div class="panel-header">
+      <div class="header-title">
+        <span class="header-icon">🔗</span>
+        <h3>Cấu hình liên kết dữ liệu</h3>
+      </div>
+      <p class="header-desc">Liên kết trường dữ liệu từ form khác sang form này</p>
+      <button class="close-btn" (click)="close()" title="Đóng">✕</button>
+    </div>
+
+    <!-- Body -->
+    <div class="panel-body">
+      <!-- Auto-link rule explanation -->
+      <div class="auto-link-info">
+        <div class="info-card concept-auto">
+          <div class="info-icon">🧬</div>
+          <div class="info-content">
+            <strong>Tự động theo Concept</strong>
+            <p>Trường có cùng <b>Concept y khoa</b> sẽ tự động liên kết dữ liệu giữa các form — không cần cấu hình.</p>
+          </div>
+        </div>
+        <div class="info-card config-manual">
+          <div class="info-icon">⚙️</div>
+          <div class="info-content">
+            <strong>Cấu hình thủ công</strong>
+            <p>Các trường <b>không có concept</b> hoặc cần liên kết đặc biệt → thêm liên kết bên dưới.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Loading -->
+      <div class="loading-state" *ngIf="isLoading">
+        <div class="spinner"></div>
+        <span>Đang tải...</span>
+      </div>
+
+      <!-- Existing links grouped by target field -->
+      <div class="links-section" *ngIf="!isLoading">
+        <!-- Concept auto-linked fields summary -->
+        <div class="concept-fields-summary" *ngIf="getConceptLinkedFields().length > 0">
+          <div class="section-title">
+            <span>🧬 Auto-link (cùng Concept)</span>
+            <span class="badge auto">{{ getConceptLinkedFields().length }}</span>
+          </div>
+          <div class="auto-link-list">
+            <div class="auto-link-item" *ngFor="let f of getConceptLinkedFields()">
+              <span class="field-label">{{ f.label }}</span>
+              <span class="concept-tag">{{ f.conceptId }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="section-title">
+          <span>⚙️ Liên kết cấu hình</span>
+          <span class="badge">{{ linkedSources.length }}</span>
+        </div>
+
+        <!-- Empty state -->
+        <div class="empty-state" *ngIf="linkedSources.length === 0 && !showAddForm">
+          <div class="empty-icon">📭</div>
+          <p>Chưa có liên kết nào</p>
+          <small>Thêm liên kết để tự động điền dữ liệu từ form khác</small>
+        </div>
+
+        <!-- Grouped links -->
+        <div class="field-group" *ngFor="let group of getLinkedSourcesByField()">
+          <div class="field-group-header">
+            <span class="field-name">🎯 {{ group.fieldLabel }}</span>
+            <span class="link-count">{{ group.sources.length }} liên kết</span>
+          </div>
+
+          <div class="source-item" *ngFor="let source of group.sources">
+            <div class="source-info">
+              <div class="source-path">
+                <span class="source-template">{{ source.sourceTemplateName }}</span>
+                <span class="arrow">→</span>
+                <span class="source-field">{{ source.sourceFieldLabel }}</span>
+              </div>
+              <div class="source-meta">
+                <span class="flow-badge" [attr.data-flow]="source.flowType">
+                  {{ getFlowTypeIcon(source.flowType) }} {{ getFlowTypeLabel(source.flowType) }}
+                </span>
+                <span class="priority-badge" *ngIf="source.priority > 0">
+                  P{{ source.priority }}
+                </span>
+                <span class="description-text" *ngIf="source.description">
+                  {{ source.description }}
+                </span>
+              </div>
+            </div>
+            <div class="source-actions">
+              <button class="action-btn edit-btn" (click)="editLink(source)" title="Sửa">
+                ✏️
+              </button>
+              <button class="action-btn delete-btn" (click)="deleteLink(source)" title="Xóa">
+                🗑️
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Add button -->
+        <button class="add-link-btn" *ngIf="!showAddForm" (click)="openAddForm()">
+          <span class="plus-icon">+</span>
+          Thêm liên kết mới
+        </button>
+      </div>
+
+      <!-- Add/Edit form -->
+      <div class="add-form" *ngIf="showAddForm">
+        <div class="form-title">
+          {{ editingLinkId ? '✏️ Chỉnh sửa liên kết' : '➕ Thêm liên kết mới' }}
+        </div>
+
+        <!-- Target field -->
+        <div class="form-group">
+          <label>🎯 Trường đích (nhận dữ liệu)</label>
+          <select [(ngModel)]="newLink.targetFieldId" [disabled]="!!editingLinkId">
+            <option value="">-- Chọn trường đích --</option>
+            <option *ngFor="let field of getTargetFields()" [value]="field.id">
+              {{ field.label }} ({{ getFieldTypeLabel(field.fieldType) }})
+            </option>
+          </select>
+        </div>
+
+        <!-- Source template -->
+        <div class="form-group">
+          <label>📋 Form nguồn</label>
+          <select [(ngModel)]="newLink.sourceTemplateId" (ngModelChange)="onSourceTemplateChange()">
+            <option value="">-- Chọn form nguồn --</option>
+            <option *ngFor="let tmpl of getAvailableSourceTemplates()" [value]="tmpl.id">
+              {{ tmpl.name }}
+            </option>
+          </select>
+        </div>
+
+        <!-- Source field -->
+        <div class="form-group" *ngIf="newLink.sourceTemplateId">
+          <label>📝 Trường nguồn (lấy dữ liệu từ)</label>
+          <select [(ngModel)]="newLink.sourceFieldId">
+            <option value="">-- Chọn trường nguồn --</option>
+            <option *ngFor="let field of sourceFields" [value]="field.id">
+              {{ field.label }} ({{ getFieldTypeLabel(field.fieldType) }})
+            </option>
+          </select>
+          <small class="field-hint" *ngIf="sourceFields.length === 0">
+            Không có trường dữ liệu trong form này
+          </small>
+        </div>
+
+        <!-- Flow type -->
+        <div class="form-group">
+          <label>⚙️ Kiểu liên kết</label>
+          <div class="flow-type-options">
+            <label class="flow-option" *ngFor="let ft of flowTypes"
+                   [class.selected]="newLink.flowType === ft.value">
+              <input type="radio" name="flowType"
+                     [value]="ft.value"
+                     [(ngModel)]="newLink.flowType" />
+              <span class="flow-option-content">
+                <span class="flow-icon">{{ ft.icon }}</span>
+                <span class="flow-label">{{ ft.label }}</span>
+                <span class="flow-desc">{{ ft.desc }}</span>
+              </span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Priority -->
+        <div class="form-group">
+          <label>🔢 Độ ưu tiên (0 = mặc định)</label>
+          <input type="number" min="0" max="100"
+                 [(ngModel)]="newLink.priority" />
+        </div>
+
+        <!-- Description -->
+        <div class="form-group">
+          <label>📝 Mô tả (tùy chọn)</label>
+          <input type="text"
+                 [(ngModel)]="newLink.description"
+                 placeholder="VD: Lấy ngày sinh từ form đăng ký..."  />
+        </div>
+
+        <!-- Form actions -->
+        <div class="form-actions">
+          <button class="cancel-btn" (click)="cancelAdd()" [disabled]="isSaving">
+            Hủy
+          </button>
+          <button class="save-btn" (click)="saveLink()"
+                  [disabled]="isSaving || !newLink.targetFieldId || !newLink.sourceTemplateId || !newLink.sourceFieldId">
+            <span *ngIf="isSaving" class="spinner-small"></span>
+            {{ editingLinkId ? 'Cập nhật' : 'Tạo liên kết' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

@@ -9,11 +9,12 @@ namespace IVF.Infrastructure.Repositories;
 public class AppointmentRepository : IAppointmentRepository
 {
     private readonly IvfDbContext _context;
-    
+
     public AppointmentRepository(IvfDbContext context) => _context = context;
 
     public async Task<Appointment?> GetByIdAsync(Guid id, CancellationToken ct = default)
         => await _context.Appointments
+            .AsNoTracking()
             .Include(a => a.Patient)
             .Include(a => a.Doctor).ThenInclude(d => d!.User)
             .Include(a => a.Cycle)
@@ -21,6 +22,7 @@ public class AppointmentRepository : IAppointmentRepository
 
     public async Task<IReadOnlyList<Appointment>> GetByPatientAsync(Guid patientId, CancellationToken ct = default)
         => await _context.Appointments
+            .AsNoTracking()
             .Include(a => a.Doctor).ThenInclude(d => d!.User)
             .Where(a => a.PatientId == patientId)
             .OrderByDescending(a => a.ScheduledAt)
@@ -39,6 +41,7 @@ public class AppointmentRepository : IAppointmentRepository
 
     public async Task<IReadOnlyList<Appointment>> GetByDateRangeAsync(DateTime start, DateTime end, CancellationToken ct = default)
         => await _context.Appointments
+            .AsNoTracking()
             .Include(a => a.Patient)
             .Include(a => a.Cycle)
             .Include(a => a.Doctor).ThenInclude(d => d!.User)
@@ -49,10 +52,12 @@ public class AppointmentRepository : IAppointmentRepository
     public async Task<IReadOnlyList<Appointment>> GetTodayAppointmentsAsync(CancellationToken ct = default)
     {
         var today = DateTime.UtcNow.Date;
+        var tomorrow = today.AddDays(1);
         return await _context.Appointments
+            .AsNoTracking()
             .Include(a => a.Patient)
             .Include(a => a.Doctor).ThenInclude(d => d!.User)
-            .Where(a => a.ScheduledAt.Date == today)
+            .Where(a => a.ScheduledAt >= today && a.ScheduledAt < tomorrow)
             .OrderBy(a => a.ScheduledAt)
             .ToListAsync(ct);
     }
@@ -62,14 +67,15 @@ public class AppointmentRepository : IAppointmentRepository
         var now = DateTime.UtcNow;
         var end = now.AddDays(days);
         var query = _context.Appointments
+            .AsNoTracking()
             .Include(a => a.Patient)
             .Include(a => a.Doctor).ThenInclude(d => d!.User)
-            .Where(a => a.ScheduledAt >= now && a.ScheduledAt <= end && 
+            .Where(a => a.ScheduledAt >= now && a.ScheduledAt <= end &&
                         a.Status != AppointmentStatus.Cancelled && a.Status != AppointmentStatus.Completed);
-        
+
         if (doctorId.HasValue)
             query = query.Where(a => a.DoctorId == doctorId);
-        
+
         return await query.OrderBy(a => a.ScheduledAt).ToListAsync(ct);
     }
 
@@ -81,10 +87,10 @@ public class AppointmentRepository : IAppointmentRepository
                         a.Status != AppointmentStatus.Cancelled &&
                         ((a.ScheduledAt >= scheduledAt && a.ScheduledAt < endTime) ||
                          (a.ScheduledAt.AddMinutes(a.DurationMinutes) > scheduledAt && a.ScheduledAt < endTime)));
-        
+
         if (excludeAppointmentId.HasValue)
             query = query.Where(a => a.Id != excludeAppointmentId);
-        
+
         return await query.AnyAsync(ct);
     }
 

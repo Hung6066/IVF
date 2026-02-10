@@ -35,6 +35,10 @@ public class TreatmentCycleConfiguration : IEntityTypeConfiguration<TreatmentCyc
             .HasForeignKey(t => t.CoupleId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.HasIndex(t => t.CoupleId);
+        builder.HasIndex(t => t.StartDate);
+        builder.HasIndex(t => t.CurrentPhase);
+
         // Extended fields
         builder.Property(t => t.Room).HasMaxLength(50);
         builder.Property(t => t.EtIuiDoctor).HasMaxLength(100);

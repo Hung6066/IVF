@@ -21,11 +21,12 @@ public class InvoiceConfiguration : IEntityTypeConfiguration<Invoice>
         builder.Property(i => i.TotalAmount).HasPrecision(18, 2);
         builder.Property(i => i.PaidAmount).HasPrecision(18, 2);
 
-        builder.HasOne(i => i.Patient).WithMany().HasForeignKey(i => i.PatientId);
-        builder.HasOne(i => i.Cycle).WithMany().HasForeignKey(i => i.CycleId);
+        builder.HasOne(i => i.Patient).WithMany().HasForeignKey(i => i.PatientId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(i => i.Cycle).WithMany().HasForeignKey(i => i.CycleId).OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(i => i.InvoiceNumber).IsUnique();
         builder.HasIndex(i => i.PatientId);
+        builder.HasIndex(i => i.CycleId);
         builder.HasIndex(i => i.Status);
         builder.HasIndex(i => i.InvoiceDate);
         builder.HasQueryFilter(i => !i.IsDeleted);

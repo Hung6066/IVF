@@ -8,7 +8,7 @@ public class FormFieldConfiguration : IEntityTypeConfiguration<FormField>
 {
     public void Configure(EntityTypeBuilder<FormField> builder)
     {
-        builder.ToTable("FormFields");
+        builder.ToTable("form_fields");
 
         builder.HasKey(f => f.Id);
 
@@ -26,6 +26,10 @@ public class FormFieldConfiguration : IEntityTypeConfiguration<FormField>
         builder.Property(f => f.HelpText)
             .HasMaxLength(1000);
 
+        builder.Property(f => f.FieldType)
+            .HasConversion<string>()
+            .HasMaxLength(30);
+
         // Relationships
         builder.HasOne(f => f.FormTemplate)
             .WithMany(t => t.Fields)
@@ -37,15 +41,12 @@ public class FormFieldConfiguration : IEntityTypeConfiguration<FormField>
             .HasForeignKey(f => f.ConceptId)
             .OnDelete(DeleteBehavior.SetNull);
 
-        builder.HasMany(f => f.Options)
-            .WithOne(o => o.FormField)
-            .HasForeignKey(o => o.FormFieldId)
-            .OnDelete(DeleteBehavior.Cascade);
+        // Options & FieldValues relationships configured in their own Configuration files
 
-        builder.HasMany(f => f.FieldValues)
-            .WithOne(v => v.FormField)
-            .HasForeignKey(v => v.FormFieldId)
-            .OnDelete(DeleteBehavior.Cascade);
+        // Indexes
+        builder.HasIndex(f => f.FormTemplateId);
+        builder.HasIndex(f => new { f.FormTemplateId, f.DisplayOrder });
+        builder.HasIndex(f => f.ConceptId);
 
         // Soft delete filter
         builder.HasQueryFilter(f => !f.IsDeleted);

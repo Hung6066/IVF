@@ -41,10 +41,7 @@ public static class CyclePhaseEndpoints
         {
             var cmd = new UpdateStimulationDataCommand(
                 cycleId, req.LastMenstruation, req.StartDate, req.StartDay,
-                req.Drug1, req.Drug1Duration, req.Drug1Posology,
-                req.Drug2, req.Drug2Duration, req.Drug2Posology,
-                req.Drug3, req.Drug3Duration, req.Drug3Posology,
-                req.Drug4, req.Drug4Duration, req.Drug4Posology,
+                req.Drugs?.Select(d => new StimulationDrugInput(d.DrugName, d.Duration, d.Posology)).ToList(),
                 req.Size12Follicle, req.Size14Follicle, req.EndometriumThickness,
                 req.TriggerDrug, req.TriggerDrug2, req.HcgDate, req.HcgDate2, req.HcgTime, req.HcgTime2,
                 req.LhLab, req.E2Lab, req.P4Lab,
@@ -91,7 +88,9 @@ public static class CyclePhaseEndpoints
 
         group.MapPut("/{cycleId:guid}/luteal-phase", async (Guid cycleId, UpdateLutealPhaseDataRequest req, IMediator m) =>
         {
-            var cmd = new UpdateLutealPhaseDataCommand(cycleId, req.LutealDrug1, req.LutealDrug2, req.EndometriumDrug1, req.EndometriumDrug2);
+            var cmd = new UpdateLutealPhaseDataCommand(
+                cycleId,
+                req.Drugs?.Select(d => new LutealPhaseDrugInput(d.DrugName, d.Category)).ToList());
             var r = await m.Send(cmd);
             return r.IsSuccess ? Results.Ok(r.Value) : Results.BadRequest(r.Error);
         });
@@ -119,7 +118,11 @@ public static class CyclePhaseEndpoints
 
         group.MapPut("/{cycleId:guid}/birth", async (Guid cycleId, UpdateBirthDataRequest req, IMediator m) =>
         {
-            var cmd = new UpdateBirthDataCommand(cycleId, req.DeliveryDate, req.GestationalWeeks, req.DeliveryMethod, req.LiveBirths, req.Stillbirths, req.BabyGenders, req.BirthWeights, req.Complications);
+            var cmd = new UpdateBirthDataCommand(
+                cycleId, req.DeliveryDate, req.GestationalWeeks, req.DeliveryMethod,
+                req.LiveBirths, req.Stillbirths,
+                req.Outcomes?.Select(o => new BirthOutcomeInput(o.Gender, o.Weight, o.IsLiveBirth)).ToList(),
+                req.Complications);
             var r = await m.Send(cmd);
             return r.IsSuccess ? Results.Ok(r.Value) : Results.BadRequest(r.Error);
         });
@@ -149,12 +152,11 @@ public record UpdateTreatmentIndicationRequest(
     string? SubType, string? ScientificResearch, string? Source, string? ProcedurePlace, string? StopReason,
     DateTime? TreatmentMonth, int PreviousTreatmentsAtSite, int PreviousTreatmentsOther);
 
+public record StimulationDrugRequest(string DrugName, int Duration, string? Posology);
+
 public record UpdateStimulationDataRequest(
     DateTime? LastMenstruation, DateTime? StartDate, int? StartDay,
-    string? Drug1, int Drug1Duration, string? Drug1Posology,
-    string? Drug2, int Drug2Duration, string? Drug2Posology,
-    string? Drug3, int Drug3Duration, string? Drug3Posology,
-    string? Drug4, int Drug4Duration, string? Drug4Posology,
+    List<StimulationDrugRequest>? Drugs,
     int? Size12Follicle, int? Size14Follicle, decimal? EndometriumThickness,
     string? TriggerDrug, string? TriggerDrug2, DateTime? HcgDate, DateTime? HcgDate2, TimeSpan? HcgTime, TimeSpan? HcgTime2,
     decimal? LhLab, decimal? E2Lab, decimal? P4Lab,
@@ -165,10 +167,16 @@ public record UpdateCultureDataRequest(int TotalFreezedEmbryo, int TotalThawedEm
 
 public record UpdateTransferDataRequest(DateTime? TransferDate, DateTime? ThawingDate, int DayOfTransfered, string? LabNote);
 
-public record UpdateLutealPhaseDataRequest(string? LutealDrug1, string? LutealDrug2, string? EndometriumDrug1, string? EndometriumDrug2);
+public record LutealPhaseDrugRequest(string DrugName, string Category);
+
+public record UpdateLutealPhaseDataRequest(List<LutealPhaseDrugRequest>? Drugs);
 
 public record UpdatePregnancyDataRequest(decimal? BetaHcg, DateTime? BetaHcgDate, bool IsPregnant, int? GestationalSacs, int? FetalHeartbeats, DateTime? DueDate, string? Notes);
 
-public record UpdateBirthDataRequest(DateTime? DeliveryDate, int GestationalWeeks, string? DeliveryMethod, int LiveBirths, int Stillbirths, string? BabyGenders, string? BirthWeights, string? Complications);
+public record BirthOutcomeRequest(string Gender, decimal? Weight, bool IsLiveBirth = true);
+
+public record UpdateBirthDataRequest(
+    DateTime? DeliveryDate, int GestationalWeeks, string? DeliveryMethod,
+    int LiveBirths, int Stillbirths, List<BirthOutcomeRequest>? Outcomes, string? Complications);
 
 public record CreateAdverseEventRequest(DateTime? EventDate, string? EventType, string? Severity, string? Description, string? Treatment, string? Outcome);

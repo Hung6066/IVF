@@ -1,6 +1,6 @@
 import { Component, Input, Output, EventEmitter, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
+import { FormBuilder, FormGroup, FormArray, ReactiveFormsModule } from '@angular/forms';
 import { CycleService } from '../../../../core/services/cycle.service';
 
 @Component({
@@ -29,24 +29,28 @@ import { CycleService } from '../../../../core/services/cycle.service';
 
       <div class="form-section">
         <h3>Thuốc sử dụng</h3>
-        <div class="drug-grid">
-          @for (i of [1, 2, 3, 4]; track i) {
-          <div class="drug-row">
+        <div class="drug-grid" formArrayName="drugs">
+          @for (drug of drugsArray.controls; track $index) {
+          <div class="drug-row" [formGroupName]="$index">
             <div class="form-group">
-              <label>Thuốc {{ i }}</label>
-              <input type="text" [formControlName]="'drug' + i" placeholder="Tên thuốc"/>
+              <label>Thuốc {{ $index + 1 }}</label>
+              <input type="text" formControlName="drugName" placeholder="Tên thuốc"/>
             </div>
             <div class="form-group">
               <label>Số ngày</label>
-              <input type="number" [formControlName]="'drug' + i + 'Duration'" min="0"/>
+              <input type="number" formControlName="duration" min="0"/>
             </div>
             <div class="form-group">
               <label>Liều dùng</label>
-              <input type="text" [formControlName]="'drug' + i + 'Posology'" placeholder="Liều"/>
+              <input type="text" formControlName="posology" placeholder="Liều"/>
+            </div>
+            <div class="form-group drug-actions">
+              <button type="button" class="btn btn-icon btn-danger" (click)="removeDrug($index)" title="Xóa">✕</button>
             </div>
           </div>
           }
         </div>
+        <button type="button" class="btn btn-secondary btn-sm" (click)="addDrug()">+ Thêm thuốc</button>
       </div>
 
       <div class="form-section">
@@ -127,8 +131,9 @@ import { CycleService } from '../../../../core/services/cycle.service';
     .form-section { margin-bottom: 1.5rem; padding: 1rem; background: var(--surface-elevated); border-radius: 8px; }
     .form-section h3 { margin: 0 0 1rem; font-size: 1rem; }
     .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; }
-    .drug-grid { display: flex; flex-direction: column; gap: 0.75rem; }
-    .drug-row { display: grid; grid-template-columns: 2fr 1fr 1.5fr; gap: 0.75rem; padding: 0.5rem; background: var(--surface); border-radius: 6px; }
+    .drug-grid { display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 0.75rem; }
+    .drug-row { display: grid; grid-template-columns: 2fr 1fr 1.5fr auto; gap: 0.75rem; padding: 0.5rem; background: var(--surface); border-radius: 6px; align-items: end; }
+    .drug-actions { justify-content: flex-end; }
     .form-group { display: flex; flex-direction: column; gap: 0.25rem; }
     .form-group label { font-size: 0.85rem; color: var(--text-secondary); }
     .form-group input { padding: 0.5rem; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); font-size: 0.9rem; }
@@ -136,6 +141,10 @@ import { CycleService } from '../../../../core/services/cycle.service';
     .btn { padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer; border: none; font-size: 0.9rem; }
     .btn-primary { background: var(--primary); color: white; }
     .btn-primary:disabled { opacity: 0.6; }
+    .btn-secondary { background: var(--surface-elevated); color: var(--text-primary); border: 1px dashed var(--border); }
+    .btn-sm { padding: 0.35rem 0.75rem; font-size: 0.85rem; }
+    .btn-icon { padding: 0.25rem 0.5rem; font-size: 0.8rem; line-height: 1; }
+    .btn-danger { background: transparent; color: var(--danger, #e53e3e); }
   `]
 })
 export class StimulationTabComponent implements OnInit {
@@ -148,15 +157,16 @@ export class StimulationTabComponent implements OnInit {
   form!: FormGroup;
   loading = false;
 
+  get drugsArray(): FormArray {
+    return this.form.get('drugs') as FormArray;
+  }
+
   ngOnInit(): void {
     this.form = this.fb.group({
       lastMenstruation: [''],
       startDate: [''],
       startDay: [null],
-      drug1: [''], drug1Duration: [0], drug1Posology: [''],
-      drug2: [''], drug2Duration: [0], drug2Posology: [''],
-      drug3: [''], drug3Duration: [0], drug3Posology: [''],
-      drug4: [''], drug4Duration: [0], drug4Posology: [''],
+      drugs: this.fb.array([]),
       size12Follicle: [null],
       size14Follicle: [null],
       endometriumThickness: [null],
@@ -174,6 +184,22 @@ export class StimulationTabComponent implements OnInit {
     this.loadData();
   }
 
+  createDrugGroup(drug?: { drugName?: string; duration?: number; posology?: string }): FormGroup {
+    return this.fb.group({
+      drugName: [drug?.drugName || ''],
+      duration: [drug?.duration || 0],
+      posology: [drug?.posology || '']
+    });
+  }
+
+  addDrug(): void {
+    this.drugsArray.push(this.createDrugGroup());
+  }
+
+  removeDrug(index: number): void {
+    this.drugsArray.removeAt(index);
+  }
+
   loadData(): void {
     this.cycleService.getCycleStimulation(this.cycleId).subscribe({
       next: (data) => this.patchForm(data),
@@ -187,10 +213,6 @@ export class StimulationTabComponent implements OnInit {
       lastMenstruation: data.lastMenstruation?.split('T')[0] || '',
       startDate: data.startDate?.split('T')[0] || '',
       startDay: data.startDay,
-      drug1: data.drug1 || '', drug1Duration: data.drug1Duration || 0, drug1Posology: data.drug1Posology || '',
-      drug2: data.drug2 || '', drug2Duration: data.drug2Duration || 0, drug2Posology: data.drug2Posology || '',
-      drug3: data.drug3 || '', drug3Duration: data.drug3Duration || 0, drug3Posology: data.drug3Posology || '',
-      drug4: data.drug4 || '', drug4Duration: data.drug4Duration || 0, drug4Posology: data.drug4Posology || '',
       size12Follicle: data.size12Follicle,
       size14Follicle: data.size14Follicle,
       endometriumThickness: data.endometriumThickness,
@@ -204,21 +226,36 @@ export class StimulationTabComponent implements OnInit {
       e2Lab: data.e2Lab,
       p4Lab: data.p4Lab
     });
+
+    // Populate drugs FormArray
+    this.drugsArray.clear();
+    if (data.drugs?.length) {
+      data.drugs.forEach((d: any) => this.drugsArray.push(this.createDrugGroup(d)));
+    } else {
+      // Default 4 empty drug rows for new records
+      for (let i = 0; i < 4; i++) this.addDrug();
+    }
   }
 
   onSubmit(): void {
     if (this.loading) return;
     this.loading = true;
 
-    const formValue = { ...this.form.value };
-    // Convert empty strings to null for optional fields
-    Object.keys(formValue).forEach(key => {
-      if (formValue[key] === '') {
-        formValue[key] = null;
+    const formValue = this.form.value;
+    // Build payload with drugs array
+    const payload: any = { ...formValue };
+    // Convert empty strings to null for scalar fields
+    Object.keys(payload).forEach(key => {
+      if (key !== 'drugs' && payload[key] === '') {
+        payload[key] = null;
       }
     });
+    // Filter out empty drug rows and assign sortOrder
+    payload.drugs = (formValue.drugs || [])
+      .filter((d: any) => d.drugName?.trim())
+      .map((d: any, i: number) => ({ ...d, sortOrder: i }));
 
-    this.cycleService.updateCycleStimulation(this.cycleId, formValue).subscribe({
+    this.cycleService.updateCycleStimulation(this.cycleId, payload).subscribe({
       next: () => { this.loading = false; this.saved.emit(); },
       error: () => { this.loading = false; }
     });

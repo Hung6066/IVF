@@ -13,12 +13,14 @@ public class CoupleRepository : ICoupleRepository
 
     public async Task<Couple?> GetByIdAsync(Guid id, CancellationToken ct = default)
         => await _context.Couples
+            .AsNoTracking()
             .Include(c => c.Wife)
             .Include(c => c.Husband)
             .FirstOrDefaultAsync(c => c.Id == id, ct);
 
     public async Task<Couple?> GetByPatientIdAsync(Guid patientId, CancellationToken ct = default)
         => await _context.Couples
+            .AsNoTracking()
             .Include(c => c.Wife)
             .Include(c => c.Husband)
             .FirstOrDefaultAsync(c => c.WifeId == patientId || c.HusbandId == patientId, ct);
@@ -28,7 +30,11 @@ public class CoupleRepository : ICoupleRepository
             .FirstOrDefaultAsync(c => c.WifeId == wifeId && c.HusbandId == husbandId, ct);
 
     public async Task<IReadOnlyList<Couple>> GetAllAsync(CancellationToken ct = default)
-        => await _context.Couples.ToListAsync(ct);
+        => await _context.Couples
+            .AsNoTracking()
+            .Include(c => c.Wife)
+            .Include(c => c.Husband)
+            .ToListAsync(ct);
 
     public async Task<Couple> AddAsync(Couple couple, CancellationToken ct = default)
     {

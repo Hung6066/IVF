@@ -50,7 +50,7 @@ public class GetCycleSuccessRatesHandler : IRequestHandler<GetCycleSuccessRatesQ
     {
         var year = request.Year ?? DateTime.UtcNow.Year;
         var stats = await _cycleRepo.GetOutcomeStatsAsync(year, ct);
-        
+
         var total = stats.Values.Sum();
         var pregnancies = stats.GetValueOrDefault(CycleOutcome.Pregnant.ToString(), 0);
         var successRate = total > 0 ? (decimal)pregnancies / total * 100 : 0;
@@ -78,11 +78,12 @@ public class GetMonthlyRevenueHandler : IRequestHandler<GetMonthlyRevenueQuery, 
 
     public async Task<IReadOnlyList<MonthlyRevenueDto>> Handle(GetMonthlyRevenueQuery request, CancellationToken ct)
     {
+        // Single query for all 12 months — eliminates 12 separate DB roundtrips
+        var yearlyRevenue = await _invoiceRepo.GetYearlyRevenueByMonthAsync(request.Year, ct);
         var revenues = new List<MonthlyRevenueDto>();
         for (int month = 1; month <= 12; month++)
         {
-            var revenue = await _invoiceRepo.GetMonthlyRevenueAsync(month, request.Year, ct);
-            revenues.Add(new MonthlyRevenueDto(month, revenue));
+            revenues.Add(new MonthlyRevenueDto(month, yearlyRevenue.GetValueOrDefault(month, 0)));
         }
         return revenues;
     }

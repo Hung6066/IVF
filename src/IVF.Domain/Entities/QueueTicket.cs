@@ -17,11 +17,13 @@ public class QueueTicket : BaseEntity
     public DateTime? CompletedAt { get; private set; }
     public Guid? CalledByUserId { get; private set; }
     
-    // Service indications - JSON array of service IDs selected during check-in
-    public string? ServiceIndications { get; private set; }
-    
     // Notes from service completion (e.g., consultation notes)
     public string? Notes { get; set; }
+
+    /// <summary>
+    /// Normalized join collection — replaces ServiceIndications JSON column.
+    /// </summary>
+    public virtual ICollection<QueueTicketService> Services { get; private set; } = new List<QueueTicketService>();
 
     // Navigation properties
     public virtual Patient Patient { get; private set; } = null!;
@@ -37,9 +39,9 @@ public class QueueTicket : BaseEntity
         Guid patientId,
         string departmentCode,
         Guid? cycleId = null,
-        string? serviceIndications = null)
+        IEnumerable<Guid>? serviceIds = null)
     {
-        return new QueueTicket
+        var ticket = new QueueTicket
         {
             TicketNumber = ticketNumber,
             QueueType = queueType,
@@ -47,10 +49,17 @@ public class QueueTicket : BaseEntity
             PatientId = patientId,
             DepartmentCode = departmentCode,
             CycleId = cycleId,
-            ServiceIndications = serviceIndications,
             Status = TicketStatus.Waiting,
             IssuedAt = DateTime.UtcNow
         };
+
+        if (serviceIds != null)
+        {
+            foreach (var serviceId in serviceIds)
+                ticket.Services.Add(QueueTicketService.Create(ticket.Id, serviceId));
+        }
+
+        return ticket;
     }
 
     public void Call(Guid userId)

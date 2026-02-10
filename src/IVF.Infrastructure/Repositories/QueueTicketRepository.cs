@@ -12,17 +12,22 @@ public class QueueTicketRepository : IQueueTicketRepository
     public QueueTicketRepository(IvfDbContext context) => _context = context;
 
     public async Task<QueueTicket?> GetByIdAsync(Guid id, CancellationToken ct = default)
-        => await _context.QueueTickets.FirstOrDefaultAsync(q => q.Id == id, ct);
+        => await _context.QueueTickets
+            .Include(q => q.Patient)
+            .Include(q => q.Services)
+            .FirstOrDefaultAsync(q => q.Id == id, ct);
 
     public async Task<IReadOnlyList<QueueTicket>> GetByDepartmentTodayAsync(string departmentCode, CancellationToken ct = default)
     {
         var today = DateTime.UtcNow.Date;
         return await _context.QueueTickets
+            .AsNoTracking()
             .Where(q => q.DepartmentCode == departmentCode && q.IssuedAt >= today
                 && q.Status != Domain.Enums.TicketStatus.Completed
                 && q.Status != Domain.Enums.TicketStatus.Skipped
                 && q.Status != Domain.Enums.TicketStatus.Cancelled)
             .Include(q => q.Patient)
+            .Include(q => q.Services)
             .OrderBy(q => q.IssuedAt)
             .ToListAsync(ct);
     }
@@ -31,11 +36,13 @@ public class QueueTicketRepository : IQueueTicketRepository
     {
         var today = DateTime.UtcNow.Date;
         return await _context.QueueTickets
+            .AsNoTracking()
             .Where(q => q.DepartmentCode == departmentCode && q.IssuedAt >= today
                 && (q.Status == Domain.Enums.TicketStatus.Completed
                  || q.Status == Domain.Enums.TicketStatus.Skipped
                  || q.Status == Domain.Enums.TicketStatus.Cancelled))
             .Include(q => q.Patient)
+            .Include(q => q.Services)
             .OrderByDescending(q => q.CompletedAt ?? q.IssuedAt)
             .ToListAsync(ct);
     }
@@ -44,8 +51,10 @@ public class QueueTicketRepository : IQueueTicketRepository
     {
         var today = DateTime.UtcNow.Date;
         return await _context.QueueTickets
+            .AsNoTracking()
             .Where(q => q.PatientId == patientId && q.IssuedAt >= today)
             .Include(q => q.Patient)
+            .Include(q => q.Services)
             .OrderByDescending(q => q.IssuedAt)
             .ToListAsync(ct);
     }
@@ -54,11 +63,13 @@ public class QueueTicketRepository : IQueueTicketRepository
     {
         var today = DateTime.UtcNow.Date;
         return await _context.QueueTickets
+            .AsNoTracking()
             .Where(q => q.IssuedAt >= today
                 && q.Status != Domain.Enums.TicketStatus.Completed
                 && q.Status != Domain.Enums.TicketStatus.Skipped
                 && q.Status != Domain.Enums.TicketStatus.Cancelled)
             .Include(q => q.Patient)
+            .Include(q => q.Services)
             .OrderBy(q => q.IssuedAt)
             .ToListAsync(ct);
     }
@@ -94,22 +105,27 @@ public class QueueTicketRepository : IQueueTicketRepository
     {
         var dateStart = date.Date;
         var dateEnd = dateStart.AddDays(1);
-        var tickets = await _context.QueueTickets
-            .Where(q => q.IssuedAt >= dateStart && q.IssuedAt < dateEnd)
-            .ToListAsync(ct);
 
-        var completed = tickets.Count(t => t.Status == Domain.Enums.TicketStatus.Completed);
-        var waiting = tickets.Count(t => t.Status == Domain.Enums.TicketStatus.Waiting);
-        var avgWait = tickets.Where(t => t.CalledAt.HasValue)
-            .Select(t => (t.CalledAt!.Value - t.IssuedAt).TotalMinutes)
-            .DefaultIfEmpty(0).Average();
+        // Server-side aggregation — eliminates loading all tickets to memory
+        var baseQuery = _context.QueueTickets
+            .Where(q => q.IssuedAt >= dateStart && q.IssuedAt < dateEnd);
+
+        var total = await baseQuery.CountAsync(ct);
+        var completed = await baseQuery.CountAsync(t => t.Status == Domain.Enums.TicketStatus.Completed, ct);
+        var waiting = await baseQuery.CountAsync(t => t.Status == Domain.Enums.TicketStatus.Waiting, ct);
+
+        var avgWaitSeconds = await baseQuery
+            .Where(t => t.CalledAt.HasValue)
+            .Select(t => (t.CalledAt!.Value - t.IssuedAt).TotalSeconds)
+            .DefaultIfEmpty(0)
+            .AverageAsync(ct);
 
         return new Dictionary<string, int>
         {
-            ["Total"] = tickets.Count,
+            ["Total"] = total,
             ["Completed"] = completed,
             ["Waiting"] = waiting,
-            ["AverageWaitMinutes"] = (int)avgWait
+            ["AverageWaitMinutes"] = (int)(avgWaitSeconds / 60.0)
         };
     }
 }

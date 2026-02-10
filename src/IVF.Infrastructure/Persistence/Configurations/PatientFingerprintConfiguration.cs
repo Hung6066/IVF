@@ -8,7 +8,7 @@ public class PatientFingerprintConfiguration : IEntityTypeConfiguration<PatientF
 {
     public void Configure(EntityTypeBuilder<PatientFingerprint> builder)
     {
-        builder.ToTable("PatientFingerprints");
+        builder.ToTable("patient_fingerprints");
 
         builder.HasKey(p => p.Id);
 
@@ -19,9 +19,13 @@ public class PatientFingerprintConfiguration : IEntityTypeConfiguration<PatientF
             .IsRequired();
 
         builder.Property(p => p.FingerType)
+            .HasConversion<string>()
+            .HasMaxLength(30)
             .IsRequired();
 
         builder.Property(p => p.SdkType)
+            .HasConversion<string>()
+            .HasMaxLength(30)
             .IsRequired();
 
         builder.Property(p => p.Quality)
@@ -38,5 +42,7 @@ public class PatientFingerprintConfiguration : IEntityTypeConfiguration<PatientF
             .WithMany(p => p.Fingerprints)
             .HasForeignKey(p => p.PatientId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasQueryFilter(p => !p.IsDeleted);
     }
 }

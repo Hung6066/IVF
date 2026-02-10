@@ -34,6 +34,7 @@ public class NotificationConfiguration : IEntityTypeConfiguration<Notification>
         builder.HasIndex(n => n.UserId);
         builder.HasIndex(n => new { n.UserId, n.IsRead });
         builder.HasIndex(n => n.CreatedAt);
+        builder.HasIndex(n => new { n.EntityType, n.EntityId });
         builder.HasQueryFilter(n => !n.IsDeleted);
     }
 }

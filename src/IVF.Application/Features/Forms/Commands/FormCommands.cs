@@ -149,6 +149,30 @@ public record DeleteReportTemplateCommand(Guid Id) : IRequest<Result<bool>>;
 
 #endregion
 
+#region Linked Field Sources
+
+public record CreateLinkedFieldSourceCommand(
+    Guid TargetFieldId,
+    Guid SourceTemplateId,
+    Guid SourceFieldId,
+    DataFlowType FlowType = DataFlowType.Suggest,
+    int Priority = 0,
+    string? Description = null
+) : IRequest<Result<LinkedFieldSourceDto>>;
+
+public record UpdateLinkedFieldSourceCommand(
+    Guid Id,
+    Guid? SourceTemplateId = null,
+    Guid? SourceFieldId = null,
+    DataFlowType? FlowType = null,
+    int? Priority = null,
+    string? Description = null
+) : IRequest<Result<LinkedFieldSourceDto>>;
+
+public record DeleteLinkedFieldSourceCommand(Guid Id) : IRequest<Result<bool>>;
+
+#endregion
+
 #region DTOs
 
 public record FormCategoryDto(
@@ -247,6 +271,21 @@ public record ReportTemplateDto(
     ReportType ReportType,
     string ConfigurationJson,
     bool IsPublished,
+    DateTime CreatedAt
+);
+
+public record LinkedFieldSourceDto(
+    Guid Id,
+    Guid TargetFieldId,
+    string TargetFieldLabel,
+    Guid SourceTemplateId,
+    string SourceTemplateName,
+    Guid SourceFieldId,
+    string SourceFieldLabel,
+    DataFlowType FlowType,
+    int Priority,
+    bool IsActive,
+    string? Description,
     DateTime CreatedAt
 );
 
@@ -954,6 +993,75 @@ public class ReportTemplateCommandsHandler :
         r.ConfigurationJson,
         r.IsPublished,
         r.CreatedAt);
+}
+
+public class LinkedFieldSourceCommandsHandler :
+    IRequestHandler<CreateLinkedFieldSourceCommand, Result<LinkedFieldSourceDto>>,
+    IRequestHandler<UpdateLinkedFieldSourceCommand, Result<LinkedFieldSourceDto>>,
+    IRequestHandler<DeleteLinkedFieldSourceCommand, Result<bool>>
+{
+    private readonly IFormRepository _repo;
+
+    public LinkedFieldSourceCommandsHandler(IFormRepository repo)
+    {
+        _repo = repo;
+    }
+
+    public async Task<Result<LinkedFieldSourceDto>> Handle(CreateLinkedFieldSourceCommand request, CancellationToken ct)
+    {
+        var source = LinkedFieldSource.Create(
+            request.TargetFieldId,
+            request.SourceTemplateId,
+            request.SourceFieldId,
+            request.FlowType,
+            request.Priority,
+            request.Description);
+
+        await _repo.AddLinkedFieldSourceAsync(source, ct);
+
+        // Reload with navigation properties
+        source = await _repo.GetLinkedFieldSourceByIdAsync(source.Id, ct);
+
+        return Result<LinkedFieldSourceDto>.Success(MapToDto(source!));
+    }
+
+    public async Task<Result<LinkedFieldSourceDto>> Handle(UpdateLinkedFieldSourceCommand request, CancellationToken ct)
+    {
+        var source = await _repo.GetLinkedFieldSourceByIdAsync(request.Id, ct);
+        if (source == null)
+            return Result<LinkedFieldSourceDto>.Failure("Linked field source not found");
+
+        source.Update(
+            request.SourceTemplateId,
+            request.SourceFieldId,
+            request.FlowType,
+            request.Priority,
+            request.Description);
+
+        await _repo.UpdateLinkedFieldSourceAsync(source, ct);
+
+        return Result<LinkedFieldSourceDto>.Success(MapToDto(source));
+    }
+
+    public async Task<Result<bool>> Handle(DeleteLinkedFieldSourceCommand request, CancellationToken ct)
+    {
+        await _repo.DeleteLinkedFieldSourceAsync(request.Id, ct);
+        return Result<bool>.Success(true);
+    }
+
+    private static LinkedFieldSourceDto MapToDto(LinkedFieldSource s) => new(
+        s.Id,
+        s.TargetFieldId,
+        s.TargetField?.Label ?? "",
+        s.SourceTemplateId,
+        s.SourceTemplate?.Name ?? "",
+        s.SourceFieldId,
+        s.SourceField?.Label ?? "",
+        s.FlowType,
+        s.Priority,
+        s.IsActive,
+        s.Description,
+        s.CreatedAt);
 }
 
 #endregion

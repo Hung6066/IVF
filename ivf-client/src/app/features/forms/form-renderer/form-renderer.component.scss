@@ -144,6 +144,20 @@
   cursor: help;
   white-space: nowrap;
 
+  // Concept auto-link (same conceptId)
+  &.concept-link {
+    color: #059669;
+    background: #ecfdf5;
+    border-color: #6ee7b7;
+  }
+
+  // Configuration link (manual)
+  &.config-link {
+    color: #7c3aed;
+    background: #f5f3ff;
+    border-color: #c4b5fd;
+  }
+
   .linked-clear-btn {
     background: none;
     border: none;
@@ -846,7 +860,9 @@
       background: #667eea;
       cursor: pointer;
       box-shadow: 0 2px 6px rgba(102, 126, 234, 0.4);
-      transition: transform 0.15s, box-shadow 0.15s;
+      transition:
+        transform 0.15s,
+        box-shadow 0.15s;
 
       &:hover {
         transform: scale(1.15);
@@ -917,7 +933,9 @@
   background: white;
   font-size: 14px;
   line-height: 1.7;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
   overflow-y: auto;
 
   &:focus {
@@ -936,15 +954,18 @@
     margin: 0 0 8px;
   }
 
-  b, strong {
+  b,
+  strong {
     font-weight: 700;
   }
 
-  i, em {
+  i,
+  em {
     font-style: italic;
   }
 
-  ul, ol {
+  ul,
+  ol {
     padding-left: 24px;
     margin: 8px 0;
   }
@@ -1014,7 +1035,9 @@
       border: 2px solid #e2e8f0;
       border-radius: 10px;
       font-size: 14px;
-      transition: border-color 0.2s, box-shadow 0.2s;
+      transition:
+        border-color 0.2s,
+        box-shadow 0.2s;
 
       &:focus {
         outline: none;

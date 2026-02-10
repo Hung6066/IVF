@@ -19,8 +19,8 @@ public class SpermWashingConfiguration : IEntityTypeConfiguration<SpermWashing>
         builder.Property(w => w.PostWashConcentration).HasPrecision(10, 2);
         builder.Property(w => w.PostWashMotility).HasPrecision(5, 2);
 
-        builder.HasOne(w => w.Patient).WithMany().HasForeignKey(w => w.PatientId);
-        builder.HasOne(w => w.Cycle).WithMany().HasForeignKey(w => w.CycleId);
+        builder.HasOne(w => w.Patient).WithMany().HasForeignKey(w => w.PatientId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(w => w.Cycle).WithMany().HasForeignKey(w => w.CycleId).OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(w => w.PatientId);
         builder.HasIndex(w => w.CycleId);

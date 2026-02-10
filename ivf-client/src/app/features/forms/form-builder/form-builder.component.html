@@ -12,6 +12,9 @@
       />
     </div>
     <div class="header-right">
+      <button class="btn btn-link-config" (click)="openLinkedFieldConfig()" *ngIf="templateId" title="Cấu hình liên kết dữ liệu giữa các form">
+        🔗 Liên kết
+      </button>
       <button class="btn btn-secondary" (click)="preview()">👁️ Xem trước</button>
       @if (templateId && !template?.isPublished) {
         <button class="btn btn-success" (click)="publish()">📤 Xuất bản</button>
@@ -893,4 +896,13 @@
     (closed)="showConceptPicker = false"
   >
   </app-concept-picker>
+
+  <!-- Linked Field Config Modal -->
+  <app-linked-field-config
+    [templateId]="templateId || ''"
+    [fields]="fields"
+    [isOpen]="showLinkedFieldConfig"
+    (closed)="showLinkedFieldConfig = false"
+  >
+  </app-linked-field-config>
 </div>

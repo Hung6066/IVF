@@ -11,15 +11,12 @@ public class LutealPhaseDataConfiguration : IEntityTypeConfiguration<LutealPhase
         builder.ToTable("luteal_phase_data");
         builder.HasKey(t => t.Id);
 
-        builder.Property(t => t.LutealDrug1).HasMaxLength(100);
-        builder.Property(t => t.LutealDrug2).HasMaxLength(100);
-        builder.Property(t => t.EndometriumDrug1).HasMaxLength(100);
-        builder.Property(t => t.EndometriumDrug2).HasMaxLength(100);
-
         builder.HasOne(t => t.Cycle)
             .WithOne(c => c.LutealPhase)
             .HasForeignKey<LutealPhaseData>(t => t.CycleId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasIndex(t => t.CycleId);
 
         builder.HasQueryFilter(t => !t.IsDeleted);
     }

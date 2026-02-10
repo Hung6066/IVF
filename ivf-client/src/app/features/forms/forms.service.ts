@@ -289,6 +289,38 @@ export interface LinkedDataValue {
   flowType: number; // 1=AutoFill, 2=Suggest, 3=Reference, 4=Copy
 }
 
+export interface LinkedFieldSource {
+  id: string;
+  targetFieldId: string;
+  targetFieldLabel: string;
+  sourceTemplateId: string;
+  sourceTemplateName: string;
+  sourceFieldId: string;
+  sourceFieldLabel: string;
+  flowType: number;
+  priority: number;
+  isActive: boolean;
+  description?: string;
+  createdAt: string;
+}
+
+export interface CreateLinkedFieldSourceRequest {
+  targetFieldId: string;
+  sourceTemplateId: string;
+  sourceFieldId: string;
+  flowType?: number;
+  priority?: number;
+  description?: string;
+}
+
+export interface UpdateLinkedFieldSourceRequest {
+  sourceTemplateId?: string;
+  sourceFieldId?: string;
+  flowType?: number;
+  priority?: number;
+  description?: string;
+}
+
 @Injectable({
   providedIn: 'root',
 })
@@ -448,6 +480,23 @@ export class FormsService {
     let params = new HttpParams().set('patientId', patientId);
     if (cycleId) params = params.set('cycleId', cycleId);
     return this.http.get<LinkedDataValue[]>(`${this.baseUrl}/linked-data/${templateId}`, { params });
+  }
+
+  // Linked Field Sources (explicit field-to-field link configuration)
+  getLinkedFieldSources(templateId: string): Observable<LinkedFieldSource[]> {
+    return this.http.get<LinkedFieldSource[]>(`${this.baseUrl}/templates/${templateId}/linked-sources`);
+  }
+
+  createLinkedFieldSource(request: CreateLinkedFieldSourceRequest): Observable<LinkedFieldSource> {
+    return this.http.post<LinkedFieldSource>(`${this.baseUrl}/linked-sources`, request);
+  }
+
+  updateLinkedFieldSource(id: string, request: UpdateLinkedFieldSourceRequest): Observable<LinkedFieldSource> {
+    return this.http.put<LinkedFieldSource>(`${this.baseUrl}/linked-sources/${id}`, request);
+  }
+
+  deleteLinkedFieldSource(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/linked-sources/${id}`);
   }
 
   // File Upload

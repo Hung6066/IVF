@@ -37,12 +37,16 @@ public class IvfDbContext : DbContext
     // Treatment Cycle Phase Data
     public DbSet<TreatmentIndication> TreatmentIndications => Set<TreatmentIndication>();
     public DbSet<StimulationData> StimulationData => Set<StimulationData>();
+    public DbSet<StimulationDrug> StimulationDrugs => Set<StimulationDrug>();
     public DbSet<CultureData> CultureData => Set<CultureData>();
     public DbSet<TransferData> TransferData => Set<TransferData>();
     public DbSet<LutealPhaseData> LutealPhaseData => Set<LutealPhaseData>();
+    public DbSet<LutealPhaseDrug> LutealPhaseDrugs => Set<LutealPhaseDrug>();
     public DbSet<PregnancyData> PregnancyData => Set<PregnancyData>();
     public DbSet<BirthData> BirthData => Set<BirthData>();
+    public DbSet<BirthOutcome> BirthOutcomes => Set<BirthOutcome>();
     public DbSet<AdverseEventData> AdverseEventData => Set<AdverseEventData>();
+    public DbSet<QueueTicketService> QueueTicketServices => Set<QueueTicketService>();
 
     // Dynamic Form Builder
     public DbSet<FormCategory> FormCategories => Set<FormCategory>();
@@ -60,6 +64,7 @@ public class IvfDbContext : DbContext
 
     // Cross-Form Linked Data
     public DbSet<PatientConceptSnapshot> PatientConceptSnapshots => Set<PatientConceptSnapshot>();
+    public DbSet<LinkedFieldSource> LinkedFieldSources => Set<LinkedFieldSource>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

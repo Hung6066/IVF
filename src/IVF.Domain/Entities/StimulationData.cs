@@ -14,19 +14,10 @@ public class StimulationData : BaseEntity
     public DateTime? StartDate { get; private set; }
     public int? StartDay { get; private set; }
 
-    // Drug 1-4 with Duration and Posology
-    public string? Drug1 { get; private set; }
-    public int Drug1Duration { get; private set; }
-    public string? Drug1Posology { get; private set; }
-    public string? Drug2 { get; private set; }
-    public int Drug2Duration { get; private set; }
-    public string? Drug2Posology { get; private set; }
-    public string? Drug3 { get; private set; }
-    public int Drug3Duration { get; private set; }
-    public string? Drug3Posology { get; private set; }
-    public string? Drug4 { get; private set; }
-    public int Drug4Duration { get; private set; }
-    public string? Drug4Posology { get; private set; }
+    /// <summary>
+    /// Normalized child collection — replaces Drug1-4/Duration/Posology repeated column groups.
+    /// </summary>
+    public virtual ICollection<StimulationDrug> Drugs { get; private set; } = new List<StimulationDrug>();
 
     // Follicle monitoring
     public int? Size12Follicle { get; private set; }
@@ -66,10 +57,6 @@ public class StimulationData : BaseEntity
         DateTime? lastMenstruation,
         DateTime? startDate,
         int? startDay,
-        string? drug1, int drug1Duration, string? drug1Posology,
-        string? drug2, int drug2Duration, string? drug2Posology,
-        string? drug3, int drug3Duration, string? drug3Posology,
-        string? drug4, int drug4Duration, string? drug4Posology,
         int? size12Follicle,
         int? size14Follicle,
         decimal? endometriumThickness,
@@ -92,10 +79,6 @@ public class StimulationData : BaseEntity
         LastMenstruation = lastMenstruation;
         StartDate = startDate;
         StartDay = startDay;
-        Drug1 = drug1; Drug1Duration = drug1Duration; Drug1Posology = drug1Posology;
-        Drug2 = drug2; Drug2Duration = drug2Duration; Drug2Posology = drug2Posology;
-        Drug3 = drug3; Drug3Duration = drug3Duration; Drug3Posology = drug3Posology;
-        Drug4 = drug4; Drug4Duration = drug4Duration; Drug4Posology = drug4Posology;
         Size12Follicle = size12Follicle;
         Size14Follicle = size14Follicle;
         EndometriumThickness = endometriumThickness;
@@ -114,6 +97,14 @@ public class StimulationData : BaseEntity
         AspirationNo = aspirationNo;
         TechniqueWife = techniqueWife;
         TechniqueHusband = techniqueHusband;
+        SetUpdated();
+    }
+
+    public void SetDrugs(IEnumerable<StimulationDrug> drugs)
+    {
+        Drugs.Clear();
+        foreach (var drug in drugs)
+            Drugs.Add(drug);
         SetUpdated();
     }
 }

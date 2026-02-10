@@ -8,7 +8,7 @@ public class ConceptMappingConfiguration : IEntityTypeConfiguration<ConceptMappi
 {
     public void Configure(EntityTypeBuilder<ConceptMapping> builder)
     {
-        builder.ToTable("ConceptMappings");
+        builder.ToTable("concept_mappings");
 
         builder.HasKey(m => m.Id);
 
@@ -41,5 +41,7 @@ public class ConceptMappingConfiguration : IEntityTypeConfiguration<ConceptMappi
         builder.HasIndex(m => new { m.ConceptId, m.TargetSystem });
         builder.HasIndex(m => new { m.TargetSystem, m.TargetCode });
         builder.HasIndex(m => m.IsActive);
+
+        builder.HasQueryFilter(m => !m.IsDeleted);
     }
 }

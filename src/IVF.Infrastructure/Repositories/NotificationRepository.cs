@@ -8,7 +8,7 @@ namespace IVF.Infrastructure.Repositories;
 public class NotificationRepository : INotificationRepository
 {
     private readonly IvfDbContext _context;
-    
+
     public NotificationRepository(IvfDbContext context) => _context = context;
 
     public async Task<Notification?> GetByIdAsync(Guid id, CancellationToken ct = default)
@@ -16,10 +16,10 @@ public class NotificationRepository : INotificationRepository
 
     public async Task<IReadOnlyList<Notification>> GetByUserAsync(Guid userId, bool unreadOnly = false, CancellationToken ct = default)
     {
-        var query = _context.Notifications.Where(n => n.UserId == userId);
+        var query = _context.Notifications.AsNoTracking().Where(n => n.UserId == userId);
         if (unreadOnly)
             query = query.Where(n => !n.IsRead);
-        return await query.OrderByDescending(n => n.CreatedAt).ToListAsync(ct);
+        return await query.OrderByDescending(n => n.CreatedAt).Take(200).ToListAsync(ct);
     }
 
     public async Task<int> GetUnreadCountAsync(Guid userId, CancellationToken ct = default)
@@ -45,7 +45,7 @@ public class NotificationRepository : INotificationRepository
         var query = _context.Notifications.Where(n => n.UserId == userId && !n.IsRead);
         if (notificationId.HasValue)
             query = query.Where(n => n.Id == notificationId);
-        
+
         await query.ExecuteUpdateAsync(s => s
             .SetProperty(n => n.IsRead, true)
             .SetProperty(n => n.ReadAt, DateTime.UtcNow), ct);

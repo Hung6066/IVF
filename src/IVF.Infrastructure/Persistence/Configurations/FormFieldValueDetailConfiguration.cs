@@ -8,7 +8,7 @@ public class FormFieldValueDetailConfiguration : IEntityTypeConfiguration<FormFi
 {
     public void Configure(EntityTypeBuilder<FormFieldValueDetail> builder)
     {
-        builder.ToTable("FormFieldValueDetails");
+        builder.ToTable("form_field_value_details");
 
         builder.HasKey(e => e.Id);
 
@@ -22,7 +22,10 @@ public class FormFieldValueDetailConfiguration : IEntityTypeConfiguration<FormFi
         builder.HasOne(d => d.FormFieldValue)
             .WithMany(p => p.Details)
             .HasForeignKey(d => d.FormFieldValueId)
-            .OnDelete(DeleteBehavior.Restrict);
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasIndex(d => d.FormFieldValueId);
+        builder.HasIndex(d => d.ConceptId);
 
         // Optional relationship to Concept
         // assuming Concept entity exists and has Id

@@ -35,5 +35,8 @@ public class EmbryoConfiguration : IEntityTypeConfiguration<Embryo>
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(e => e.CycleId);
+        builder.HasIndex(e => e.CryoLocationId);
+
+        builder.HasQueryFilter(e => !e.IsDeleted);
     }
 }

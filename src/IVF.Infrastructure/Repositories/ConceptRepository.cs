@@ -16,16 +16,17 @@ public class ConceptRepository : IConceptRepository
 
     public async Task<Concept?> GetByIdAsync(Guid id, bool includeMappings = true, CancellationToken ct = default)
     {
-        var query = _context.Concepts.AsQueryable();
+        var query = _context.Concepts.AsNoTracking().AsQueryable();
         if (includeMappings)
             query = query.Include(c => c.Mappings);
-        
+
         return await query.FirstOrDefaultAsync(c => c.Id == id, ct);
     }
 
     public async Task<Concept?> GetByCodeAsync(string code, CancellationToken ct = default)
     {
         return await _context.Concepts
+            .AsNoTracking()
             .Include(c => c.Mappings)
             .FirstOrDefaultAsync(c => c.Code == code, ct);
     }
@@ -33,6 +34,7 @@ public class ConceptRepository : IConceptRepository
     public async Task<List<Concept>> GetByTypeAsync(int conceptType, int pageSize = 50, int pageNumber = 1, CancellationToken ct = default)
     {
         return await _context.Concepts
+            .AsNoTracking()
             .Include(c => c.Mappings)
             .Where(c => !c.IsDeleted && (int)c.ConceptType == conceptType)
             .OrderBy(c => c.Display)
@@ -49,6 +51,7 @@ public class ConceptRepository : IConceptRepository
         CancellationToken ct = default)
     {
         var query = _context.Concepts
+            .AsNoTracking()
             .Include(c => c.Mappings)
             .Where(c => !c.IsDeleted);
 
@@ -60,11 +63,11 @@ public class ConceptRepository : IConceptRepository
             var term = searchTerm!.Trim();
             // Add :* for prefix matching
             var tsQueryTerm = string.Join(" & ", term.Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(t => t + ":*"));
-            
-            query = query.Where(c => 
-                EF.Functions.ToTsVector("english", 
-                    (c.Code ?? "") + " " + 
-                    (c.Display ?? "") + " " + 
+
+            query = query.Where(c =>
+                EF.Functions.ToTsVector("english",
+                    (c.Code ?? "") + " " +
+                    (c.Display ?? "") + " " +
                     (c.Description ?? ""))
                 .Matches(EF.Functions.ToTsQuery("english", tsQueryTerm))
             );
@@ -84,11 +87,11 @@ public class ConceptRepository : IConceptRepository
         {
             var term = searchTerm!.Trim();
             var tsQueryTerm = string.Join(" & ", term.Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(t => t + ":*"));
-            
-            orderedQuery = query.OrderByDescending(c => 
-                EF.Functions.ToTsVector("english", 
-                    (c.Code ?? "") + " " + 
-                    (c.Display ?? "") + " " + 
+
+            orderedQuery = query.OrderByDescending(c =>
+                EF.Functions.ToTsVector("english",
+                    (c.Code ?? "") + " " +
+                    (c.Display ?? "") + " " +
                     (c.Description ?? ""))
                 .Rank(EF.Functions.ToTsQuery("english", tsQueryTerm))
             );

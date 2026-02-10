@@ -42,11 +42,11 @@ public class FlowSeeder : IFlowSeeder
         if (!await _context.StimulationData.AnyAsync(x => x.CycleId == cy2.Id))
         {
             var stim2 = StimulationData.Create(cy2.Id);
-            stim2.Update(DateTime.UtcNow.AddDays(-20), DateTime.UtcNow.AddDays(-5), 5, 
-                "Gonal F", 5, "150IU", 
-                null, 0, null, null, 0, null, null, 0, null, 
-                3, 1, 6.5m, 
-                null, null, null, null, null, null, null, null, null, null, null, null, 0, null, null);
+            stim2.Update(DateTime.UtcNow.AddDays(-20), DateTime.UtcNow.AddDays(-5), 5,
+                3, 1, 6.5m,
+                null, null, null, null, null, null, null, null, null,
+                null, null, null, 0, null, null);
+            stim2.SetDrugs(new[] { StimulationDrug.Create(stim2.Id, 0, "Gonal F", 5, "150IU") });
             _context.StimulationData.Add(stim2);
         }
         
@@ -59,11 +59,15 @@ public class FlowSeeder : IFlowSeeder
         if (!await _context.StimulationData.AnyAsync(x => x.CycleId == cy3.Id))
         {
             var stim3 = StimulationData.Create(cy3.Id);
-            stim3.Update(DateTime.UtcNow.AddDays(-25), DateTime.UtcNow.AddDays(-10), 10, 
-                "Gonal F", 10, "150IU", 
-                "Cetrotide", 3, "0.25mg", null, 0, null, null, 0, null, 
-                10, 8, 10.5m, 
-                null, null, null, null, null, null, null, null, null, null, null, null, 0, null, null);
+            stim3.Update(DateTime.UtcNow.AddDays(-25), DateTime.UtcNow.AddDays(-10), 10,
+                10, 8, 10.5m,
+                null, null, null, null, null, null, null, null, null,
+                null, null, null, 0, null, null);
+            stim3.SetDrugs(new[]
+            {
+                StimulationDrug.Create(stim3.Id, 0, "Gonal F", 10, "150IU"),
+                StimulationDrug.Create(stim3.Id, 1, "Cetrotide", 3, "0.25mg")
+            });
             _context.StimulationData.Add(stim3);
         }
         
@@ -76,11 +80,15 @@ public class FlowSeeder : IFlowSeeder
         if (!await _context.StimulationData.AnyAsync(x => x.CycleId == cy4.Id))
         {
             var stim4 = StimulationData.Create(cy4.Id);
-            stim4.Update(DateTime.UtcNow.AddDays(-30), DateTime.UtcNow.AddDays(-12), 11, 
-                "Gonal F", 11, "150IU", "Cetrotide", 4, "0.25mg", null, 0, null, null, 0, null, 
-                12, 10, 11.5m, 
-                "Ovitrelle", null, DateTime.UtcNow.AddDays(-2), null, new TimeSpan(21, 0, 0), null, null, null, null, 
+            stim4.Update(DateTime.UtcNow.AddDays(-30), DateTime.UtcNow.AddDays(-12), 11,
+                12, 10, 11.5m,
+                "Ovitrelle", null, DateTime.UtcNow.AddDays(-2), null, new TimeSpan(21, 0, 0), null, null, null, null,
                 null, DateTime.UtcNow, null, null, null, null); // Aspiration Date = Today
+            stim4.SetDrugs(new[]
+            {
+                StimulationDrug.Create(stim4.Id, 0, "Gonal F", 11, "150IU"),
+                StimulationDrug.Create(stim4.Id, 1, "Cetrotide", 4, "0.25mg")
+            });
             _context.StimulationData.Add(stim4);
         }
 

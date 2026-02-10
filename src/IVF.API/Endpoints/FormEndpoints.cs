@@ -256,6 +256,35 @@ public static class FormEndpoints
 
         #endregion
 
+        #region Linked Field Sources
+
+        group.MapGet("/templates/{templateId:guid}/linked-sources", async (Guid templateId, IMediator m) =>
+            Results.Ok(await m.Send(new GetLinkedFieldSourcesQuery(templateId))));
+
+        group.MapPost("/linked-sources", async (CreateLinkedFieldSourceRequest req, IMediator m) =>
+        {
+            var r = await m.Send(new CreateLinkedFieldSourceCommand(
+                req.TargetFieldId, req.SourceTemplateId, req.SourceFieldId,
+                req.FlowType, req.Priority, req.Description));
+            return r.IsSuccess ? Results.Created($"/api/forms/linked-sources/{r.Value!.Id}", r.Value) : Results.BadRequest(r.Error);
+        });
+
+        group.MapPut("/linked-sources/{id:guid}", async (Guid id, UpdateLinkedFieldSourceRequest req, IMediator m) =>
+        {
+            var r = await m.Send(new UpdateLinkedFieldSourceCommand(
+                id, req.SourceTemplateId, req.SourceFieldId,
+                req.FlowType, req.Priority, req.Description));
+            return r.IsSuccess ? Results.Ok(r.Value) : Results.NotFound(r.Error);
+        });
+
+        group.MapDelete("/linked-sources/{id:guid}", async (Guid id, IMediator m) =>
+        {
+            var r = await m.Send(new DeleteLinkedFieldSourceCommand(id));
+            return r.IsSuccess ? Results.NoContent() : Results.NotFound();
+        });
+
+        #endregion
+
         #region Files
 
         group.MapPost("/files/upload", async (HttpRequest httpReq, IFileStorageService fileStorage) =>
@@ -342,5 +371,13 @@ public record CreateReportTemplateRequest(
 
 public record UpdateReportTemplateRequest(
     string Name, string? Description, ReportType ReportType, string ConfigurationJson);
+
+public record CreateLinkedFieldSourceRequest(
+    Guid TargetFieldId, Guid SourceTemplateId, Guid SourceFieldId,
+    DataFlowType FlowType = DataFlowType.Suggest, int Priority = 0, string? Description = null);
+
+public record UpdateLinkedFieldSourceRequest(
+    Guid? SourceTemplateId = null, Guid? SourceFieldId = null,
+    DataFlowType? FlowType = null, int? Priority = null, string? Description = null);
 
 #endregion

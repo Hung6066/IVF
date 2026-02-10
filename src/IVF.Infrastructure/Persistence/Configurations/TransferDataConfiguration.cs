@@ -18,6 +18,8 @@ public class TransferDataConfiguration : IEntityTypeConfiguration<TransferData>
             .HasForeignKey<TransferData>(t => t.CycleId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        builder.HasIndex(t => t.CycleId);
+
         builder.HasQueryFilter(t => !t.IsDeleted);
     }
 }

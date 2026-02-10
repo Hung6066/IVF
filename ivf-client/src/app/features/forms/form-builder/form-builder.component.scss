@@ -70,6 +70,19 @@
   color: white;
 }
 
+.btn-link-config {
+  background: linear-gradient(135deg, #6366f1 0%, #3b82f6 100%);
+  color: white;
+  font-weight: 600;
+  transition: all 0.2s;
+  box-shadow: 0 1px 3px rgba(99, 102, 241, 0.3);
+
+  &:hover {
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+    transform: translateY(-1px);
+  }
+}
+
 .builder-content {
   display: flex;
   flex: 1;

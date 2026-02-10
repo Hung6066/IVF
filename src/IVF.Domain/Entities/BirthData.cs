@@ -13,12 +13,15 @@ public class BirthData : BaseEntity
     public string? DeliveryMethod { get; private set; }
     public int LiveBirths { get; private set; }
     public int Stillbirths { get; private set; }
-    public string? BabyGenders { get; private set; }
-    public string? BirthWeights { get; private set; }
     public string? Complications { get; private set; }
 
     // Navigation
     public virtual TreatmentCycle Cycle { get; private set; } = null!;
+
+    /// <summary>
+    /// Normalized child collection — replaces BabyGenders/BirthWeights CSV columns.
+    /// </summary>
+    public virtual ICollection<BirthOutcome> Outcomes { get; private set; } = new List<BirthOutcome>();
 
     private BirthData() { }
 
@@ -33,8 +36,6 @@ public class BirthData : BaseEntity
         string? deliveryMethod,
         int liveBirths,
         int stillbirths,
-        string? babyGenders,
-        string? birthWeights,
         string? complications)
     {
         DeliveryDate = deliveryDate;
@@ -42,9 +43,15 @@ public class BirthData : BaseEntity
         DeliveryMethod = deliveryMethod;
         LiveBirths = liveBirths;
         Stillbirths = stillbirths;
-        BabyGenders = babyGenders;
-        BirthWeights = birthWeights;
         Complications = complications;
+        SetUpdated();
+    }
+
+    public void SetOutcomes(IEnumerable<BirthOutcome> outcomes)
+    {
+        Outcomes.Clear();
+        foreach (var outcome in outcomes)
+            Outcomes.Add(outcome);
         SetUpdated();
     }
 }
