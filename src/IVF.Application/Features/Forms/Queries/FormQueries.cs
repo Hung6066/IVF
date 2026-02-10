@@ -1,5 +1,6 @@
 using IVF.Application.Common.Interfaces;
 using IVF.Application.Features.Forms.Commands;
+using IVF.Domain.Entities;
 using IVF.Domain.Enums;
 using MediatR;
 
@@ -70,6 +71,39 @@ public record ReportSummaryDto(
     int TotalResponses,
     Dictionary<string, int> FieldValueCounts,
     Dictionary<string, decimal?> FieldValueAverages
+);
+
+#endregion
+
+#region Linked Data
+
+/// <summary>
+/// Pre-fill query: given a template, patient, and optional cycle,
+/// return previously captured concept values that map to fields in this template.
+/// </summary>
+public record GetLinkedDataQuery(
+    Guid TemplateId,
+    Guid PatientId,
+    Guid? CycleId = null
+) : IRequest<List<LinkedDataValueDto>>;
+
+/// <summary>
+/// A pre-fill value from a previously captured concept snapshot.
+/// </summary>
+public record LinkedDataValueDto(
+    Guid FieldId,
+    string FieldLabel,
+    Guid ConceptId,
+    string ConceptDisplay,
+    string? TextValue,
+    decimal? NumericValue,
+    DateTime? DateValue,
+    bool? BooleanValue,
+    string? JsonValue,
+    string DisplayValue,
+    string SourceFormName,
+    DateTime CapturedAt,
+    DataFlowType FlowType
 );
 
 #endregion
@@ -365,6 +399,68 @@ public class ReportQueriesHandler :
         var summary = new ReportSummaryDto(total, fieldValueCounts, averages);
 
         return new ReportDataDto(templateDto, data, summary);
+    }
+}
+
+public class LinkedDataQueryHandler : IRequestHandler<GetLinkedDataQuery, List<LinkedDataValueDto>>
+{
+    private readonly IFormRepository _repo;
+
+    public LinkedDataQueryHandler(IFormRepository repo)
+    {
+        _repo = repo;
+    }
+
+    public async Task<List<LinkedDataValueDto>> Handle(GetLinkedDataQuery request, CancellationToken ct)
+    {
+        // Load template fields that have ConceptId
+        var template = await _repo.GetTemplateByIdAsync(request.TemplateId, true, ct);
+        if (template?.Fields == null)
+            return [];
+
+        var fieldsWithConcept = template.Fields
+            .Where(f => f.ConceptId.HasValue)
+            .ToList();
+
+        if (fieldsWithConcept.Count == 0)
+            return [];
+
+        // Get all snapshots for this patient (optionally scoped to cycle)
+        var snapshots = await _repo.GetSnapshotsByPatientAsync(
+            request.PatientId, request.CycleId, ct);
+
+        // Build lookup by ConceptId
+        var snapshotByConceptId = snapshots
+            .GroupBy(s => s.ConceptId)
+            .ToDictionary(g => g.Key, g => g.First()); // latest first (ordered by CapturedAt desc in repo)
+
+        var results = new List<LinkedDataValueDto>();
+
+        foreach (var field in fieldsWithConcept)
+        {
+            if (!snapshotByConceptId.TryGetValue(field.ConceptId!.Value, out var snapshot))
+                continue;
+
+            // Don't suggest if the snapshot came from this same template's latest response
+            // (user is likely re-filling the same form)
+            results.Add(new LinkedDataValueDto(
+                FieldId: field.Id,
+                FieldLabel: field.Label,
+                ConceptId: snapshot.ConceptId,
+                ConceptDisplay: snapshot.Concept?.Display ?? snapshot.ConceptId.ToString(),
+                TextValue: snapshot.TextValue,
+                NumericValue: snapshot.NumericValue,
+                DateValue: snapshot.DateValue,
+                BooleanValue: snapshot.BooleanValue,
+                JsonValue: snapshot.JsonValue,
+                DisplayValue: snapshot.GetDisplayValue(),
+                SourceFormName: snapshot.FormResponse?.FormTemplate?.Name ?? "",
+                CapturedAt: snapshot.CapturedAt,
+                FlowType: DataFlowType.Suggest
+            ));
+        }
+
+        return results;
     }
 }
 

@@ -612,6 +612,13 @@ public class FormResponseCommandsHandler :
 
         await _repo.AddResponseAsync(response, ct);
 
+        // Upsert concept snapshots for cross-form linked data
+        if (!request.IsDraft && request.PatientId.HasValue)
+        {
+            await UpsertConceptSnapshots(
+                response, template.Fields, request.PatientId.Value, request.CycleId, ct);
+        }
+
         response = await _repo.GetResponseByIdAsync(response.Id, true, ct);
 
         return Result<FormResponseDto>.Success(MapToDto(response!));
@@ -667,6 +674,17 @@ public class FormResponseCommandsHandler :
         }
 
         await _repo.UpdateResponseAsync(response, ct);
+
+        // Upsert concept snapshots if response has patient and is submitted
+        if (response.PatientId.HasValue && response.Status == ResponseStatus.Submitted)
+        {
+            var template = await _repo.GetTemplateByIdAsync(response.FormTemplateId, true, ct);
+            if (template?.Fields != null)
+            {
+                await UpsertConceptSnapshots(
+                    response, template.Fields, response.PatientId.Value, response.CycleId, ct);
+            }
+        }
 
         return Result<FormResponseDto>.Success(MapToDto(response));
     }
@@ -801,6 +819,61 @@ public class FormResponseCommandsHandler :
             && !fv.DateValue.HasValue
             && !fv.BooleanValue.HasValue
             && string.IsNullOrWhiteSpace(fv.JsonValue);
+    }
+
+    /// <summary>
+    /// After a form response is saved, upsert PatientConceptSnapshots for all fields that have a ConceptId.
+    /// This materializes the latest known value per (Patient, Concept) for O(1) cross-form lookup.
+    /// </summary>
+    private async Task UpsertConceptSnapshots(
+        FormResponse response,
+        ICollection<FormField> templateFields,
+        Guid patientId,
+        Guid? cycleId,
+        CancellationToken ct)
+    {
+        var fieldsWithConcept = templateFields
+            .Where(f => f.ConceptId.HasValue)
+            .ToDictionary(f => f.Id, f => f);
+
+        if (fieldsWithConcept.Count == 0) return;
+
+        var fieldValueMap = response.FieldValues?.ToDictionary(fv => fv.FormFieldId) ?? new();
+
+        var snapshots = new List<PatientConceptSnapshot>();
+
+        foreach (var (fieldId, field) in fieldsWithConcept)
+        {
+            if (!fieldValueMap.TryGetValue(fieldId, out var fv)) continue;
+
+            // Skip empty values
+            if (string.IsNullOrWhiteSpace(fv.TextValue)
+                && !fv.NumericValue.HasValue
+                && !fv.DateValue.HasValue
+                && !fv.BooleanValue.HasValue
+                && string.IsNullOrWhiteSpace(fv.JsonValue))
+                continue;
+
+            var snapshot = PatientConceptSnapshot.Create(
+                patientId,
+                field.ConceptId!.Value,
+                response.Id,
+                fieldId,
+                cycleId,
+                response.SubmittedAt ?? DateTime.UtcNow,
+                fv.TextValue,
+                fv.NumericValue,
+                fv.DateValue,
+                fv.BooleanValue,
+                fv.JsonValue);
+
+            snapshots.Add(snapshot);
+        }
+
+        if (snapshots.Count > 0)
+        {
+            await _repo.UpsertSnapshotsAsync(snapshots, ct);
+        }
     }
 
     private record ValidationRuleEntry

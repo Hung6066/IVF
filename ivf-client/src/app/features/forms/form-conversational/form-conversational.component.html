@@ -306,6 +306,78 @@
                   }
                 </div>
               }
+              @case (FieldType.Slider) {
+                <div class="conv-slider-field">
+                  <input
+                    type="range"
+                    class="conv-slider"
+                    [min]="getSliderConfig(currentChatField.field).min"
+                    [max]="getSliderConfig(currentChatField.field).max"
+                    [step]="getSliderConfig(currentChatField.field).step"
+                    [value]="currentChatField.control.value"
+                    (input)="onSliderChange(currentChatField, $event)"
+                  />
+                  <div class="conv-slider-labels">
+                    <span>{{ getSliderConfig(currentChatField.field).min }}</span>
+                    <span class="conv-slider-value">{{ currentChatField.control.value }}{{ getSliderConfig(currentChatField.field).unit ? ' ' + getSliderConfig(currentChatField.field).unit : '' }}</span>
+                    <span>{{ getSliderConfig(currentChatField.field).max }}</span>
+                  </div>
+                </div>
+              }
+              @case (FieldType.RichText) {
+                <textarea
+                  class="conv-textarea"
+                  [formControl]="$any(currentChatField.control)"
+                  [placeholder]="currentChatField.field.placeholder || 'Nhập nội dung văn bản...'"
+                  rows="5"
+                ></textarea>
+              }
+              @case (FieldType.Signature) {
+                <div class="conv-signature-field">
+                  <canvas
+                    class="conv-signature-canvas"
+                    width="400"
+                    height="150"
+                    (mousedown)="initSignatureCanvas(currentChatField, $event)"
+                    (mousemove)="drawSignature(currentChatField, $event)"
+                    (mouseup)="endSignatureDraw(currentChatField)"
+                    (mouseleave)="endSignatureDraw(currentChatField)"
+                    (touchstart)="initSignatureCanvas(currentChatField, $event)"
+                    (touchmove)="drawSignature(currentChatField, $event)"
+                    (touchend)="endSignatureDraw(currentChatField)"
+                  ></canvas>
+                  <div class="conv-signature-actions">
+                    <button type="button" class="conv-btn conv-btn-ghost" (click)="clearSignature(currentChatField)">🗑️ Xóa chữ ký</button>
+                    @if (currentChatField.control.value) {
+                      <span class="conv-sig-status">✅ Đã ký</span>
+                    }
+                  </div>
+                </div>
+              }
+              @case (FieldType.Lookup) {
+                <div class="conv-lookup-field">
+                  <input
+                    type="text"
+                    class="conv-input"
+                    [value]="lookupSearchQueries[currentChatField.field.id] || getLookupDisplayLabel(currentChatField)"
+                    (input)="searchLookupOptions(currentChatField, $any($event.target).value)"
+                    placeholder="🔍 Tìm kiếm..."
+                    autocomplete="off"
+                  />
+                  @if (lookupSearchResults[currentChatField.field.id]?.length) {
+                    <div class="conv-lookup-dropdown">
+                      @for (opt of lookupSearchResults[currentChatField.field.id]; track opt.value) {
+                        <button type="button" class="conv-lookup-option" (click)="selectLookupOption(currentChatField, opt)">
+                          {{ opt.label }}
+                        </button>
+                      }
+                    </div>
+                  }
+                  @if (currentChatField.control.value) {
+                    <div class="conv-lookup-selected">✅ {{ getLookupDisplayLabel(currentChatField) }}</div>
+                  }
+                </div>
+              }
             }
 
             <!-- Errors -->

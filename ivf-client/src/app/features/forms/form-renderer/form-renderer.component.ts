@@ -31,6 +31,7 @@ import {
   ConditionalLogic,
   Condition,
   FileUploadResult,
+  LinkedDataValue,
 } from '../forms.service';
 import { ConceptService } from '../services/concept.service';
 import { Subject, Subscription, debounceTime, distinctUntilChanged, lastValueFrom } from 'rxjs';
@@ -66,6 +67,23 @@ export class FormRendererComponent implements OnInit, OnDestroy, AfterViewInit {
   currentPageIndex = 0;
   isMultiPage = false;
 
+  // Review step
+  showReview = false;
+
+  // Signature canvases
+  signatureContexts: { [key: string]: CanvasRenderingContext2D } = {};
+  signatureDrawing: { [key: string]: boolean } = {};
+
+  // Slider display values
+  sliderValues: { [key: string]: number } = {};
+
+  // Linked data (cross-form auto-fill)
+  linkedData: LinkedDataValue[] = [];
+  linkedDataMap: { [fieldId: string]: LinkedDataValue } = {};
+  linkedFieldIds: Set<string> = new Set();
+  patientId: string | null = null;
+  cycleId: string | null = null;
+
   // Auto-save draft
   autoSaveEnabled = true;
   autoSaveStatus: 'idle' | 'saving' | 'saved' | 'error' = 'idle';
@@ -97,6 +115,12 @@ export class FormRendererComponent implements OnInit, OnDestroy, AfterViewInit {
         this.restoreDraft();
       }
     });
+
+    // Read patient/cycle from query params for linked data
+    this.route.queryParams.subscribe((qp) => {
+      this.patientId = qp['patientId'] || null;
+      this.cycleId = qp['cycleId'] || null;
+    });
   }
 
   ngOnDestroy() {
@@ -125,7 +149,12 @@ export class FormRendererComponent implements OnInit, OnDestroy, AfterViewInit {
         }))
         .sort((a, b) => a.displayOrder - b.displayOrder);
       this.buildForm();
-      if (onComplete) onComplete();
+      if (onComplete) {
+        onComplete();
+      } else if (!this.isEditMode) {
+        // For new entries, load linked data to auto-fill
+        this.loadLinkedData();
+      }
     });
   }
 
@@ -165,6 +194,13 @@ export class FormRendererComponent implements OnInit, OnDestroy, AfterViewInit {
       Tags: FieldType.Tags,
       PageBreak: FieldType.PageBreak,
       Address: FieldType.Address,
+      Hidden: FieldType.Hidden,
+      Slider: FieldType.Slider,
+      Calculated: FieldType.Calculated,
+      RichText: FieldType.RichText,
+      Signature: FieldType.Signature,
+      Lookup: FieldType.Lookup,
+      Repeater: FieldType.Repeater,
     };
     const mapped = typeMap[type];
     if (mapped === undefined) {
@@ -218,6 +254,19 @@ export class FormRendererComponent implements OnInit, OnDestroy, AfterViewInit {
         continue;
       }
 
+      // Calculated fields: read-only display with formula evaluation
+      if (field.fieldType === FieldType.Calculated) {
+        formConfig[field.id] = new FormControl({ value: '', disabled: true });
+        continue;
+      }
+
+      // Hidden fields: resolve token-based default values
+      if (field.fieldType === FieldType.Hidden) {
+        const resolvedValue = this.resolveHiddenToken(field.defaultValue || '');
+        formConfig[field.id] = new FormControl(resolvedValue);
+        continue;
+      }
+
       // Address/Composite: create a nested FormGroup with sub-field controls
       if (field.fieldType === FieldType.Address) {
         const subFields = this.getAddressSubFields(field);
@@ -227,6 +276,12 @@ export class FormRendererComponent implements OnInit, OnDestroy, AfterViewInit {
           subGroup[sub.key] = new FormControl('', subValidators);
         }
         formConfig[field.id] = new FormGroup(subGroup) as any;
+        continue;
+      }
+
+      // Repeater: store as JSON string
+      if (field.fieldType === FieldType.Repeater) {
+        formConfig[field.id] = new FormControl('[]');
         continue;
       }
 
@@ -276,6 +331,15 @@ export class FormRendererComponent implements OnInit, OnDestroy, AfterViewInit {
           // If parsing failed (plain string), wrap it
           defaultValue = field.defaultValue ? [field.defaultValue] : [];
         }
+      } else if (field.fieldType === FieldType.Slider) {
+        try {
+          const config = field.optionsJson ? JSON.parse(field.optionsJson) : {};
+          defaultValue = field.defaultValue ? parseFloat(field.defaultValue) : (config.min || 0);
+        } catch {
+          defaultValue = 0;
+        }
+      } else if (field.fieldType === FieldType.Signature) {
+        defaultValue = '';
       }
 
       formConfig[field.id] = new FormControl(defaultValue, validators);
@@ -293,11 +357,112 @@ export class FormRendererComponent implements OnInit, OnDestroy, AfterViewInit {
     // Subscribe to changes
     this.valueChangesSubscription = this.form.valueChanges.subscribe(() => {
       this.evaluateConditions();
+      this.evaluateCalculatedFields();
       // Trigger auto-save on value changes
       if (this.autoSaveEnabled && !this.isEditMode) {
         this.autoSaveSubject.next();
       }
     });
+  }
+
+  // ===== Linked Data (Cross-Form Auto-Fill) =====
+  loadLinkedData() {
+    if (!this.patientId || !this.templateId) return;
+
+    this.formsService.getLinkedData(this.templateId, this.patientId, this.cycleId || undefined).subscribe({
+      next: (data) => {
+        this.linkedData = data;
+        this.linkedDataMap = {};
+        this.linkedFieldIds = new Set();
+
+        for (const item of data) {
+          this.linkedDataMap[item.fieldId] = item;
+          this.linkedFieldIds.add(item.fieldId);
+        }
+
+        if (data.length > 0) {
+          this.applyLinkedData();
+        }
+      },
+      error: (err) => {
+        console.warn('Failed to load linked data:', err);
+      },
+    });
+  }
+
+  applyLinkedData() {
+    for (const item of this.linkedData) {
+      const control = this.form.get(item.fieldId);
+      if (!control) continue;
+
+      // Only pre-fill if the field is currently empty
+      const currentValue = control.value;
+      if (currentValue !== '' && currentValue !== null && currentValue !== undefined) continue;
+
+      const field = this.fields.find(f => f.id === item.fieldId);
+      if (!field) continue;
+
+      // Apply value based on field type
+      switch (field.fieldType) {
+        case FieldType.Number:
+        case FieldType.Decimal:
+        case FieldType.Rating:
+        case FieldType.Slider:
+          if (item.numericValue != null) {
+            control.setValue(item.numericValue, { emitEvent: true });
+          }
+          break;
+        case FieldType.Date:
+          if (item.dateValue) {
+            control.setValue(new Date(item.dateValue).toISOString().split('T')[0], { emitEvent: true });
+          }
+          break;
+        case FieldType.DateTime:
+          if (item.dateValue) {
+            control.setValue(new Date(item.dateValue).toISOString().slice(0, 16), { emitEvent: true });
+          }
+          break;
+        case FieldType.Checkbox:
+          if (item.booleanValue != null) {
+            control.setValue(item.booleanValue, { emitEvent: true });
+          } else if (item.jsonValue) {
+            try {
+              control.setValue(JSON.parse(item.jsonValue), { emitEvent: true });
+            } catch { /* ignore */ }
+          }
+          break;
+        case FieldType.MultiSelect:
+        case FieldType.Tags:
+          if (item.jsonValue) {
+            try {
+              control.setValue(JSON.parse(item.jsonValue), { emitEvent: true });
+            } catch { /* ignore */ }
+          }
+          break;
+        default:
+          if (item.textValue) {
+            control.setValue(item.textValue, { emitEvent: true });
+          }
+          break;
+      }
+    }
+  }
+
+  isLinkedField(fieldId: string): boolean {
+    return this.linkedFieldIds.has(fieldId);
+  }
+
+  getLinkedDataInfo(fieldId: string): LinkedDataValue | null {
+    return this.linkedDataMap[fieldId] || null;
+  }
+
+  clearLinkedValue(fieldId: string) {
+    const control = this.form.get(fieldId);
+    if (control) {
+      control.setValue('', { emitEvent: true });
+    }
+    this.linkedFieldIds.delete(fieldId);
+    delete this.linkedDataMap[fieldId];
   }
 
   // ===== Multi-page Support =====
@@ -963,7 +1128,8 @@ export class FormRendererComponent implements OnInit, OnDestroy, AfterViewInit {
       if (
         field.fieldType === FieldType.Section ||
         field.fieldType === FieldType.Label ||
-        field.fieldType === FieldType.PageBreak
+        field.fieldType === FieldType.PageBreak ||
+        field.fieldType === FieldType.Calculated
       ) {
         continue;
       }
@@ -976,6 +1142,7 @@ export class FormRendererComponent implements OnInit, OnDestroy, AfterViewInit {
         case FieldType.Number:
         case FieldType.Decimal:
         case FieldType.Rating:
+        case FieldType.Slider:
           fieldValue.numericValue = value != null ? parseFloat(value) : undefined;
           break;
         case FieldType.Date:
@@ -1138,6 +1305,26 @@ export class FormRendererComponent implements OnInit, OnDestroy, AfterViewInit {
             fieldValue.textValue = parts.join(', ');
           }
           break;
+        case FieldType.Signature:
+        case FieldType.RichText:
+          fieldValue.textValue = value?.toString() || '';
+          break;
+        case FieldType.Hidden:
+          fieldValue.textValue = value?.toString() || '';
+          break;
+        case FieldType.Lookup:
+          fieldValue.textValue = value?.toString() || '';
+          if (value) {
+            const lookupOpts = this.getOptions(field);
+            const lookupOpt = lookupOpts.find((o) => o.value === value);
+            if (lookupOpt) {
+              details.push({ value: lookupOpt.value, label: lookupOpt.label, conceptId: (lookupOpt as any).conceptId });
+            }
+          }
+          break;
+        case FieldType.Repeater:
+          fieldValue.jsonValue = value || '[]';
+          break;
         default:
           fieldValue.textValue = value?.toString() || '';
       }
@@ -1250,6 +1437,320 @@ export class FormRendererComponent implements OnInit, OnDestroy, AfterViewInit {
         alert(typeof msg === 'string' ? msg : JSON.stringify(msg));
       },
     });
+  }
+
+  // ===== Entry Preview / Review Step =====
+  toggleReview() {
+    // Validate all fields before showing review
+    if (!this.showReview) {
+      this.form.markAllAsTouched();
+      if (this.form.invalid) return;
+    }
+    this.showReview = !this.showReview;
+  }
+
+  getReviewDisplayValue(field: FormField): string {
+    const value = this.form.get(field.id)?.value;
+    if (value === null || value === undefined || value === '') return '—';
+
+    switch (field.fieldType) {
+      case FieldType.Dropdown:
+      case FieldType.Radio: {
+        const opts = this.getOptions(field);
+        const opt = opts.find((o: any) => o.value === value);
+        return opt?.label ?? value;
+      }
+      case FieldType.Checkbox: {
+        const opts = this.getOptions(field);
+        if (opts.length > 0 && Array.isArray(value)) {
+          return value.map((v: string) => {
+            const opt = opts.find((o: any) => o.value === v);
+            return opt?.label ?? v;
+          }).join(', ');
+        }
+        return typeof value === 'boolean' ? (value ? 'Có' : 'Không') : String(value);
+      }
+      case FieldType.MultiSelect: {
+        if (!Array.isArray(value)) return '—';
+        const opts = this.getOptions(field);
+        return value.map((v: string) => {
+          const opt = opts.find((o: any) => o.value === v);
+          return opt?.label ?? v;
+        }).join(', ');
+      }
+      case FieldType.Rating:
+        return '⭐'.repeat(value || 0);
+      case FieldType.Date:
+        return value ? new Date(value).toLocaleDateString('vi-VN') : '—';
+      case FieldType.DateTime:
+        return value ? new Date(value).toLocaleString('vi-VN') : '—';
+      case FieldType.Address:
+        if (typeof value === 'object') {
+          const parts = Object.values(value).filter((v: any) => v);
+          return parts.length > 0 ? (parts as string[]).join(', ') : '—';
+        }
+        return '—';
+      case FieldType.FileUpload:
+        return this.fileValues[field.id]?.name ?? (value || '—');
+      case FieldType.Slider: {
+        const config = this.getSliderConfig(field);
+        return `${value}${config.unit ? ' ' + config.unit : ''}`;
+      }
+      case FieldType.Signature:
+        return value ? '✍️ Đã ký' : '—';
+      case FieldType.Hidden:
+        return value || '—';
+      case FieldType.Calculated:
+        return this.form.get(field.id)?.value || '—';
+      default:
+        return String(value);
+    }
+  }
+
+  getReviewFields(): FormField[] {
+    return this.fields.filter(f =>
+      f.fieldType !== FieldType.Section &&
+      f.fieldType !== FieldType.Label &&
+      f.fieldType !== FieldType.PageBreak &&
+      f.fieldType !== FieldType.Hidden &&
+      this.isFieldVisible(f.id)
+    );
+  }
+
+  // ===== Hidden Field Token Resolution =====
+  resolveHiddenToken(token: string): string {
+    if (!token) return '';
+    const now = new Date();
+    return token
+      .replace(/\{currentUser\}/gi, 'current-user-id')
+      .replace(/\{currentDate\}/gi, now.toISOString().split('T')[0])
+      .replace(/\{currentTime\}/gi, now.toTimeString().slice(0, 5))
+      .replace(/\{currentDateTime\}/gi, now.toISOString())
+      .replace(/\{timestamp\}/gi, now.getTime().toString());
+  }
+
+  // ===== Calculated Fields =====
+  evaluateCalculatedFields() {
+    const calcFields = this.fields.filter(f => f.fieldType === FieldType.Calculated);
+    if (calcFields.length === 0) return;
+
+    const formValues = this.form.getRawValue();
+    // Build a field key-to-id map and key-to-value map
+    const keyToValue: { [key: string]: number } = {};
+    for (const field of this.fields) {
+      const val = formValues[field.id];
+      if (val !== null && val !== undefined && !isNaN(Number(val))) {
+        keyToValue[field.fieldKey] = Number(val);
+      }
+    }
+
+    for (const field of calcFields) {
+      try {
+        const config = field.optionsJson ? JSON.parse(field.optionsJson) : {};
+        const formula: string = config.formula || '';
+        if (!formula) continue;
+
+        // Replace {fieldKey} tokens with numeric values
+        let expression = formula.replace(/\{(\w+)\}/g, (_, key) => {
+          return (keyToValue[key] ?? 0).toString();
+        });
+
+        // Replace ^ with ** for exponentiation
+        expression = expression.replace(/\^/g, '**');
+
+        // Safe eval using Function constructor (only math operations)
+        const result = new Function('return ' + expression)();
+        const decimalPlaces = config.decimalPlaces ?? 2;
+        const unit = config.unit || '';
+
+        const displayValue = isNaN(result) ? 'N/A' : `${Number(result).toFixed(decimalPlaces)}${unit ? ' ' + unit : ''}`;
+
+        const control = this.form.get(field.id);
+        if (control && control.value !== displayValue) {
+          control.setValue(displayValue, { emitEvent: false });
+        }
+      } catch {
+        const control = this.form.get(field.id);
+        if (control) control.setValue('Lỗi công thức', { emitEvent: false });
+      }
+    }
+  }
+
+  // ===== Slider Helpers =====
+  getSliderConfig(field: FormField): { min: number; max: number; step: number; unit: string } {
+    try {
+      const config = field.optionsJson ? JSON.parse(field.optionsJson) : {};
+      return { min: config.min ?? 0, max: config.max ?? 100, step: config.step ?? 1, unit: config.unit || '' };
+    } catch {
+      return { min: 0, max: 100, step: 1, unit: '' };
+    }
+  }
+
+  onSliderChange(fieldId: string, event: Event) {
+    const val = Number((event.target as HTMLInputElement).value);
+    this.form.get(fieldId)?.setValue(val);
+    this.sliderValues[fieldId] = val;
+  }
+
+  getSliderDisplayValue(fieldId: string, field: FormField): string {
+    const val = this.form.get(fieldId)?.value;
+    const config = this.getSliderConfig(field);
+    return `${val ?? config.min}${config.unit ? ' ' + config.unit : ''}`;
+  }
+
+  // ===== Signature Helpers =====
+  initSignatureCanvas(fieldId: string) {
+    setTimeout(() => {
+      const canvas = document.getElementById('sig-' + fieldId) as HTMLCanvasElement;
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      this.signatureContexts[fieldId] = ctx;
+      ctx.strokeStyle = '#1e293b';
+      ctx.lineWidth = 2;
+      ctx.lineCap = 'round';
+
+      canvas.addEventListener('mousedown', (e) => this.startSignatureDraw(fieldId, e));
+      canvas.addEventListener('mousemove', (e) => this.drawSignature(fieldId, e));
+      canvas.addEventListener('mouseup', () => this.endSignatureDraw(fieldId));
+      canvas.addEventListener('mouseleave', () => this.endSignatureDraw(fieldId));
+      // Touch support
+      canvas.addEventListener('touchstart', (e) => { e.preventDefault(); this.startSignatureDraw(fieldId, e.touches[0]); });
+      canvas.addEventListener('touchmove', (e) => { e.preventDefault(); this.drawSignature(fieldId, e.touches[0]); });
+      canvas.addEventListener('touchend', () => this.endSignatureDraw(fieldId));
+    }, 100);
+  }
+
+  startSignatureDraw(fieldId: string, e: MouseEvent | Touch) {
+    this.signatureDrawing[fieldId] = true;
+    const canvas = document.getElementById('sig-' + fieldId) as HTMLCanvasElement;
+    const rect = canvas.getBoundingClientRect();
+    const ctx = this.signatureContexts[fieldId];
+    if (ctx) {
+      ctx.beginPath();
+      ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
+    }
+  }
+
+  drawSignature(fieldId: string, e: MouseEvent | Touch) {
+    if (!this.signatureDrawing[fieldId]) return;
+    const canvas = document.getElementById('sig-' + fieldId) as HTMLCanvasElement;
+    const rect = canvas.getBoundingClientRect();
+    const ctx = this.signatureContexts[fieldId];
+    if (ctx) {
+      ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
+      ctx.stroke();
+    }
+  }
+
+  endSignatureDraw(fieldId: string) {
+    if (!this.signatureDrawing[fieldId]) return;
+    this.signatureDrawing[fieldId] = false;
+    const canvas = document.getElementById('sig-' + fieldId) as HTMLCanvasElement;
+    if (canvas) {
+      const dataUrl = canvas.toDataURL('image/png');
+      this.form.get(fieldId)?.setValue(dataUrl);
+    }
+  }
+
+  clearSignature(fieldId: string) {
+    const canvas = document.getElementById('sig-' + fieldId) as HTMLCanvasElement;
+    if (canvas) {
+      const ctx = this.signatureContexts[fieldId];
+      if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+      this.form.get(fieldId)?.setValue('');
+    }
+  }
+
+  // ===== Lookup Helpers =====
+  lookupSearchQueries: { [key: string]: string } = {};
+  lookupSearchResults: { [key: string]: { value: string; label: string }[] } = {};
+  activeLookupFieldId = '';
+
+  searchLookupOptions(field: FormField) {
+    const query = (this.lookupSearchQueries[field.id] || '').toLowerCase();
+    const options = this.getOptions(field);
+
+    if (!query || query.length < 1) {
+      this.lookupSearchResults[field.id] = options.slice(0, 10);
+      return;
+    }
+
+    this.lookupSearchResults[field.id] = options
+      .filter(opt => opt.label.toLowerCase().includes(query) || opt.value.toLowerCase().includes(query))
+      .slice(0, 10);
+  }
+
+  selectLookupOption(fieldId: string, opt: { value: string; label: string }) {
+    this.form.get(fieldId)?.setValue(opt.value);
+    this.lookupSearchQueries[fieldId] = opt.label;
+    this.lookupSearchResults[fieldId] = [];
+    this.activeLookupFieldId = '';
+  }
+
+  getLookupDisplayLabel(field: FormField): string {
+    const val = this.form.get(field.id)?.value;
+    if (!val) return '';
+    const opts = this.getOptions(field);
+    const opt = opts.find(o => o.value === val);
+    return opt?.label || val;
+  }
+
+  // ===== Repeater Helpers =====
+  repeaterRows: { [key: string]: any[][] } = {};
+
+  getRepeaterConfig(field: FormField): { minRows: number; maxRows: number; fields: { key: string; label: string; type: string }[] } {
+    try {
+      const config = field.optionsJson ? JSON.parse(field.optionsJson) : {};
+      return {
+        minRows: config.minRows ?? 1,
+        maxRows: config.maxRows ?? 10,
+        fields: config.fields || [],
+      };
+    } catch {
+      return { minRows: 1, maxRows: 10, fields: [] };
+    }
+  }
+
+  initRepeater(field: FormField) {
+    if (!this.repeaterRows[field.id]) {
+      const config = this.getRepeaterConfig(field);
+      this.repeaterRows[field.id] = [];
+      for (let i = 0; i < (config.minRows || 1); i++) {
+        this.addRepeaterRow(field);
+      }
+    }
+  }
+
+  addRepeaterRow(field: FormField) {
+    const config = this.getRepeaterConfig(field);
+    if (!this.repeaterRows[field.id]) this.repeaterRows[field.id] = [];
+    if (this.repeaterRows[field.id].length >= config.maxRows) return;
+
+    const row: any = {};
+    for (const col of config.fields) {
+      row[col.key] = '';
+    }
+    this.repeaterRows[field.id].push(row);
+    this.updateRepeaterFormValue(field.id);
+  }
+
+  removeRepeaterRow(field: FormField, index: number) {
+    const config = this.getRepeaterConfig(field);
+    if (this.repeaterRows[field.id]?.length <= (config.minRows || 0)) return;
+    this.repeaterRows[field.id].splice(index, 1);
+    this.updateRepeaterFormValue(field.id);
+  }
+
+  onRepeaterCellChange(fieldId: string) {
+    this.updateRepeaterFormValue(fieldId);
+  }
+
+  private updateRepeaterFormValue(fieldId: string) {
+    const control = this.form.get(fieldId);
+    if (control) {
+      control.setValue(JSON.stringify(this.repeaterRows[fieldId] || []));
+    }
   }
 
   // Mention-style Tags input

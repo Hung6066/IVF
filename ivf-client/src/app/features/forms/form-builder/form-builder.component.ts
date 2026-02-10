@@ -62,6 +62,13 @@ export class FormBuilderComponent implements OnInit {
     { type: FieldType.FileUpload, icon: '📎', label: 'Tải file' },
     { type: FieldType.PageBreak, icon: '📄', label: 'Ngắt trang' },
     { type: FieldType.Address, icon: '🏠', label: 'Địa chỉ' },
+    { type: FieldType.Hidden, icon: '👁️‍🗨️', label: 'Ẩn' },
+    { type: FieldType.Slider, icon: '🖊️', label: 'Thanh trượt' },
+    { type: FieldType.Calculated, icon: '🧮', label: 'Tính toán' },
+    { type: FieldType.RichText, icon: '📝', label: 'Rich Text' },
+    { type: FieldType.Signature, icon: '✍️', label: 'Chữ ký' },
+    { type: FieldType.Lookup, icon: '🔍', label: 'Tra cứu' },
+    { type: FieldType.Repeater, icon: '🔁', label: 'Lặp nhóm' },
   ];
 
   ngOnInit() {
@@ -106,7 +113,15 @@ export class FormBuilderComponent implements OnInit {
         Label: FieldType.Label,
         Tags: FieldType.Tags,
         PageBreak: FieldType.PageBreak,
-      };
+      Address: FieldType.Address,
+      Hidden: FieldType.Hidden,
+      Slider: FieldType.Slider,
+      Calculated: FieldType.Calculated,
+      RichText: FieldType.RichText,
+      Signature: FieldType.Signature,
+      Lookup: FieldType.Lookup,
+      Repeater: FieldType.Repeater,
+    };
 
       this.fields = (template.fields || []).map((f) => {
         let numericType: number;
@@ -268,7 +283,18 @@ export class FormBuilderComponent implements OnInit {
             { value: 'opt1', label: 'Lựa chọn 1' },
             { value: 'opt2', label: 'Lựa chọn 2' },
           ])
-        : undefined,
+        : numericType === FieldType.Slider
+          ? JSON.stringify({ min: 0, max: 100, step: 1, unit: '' })
+          : numericType === FieldType.Calculated
+            ? JSON.stringify({ formula: '', decimalPlaces: 2, unit: '' })
+            : numericType === FieldType.Hidden
+              ? JSON.stringify({ token: '' })
+              : numericType === FieldType.Repeater
+                ? JSON.stringify({ minRows: 1, maxRows: 10, fields: [
+                    { key: 'col1', label: 'Cột 1', type: 'text' },
+                    { key: 'col2', label: 'Cột 2', type: 'text' },
+                  ]})
+                : undefined,
       conditionalLogicJson: undefined, // Ensure no logic is set by default
     };
 
@@ -487,8 +513,9 @@ export class FormBuilderComponent implements OnInit {
       FieldType.Radio,
       FieldType.Checkbox,
       FieldType.Tags,
+      FieldType.Lookup,
     ];
-    const optionTypeNames = ['Dropdown', 'MultiSelect', 'Radio', 'Checkbox', 'Tags'];
+    const optionTypeNames = ['Dropdown', 'MultiSelect', 'Radio', 'Checkbox', 'Tags', 'Lookup'];
 
     if (typeof type === 'string') {
       // Check if it's a number string like "10"
@@ -885,9 +912,9 @@ export class FormBuilderComponent implements OnInit {
         return ft === FieldType.Text || ft === FieldType.TextArea;
       case 'min':
       case 'max':
-        return ft === FieldType.Number || ft === FieldType.Decimal || ft === FieldType.Rating;
+        return ft === FieldType.Number || ft === FieldType.Decimal || ft === FieldType.Rating || ft === FieldType.Slider;
       case 'pattern':
-        return ft === FieldType.Text || ft === FieldType.TextArea;
+        return ft === FieldType.Text || ft === FieldType.TextArea || ft === FieldType.RichText;
       case 'email':
         return ft === FieldType.Text;
       default:
@@ -985,6 +1012,106 @@ export class FormBuilderComponent implements OnInit {
     }
 
     return null;
+  }
+
+  // ===== Slider Config Helpers =====
+  getSliderConfig(key: string): any {
+    if (!this.selectedField) return '';
+    try {
+      const config = this.selectedField.optionsJson ? JSON.parse(this.selectedField.optionsJson) : {};
+      return config[key] ?? '';
+    } catch { return ''; }
+  }
+
+  setSliderConfig(key: string, value: any) {
+    if (!this.selectedField) return;
+    try {
+      const config = this.selectedField.optionsJson ? JSON.parse(this.selectedField.optionsJson) : {};
+      config[key] = key === 'unit' ? value : Number(value);
+      this.selectedField.optionsJson = JSON.stringify(config);
+      this.updateField();
+    } catch {}
+  }
+
+  // ===== Calculated Field Config Helpers =====
+  getCalcConfig(key: string): any {
+    if (!this.selectedField) return '';
+    try {
+      const config = this.selectedField.optionsJson ? JSON.parse(this.selectedField.optionsJson) : {};
+      return config[key] ?? '';
+    } catch { return ''; }
+  }
+
+  setCalcConfig(key: string, value: any) {
+    if (!this.selectedField) return;
+    try {
+      const config = this.selectedField.optionsJson ? JSON.parse(this.selectedField.optionsJson) : {};
+      config[key] = key === 'formula' || key === 'unit' ? value : Number(value);
+      this.selectedField.optionsJson = JSON.stringify(config);
+      this.updateField();
+    } catch {}
+  }
+
+  // ===== Repeater Config Helpers =====
+  getRepeaterConfig(key: string): any {
+    if (!this.selectedField) return '';
+    try {
+      const config = this.selectedField.optionsJson ? JSON.parse(this.selectedField.optionsJson) : {};
+      return config[key] ?? '';
+    } catch { return ''; }
+  }
+
+  setRepeaterConfig(key: string, value: any) {
+    if (!this.selectedField) return;
+    try {
+      const config = this.selectedField.optionsJson ? JSON.parse(this.selectedField.optionsJson) : {};
+      config[key] = Number(value);
+      this.selectedField.optionsJson = JSON.stringify(config);
+      this.updateField();
+    } catch {}
+  }
+
+  getRepeaterFields(): { key: string; label: string; type: string }[] {
+    if (!this.selectedField) return [];
+    try {
+      const config = this.selectedField.optionsJson ? JSON.parse(this.selectedField.optionsJson) : {};
+      return config.fields || [];
+    } catch { return []; }
+  }
+
+  addRepeaterField() {
+    if (!this.selectedField) return;
+    try {
+      const config = this.selectedField.optionsJson ? JSON.parse(this.selectedField.optionsJson) : { minRows: 1, maxRows: 10, fields: [] };
+      if (!config.fields) config.fields = [];
+      config.fields.push({ key: `col${config.fields.length + 1}`, label: `Cột ${config.fields.length + 1}`, type: 'text' });
+      this.selectedField.optionsJson = JSON.stringify(config);
+      this.updateField();
+    } catch {}
+  }
+
+  removeRepeaterField(index: number) {
+    if (!this.selectedField) return;
+    try {
+      const config = JSON.parse(this.selectedField.optionsJson || '{}');
+      if (config.fields) {
+        config.fields.splice(index, 1);
+        this.selectedField.optionsJson = JSON.stringify(config);
+        this.updateField();
+      }
+    } catch {}
+  }
+
+  updateRepeaterField(index: number, key: string, value: string) {
+    if (!this.selectedField) return;
+    try {
+      const config = JSON.parse(this.selectedField.optionsJson || '{}');
+      if (config.fields && config.fields[index]) {
+        config.fields[index][key] = value;
+        this.selectedField.optionsJson = JSON.stringify(config);
+        this.updateField();
+      }
+    } catch {}
   }
 }
 

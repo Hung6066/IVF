@@ -145,6 +145,13 @@ export enum FieldType {
   Tags = 16,
   PageBreak = 17,
   Address = 18,
+  Hidden = 19,
+  Slider = 20,
+  Calculated = 21,
+  RichText = 22,
+  Signature = 23,
+  Lookup = 24,
+  Repeater = 25,
 }
 
 export enum ResponseStatus {
@@ -182,6 +189,13 @@ export const FieldTypeLabels: { [key: number]: string } = {
   [FieldType.Tags]: 'Tags',
   [FieldType.PageBreak]: 'Ngắt trang',
   [FieldType.Address]: 'Địa chỉ/Phức hợp',
+  [FieldType.Hidden]: 'Ẩn',
+  [FieldType.Slider]: 'Thanh trượt',
+  [FieldType.Calculated]: 'Tính toán',
+  [FieldType.RichText]: 'Văn bản phong phú',
+  [FieldType.Signature]: 'Chữ ký',
+  [FieldType.Lookup]: 'Tra cứu',
+  [FieldType.Repeater]: 'Lặp nhóm',
 };
 
 // Request DTOs
@@ -257,6 +271,22 @@ export interface FieldValueDetailRequest {
   value: string;
   label?: string;
   conceptId?: string;
+}
+
+export interface LinkedDataValue {
+  fieldId: string;
+  fieldLabel: string;
+  conceptId: string;
+  conceptDisplay: string;
+  textValue?: string;
+  numericValue?: number;
+  dateValue?: string;
+  booleanValue?: boolean;
+  jsonValue?: string;
+  displayValue: string;
+  sourceFormName: string;
+  capturedAt: string;
+  flowType: number; // 1=AutoFill, 2=Suggest, 3=Reference, 4=Copy
 }
 
 @Injectable({
@@ -411,6 +441,13 @@ export class FormsService {
     return this.http.get(`${this.baseUrl}/responses/${id}/export-pdf`, {
       responseType: 'blob',
     });
+  }
+
+  // Linked Data (cross-form concept pre-fill)
+  getLinkedData(templateId: string, patientId: string, cycleId?: string): Observable<LinkedDataValue[]> {
+    let params = new HttpParams().set('patientId', patientId);
+    if (cycleId) params = params.set('cycleId', cycleId);
+    return this.http.get<LinkedDataValue[]>(`${this.baseUrl}/linked-data/${templateId}`, { params });
   }
 
   // File Upload

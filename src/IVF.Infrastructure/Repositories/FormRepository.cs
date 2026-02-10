@@ -364,4 +364,90 @@ public class FormRepository : IFormRepository
     }
 
     #endregion
+
+    #region Patient Concept Snapshots
+
+    public async Task<List<PatientConceptSnapshot>> GetSnapshotsByPatientAsync(
+        Guid patientId, Guid? cycleId = null, CancellationToken ct = default)
+    {
+        var query = _context.PatientConceptSnapshots
+            .Include(s => s.Concept)
+            .Include(s => s.FormField)
+            .Include(s => s.FormResponse)
+                .ThenInclude(r => r.FormTemplate)
+            .Where(s => s.PatientId == patientId);
+
+        if (cycleId.HasValue)
+            query = query.Where(s => s.CycleId == cycleId.Value);
+
+        return await query.OrderByDescending(s => s.CapturedAt).ToListAsync(ct);
+    }
+
+    public async Task<PatientConceptSnapshot?> GetSnapshotAsync(
+        Guid patientId, Guid conceptId, Guid? cycleId, CancellationToken ct = default)
+    {
+        return await _context.PatientConceptSnapshots
+            .FirstOrDefaultAsync(s =>
+                s.PatientId == patientId &&
+                s.ConceptId == conceptId &&
+                s.CycleId == cycleId, ct);
+    }
+
+    public async Task UpsertSnapshotAsync(PatientConceptSnapshot snapshot, CancellationToken ct = default)
+    {
+        var existing = await GetSnapshotAsync(
+            snapshot.PatientId, snapshot.ConceptId, snapshot.CycleId, ct);
+
+        if (existing != null)
+        {
+            existing.UpdateValue(
+                snapshot.FormResponseId,
+                snapshot.FormFieldId,
+                snapshot.CapturedAt,
+                snapshot.TextValue,
+                snapshot.NumericValue,
+                snapshot.DateValue,
+                snapshot.BooleanValue,
+                snapshot.JsonValue);
+        }
+        else
+        {
+            _context.PatientConceptSnapshots.Add(snapshot);
+        }
+
+        await _context.SaveChangesAsync(ct);
+    }
+
+    public async Task UpsertSnapshotsAsync(IEnumerable<PatientConceptSnapshot> snapshots, CancellationToken ct = default)
+    {
+        foreach (var snapshot in snapshots)
+        {
+            var existing = await _context.PatientConceptSnapshots
+                .FirstOrDefaultAsync(s =>
+                    s.PatientId == snapshot.PatientId &&
+                    s.ConceptId == snapshot.ConceptId &&
+                    s.CycleId == snapshot.CycleId, ct);
+
+            if (existing != null)
+            {
+                existing.UpdateValue(
+                    snapshot.FormResponseId,
+                    snapshot.FormFieldId,
+                    snapshot.CapturedAt,
+                    snapshot.TextValue,
+                    snapshot.NumericValue,
+                    snapshot.DateValue,
+                    snapshot.BooleanValue,
+                    snapshot.JsonValue);
+            }
+            else
+            {
+                _context.PatientConceptSnapshots.Add(snapshot);
+            }
+        }
+
+        await _context.SaveChangesAsync(ct);
+    }
+
+    #endregion
 }

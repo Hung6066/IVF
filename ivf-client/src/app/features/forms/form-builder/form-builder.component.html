@@ -245,6 +245,43 @@
                     }
                   </div>
                 }
+                @case (FieldType.Hidden) {
+                  <div class="hidden-preview" style="padding:8px;background:#f1f5f9;border-radius:6px;color:#64748b;font-style:italic;font-size:12px">
+                    👁️‍🗨️ Trường ẩn — không hiển thị cho người dùng
+                  </div>
+                }
+                @case (FieldType.Slider) {
+                  <input type="range" min="0" max="100" disabled style="width:100%" />
+                }
+                @case (FieldType.Calculated) {
+                  <div style="padding:8px;background:#eff6ff;border-radius:6px;color:#3b82f6;font-size:12px">
+                    🧮 Giá trị tự động = <em>công thức tính</em>
+                  </div>
+                }
+                @case (FieldType.RichText) {
+                  <div style="border:1px dashed #cbd5e1;border-radius:6px;padding:12px;min-height:80px;color:#94a3b8;font-size:12px">
+                    📝 Trình soạn thảo văn bản phong phú (WYSIWYG)
+                  </div>
+                }
+                @case (FieldType.Signature) {
+                  <div style="border:2px dashed #cbd5e1;border-radius:6px;padding:20px;text-align:center;color:#94a3b8;min-height:80px;display:flex;align-items:center;justify-content:center">
+                    ✍️ Vùng ký tên
+                  </div>
+                }
+                @case (FieldType.Lookup) {
+                  <div style="position:relative">
+                    <input type="text" disabled placeholder="🔍 Tìm kiếm..." style="width:100%" />
+                  </div>
+                }
+                @case (FieldType.Repeater) {
+                  <div style="border:1px solid #e2e8f0;border-radius:6px;padding:8px">
+                    <div style="display:flex;gap:8px;margin-bottom:4px">
+                      <input type="text" disabled placeholder="Cột 1" style="flex:1" />
+                      <input type="text" disabled placeholder="Cột 2" style="flex:1" />
+                    </div>
+                    <button disabled style="font-size:12px;color:#3b82f6;background:none;border:none;cursor:pointer">🔁 + Thêm dòng</button>
+                  </div>
+                }
                 @default {
                   <input type="text" disabled [placeholder]="getFieldTypeLabel(field.fieldType)" />
                 }
@@ -595,6 +632,95 @@
                 📋 Mặc định (Địa chỉ VN)
               </button>
               <small>Mỗi sub-field có key, nhãn, và độ rộng (%)</small>
+            </div>
+          }
+
+          <!-- Slider config -->
+          @if (selectedField.fieldType === FieldType.Slider) {
+            <div class="options-section">
+              <label>🎚️ Cấu hình thanh trượt</label>
+              <div class="form-group">
+                <label>Min</label>
+                <input type="number" [ngModel]="getSliderConfig('min')" (blur)="setSliderConfig('min', $any($event.target).value)" />
+              </div>
+              <div class="form-group">
+                <label>Max</label>
+                <input type="number" [ngModel]="getSliderConfig('max')" (blur)="setSliderConfig('max', $any($event.target).value)" />
+              </div>
+              <div class="form-group">
+                <label>Step</label>
+                <input type="number" [ngModel]="getSliderConfig('step')" (blur)="setSliderConfig('step', $any($event.target).value)" />
+              </div>
+              <div class="form-group">
+                <label>Đơn vị</label>
+                <input type="text" [ngModel]="getSliderConfig('unit')" (blur)="setSliderConfig('unit', $any($event.target).value)" placeholder="vd: kg, cm, %" />
+              </div>
+            </div>
+          }
+
+          <!-- Calculated field config -->
+          @if (selectedField.fieldType === FieldType.Calculated) {
+            <div class="options-section">
+              <label>🧮 Cấu hình công thức</label>
+              <div class="form-group">
+                <label>Công thức</label>
+                <input type="text" [ngModel]="getCalcConfig('formula')" (blur)="setCalcConfig('formula', $any($event.target).value)" [placeholder]="'vd: {weight} / ({height}/100)^2'" />
+                <small>Dùng {{ '{' }}fieldKey{{ '}' }} để tham chiếu trường khác</small>
+              </div>
+              <div class="form-group">
+                <label>Số thập phân</label>
+                <input type="number" min="0" max="6" [ngModel]="getCalcConfig('decimalPlaces')" (blur)="setCalcConfig('decimalPlaces', $any($event.target).value)" />
+              </div>
+              <div class="form-group">
+                <label>Đơn vị</label>
+                <input type="text" [ngModel]="getCalcConfig('unit')" (blur)="setCalcConfig('unit', $any($event.target).value)" placeholder="vd: kg/m², ml" />
+              </div>
+            </div>
+          }
+
+          <!-- Hidden field config -->
+          @if (selectedField.fieldType === FieldType.Hidden) {
+            <div class="options-section">
+              <label>👁️‍🗨️ Cấu hình trường ẩn</label>
+              <div class="form-group">
+                <label>Giá trị mặc định / Token</label>
+                <input type="text" [(ngModel)]="selectedField.defaultValue" (blur)="updateField()" [placeholder]="'vd: {currentUser}, {currentDate}'" />
+                <small>Tokens: {{ '{' }}currentUser{{ '}' }}, {{ '{' }}currentDate{{ '}' }}, {{ '{' }}currentTime{{ '}' }}, hoặc giá trị cố định</small>
+              </div>
+            </div>
+          }
+
+          <!-- Repeater config -->
+          @if (selectedField.fieldType === FieldType.Repeater) {
+            <div class="options-section">
+              <label>🔁 Cấu hình lặp nhóm</label>
+              <div class="form-group">
+                <label>Số dòng tối thiểu</label>
+                <input type="number" min="0" max="50" [ngModel]="getRepeaterConfig('minRows')" (blur)="setRepeaterConfig('minRows', $any($event.target).value)" />
+              </div>
+              <div class="form-group">
+                <label>Số dòng tối đa</label>
+                <input type="number" min="1" max="100" [ngModel]="getRepeaterConfig('maxRows')" (blur)="setRepeaterConfig('maxRows', $any($event.target).value)" />
+              </div>
+              <label>Các cột</label>
+              <div class="options-list">
+                @for (col of getRepeaterFields(); track $index; let i = $index) {
+                  <div class="option-row">
+                    <div class="option-inputs">
+                      <input type="text" [ngModel]="col.key" (blur)="updateRepeaterField(i, 'key', $any($event.target).value)" placeholder="Key" class="opt-value" />
+                      <input type="text" [ngModel]="col.label" (blur)="updateRepeaterField(i, 'label', $any($event.target).value)" placeholder="Nhãn" class="opt-label" />
+                      <select [ngModel]="col.type" (change)="updateRepeaterField(i, 'type', $any($event.target).value)" style="width:80px">
+                        <option value="text">Text</option>
+                        <option value="number">Number</option>
+                        <option value="date">Date</option>
+                        <option value="dropdown">Dropdown</option>
+                      </select>
+                    </div>
+                    <button type="button" class="remove-option-btn" (click)="removeRepeaterField(i)">🗑️</button>
+                  </div>
+                }
+              </div>
+              <button type="button" class="add-option-btn" (click)="addRepeaterField()">+ Thêm cột</button>
             </div>
           }
 

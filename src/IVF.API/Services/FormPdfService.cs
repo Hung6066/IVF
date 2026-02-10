@@ -177,6 +177,58 @@ public static class FormPdfService
             case FieldType.FileUpload:
                 return fv.TextValue ?? "[File]";
 
+            case FieldType.Hidden:
+                return fv.TextValue ?? "-";
+
+            case FieldType.Slider:
+                if (fv.NumericValue.HasValue)
+                {
+                    // Try to get unit from options
+                    try
+                    {
+                        if (!string.IsNullOrEmpty(field.OptionsJson))
+                        {
+                            var cfg = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, System.Text.Json.JsonElement>>(field.OptionsJson);
+                            if (cfg != null && cfg.TryGetValue("unit", out var unit))
+                                return $"{fv.NumericValue.Value} {unit.GetString()}";
+                        }
+                    }
+                    catch { }
+                    return fv.NumericValue.Value.ToString();
+                }
+                return "-";
+
+            case FieldType.Calculated:
+                return fv.TextValue ?? fv.NumericValue?.ToString() ?? "-";
+
+            case FieldType.RichText:
+                // Strip HTML tags for PDF
+                if (!string.IsNullOrEmpty(fv.TextValue))
+                    return System.Text.RegularExpressions.Regex.Replace(fv.TextValue, "<[^>]+>", " ").Trim();
+                return "-";
+
+            case FieldType.Signature:
+                return !string.IsNullOrEmpty(fv.TextValue) ? "[Đã ký]" : "-";
+
+            case FieldType.Lookup:
+                if (fv.Details?.Any() == true)
+                    return fv.Details[0].Label ?? fv.Details[0].Value;
+                return fv.TextValue ?? "-";
+
+            case FieldType.Repeater:
+                if (!string.IsNullOrEmpty(fv.JsonValue))
+                {
+                    try
+                    {
+                        var rows = System.Text.Json.JsonSerializer.Deserialize<List<Dictionary<string, string>>>(fv.JsonValue);
+                        if (rows != null)
+                            return $"{rows.Count} dòng dữ liệu";
+                    }
+                    catch { }
+                    return fv.JsonValue;
+                }
+                return "-";
+
             default:
                 return fv.TextValue ?? fv.NumericValue?.ToString() ?? "-";
         }

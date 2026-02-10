@@ -204,6 +204,12 @@ public static class FormEndpoints
         group.MapGet("/templates/{templateId:guid}/reports", async (Guid templateId, IMediator m) =>
             Results.Ok(await m.Send(new GetReportTemplatesQuery(templateId))));
 
+        group.MapGet("/linked-data/{templateId:guid}", async (Guid templateId, Guid patientId, IMediator m, Guid? cycleId = null) =>
+        {
+            var result = await m.Send(new GetLinkedDataQuery(templateId, patientId, cycleId));
+            return Results.Ok(result);
+        });
+
         group.MapGet("/reports/{id:guid}", async (Guid id, IMediator m) =>
         {
             var result = await m.Send(new GetReportTemplateByIdQuery(id));

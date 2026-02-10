@@ -54,6 +54,18 @@ export class FormConversationalComponent implements OnInit, OnDestroy {
   // Keyboard shortcut hint
   showKeyHint = true;
 
+  // Slider state
+  sliderValues: { [fieldId: string]: number } = {};
+
+  // Signature state
+  signatureContexts: { [fieldId: string]: CanvasRenderingContext2D } = {};
+  signatureDrawing: { [fieldId: string]: boolean } = {};
+
+  // Lookup state
+  lookupSearchQueries: { [fieldId: string]: string } = {};
+  lookupSearchResults: { [fieldId: string]: { value: string; label: string }[] } = {};
+  activeLookupFieldId = '';
+
   get currentChatField(): ConversationalField | null {
     return this.chatFields[this.currentIndex] ?? null;
   }
@@ -137,6 +149,13 @@ export class FormConversationalComponent implements OnInit, OnDestroy {
       Tags: FieldType.Tags,
       PageBreak: FieldType.PageBreak,
       Address: FieldType.Address,
+      Hidden: FieldType.Hidden,
+      Slider: FieldType.Slider,
+      Calculated: FieldType.Calculated,
+      RichText: FieldType.RichText,
+      Signature: FieldType.Signature,
+      Lookup: FieldType.Lookup,
+      Repeater: FieldType.Repeater,
     };
     return map[type as string] ?? FieldType.Text;
   }
@@ -149,7 +168,9 @@ export class FormConversationalComponent implements OnInit, OnDestroy {
       if (
         field.fieldType === FieldType.Section ||
         field.fieldType === FieldType.Label ||
-        field.fieldType === FieldType.PageBreak
+        field.fieldType === FieldType.PageBreak ||
+        field.fieldType === FieldType.Hidden ||
+        field.fieldType === FieldType.Calculated
       ) {
         continue;
       }
@@ -201,6 +222,15 @@ export class FormConversationalComponent implements OnInit, OnDestroy {
           field.fieldType === FieldType.Tags
         ) {
           defaultValue = [];
+        } else if (field.fieldType === FieldType.Slider) {
+          try {
+            const cfg = field.optionsJson ? JSON.parse(field.optionsJson) : {};
+            defaultValue = cfg.min ?? 0;
+          } catch { defaultValue = 0; }
+        } else if (field.fieldType === FieldType.Signature) {
+          defaultValue = '';
+        } else if (field.fieldType === FieldType.Repeater) {
+          defaultValue = '[]';
         }
         control = new FormControl(defaultValue, validators);
       }
@@ -274,6 +304,26 @@ export class FormConversationalComponent implements OnInit, OnDestroy {
       }
       case FieldType.FileUpload:
         return this.fileValues[cf.field.id]?.name ?? '(chưa chọn file)';
+      case FieldType.Slider: {
+        try {
+          const cfg = cf.field.optionsJson ? JSON.parse(cf.field.optionsJson) : {};
+          return `${value}${cfg.unit ? ' ' + cfg.unit : ''}`;
+        } catch { return String(value); }
+      }
+      case FieldType.RichText:
+        return value ? String(value).replace(/<[^>]+>/g, '').substring(0, 80) + '...' : '(bỏ trống)';
+      case FieldType.Signature:
+        return value ? '✍️ Đã ký' : '(chưa ký)';
+      case FieldType.Lookup: {
+        const opts = this.getOptions(cf.field);
+        const opt = opts.find(o => o.value === value);
+        return opt?.label ?? value ?? '(bỏ trống)';
+      }
+      case FieldType.Repeater:
+        try {
+          const rows = JSON.parse(value || '[]');
+          return `${rows.length} dòng`;
+        } catch { return '(không có dữ liệu)'; }
       default:
         return String(value);
     }
@@ -413,6 +463,101 @@ export class FormConversationalComponent implements OnInit, OnDestroy {
     return errors;
   }
 
+  // === Slider helpers ===
+  getSliderConfig(field: FormField): { min: number; max: number; step: number; unit: string } {
+    try {
+      const cfg = field.optionsJson ? JSON.parse(field.optionsJson) : {};
+      return { min: cfg.min ?? 0, max: cfg.max ?? 100, step: cfg.step ?? 1, unit: cfg.unit ?? '' };
+    } catch { return { min: 0, max: 100, step: 1, unit: '' }; }
+  }
+
+  onSliderChange(cf: ConversationalField, event: Event) {
+    const val = +(event.target as HTMLInputElement).value;
+    (cf.control as FormControl).setValue(val);
+    this.sliderValues[cf.field.id] = val;
+  }
+
+  // === Signature helpers ===
+  initSignatureCanvas(cf: ConversationalField, event: MouseEvent | TouchEvent) {
+    const canvas = (event.target as HTMLCanvasElement);
+    if (!this.signatureContexts[cf.field.id]) {
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.strokeStyle = '#1e293b';
+        ctx.lineWidth = 2;
+        ctx.lineCap = 'round';
+        this.signatureContexts[cf.field.id] = ctx;
+      }
+    }
+    this.startSignatureDraw(cf, event);
+  }
+
+  startSignatureDraw(cf: ConversationalField, event: MouseEvent | TouchEvent) {
+    event.preventDefault();
+    this.signatureDrawing[cf.field.id] = true;
+    const ctx = this.signatureContexts[cf.field.id];
+    if (!ctx) return;
+    const canvas = ctx.canvas;
+    const rect = canvas.getBoundingClientRect();
+    const point = event instanceof MouseEvent ? event : event.touches[0];
+    ctx.beginPath();
+    ctx.moveTo(point.clientX - rect.left, point.clientY - rect.top);
+  }
+
+  drawSignature(cf: ConversationalField, event: MouseEvent | TouchEvent) {
+    if (!this.signatureDrawing[cf.field.id]) return;
+    event.preventDefault();
+    const ctx = this.signatureContexts[cf.field.id];
+    if (!ctx) return;
+    const canvas = ctx.canvas;
+    const rect = canvas.getBoundingClientRect();
+    const point = event instanceof MouseEvent ? event : event.touches[0];
+    ctx.lineTo(point.clientX - rect.left, point.clientY - rect.top);
+    ctx.stroke();
+  }
+
+  endSignatureDraw(cf: ConversationalField) {
+    this.signatureDrawing[cf.field.id] = false;
+    const ctx = this.signatureContexts[cf.field.id];
+    if (!ctx) return;
+    (cf.control as FormControl).setValue(ctx.canvas.toDataURL('image/png'));
+  }
+
+  clearSignature(cf: ConversationalField) {
+    const ctx = this.signatureContexts[cf.field.id];
+    if (ctx) {
+      ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    }
+    (cf.control as FormControl).setValue('');
+  }
+
+  // === Lookup helpers ===
+  searchLookupOptions(cf: ConversationalField, query: string) {
+    this.lookupSearchQueries[cf.field.id] = query;
+    this.activeLookupFieldId = cf.field.id;
+    if (!query || query.length < 1) {
+      this.lookupSearchResults[cf.field.id] = [];
+      return;
+    }
+    const all = this.getOptions(cf.field);
+    const q = query.toLowerCase();
+    this.lookupSearchResults[cf.field.id] = all.filter(o => o.label.toLowerCase().includes(q)).slice(0, 10);
+  }
+
+  selectLookupOption(cf: ConversationalField, opt: { value: string; label: string }) {
+    (cf.control as FormControl).setValue(opt.value);
+    this.lookupSearchQueries[cf.field.id] = opt.label;
+    this.lookupSearchResults[cf.field.id] = [];
+    this.activeLookupFieldId = '';
+  }
+
+  getLookupDisplayLabel(cf: ConversationalField): string {
+    const val = cf.control.value;
+    if (!val) return '';
+    const opts = this.getOptions(cf.field);
+    return opts.find(o => o.value === val)?.label ?? val;
+  }
+
   // === Submission ===
   async submit() {
     this.isSubmitting = true;
@@ -490,6 +635,25 @@ export class FormConversationalComponent implements OnInit, OnDestroy {
           fv.jsonValue = JSON.stringify(value || []);
           break;
         }
+        case FieldType.Slider:
+          fv.numericValue = value != null ? parseFloat(value) : undefined;
+          break;
+        case FieldType.Signature:
+        case FieldType.RichText:
+          fv.textValue = value?.toString() || '';
+          break;
+        case FieldType.Lookup: {
+          fv.textValue = value?.toString() || '';
+          if (value) {
+            const opts = this.getOptions(field);
+            const opt = opts.find(o => o.value === value);
+            if (opt) details.push({ value: opt.value, label: opt.label, conceptId: (opt as any)?.conceptId });
+          }
+          break;
+        }
+        case FieldType.Repeater:
+          fv.jsonValue = value || '[]';
+          break;
         default:
           fv.textValue = value?.toString() || '';
       }

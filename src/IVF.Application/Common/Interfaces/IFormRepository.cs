@@ -49,4 +49,10 @@ public interface IFormRepository
     Task<ReportTemplate> AddReportTemplateAsync(ReportTemplate reportTemplate, CancellationToken ct = default);
     Task UpdateReportTemplateAsync(ReportTemplate reportTemplate, CancellationToken ct = default);
     Task DeleteReportTemplateAsync(Guid id, CancellationToken ct = default);
+
+    // Patient Concept Snapshots (Cross-Form Linked Data)
+    Task<List<PatientConceptSnapshot>> GetSnapshotsByPatientAsync(Guid patientId, Guid? cycleId = null, CancellationToken ct = default);
+    Task<PatientConceptSnapshot?> GetSnapshotAsync(Guid patientId, Guid conceptId, Guid? cycleId, CancellationToken ct = default);
+    Task UpsertSnapshotAsync(PatientConceptSnapshot snapshot, CancellationToken ct = default);
+    Task UpsertSnapshotsAsync(IEnumerable<PatientConceptSnapshot> snapshots, CancellationToken ct = default);
 }

@@ -22,7 +22,14 @@ public enum FieldType
     Label = 15,
     Tags = 16,
     PageBreak = 17,
-    Address = 18
+    Address = 18,
+    Hidden = 19,
+    Slider = 20,
+    Calculated = 21,
+    RichText = 22,
+    Signature = 23,
+    Lookup = 24,
+    Repeater = 25
 }
 
 /// <summary>
@@ -47,4 +54,19 @@ public enum ReportType
     LineChart = 3,
     PieChart = 4,
     Summary = 5
+}
+
+/// <summary>
+/// How linked data should be presented to the user in the target form
+/// </summary>
+public enum DataFlowType
+{
+    /// <summary>Auto-populate field with latest value (editable)</summary>
+    AutoFill = 1,
+    /// <summary>Show as suggestion, user must confirm</summary>
+    Suggest = 2,
+    /// <summary>Read-only reference display, not editable</summary>
+    Reference = 3,
+    /// <summary>Copy value into new response on submit</summary>
+    Copy = 4
 }

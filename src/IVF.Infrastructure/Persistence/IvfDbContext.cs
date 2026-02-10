@@ -58,6 +58,9 @@ public class IvfDbContext : DbContext
     public DbSet<Concept> Concepts => Set<Concept>();
     public DbSet<ConceptMapping> ConceptMappings => Set<ConceptMapping>();
 
+    // Cross-Form Linked Data
+    public DbSet<PatientConceptSnapshot> PatientConceptSnapshots => Set<PatientConceptSnapshot>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
