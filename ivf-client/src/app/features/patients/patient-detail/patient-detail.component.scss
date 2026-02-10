@@ -193,6 +193,74 @@
     }
 }
 
+// Forms Card
+.forms-card {
+    grid-column: 1 / -1;
+
+    .forms-hint {
+        font-size: 0.8rem;
+        color: var(--text-secondary);
+        margin: -0.75rem 0 1rem;
+        font-style: italic;
+    }
+}
+
+.form-template-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 0.75rem;
+}
+
+.form-template-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 1.25rem;
+    background: #f8fafc;
+    border-radius: 10px;
+    text-decoration: none;
+    border: 1px solid var(--border-color);
+    transition: all 0.2s ease;
+
+    &:hover {
+        border-color: var(--primary);
+        background: #eff6ff;
+        transform: translateX(4px);
+
+        .action-arrow {
+            transform: translateX(4px);
+            color: var(--primary);
+        }
+    }
+
+    .form-template-info {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+
+    .form-template-name {
+        font-weight: 600;
+        color: var(--text-primary);
+        font-size: 0.9375rem;
+    }
+
+    .form-template-desc {
+        font-size: 0.8rem;
+        color: var(--text-secondary);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .action-arrow {
+        font-size: 1.25rem;
+        color: var(--text-secondary);
+        transition: all 0.2s ease;
+    }
+}
+
 .cycles-card {
     grid-column: 1 / -1;
 }

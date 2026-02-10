@@ -4,6 +4,7 @@ import { ActivatedRoute, RouterModule, Router } from '@angular/router';
 import { PatientService } from '../../../core/services/patient.service';
 import { CoupleService } from '../../../core/services/couple.service';
 import { CycleService } from '../../../core/services/cycle.service';
+import { FormsService, FormTemplate } from '../../forms/forms.service';
 import { Patient, Couple, TreatmentCycle } from '../../../core/models/api.models';
 
 @Component({
@@ -17,6 +18,7 @@ export class PatientDetailComponent implements OnInit {
   patient = signal<Patient | null>(null);
   couple = signal<Couple | null>(null);
   cycles = signal<TreatmentCycle[]>([]);
+  formTemplates = signal<FormTemplate[]>([]);
   patientId = '';
 
   private route = inject(ActivatedRoute);
@@ -24,11 +26,13 @@ export class PatientDetailComponent implements OnInit {
   private patientService = inject(PatientService);
   private coupleService = inject(CoupleService);
   private cycleService = inject(CycleService);
+  private formsService = inject(FormsService);
 
   ngOnInit(): void {
     this.route.params.subscribe(params => {
       this.patientId = params['id'];
       this.loadPatient();
+      this.loadFormTemplates();
     });
   }
 
@@ -56,6 +60,13 @@ export class PatientDetailComponent implements OnInit {
     this.cycleService.getCyclesByCouple(coupleId).subscribe({
       next: (cycles) => this.cycles.set(cycles),
       error: (err) => console.error('Error loading cycles', err)
+    });
+  }
+
+  loadFormTemplates(): void {
+    this.formsService.getTemplates(undefined, true).subscribe({
+      next: (templates) => this.formTemplates.set(templates),
+      error: () => console.log('No form templates found')
     });
   }
 

@@ -8,6 +8,48 @@
         }
       </div>
 
+      <!-- Patient context bar -->
+      <div class="patient-context-bar">
+        @if (selectedPatient) {
+          <div class="patient-selected">
+            <span class="patient-icon">👤</span>
+            <div class="patient-info">
+              <strong>{{ selectedPatient.fullName }}</strong>
+              <span class="patient-code">{{ selectedPatient.patientCode }}</span>
+            </div>
+            @if (linkedData.length > 0) {
+              <span class="linked-count" title="Số trường được tự động điền từ form khác">
+                🔗 {{ linkedData.length }} liên kết
+              </span>
+            }
+            <button type="button" class="btn-change-patient" (click)="clearPatient()">Đổi BN</button>
+          </div>
+        } @else {
+          <div class="patient-search">
+            <span class="search-icon">🔍</span>
+            <input
+              type="text"
+              class="patient-search-input"
+              [value]="patientSearchQuery"
+              (input)="onPatientSearchInput($any($event.target).value)"
+              (blur)="hidePatientDropdown()"
+              placeholder="Tìm bệnh nhân (mã, tên, SĐT)..."
+            />
+            @if (showPatientDropdown && patientSearchResults.length > 0) {
+              <div class="patient-dropdown">
+                @for (p of patientSearchResults; track p.id) {
+                  <div class="patient-option" (mousedown)="selectPatient(p)">
+                    <span class="option-name">{{ p.fullName }}</span>
+                    <span class="option-code">{{ p.patientCode }}</span>
+                  </div>
+                }
+              </div>
+            }
+          </div>
+          <span class="patient-hint">Chọn bệnh nhân để tự động liên kết dữ liệu từ các form khác</span>
+        }
+      </div>
+
       <form [formGroup]="form" (ngSubmit)="submit()">
         <!-- Multi-page progress bar -->
         @if (isMultiPage) {

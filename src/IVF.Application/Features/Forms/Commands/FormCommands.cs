@@ -862,6 +862,7 @@ public class FormResponseCommandsHandler :
 
     /// <summary>
     /// After a form response is saved, upsert PatientConceptSnapshots for all fields that have a ConceptId.
+    /// Also extracts concepts from field value details (Tags/Mention fields where individual tags reference concepts).
     /// This materializes the latest known value per (Patient, Concept) for O(1) cross-form lookup.
     /// </summary>
     private async Task UpsertConceptSnapshots(
@@ -871,19 +872,16 @@ public class FormResponseCommandsHandler :
         Guid? cycleId,
         CancellationToken ct)
     {
-        var fieldsWithConcept = templateFields
-            .Where(f => f.ConceptId.HasValue)
-            .ToDictionary(f => f.Id, f => f);
-
-        if (fieldsWithConcept.Count == 0) return;
-
+        var fieldsById = templateFields.ToDictionary(f => f.Id, f => f);
         var fieldValueMap = response.FieldValues?.ToDictionary(fv => fv.FormFieldId) ?? new();
-
         var snapshots = new List<PatientConceptSnapshot>();
+        var capturedAt = response.SubmittedAt ?? DateTime.UtcNow;
 
-        foreach (var (fieldId, field) in fieldsWithConcept)
+        // === Source 1: Fields with ConceptId on the field definition ===
+        var fieldsWithConcept = templateFields.Where(f => f.ConceptId.HasValue);
+        foreach (var field in fieldsWithConcept)
         {
-            if (!fieldValueMap.TryGetValue(fieldId, out var fv)) continue;
+            if (!fieldValueMap.TryGetValue(field.Id, out var fv)) continue;
 
             // Skip empty values
             if (string.IsNullOrWhiteSpace(fv.TextValue)
@@ -893,20 +891,28 @@ public class FormResponseCommandsHandler :
                 && string.IsNullOrWhiteSpace(fv.JsonValue))
                 continue;
 
-            var snapshot = PatientConceptSnapshot.Create(
-                patientId,
-                field.ConceptId!.Value,
-                response.Id,
-                fieldId,
-                cycleId,
-                response.SubmittedAt ?? DateTime.UtcNow,
-                fv.TextValue,
-                fv.NumericValue,
-                fv.DateValue,
-                fv.BooleanValue,
-                fv.JsonValue);
+            snapshots.Add(PatientConceptSnapshot.Create(
+                patientId, field.ConceptId!.Value, response.Id, field.Id,
+                cycleId, capturedAt,
+                fv.TextValue, fv.NumericValue, fv.DateValue, fv.BooleanValue, fv.JsonValue));
+        }
 
-            snapshots.Add(snapshot);
+        // === Source 2: Field value details with ConceptId (Tags/Mention fields) ===
+        // Each detail (tag) that references a concept gets its own snapshot
+        foreach (var fv in response.FieldValues ?? Enumerable.Empty<FormFieldValue>())
+        {
+            if (fv.Details == null || fv.Details.Count == 0) continue;
+
+            foreach (var detail in fv.Details.Where(d => d.ConceptId.HasValue && !d.IsDeleted))
+            {
+                // Skip if this concept was already captured from a field-level ConceptId
+                if (snapshots.Any(s => s.ConceptId == detail.ConceptId!.Value)) continue;
+
+                snapshots.Add(PatientConceptSnapshot.Create(
+                    patientId, detail.ConceptId!.Value, response.Id, fv.FormFieldId,
+                    cycleId, capturedAt,
+                    detail.Value, null, null, null, null));
+            }
         }
 
         if (snapshots.Count > 0)

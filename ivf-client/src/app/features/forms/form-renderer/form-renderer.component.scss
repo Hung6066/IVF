@@ -1,16 +1,23 @@
 .form-renderer-container {
   padding: 24px;
-  max-width: 800px;
+  max-width: 900px;
   margin: 0 auto;
   min-height: 100vh;
   background: #f1f5f9;
+
+  // Ensure all elements use border-box
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
 }
 
 .form-card {
   background: white;
   border-radius: 16px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-  overflow: hidden;
+  overflow: visible;
 }
 
 .form-header {
@@ -27,6 +34,159 @@
 .form-header .description {
   margin: 0;
   opacity: 0.9;
+}
+
+// ===== Patient Context Bar =====
+.patient-context-bar {
+  padding: 16px 32px;
+  background: #fefce8;
+  border-bottom: 1px solid #fde68a;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.patient-selected {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+
+  .patient-icon {
+    font-size: 20px;
+  }
+
+  .patient-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+
+    strong {
+      font-size: 15px;
+      color: #1e293b;
+    }
+
+    .patient-code {
+      font-size: 12px;
+      color: #64748b;
+    }
+  }
+
+  .linked-count {
+    margin-left: auto;
+    font-size: 13px;
+    color: #059669;
+    font-weight: 500;
+    background: #ecfdf5;
+    padding: 4px 10px;
+    border-radius: 12px;
+    border: 1px solid #6ee7b7;
+  }
+
+  .btn-change-patient {
+    padding: 6px 14px;
+    background: white;
+    color: #64748b;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+
+    &:hover {
+      background: #fee2e2;
+      border-color: #fca5a5;
+      color: #dc2626;
+    }
+  }
+}
+
+.patient-search {
+  position: relative;
+  flex: 1;
+  min-width: 250px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  .search-icon {
+    font-size: 16px;
+  }
+
+  .patient-search-input {
+    flex: 1;
+    padding: 10px 14px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 14px;
+    background: white;
+    transition: all 0.2s;
+
+    &:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    &::placeholder {
+      color: #94a3b8;
+    }
+  }
+
+  .patient-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 28px;
+    right: 0;
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.12);
+    max-height: 250px;
+    overflow-y: auto;
+    z-index: 200;
+    margin-top: 4px;
+
+    .patient-option {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      cursor: pointer;
+      transition: background 0.15s;
+      border-bottom: 1px solid #f1f5f9;
+
+      &:last-child {
+        border-bottom: none;
+      }
+
+      &:hover {
+        background: #f0f4ff;
+      }
+
+      .option-name {
+        font-size: 14px;
+        color: #1e293b;
+        font-weight: 500;
+      }
+
+      .option-code {
+        font-size: 12px;
+        color: #667eea;
+        font-weight: 500;
+        background: #eff3ff;
+        padding: 2px 8px;
+        border-radius: 4px;
+      }
+    }
+  }
+}
+
+.patient-hint {
+  font-size: 12px;
+  color: #92400e;
+  font-style: italic;
 }
 
 // ===== Multi-page Progress =====
@@ -100,16 +260,18 @@
 }
 
 .form-fields-grid {
-  padding: 32px;
+  padding: 28px 32px;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 20px;
+  gap: 24px 20px;
   align-items: start;
 }
 
 .field-wrapper {
   display: flex;
   flex-direction: column;
+  min-width: 0; // Prevent grid blowout
+  overflow: hidden; // Contain overflowing children
 }
 
 .section-header {
@@ -121,9 +283,13 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 6px;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   font-weight: 500;
+  font-size: 13px;
   color: #374151;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .required {
@@ -177,11 +343,13 @@
 .form-textarea,
 .form-select {
   width: 100%;
-  padding: 12px 16px;
+  padding: 10px 12px;
   border: 1px solid #d1d5db;
   border-radius: 8px;
-  font-size: 15px;
+  font-size: 14px;
   transition: all 0.2s;
+  box-sizing: border-box;
+  min-width: 0; // Prevent overflow in grid
 }
 
 .form-input:focus,
@@ -253,14 +421,16 @@
 }
 
 .section-header {
-  padding: 16px 0;
+  padding: 20px 0 12px;
   border-bottom: 2px solid #e2e8f0;
-  margin-bottom: 8px;
+  margin-top: 8px;
 }
 
 .section-header h3 {
   margin: 0 0 4px;
   color: #1e293b;
+  font-size: 16px;
+  font-weight: 600;
 }
 
 .section-header p {
@@ -704,7 +874,8 @@
     display: flex;
     flex-direction: column;
     gap: 4px;
-    min-width: 120px;
+    min-width: 0;
+    flex: 1 1 120px;
 
     small {
       font-size: 12px;
@@ -713,10 +884,13 @@
     }
 
     input {
+      width: 100%;
       padding: 10px 12px;
       border: 1px solid #e2e8f0;
       border-radius: 8px;
       font-size: 14px;
+      box-sizing: border-box;
+      min-width: 0;
       transition: border-color 0.2s;
 
       &:focus {
@@ -759,6 +933,25 @@
 }
 
 /* Responsive */
+@media (max-width: 1024px) {
+  .form-fields-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px 16px;
+  }
+
+  .field-wrapper {
+    // Remap: 1-col → 1, 2-col → 2, 3/4-col → 2 (full row)
+    &[style*='span 3'],
+    &[style*='span 4'] {
+      grid-column: span 2 !important;
+    }
+  }
+
+  .section-header {
+    grid-column: span 2;
+  }
+}
+
 @media (max-width: 768px) {
   .form-renderer-container {
     padding: 12px;
@@ -803,13 +996,16 @@
 
 .mention-editor {
   min-height: 80px;
-  padding: 12px 16px;
+  padding: 10px 14px;
   border: 2px solid #e2e8f0;
   border-radius: 12px;
   background: white;
   font-size: 14px;
   line-height: 2.2;
   transition: all 0.3s;
+  box-sizing: border-box;
+  word-break: break-word;
+  overflow-wrap: break-word;
 
   &:focus {
     outline: none;
@@ -933,6 +1129,9 @@
   background: white;
   font-size: 14px;
   line-height: 1.7;
+  box-sizing: border-box;
+  word-break: break-word;
+  overflow-wrap: break-word;
   transition:
     border-color 0.2s,
     box-shadow 0.2s;
@@ -1115,6 +1314,7 @@
     border: 1px solid #e2e8f0;
     border-radius: 10px;
     overflow: hidden;
+    table-layout: fixed;
 
     thead {
       th {

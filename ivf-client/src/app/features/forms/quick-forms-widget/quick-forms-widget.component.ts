@@ -18,6 +18,7 @@ export class QuickFormsWidgetComponent implements OnInit {
     @Input() maxForms = 6; // Maximum number of forms to display
     @Input() title = 'Biểu mẫu nhanh';
     @Input() showViewAll = true;
+    @Input() patientId?: string; // Pass patient context when opening forms
 
     templates: FormTemplate[] = [];
     filteredForms: FormTemplate[] = [];
@@ -69,7 +70,8 @@ export class QuickFormsWidgetComponent implements OnInit {
     }
 
     openForm(form: FormTemplate) {
-        this.router.navigate(['/forms/fill', form.id]);
+        const queryParams = this.patientId ? { patientId: this.patientId } : {};
+        this.router.navigate(['/forms/fill', form.id], { queryParams });
     }
 
     viewAllForms() {

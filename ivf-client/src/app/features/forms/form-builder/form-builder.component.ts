@@ -43,6 +43,7 @@ export class FormBuilderComponent implements OnInit {
   selectedCategoryId = '';
   selectedFieldColSpan = '4';
   selectedFieldHeight = 'auto';
+  activePropertiesTab: 'basic' | 'validation' | 'layout' = 'basic';
 
   fieldTypes = [
     { type: FieldType.Text, icon: '📝', label: 'Văn bản' },
@@ -336,11 +337,12 @@ export class FormBuilderComponent implements OnInit {
       'hasOptions:',
       this.hasOptions(field.fieldType),
     );
-    // Get colSpan and height from field's validation rules
+    // Get colSpan and height — read layoutJson first, fallback to validationRulesJson (matches getFieldColSpan logic)
     try {
-      const rules = field.validationRulesJson ? JSON.parse(field.validationRulesJson) : {};
-      this.selectedFieldColSpan = rules.colSpan?.toString() || '4';
-      this.selectedFieldHeight = rules.height || 'auto';
+      const json = field.layoutJson || field.validationRulesJson;
+      const data = json ? JSON.parse(json) : {};
+      this.selectedFieldColSpan = data.colSpan?.toString() || '4';
+      this.selectedFieldHeight = data.height || 'auto';
     } catch {
       this.selectedFieldColSpan = '4';
       this.selectedFieldHeight = 'auto';

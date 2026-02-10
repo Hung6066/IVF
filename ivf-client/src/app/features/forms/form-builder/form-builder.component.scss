@@ -3,6 +3,13 @@
   display: flex;
   flex-direction: column;
   background: #f1f5f9;
+
+  // Global box-sizing to prevent overflow from padding
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
 }
 
 .builder-header {
@@ -345,24 +352,26 @@
 }
 
 .properties-panel {
-  width: 320px;
+  width: 340px;
+  min-width: 340px;
   background: white;
   border-left: 1px solid #e2e8f0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .panel-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 20px;
+  padding: 12px 16px;
   border-bottom: 1px solid #e2e8f0;
 }
 
 .panel-header h3 {
   margin: 0;
-  font-size: 16px;
+  font-size: 15px;
 }
 
 .close-btn {
@@ -371,22 +380,163 @@
   font-size: 18px;
   cursor: pointer;
   color: #64748b;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background 0.15s;
+
+  &:hover {
+    background: #f1f5f9;
+  }
+}
+
+// ===== Tab Navigation =====
+.panel-tabs {
+  display: flex;
+  border-bottom: 2px solid #e2e8f0;
+  background: #f8fafc;
+  flex-shrink: 0;
+}
+
+.panel-tab {
+  flex: 1;
+  padding: 10px 8px;
+  border: none;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 500;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.2s;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  white-space: nowrap;
+  text-align: center;
+
+  &:hover {
+    color: #475569;
+    background: #f1f5f9;
+  }
+
+  &.active {
+    color: #667eea;
+    border-bottom-color: #667eea;
+    background: white;
+    font-weight: 600;
+  }
+}
+
+.tab-content {
+  animation: tabFadeIn 0.15s ease-out;
+}
+
+@keyframes tabFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.tab-section-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  margin-bottom: 16px;
+
+  .tab-section-icon {
+    font-size: 20px;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  h4 {
+    margin: 0 0 2px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #1e293b;
+  }
+
+  p {
+    margin: 0;
+    font-size: 11px;
+    color: #64748b;
+  }
+}
+
+.empty-tab-message {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px;
+  text-align: center;
+  color: #94a3b8;
+
+  span {
+    font-size: 32px;
+    margin-bottom: 8px;
+  }
+
+  p {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+}
+
+.validation-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+
+  .form-group {
+    margin-bottom: 8px;
+  }
+}
+
+.logic-section-divider {
+  display: flex;
+  align-items: center;
+  margin: 16px 0 12px;
+  padding-top: 12px;
+  border-top: 1px solid #e2e8f0;
+
+  span {
+    font-size: 12px;
+    font-weight: 600;
+    color: #1e293b;
+    white-space: nowrap;
+  }
+}
+
+.condition-op-val {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
 }
 
 .panel-body {
   flex: 1;
-  padding: 20px;
+  padding: 16px;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .form-group {
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 .form-group label {
   display: block;
-  margin-bottom: 6px;
-  font-size: 13px;
+  margin-bottom: 4px;
+  font-size: 12px;
   font-weight: 500;
   color: #374151;
 }
@@ -398,7 +548,8 @@
   padding: 8px 12px;
   border: 1px solid #d1d5db;
   border-radius: 6px;
-  font-size: 14px;
+  font-size: 13px;
+  min-width: 0;
 }
 
 .form-group textarea {
@@ -418,20 +569,30 @@
   align-items: center;
   gap: 8px;
   cursor: pointer;
+  white-space: nowrap;
+  overflow: visible;
+  font-size: 13px;
+
+  input[type='checkbox'] {
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+  }
 }
 
 .section-divider {
   display: flex;
   align-items: center;
-  margin: 20px 0 16px;
-  padding-top: 16px;
+  margin: 16px 0 12px;
+  padding-top: 12px;
   border-top: 1px solid #e2e8f0;
 }
 
 .section-divider span {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   color: #1e293b;
+  white-space: nowrap;
 }
 
 .layout-controls {
@@ -571,6 +732,7 @@
 
   .properties-panel {
     width: 100%;
+    min-width: 100%;
     border-left: none;
     border-top: 1px solid #e2e8f0;
     max-height: 300px;
@@ -652,20 +814,25 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
   border: 1px solid #93c5fd;
   border-radius: 8px;
-  padding: 8px 12px;
+  padding: 8px 10px;
+  overflow: hidden;
+  word-break: break-word;
 }
 
 .concept-tag {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 12px;
+  gap: 4px;
+  font-size: 11px;
   color: #1d4ed8;
   font-weight: 500;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .concept-display {
@@ -704,12 +871,13 @@
 
 .concept-search-input {
   width: 100%;
-  padding: 8px 12px !important;
+  padding: 8px 10px !important;
   border: 1px dashed #93c5fd !important;
   border-radius: 6px;
   background: #f8fafc;
-  font-size: 13px;
+  font-size: 12px;
   transition: all 0.2s;
+  min-width: 0;
 }
 
 .concept-search-input:focus {
@@ -787,16 +955,18 @@
 // ===== Structured Options Editor =====
 .options-section {
   margin-top: 16px;
-  padding: 12px;
+  padding: 10px;
   background: #f8fafc;
   border-radius: 8px;
   border: 1px solid #e2e8f0;
+  overflow: hidden;
 
   > label {
     display: block;
     font-weight: 600;
-    margin-bottom: 12px;
+    margin-bottom: 10px;
     color: #334155;
+    font-size: 13px;
   }
 
   small {
@@ -816,31 +986,36 @@
 .option-row {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 10px;
+  gap: 6px;
+  padding: 8px;
   background: white;
   border-radius: 6px;
   border: 1px solid #e2e8f0;
   position: relative;
+  overflow: hidden;
 
   .remove-option-btn {
     position: absolute;
-    top: 8px;
-    right: 8px;
+    top: 6px;
+    right: 6px;
+    padding: 2px 4px;
+    font-size: 12px;
   }
 }
 
 .option-inputs {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   width: 100%;
+  min-width: 0;
 
   .opt-value {
     flex: 1;
-    padding: 6px 8px;
+    min-width: 0;
+    padding: 5px 6px;
     border: 1px solid #e2e8f0;
     border-radius: 4px;
-    font-size: 12px;
+    font-size: 11px;
     font-family: monospace;
     color: #64748b;
 
@@ -852,10 +1027,11 @@
 
   .opt-label {
     flex: 2;
-    padding: 6px 8px;
+    min-width: 0;
+    padding: 5px 6px;
     border: 1px solid #e2e8f0;
     border-radius: 4px;
-    font-size: 12px;
+    font-size: 11px;
 
     &:focus {
       outline: none;
@@ -965,8 +1141,9 @@
 // ===== Inline Concept Search for Options =====
 .option-concept {
   flex: 1;
-  min-width: 150px;
+  min-width: 0;
   position: relative;
+  overflow: hidden;
 }
 
 .linked-concept-info {
@@ -981,10 +1158,11 @@
 
 .concept-search-input {
   width: 100%;
-  padding: 6px 8px;
+  padding: 5px 6px;
   border: 1px solid #e2e8f0;
   border-radius: 4px;
   font-size: 11px;
+  min-width: 0;
 
   &:focus {
     outline: none;
@@ -1038,24 +1216,27 @@
 .option-row {
   display: flex;
   align-items: flex-start;
-  gap: 8px;
-  padding: 10px;
+  gap: 6px;
+  padding: 8px;
   background: white;
   border-radius: 6px;
   border: 1px solid #e2e8f0;
   flex-wrap: wrap;
+  overflow: hidden;
 }
 
 .option-inputs {
   display: flex;
-  gap: 6px;
-  min-width: 180px;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
 
   input {
-    padding: 6px 8px;
+    padding: 5px 6px;
     border: 1px solid #e2e8f0;
     border-radius: 4px;
-    font-size: 12px;
+    font-size: 11px;
+    min-width: 0;
 
     &:focus {
       outline: none;
@@ -1064,13 +1245,17 @@
   }
 
   .opt-value {
-    width: 70px;
+    width: 60px;
+    min-width: 0;
+    flex-shrink: 1;
     font-family: monospace;
     color: #64748b;
   }
 
   .opt-label {
-    width: 100px;
+    width: 80px;
+    min-width: 0;
+    flex: 1;
   }
 }
 
@@ -1181,6 +1366,7 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
+  min-width: 0;
 }
 
 .cond-field,
@@ -1190,8 +1376,9 @@
   padding: 6px;
   border: 1px solid #cbd5e1;
   border-radius: 4px;
-  font-size: 12px;
+  font-size: 11px;
   background: white;
+  min-width: 0;
 }
 
 .remove-cond-btn {
@@ -1248,7 +1435,8 @@
     padding: 6px 10px;
     border: 1px solid #d1d5db;
     border-radius: 6px;
-    font-size: 13px;
+    font-size: 12px;
+    min-width: 0;
 
     &:focus {
       outline: none;

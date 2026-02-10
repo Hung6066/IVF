@@ -58,6 +58,29 @@
             </div>
         </section>
 
+        <!-- Forms Section -->
+        @if (formTemplates().length > 0) {
+        <section class="card forms-card">
+            <div class="section-header">
+                <h2 class="card-title">📋 Biểu mẫu</h2>
+            </div>
+            <p class="forms-hint">Điền form cho bệnh nhân — dữ liệu sẽ tự động liên kết giữa các form cùng concept</p>
+            <div class="form-template-list">
+                @for (tmpl of formTemplates(); track tmpl.id) {
+                <a [routerLink]="['/forms/fill', tmpl.id]" [queryParams]="{ patientId: patientId }" class="form-template-item">
+                    <div class="form-template-info">
+                        <span class="form-template-name">{{ tmpl.name }}</span>
+                        @if (tmpl.description) {
+                        <span class="form-template-desc">{{ tmpl.description }}</span>
+                        }
+                    </div>
+                    <span class="action-arrow">→</span>
+                </a>
+                }
+            </div>
+        </section>
+        }
+
         <!-- Partner Info (if exists) -->
         @if (couple()) {
         <section class="card info-card partner">

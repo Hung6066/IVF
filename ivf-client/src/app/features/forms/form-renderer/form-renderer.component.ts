@@ -32,9 +32,20 @@ import {
   Condition,
   FileUploadResult,
   LinkedDataValue,
+  ResponseStatus,
 } from '../forms.service';
 import { ConceptService } from '../services/concept.service';
-import { Subject, Subscription, debounceTime, distinctUntilChanged, lastValueFrom } from 'rxjs';
+import { PatientService } from '../../../core/services/patient.service';
+import { Patient } from '../../../core/models/patient.models';
+import {
+  Subject,
+  Subscription,
+  debounceTime,
+  distinctUntilChanged,
+  switchMap,
+  of,
+  lastValueFrom,
+} from 'rxjs';
 
 @Component({
   selector: 'app-form-renderer',
@@ -46,6 +57,7 @@ import { Subject, Subscription, debounceTime, distinctUntilChanged, lastValueFro
 export class FormRendererComponent implements OnInit, OnDestroy, AfterViewInit {
   private readonly formsService = inject(FormsService);
   private readonly conceptService = inject(ConceptService);
+  private readonly patientService = inject(PatientService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly fb = inject(FormBuilder);
@@ -84,6 +96,14 @@ export class FormRendererComponent implements OnInit, OnDestroy, AfterViewInit {
   patientId: string | null = null;
   cycleId: string | null = null;
 
+  // Patient search (inline selector when patientId not provided)
+  patientSearchQuery = '';
+  patientSearchResults: Patient[] = [];
+  selectedPatient: Patient | null = null;
+  showPatientDropdown = false;
+  private patientSearchSubject = new Subject<string>();
+  private patientSearchSub?: Subscription;
+
   // Auto-save draft
   autoSaveEnabled = true;
   autoSaveStatus: 'idle' | 'saving' | 'saved' | 'error' = 'idle';
@@ -99,6 +119,22 @@ export class FormRendererComponent implements OnInit, OnDestroy, AfterViewInit {
     this.autoSaveSubscription = this.autoSaveSubject
       .pipe(debounceTime(5000), distinctUntilChanged())
       .subscribe(() => this.autoSaveDraft());
+
+    // Set up patient search debounce
+    this.patientSearchSub = this.patientSearchSubject
+      .pipe(
+        debounceTime(300),
+        distinctUntilChanged(),
+        switchMap((q) =>
+          q.length >= 2
+            ? this.patientService.searchPatients(q, 1, 10)
+            : of({ items: [], totalCount: 0 }),
+        ),
+      )
+      .subscribe((result) => {
+        this.patientSearchResults = result.items || [];
+        this.showPatientDropdown = this.patientSearchResults.length > 0;
+      });
 
     this.route.params.subscribe((params) => {
       if (params['responseId']) {
@@ -118,8 +154,24 @@ export class FormRendererComponent implements OnInit, OnDestroy, AfterViewInit {
 
     // Read patient/cycle from query params for linked data
     this.route.queryParams.subscribe((qp) => {
-      this.patientId = qp['patientId'] || null;
-      this.cycleId = qp['cycleId'] || null;
+      const newPatientId = qp['patientId'] || null;
+      const newCycleId = qp['cycleId'] || null;
+      const patientChanged = newPatientId !== this.patientId;
+      this.patientId = newPatientId;
+      this.cycleId = newCycleId;
+
+      // Load patient info for display when patientId is provided via URL
+      if (this.patientId && !this.selectedPatient) {
+        this.patientService.getPatient(this.patientId).subscribe({
+          next: (p) => (this.selectedPatient = p),
+          error: () => {},
+        });
+      }
+
+      // If template already loaded and patient changed, reload linked data
+      if (patientChanged && this.template && this.patientId) {
+        this.loadLinkedData();
+      }
     });
   }
 
@@ -128,13 +180,28 @@ export class FormRendererComponent implements OnInit, OnDestroy, AfterViewInit {
       this.valueChangesSubscription.unsubscribe();
     }
     this.autoSaveSubscription?.unsubscribe();
+    this.patientSearchSub?.unsubscribe();
   }
 
   loadResponseForEdit() {
     this.formsService.getResponseById(this.responseId).subscribe((response) => {
       this.existingResponse = response;
       this.templateId = response.formTemplateId;
-      this.loadTemplate(() => this.populateFormWithResponse(response));
+
+      // Restore patient context from the saved response
+      if (response.patientId) {
+        this.patientId = response.patientId;
+        this.patientService.getPatient(response.patientId).subscribe({
+          next: (p) => (this.selectedPatient = p),
+          error: () => {},
+        });
+      }
+
+      this.loadTemplate(() => {
+        this.populateFormWithResponse(response);
+        // Load linked data after populating so existing values are preserved
+        this.loadLinkedData();
+      });
     });
   }
 
@@ -334,7 +401,7 @@ export class FormRendererComponent implements OnInit, OnDestroy, AfterViewInit {
       } else if (field.fieldType === FieldType.Slider) {
         try {
           const config = field.optionsJson ? JSON.parse(field.optionsJson) : {};
-          defaultValue = field.defaultValue ? parseFloat(field.defaultValue) : (config.min || 0);
+          defaultValue = field.defaultValue ? parseFloat(field.defaultValue) : config.min || 0;
         } catch {
           defaultValue = 0;
         }
@@ -367,41 +434,243 @@ export class FormRendererComponent implements OnInit, OnDestroy, AfterViewInit {
 
   // ===== Linked Data (Cross-Form Auto-Fill) =====
   loadLinkedData() {
-    if (!this.patientId || !this.templateId) return;
+    if (!this.patientId || !this.templateId) {
+      console.log('[loadLinkedData] Skipped - no patientId or templateId');
+      return;
+    }
 
-    this.formsService.getLinkedData(this.templateId, this.patientId, this.cycleId || undefined).subscribe({
-      next: (data) => {
-        this.linkedData = data;
-        this.linkedDataMap = {};
-        this.linkedFieldIds = new Set();
+    console.log('[loadLinkedData] Fetching for template:', this.templateId, 'patient:', this.patientId);
+    this.formsService
+      .getLinkedData(this.templateId, this.patientId, this.cycleId || undefined)
+      .subscribe({
+        next: (data) => {
+          console.log('[loadLinkedData] Received', data.length, 'linked data items:', data);
+          this.linkedData = data;
+          this.linkedDataMap = {};
+          this.linkedFieldIds = new Set();
 
-        for (const item of data) {
-          this.linkedDataMap[item.fieldId] = item;
-          this.linkedFieldIds.add(item.fieldId);
-        }
+          for (const item of data) {
+            this.linkedDataMap[item.fieldId] = item;
+            this.linkedFieldIds.add(item.fieldId);
+          }
 
-        if (data.length > 0) {
-          this.applyLinkedData();
-        }
-      },
-      error: (err) => {
-        console.warn('Failed to load linked data:', err);
-      },
+          if (data.length > 0) {
+            this.applyLinkedData();
+          }
+
+          // Also load previous response for same template+patient (self-fill)
+          this.loadPreviousResponse();
+        },
+        error: (err) => {
+          console.warn('[loadLinkedData] Failed:', err);
+          // Still try previous response even if linked data fails
+          this.loadPreviousResponse();
+        },
+      });
+  }
+
+  // Load the most recent submitted response for this template+patient
+  // and pre-fill any fields that are still empty (not already filled by linked data)
+  loadPreviousResponse() {
+    if (!this.patientId || !this.templateId || this.isEditMode) {
+      console.log(
+        '[loadPreviousResponse] Skipped - patientId:',
+        this.patientId,
+        'templateId:',
+        this.templateId,
+        'isEditMode:',
+        this.isEditMode,
+      );
+      return;
+    }
+
+    console.log(
+      '[loadPreviousResponse] Fetching responses for template:',
+      this.templateId,
+      'patient:',
+      this.patientId,
+    );
+    this.formsService
+      .getResponses(
+        this.templateId,
+        this.patientId,
+        undefined,
+        undefined,
+        1,
+        1,
+        ResponseStatus.Submitted,
+      )
+      .subscribe({
+        next: (result) => {
+          console.log(
+            '[loadPreviousResponse] Found',
+            result.items?.length || 0,
+            'submitted responses',
+          );
+          if (!result.items || result.items.length === 0) return;
+          const latestResponseId = result.items[0].id;
+          console.log('[loadPreviousResponse] Loading response details:', latestResponseId);
+          this.formsService.getResponseById(latestResponseId).subscribe({
+            next: (response) => {
+              console.log(
+                '[loadPreviousResponse] Response loaded with',
+                response.fieldValues?.length || 0,
+                'field values',
+              );
+              if (!response.fieldValues) return;
+              this.prefillFromPreviousResponse(response);
+            },
+            error: (err) => {
+              console.error('[loadPreviousResponse] Error loading response details:', err);
+            },
+          });
+        },
+        error: (err) => {
+          console.error('[loadPreviousResponse] Error fetching responses:', err);
+        },
+      });
+  }
+
+  prefillFromPreviousResponse(response: any) {
+    console.log(
+      '[prefillFromPreviousResponse] Processing',
+      response.fieldValues.length,
+      'field values',
+    );
+    const valueMap: { [key: string]: any } = {};
+    response.fieldValues.forEach((fv: any) => {
+      valueMap[fv.formFieldId] = fv;
     });
+
+    setTimeout(() => {
+      let filledCount = 0;
+      let skippedCount = 0;
+      for (const field of this.fields) {
+        // Skip non-data fields
+        if (
+          field.fieldType === FieldType.Section ||
+          field.fieldType === FieldType.Label ||
+          field.fieldType === FieldType.PageBreak
+        )
+          continue;
+
+        const fv = valueMap[field.id];
+        if (!fv) continue;
+
+        const control = this.form.get(field.id);
+        if (!control) continue;
+
+        // Only fill if field is currently empty (don't overwrite linked data or user input)
+        if (!this.isFieldValueEmpty(control.value)) {
+          skippedCount++;
+          continue;
+        }
+
+        switch (field.fieldType) {
+          case FieldType.Number:
+          case FieldType.Decimal:
+          case FieldType.Rating:
+            if (fv.numericValue != null) {
+              control.setValue(fv.numericValue);
+              filledCount++;
+            }
+            break;
+          case FieldType.Date:
+            if (fv.dateValue) {
+              control.setValue(new Date(fv.dateValue).toISOString().split('T')[0]);
+              filledCount++;
+            }
+            break;
+          case FieldType.DateTime:
+            if (fv.dateValue) {
+              control.setValue(new Date(fv.dateValue).toISOString().slice(0, 16));
+              filledCount++;
+            }
+            break;
+          case FieldType.Checkbox:
+            if (fv.jsonValue) {
+              try {
+                const parsed = JSON.parse(fv.jsonValue);
+                if (Array.isArray(parsed)) {
+                  control.setValue(parsed);
+                  filledCount++;
+                  break;
+                }
+              } catch {
+                /* ignore */
+              }
+            }
+            if (fv.booleanValue != null) {
+              control.setValue(fv.booleanValue);
+              filledCount++;
+            }
+            break;
+          case FieldType.MultiSelect:
+            if (fv.jsonValue) {
+              try {
+                control.setValue(JSON.parse(fv.jsonValue));
+                filledCount++;
+              } catch {
+                /* ignore */
+              }
+            }
+            break;
+          case FieldType.Tags:
+            if (fv.jsonValue) {
+              control.setValue(fv.jsonValue);
+              filledCount++;
+            } else if (fv.textValue) {
+              control.setValue(fv.textValue);
+              filledCount++;
+            }
+            this.updateTagsEditorFromValue(field.id);
+            break;
+          default:
+            if (fv.textValue) {
+              control.setValue(fv.textValue);
+              filledCount++;
+            }
+        }
+      }
+      console.log(
+        '[prefillFromPreviousResponse] Filled',
+        filledCount,
+        'fields, skipped',
+        skippedCount,
+        'non-empty fields',
+      );
+    }, 150);
+  }
+
+  private isFieldValueEmpty(value: any): boolean {
+    if (value === '' || value === null || value === undefined) return true;
+    if (Array.isArray(value) && value.length === 0) return true;
+    if (value === false) return true;
+    return false;
   }
 
   applyLinkedData() {
+    console.log('[applyLinkedData] Applying', this.linkedData.length, 'items');
     for (const item of this.linkedData) {
       const control = this.form.get(item.fieldId);
-      if (!control) continue;
+      if (!control) {
+        console.log('[applyLinkedData] No control for field:', item.fieldId);
+        continue;
+      }
 
       // Only pre-fill if the field is currently empty
-      const currentValue = control.value;
-      if (currentValue !== '' && currentValue !== null && currentValue !== undefined) continue;
+      if (!this.isFieldValueEmpty(control.value)) {
+        console.log('[applyLinkedData] Field not empty, skipping:', item.fieldId, 'value:', control.value);
+        continue;
+      }
 
-      const field = this.fields.find(f => f.id === item.fieldId);
-      if (!field) continue;
+      const field = this.fields.find((f) => f.id === item.fieldId);
+      if (!field) {
+        console.log('[applyLinkedData] No field definition for:', item.fieldId);
+        continue;
+      }
 
+      console.log('[applyLinkedData] Applying to field:', field.label, 'type:', field.fieldType, 'jsonValue:', item.jsonValue?.substring(0, 50));
       // Apply value based on field type
       switch (field.fieldType) {
         case FieldType.Number:
@@ -414,12 +683,16 @@ export class FormRendererComponent implements OnInit, OnDestroy, AfterViewInit {
           break;
         case FieldType.Date:
           if (item.dateValue) {
-            control.setValue(new Date(item.dateValue).toISOString().split('T')[0], { emitEvent: true });
+            control.setValue(new Date(item.dateValue).toISOString().split('T')[0], {
+              emitEvent: true,
+            });
           }
           break;
         case FieldType.DateTime:
           if (item.dateValue) {
-            control.setValue(new Date(item.dateValue).toISOString().slice(0, 16), { emitEvent: true });
+            control.setValue(new Date(item.dateValue).toISOString().slice(0, 16), {
+              emitEvent: true,
+            });
           }
           break;
         case FieldType.Checkbox:
@@ -428,16 +701,29 @@ export class FormRendererComponent implements OnInit, OnDestroy, AfterViewInit {
           } else if (item.jsonValue) {
             try {
               control.setValue(JSON.parse(item.jsonValue), { emitEvent: true });
-            } catch { /* ignore */ }
+            } catch {
+              /* ignore */
+            }
           }
           break;
         case FieldType.MultiSelect:
-        case FieldType.Tags:
           if (item.jsonValue) {
             try {
               control.setValue(JSON.parse(item.jsonValue), { emitEvent: true });
-            } catch { /* ignore */ }
+            } catch {
+              /* ignore */
+            }
           }
+          break;
+        case FieldType.Tags:
+          if (item.jsonValue) {
+            // Tags control stores the raw JSON string, not parsed object
+            control.setValue(item.jsonValue, { emitEvent: true });
+          } else if (item.textValue) {
+            control.setValue(item.textValue, { emitEvent: true });
+          }
+          // Render the tags in the contenteditable editor
+          setTimeout(() => this.updateTagsEditorFromValue(field.id), 100);
           break;
         default:
           if (item.textValue) {
@@ -463,6 +749,48 @@ export class FormRendererComponent implements OnInit, OnDestroy, AfterViewInit {
     }
     this.linkedFieldIds.delete(fieldId);
     delete this.linkedDataMap[fieldId];
+  }
+
+  // ===== Patient Search (inline selector) =====
+  onPatientSearchInput(query: string) {
+    this.patientSearchQuery = query;
+    this.patientSearchSubject.next(query);
+  }
+
+  selectPatient(patient: Patient) {
+    this.selectedPatient = patient;
+    this.patientId = patient.id;
+    this.patientSearchQuery = '';
+    this.showPatientDropdown = false;
+    this.patientSearchResults = [];
+    // Now load linked data for this patient
+    this.loadLinkedData();
+    // Update URL query params without reloading
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { patientId: patient.id },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
+  }
+
+  clearPatient() {
+    this.selectedPatient = null;
+    this.patientId = null;
+    this.linkedData = [];
+    this.linkedDataMap = {};
+    this.linkedFieldIds = new Set();
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { patientId: null },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
+  }
+
+  hidePatientDropdown() {
+    // Delay to allow click on dropdown item
+    setTimeout(() => (this.showPatientDropdown = false), 200);
   }
 
   // ===== Multi-page Support =====
@@ -1064,6 +1392,9 @@ export class FormRendererComponent implements OnInit, OnDestroy, AfterViewInit {
 
   private restoreDraft() {
     if (!this.templateId) return;
+    // Don't restore draft when we have a patient context — loadPreviousResponse handles that
+    if (this.route.snapshot.queryParams['patientId']) return;
+
     const draftKey = `form_draft_${this.templateId}`;
 
     try {
@@ -1086,9 +1417,7 @@ export class FormRendererComponent implements OnInit, OnDestroy, AfterViewInit {
         if (draftData.values && Object.keys(draftData.values).length > 0) {
           // Check if form has any user-entered values already
           const formValues = this.form.getRawValue();
-          const hasValues = Object.values(formValues).some(
-            (v) => v !== '' && v !== null && v !== undefined && v !== false,
-          );
+          const hasValues = Object.values(formValues).some((v) => !this.isFieldValueEmpty(v));
           if (hasValues) return; // Don't overwrite if user already entered data
 
           this.form.patchValue(draftData.values, { emitEvent: false });
@@ -1318,7 +1647,11 @@ export class FormRendererComponent implements OnInit, OnDestroy, AfterViewInit {
             const lookupOpts = this.getOptions(field);
             const lookupOpt = lookupOpts.find((o) => o.value === value);
             if (lookupOpt) {
-              details.push({ value: lookupOpt.value, label: lookupOpt.label, conceptId: (lookupOpt as any).conceptId });
+              details.push({
+                value: lookupOpt.value,
+                label: lookupOpt.label,
+                conceptId: (lookupOpt as any).conceptId,
+              });
             }
           }
           break;
@@ -1344,11 +1677,15 @@ export class FormRendererComponent implements OnInit, OnDestroy, AfterViewInit {
       fieldValues.push(fieldValue);
     }
 
-    const request = {
+    const request: any = {
       formTemplateId: this.templateId,
       submittedByUserId: null, // Will be set from auth when available
       fieldValues,
     };
+
+    // Include patient/cycle context so backend creates concept snapshots
+    if (this.patientId) request.patientId = this.patientId;
+    if (this.cycleId) request.cycleId = this.cycleId;
 
     console.log('Submitting form:', JSON.stringify(request, null, 2));
 
@@ -1358,7 +1695,11 @@ export class FormRendererComponent implements OnInit, OnDestroy, AfterViewInit {
         next: () => {
           this.isSubmitting = false;
           alert('Đã cập nhật phản hồi thành công!');
-          this.router.navigate(['/forms/responses', this.responseId]);
+          if (this.patientId) {
+            this.router.navigate(['/patients', this.patientId]);
+          } else {
+            this.router.navigate(['/forms/responses', this.responseId]);
+          }
         },
         error: (err) => {
           this.isSubmitting = false;
@@ -1373,7 +1714,11 @@ export class FormRendererComponent implements OnInit, OnDestroy, AfterViewInit {
           this.isSubmitting = false;
           this.clearDraft(); // Clear auto-saved draft on successful submit
           alert('Đã gửi phản hồi thành công!');
-          this.router.navigate(['/forms']);
+          if (this.patientId) {
+            this.router.navigate(['/patients', this.patientId]);
+          } else {
+            this.router.navigate(['/forms']);
+          }
         },
         error: (err) => {
           this.isSubmitting = false;
@@ -1385,7 +1730,11 @@ export class FormRendererComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   cancel() {
-    this.router.navigate(['/forms']);
+    if (this.patientId) {
+      this.router.navigate(['/patients', this.patientId]);
+    } else {
+      this.router.navigate(['/forms']);
+    }
   }
 
   saveDraftToDb() {
@@ -1416,12 +1765,16 @@ export class FormRendererComponent implements OnInit, OnDestroy, AfterViewInit {
       fieldValues.push(fieldValue);
     }
 
-    const request = {
+    const request: any = {
       formTemplateId: this.templateId,
       submittedByUserId: null as string | null,
       fieldValues,
       isDraft: true,
     };
+
+    // Include patient/cycle context in draft too
+    if (this.patientId) request.patientId = this.patientId;
+    if (this.cycleId) request.cycleId = this.cycleId;
 
     this.formsService.submitResponse(request).subscribe({
       next: (resp) => {
@@ -1463,20 +1816,24 @@ export class FormRendererComponent implements OnInit, OnDestroy, AfterViewInit {
       case FieldType.Checkbox: {
         const opts = this.getOptions(field);
         if (opts.length > 0 && Array.isArray(value)) {
-          return value.map((v: string) => {
-            const opt = opts.find((o: any) => o.value === v);
-            return opt?.label ?? v;
-          }).join(', ');
+          return value
+            .map((v: string) => {
+              const opt = opts.find((o: any) => o.value === v);
+              return opt?.label ?? v;
+            })
+            .join(', ');
         }
         return typeof value === 'boolean' ? (value ? 'Có' : 'Không') : String(value);
       }
       case FieldType.MultiSelect: {
         if (!Array.isArray(value)) return '—';
         const opts = this.getOptions(field);
-        return value.map((v: string) => {
-          const opt = opts.find((o: any) => o.value === v);
-          return opt?.label ?? v;
-        }).join(', ');
+        return value
+          .map((v: string) => {
+            const opt = opts.find((o: any) => o.value === v);
+            return opt?.label ?? v;
+          })
+          .join(', ');
       }
       case FieldType.Rating:
         return '⭐'.repeat(value || 0);
@@ -1508,12 +1865,13 @@ export class FormRendererComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   getReviewFields(): FormField[] {
-    return this.fields.filter(f =>
-      f.fieldType !== FieldType.Section &&
-      f.fieldType !== FieldType.Label &&
-      f.fieldType !== FieldType.PageBreak &&
-      f.fieldType !== FieldType.Hidden &&
-      this.isFieldVisible(f.id)
+    return this.fields.filter(
+      (f) =>
+        f.fieldType !== FieldType.Section &&
+        f.fieldType !== FieldType.Label &&
+        f.fieldType !== FieldType.PageBreak &&
+        f.fieldType !== FieldType.Hidden &&
+        this.isFieldVisible(f.id),
     );
   }
 
@@ -1531,7 +1889,7 @@ export class FormRendererComponent implements OnInit, OnDestroy, AfterViewInit {
 
   // ===== Calculated Fields =====
   evaluateCalculatedFields() {
-    const calcFields = this.fields.filter(f => f.fieldType === FieldType.Calculated);
+    const calcFields = this.fields.filter((f) => f.fieldType === FieldType.Calculated);
     if (calcFields.length === 0) return;
 
     const formValues = this.form.getRawValue();
@@ -1563,7 +1921,9 @@ export class FormRendererComponent implements OnInit, OnDestroy, AfterViewInit {
         const decimalPlaces = config.decimalPlaces ?? 2;
         const unit = config.unit || '';
 
-        const displayValue = isNaN(result) ? 'N/A' : `${Number(result).toFixed(decimalPlaces)}${unit ? ' ' + unit : ''}`;
+        const displayValue = isNaN(result)
+          ? 'N/A'
+          : `${Number(result).toFixed(decimalPlaces)}${unit ? ' ' + unit : ''}`;
 
         const control = this.form.get(field.id);
         if (control && control.value !== displayValue) {
@@ -1580,7 +1940,12 @@ export class FormRendererComponent implements OnInit, OnDestroy, AfterViewInit {
   getSliderConfig(field: FormField): { min: number; max: number; step: number; unit: string } {
     try {
       const config = field.optionsJson ? JSON.parse(field.optionsJson) : {};
-      return { min: config.min ?? 0, max: config.max ?? 100, step: config.step ?? 1, unit: config.unit || '' };
+      return {
+        min: config.min ?? 0,
+        max: config.max ?? 100,
+        step: config.step ?? 1,
+        unit: config.unit || '',
+      };
     } catch {
       return { min: 0, max: 100, step: 1, unit: '' };
     }
@@ -1615,8 +1980,14 @@ export class FormRendererComponent implements OnInit, OnDestroy, AfterViewInit {
       canvas.addEventListener('mouseup', () => this.endSignatureDraw(fieldId));
       canvas.addEventListener('mouseleave', () => this.endSignatureDraw(fieldId));
       // Touch support
-      canvas.addEventListener('touchstart', (e) => { e.preventDefault(); this.startSignatureDraw(fieldId, e.touches[0]); });
-      canvas.addEventListener('touchmove', (e) => { e.preventDefault(); this.drawSignature(fieldId, e.touches[0]); });
+      canvas.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        this.startSignatureDraw(fieldId, e.touches[0]);
+      });
+      canvas.addEventListener('touchmove', (e) => {
+        e.preventDefault();
+        this.drawSignature(fieldId, e.touches[0]);
+      });
       canvas.addEventListener('touchend', () => this.endSignatureDraw(fieldId));
     }, 100);
   }
@@ -1677,7 +2048,9 @@ export class FormRendererComponent implements OnInit, OnDestroy, AfterViewInit {
     }
 
     this.lookupSearchResults[field.id] = options
-      .filter(opt => opt.label.toLowerCase().includes(query) || opt.value.toLowerCase().includes(query))
+      .filter(
+        (opt) => opt.label.toLowerCase().includes(query) || opt.value.toLowerCase().includes(query),
+      )
       .slice(0, 10);
   }
 
@@ -1692,14 +2065,18 @@ export class FormRendererComponent implements OnInit, OnDestroy, AfterViewInit {
     const val = this.form.get(field.id)?.value;
     if (!val) return '';
     const opts = this.getOptions(field);
-    const opt = opts.find(o => o.value === val);
+    const opt = opts.find((o) => o.value === val);
     return opt?.label || val;
   }
 
   // ===== Repeater Helpers =====
   repeaterRows: { [key: string]: any[][] } = {};
 
-  getRepeaterConfig(field: FormField): { minRows: number; maxRows: number; fields: { key: string; label: string; type: string }[] } {
+  getRepeaterConfig(field: FormField): {
+    minRows: number;
+    maxRows: number;
+    fields: { key: string; label: string; type: string }[];
+  } {
     try {
       const config = field.optionsJson ? JSON.parse(field.optionsJson) : {};
       return {
