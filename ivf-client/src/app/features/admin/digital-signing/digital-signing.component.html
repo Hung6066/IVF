@@ -1,0 +1,1070 @@
+<div class="dashboard-layout">
+  <header class="page-header">
+    <div class="header-title">
+      <h1>🔏 Quản lý Ký số</h1>
+      <p class="subtitle">EJBCA Certificate Authority & SignServer Document Signing</p>
+    </div>
+    <div class="header-actions">
+      <button
+        class="btn-secondary"
+        [class.active]="autoRefreshEnabled"
+        (click)="toggleAutoRefresh()"
+      >
+        {{ autoRefreshEnabled ? '⏸ Dừng auto-refresh' : '🔄 Auto-refresh' }}
+      </button>
+      <button class="btn-primary" (click)="loadDashboard()" [disabled]="loading()">
+        {{ loading() ? '⏳ Đang tải...' : '🔄 Làm mới' }}
+      </button>
+    </div>
+  </header>
+
+  <!-- Tab Navigation -->
+  <div class="tab-nav">
+    <button
+      class="tab-btn"
+      [class.active]="activeTab === 'overview'"
+      (click)="switchTab('overview')"
+    >
+      📊 Tổng quan
+    </button>
+    <button
+      class="tab-btn"
+      [class.active]="activeTab === 'signserver'"
+      (click)="switchTab('signserver')"
+    >
+      ✍️ SignServer
+    </button>
+    <button class="tab-btn" [class.active]="activeTab === 'ejbca'" (click)="switchTab('ejbca')">
+      🏛️ EJBCA
+    </button>
+    <button class="tab-btn" [class.active]="activeTab === 'config'" (click)="switchTab('config')">
+      ⚙️ Cấu hình
+    </button>
+    <button
+      class="tab-btn"
+      [class.active]="activeTab === 'signatures'"
+      (click)="switchTab('signatures')"
+    >
+      ✍️ Chữ ký
+    </button>
+    <button class="tab-btn" [class.active]="activeTab === 'test'" (click)="switchTab('test')">
+      🧪 Kiểm tra
+    </button>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- TAB: Overview -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  @if (activeTab === 'overview') {
+    <div class="tab-content">
+      @if (loading()) {
+        <div class="loading-state">
+          <div class="spinner"></div>
+          <p>Đang tải thông tin...</p>
+        </div>
+      } @else if (dashboard()) {
+        <!-- Status Cards -->
+        <div class="stats-grid">
+          <div class="stat-card" [class]="getStatusClass(dashboard()!.signServer.status)">
+            <div class="stat-icon">✍️</div>
+            <div class="stat-info">
+              <h3>SignServer</h3>
+              <span class="stat-badge" [class]="getStatusClass(dashboard()!.signServer.status)">
+                {{ getStatusIcon(dashboard()!.signServer.status) }}
+                {{ getStatusLabel(dashboard()!.signServer.status) }}
+              </span>
+              <small class="stat-url">{{ dashboard()!.signServer.url }}</small>
+            </div>
+            <button
+              class="btn-icon"
+              title="Mở Admin UI"
+              (click)="
+                openExternalUrl(
+                  dashboard()!
+                    .signing.signServerUrl.replace('http://', 'https://')
+                    .replace(':8080', ':8443') + '/adminweb/'
+                )
+              "
+            >
+              🔗
+            </button>
+          </div>
+
+          <div class="stat-card" [class]="getStatusClass(dashboard()!.ejbca.status)">
+            <div class="stat-icon">🏛️</div>
+            <div class="stat-info">
+              <h3>EJBCA</h3>
+              <span class="stat-badge" [class]="getStatusClass(dashboard()!.ejbca.status)">
+                {{ getStatusIcon(dashboard()!.ejbca.status) }}
+                {{ getStatusLabel(dashboard()!.ejbca.status) }}
+              </span>
+              <small class="stat-url">{{ dashboard()!.ejbca.url }}</small>
+            </div>
+            <button
+              class="btn-icon"
+              title="Mở Admin UI"
+              (click)="openExternalUrl(dashboard()!.signing.ejbcaUrl + '/adminweb/')"
+            >
+              🔗
+            </button>
+          </div>
+
+          <div
+            class="stat-card"
+            [class]="dashboard()!.signing.enabled ? 'status-healthy' : 'status-disabled'"
+          >
+            <div class="stat-icon">🔏</div>
+            <div class="stat-info">
+              <h3>Ký số PDF</h3>
+              <span
+                class="stat-badge"
+                [class]="dashboard()!.signing.enabled ? 'status-healthy' : 'status-disabled'"
+              >
+                {{ dashboard()!.signing.enabled ? '✅ Đã bật' : '⏸️ Đã tắt' }}
+              </span>
+              <small>Worker: {{ dashboard()!.signing.workerName }}</small>
+            </div>
+          </div>
+
+          <div
+            class="stat-card"
+            [class]="dashboard()!.health.isHealthy ? 'status-healthy' : 'status-unhealthy'"
+          >
+            <div class="stat-icon">💚</div>
+            <div class="stat-info">
+              <h3>Trạng thái chung</h3>
+              <span
+                class="stat-badge"
+                [class]="dashboard()!.health.isHealthy ? 'status-healthy' : 'status-unhealthy'"
+              >
+                {{ dashboard()!.health.isHealthy ? '✅ Sẵn sàng' : '⚠️ Chưa sẵn sàng' }}
+              </span>
+              @if (dashboard()!.health.errorMessage) {
+                <small class="error-text">{{ dashboard()!.health.errorMessage }}</small>
+              }
+            </div>
+          </div>
+        </div>
+
+        <!-- Infrastructure Diagram -->
+        <div class="card">
+          <div class="section-header">
+            <h2>🏗️ Kiến trúc hệ thống</h2>
+          </div>
+          <div class="infra-diagram">
+            <div class="infra-node ejbca-node">
+              <div class="node-header">
+                <span class="node-icon">🏛️</span>
+                <span>EJBCA</span>
+              </div>
+              <div class="node-body">
+                <small>Certificate Authority</small>
+                <span class="node-status" [class]="getStatusClass(dashboard()!.ejbca.status)">
+                  {{ getStatusIcon(dashboard()!.ejbca.status) }}
+                </span>
+              </div>
+            </div>
+
+            <div class="infra-arrow">→ phát hành cert →</div>
+
+            <div class="infra-node signserver-node">
+              <div class="node-header">
+                <span class="node-icon">✍️</span>
+                <span>SignServer</span>
+              </div>
+              <div class="node-body">
+                <small>PDFSigner Worker</small>
+                <span class="node-status" [class]="getStatusClass(dashboard()!.signServer.status)">
+                  {{ getStatusIcon(dashboard()!.signServer.status) }}
+                </span>
+              </div>
+            </div>
+
+            <div class="infra-arrow">← REST API ←</div>
+
+            <div class="infra-node api-node">
+              <div class="node-header">
+                <span class="node-icon">🖥️</span>
+                <span>IVF API</span>
+              </div>
+              <div class="node-body">
+                <small>DigitalSigningService</small>
+                <span class="node-status status-healthy">✅</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Info -->
+        <div class="card">
+          <div class="section-header">
+            <h2>📋 Thông tin cấu hình</h2>
+          </div>
+          <div class="info-grid">
+            <div class="info-item">
+              <label>SignServer URL</label>
+              <span>{{ dashboard()!.signing.signServerUrl }}</span>
+            </div>
+            <div class="info-item">
+              <label>EJBCA URL</label>
+              <span>{{ dashboard()!.signing.ejbcaUrl }}</span>
+            </div>
+            <div class="info-item">
+              <label>Worker</label>
+              <span
+                >{{ dashboard()!.signing.workerName }} (ID:
+                {{ dashboard()!.signing.workerId || 'auto' }})</span
+              >
+            </div>
+            <div class="info-item">
+              <label>Lý do ký mặc định</label>
+              <span>{{ dashboard()!.signing.defaultReason }}</span>
+            </div>
+            <div class="info-item">
+              <label>Vị trí mặc định</label>
+              <span>{{ dashboard()!.signing.defaultLocation }}</span>
+            </div>
+            <div class="info-item">
+              <label>Chữ ký hiển thị</label>
+              <span>{{ dashboard()!.signing.addVisibleSignature ? 'Có' : 'Không' }}</span>
+            </div>
+            <div class="info-item">
+              <label>Timeout</label>
+              <span>{{ dashboard()!.signing.timeoutSeconds }}s</span>
+            </div>
+            @if (dashboard()!.health.certificateSubject) {
+              <div class="info-item">
+                <label>Chứng thư số</label>
+                <span>{{ dashboard()!.health.certificateSubject }}</span>
+              </div>
+            }
+            @if (dashboard()!.health.certificateExpiry) {
+              <div class="info-item">
+                <label>Hết hạn</label>
+                <span>{{ formatDateTime(dashboard()!.health.certificateExpiry!) }}</span>
+              </div>
+            }
+          </div>
+        </div>
+      } @else {
+        <div class="empty-state-box">
+          <p>⚠️ Không thể tải thông tin ký số. Kiểm tra kết nối API.</p>
+          <button class="btn-primary" (click)="loadDashboard()">Thử lại</button>
+        </div>
+      }
+    </div>
+  }
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- TAB: SignServer -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  @if (activeTab === 'signserver') {
+    <div class="tab-content">
+      <!-- SignServer Health -->
+      <div class="card">
+        <div class="section-header">
+          <h2>✍️ SignServer Health</h2>
+          <button
+            class="btn-secondary"
+            (click)="refreshSignServerHealth()"
+            [disabled]="refreshingHealth()"
+          >
+            {{ refreshingHealth() ? '⏳' : '🔄' }} Kiểm tra
+          </button>
+        </div>
+
+        @if (signServerHealth()) {
+          <div class="health-detail">
+            <div class="health-row">
+              <span class="health-label">Kết nối</span>
+              <span
+                class="health-value"
+                [class.healthy]="signServerHealth()!.reachable"
+                [class.error]="!signServerHealth()!.reachable"
+              >
+                {{
+                  signServerHealth()!.reachable ? '✅ Kết nối thành công' : '❌ Không kết nối được'
+                }}
+              </span>
+            </div>
+            <div class="health-row">
+              <span class="health-label">HTTP Status</span>
+              <span class="health-value">{{ signServerHealth()!.statusCode }}</span>
+            </div>
+            <div class="health-row">
+              <span class="health-label">Trạng thái</span>
+              <span
+                class="health-value"
+                [class.healthy]="signServerHealth()!.healthy"
+                [class.error]="!signServerHealth()!.healthy"
+              >
+                {{ signServerHealth()!.healthy ? '✅ Healthy' : '⚠️ Unhealthy' }}
+              </span>
+            </div>
+            <div class="health-row">
+              <span class="health-label">URL</span>
+              <span class="health-value mono">{{ signServerHealth()!.url }}</span>
+            </div>
+            @if (signServerHealth()!.body) {
+              <div class="health-row">
+                <span class="health-label">Response</span>
+                <pre class="health-body">{{ signServerHealth()!.body }}</pre>
+              </div>
+            }
+          </div>
+        } @else {
+          <p class="muted">Nhấn "Kiểm tra" để kiểm tra trạng thái SignServer.</p>
+        }
+      </div>
+
+      <!-- Workers -->
+      <div class="card">
+        <div class="section-header">
+          <h2>👷 Workers</h2>
+          <button class="btn-secondary" (click)="loadWorkers()">🔄 Tải lại</button>
+        </div>
+
+        @if (workers()) {
+          @if (workers().workers?.length > 0) {
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Tên</th>
+                  <th>Loại</th>
+                  <th>Trạng thái</th>
+                  <th>Số lần ký</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (worker of workers().workers; track worker.id || $index) {
+                  <tr>
+                    <td>{{ worker.id }}</td>
+                    <td>
+                      <strong>{{ worker.name }}</strong>
+                    </td>
+                    <td>{{ worker.type || 'PDFSigner' }}</td>
+                    <td>
+                      <span
+                        class="status-badge"
+                        [class.active]="worker.status === 'Active'"
+                        [class.offline]="worker.status !== 'Active'"
+                      >
+                        {{ worker.status || 'N/A' }}
+                      </span>
+                    </td>
+                    <td>{{ worker.signings ?? '-' }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          } @else {
+            <div class="info-message">
+              <p>
+                📋 Worker mặc định:
+                <strong>{{ dashboard()?.signing?.workerName || 'PDFSigner' }}</strong> (ID:
+                {{ dashboard()?.signing?.workerId || 1 }})
+              </p>
+              @if (workers().error) {
+                <p class="muted">ℹ️ REST API workers list không khả dụng: {{ workers().error }}</p>
+              }
+            </div>
+          }
+        } @else {
+          <p class="muted">Nhấn "Tải lại" để xem danh sách workers.</p>
+        }
+      </div>
+
+      <!-- External Links -->
+      <div class="card">
+        <div class="section-header">
+          <h2>🔗 Liên kết quản trị</h2>
+        </div>
+        <div class="links-grid">
+          <button
+            class="link-card"
+            (click)="openExternalUrl('https://localhost:9443/signserver/adminweb/')"
+          >
+            <span class="link-icon">🌐</span>
+            <span class="link-text">
+              <strong>SignServer Admin UI</strong>
+              <small>https://localhost:9443/signserver/adminweb/</small>
+            </span>
+          </button>
+          <button
+            class="link-card"
+            (click)="
+              openExternalUrl('https://localhost:9443/signserver/healthcheck/signserverhealth')
+            "
+          >
+            <span class="link-icon">💚</span>
+            <span class="link-text">
+              <strong>Health Check</strong>
+              <small>SignServer healthcheck endpoint</small>
+            </span>
+          </button>
+          <button
+            class="link-card"
+            (click)="openExternalUrl('http://localhost:9080/signserver/process')"
+          >
+            <span class="link-icon">⚡</span>
+            <span class="link-text">
+              <strong>REST Process API</strong>
+              <small>http://localhost:9080/signserver/process</small>
+            </span>
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- TAB: EJBCA -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  @if (activeTab === 'ejbca') {
+    <div class="tab-content">
+      <!-- EJBCA Health -->
+      <div class="card">
+        <div class="section-header">
+          <h2>🏛️ EJBCA Health</h2>
+          <button
+            class="btn-secondary"
+            (click)="refreshEjbcaHealth()"
+            [disabled]="refreshingHealth()"
+          >
+            {{ refreshingHealth() ? '⏳' : '🔄' }} Kiểm tra
+          </button>
+        </div>
+
+        @if (ejbcaHealth()) {
+          <div class="health-detail">
+            <div class="health-row">
+              <span class="health-label">Kết nối</span>
+              <span
+                class="health-value"
+                [class.healthy]="ejbcaHealth()!.reachable"
+                [class.error]="!ejbcaHealth()!.reachable"
+              >
+                {{ ejbcaHealth()!.reachable ? '✅ Kết nối thành công' : '❌ Không kết nối được' }}
+              </span>
+            </div>
+            <div class="health-row">
+              <span class="health-label">HTTP Status</span>
+              <span class="health-value">{{ ejbcaHealth()!.statusCode }}</span>
+            </div>
+            <div class="health-row">
+              <span class="health-label">Trạng thái</span>
+              <span
+                class="health-value"
+                [class.healthy]="ejbcaHealth()!.healthy"
+                [class.error]="!ejbcaHealth()!.healthy"
+              >
+                {{ ejbcaHealth()!.healthy ? '✅ Healthy' : '⚠️ Unhealthy' }}
+              </span>
+            </div>
+            <div class="health-row">
+              <span class="health-label">URL</span>
+              <span class="health-value mono">{{ ejbcaHealth()!.url }}</span>
+            </div>
+            @if (ejbcaHealth()!.body) {
+              <div class="health-row">
+                <span class="health-label">Response</span>
+                <pre class="health-body">{{ ejbcaHealth()!.body }}</pre>
+              </div>
+            }
+          </div>
+        } @else {
+          <p class="muted">Nhấn "Kiểm tra" để kiểm tra trạng thái EJBCA.</p>
+        }
+      </div>
+
+      <!-- Certificate Authorities -->
+      <div class="card">
+        <div class="section-header">
+          <h2>📜 Certificate Authorities</h2>
+          <button class="btn-secondary" (click)="loadEjbcaCAs()">🔄 Tải lại</button>
+        </div>
+
+        @if (ejbcaCAs()) {
+          @if (ejbcaCAs().certificate_authorities?.length > 0) {
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Tên CA</th>
+                  <th>Subject DN</th>
+                  <th>Trạng thái</th>
+                  <th>Hết hạn</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (ca of ejbcaCAs().certificate_authorities; track ca.name || $index) {
+                  <tr>
+                    <td>
+                      <strong>{{ ca.name }}</strong>
+                    </td>
+                    <td class="mono small">{{ ca.subject_dn || ca.subjectDn || '-' }}</td>
+                    <td>
+                      <span class="status-badge active">{{ ca.status || 'Active' }}</span>
+                    </td>
+                    <td>{{ ca.expiration_date ? formatDateTime(ca.expiration_date) : '-' }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          } @else {
+            <div class="info-message">
+              <p>ℹ️ Chưa có CA nào hoặc REST API EJBCA yêu cầu client certificate.</p>
+              @if (ejbcaCAs().message) {
+                <p class="muted">{{ ejbcaCAs().message }}</p>
+              }
+              @if (ejbcaCAs().error) {
+                <p class="muted">{{ ejbcaCAs().error }}</p>
+              }
+            </div>
+          }
+        } @else {
+          <p class="muted">Nhấn "Tải lại" để xem danh sách CA.</p>
+        }
+      </div>
+
+      <!-- External Links -->
+      <div class="card">
+        <div class="section-header">
+          <h2>🔗 Liên kết quản trị</h2>
+        </div>
+        <div class="links-grid">
+          <button
+            class="link-card"
+            (click)="openExternalUrl('https://localhost:8443/ejbca/adminweb/')"
+          >
+            <span class="link-icon">🌐</span>
+            <span class="link-text">
+              <strong>EJBCA Admin UI</strong>
+              <small>https://localhost:8443/ejbca/adminweb/</small>
+            </span>
+          </button>
+          <button
+            class="link-card"
+            (click)="openExternalUrl('https://localhost:8443/ejbca/publicweb/')"
+          >
+            <span class="link-icon">🌍</span>
+            <span class="link-text">
+              <strong>EJBCA Public Web</strong>
+              <small>Enrollment & certificate info</small>
+            </span>
+          </button>
+          <button
+            class="link-card"
+            (click)="
+              openExternalUrl('https://localhost:8443/ejbca/publicweb/healthcheck/ejbcahealth')
+            "
+          >
+            <span class="link-icon">💚</span>
+            <span class="link-text">
+              <strong>Health Check</strong>
+              <small>EJBCA healthcheck endpoint</small>
+            </span>
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- TAB: Config -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  @if (activeTab === 'config') {
+    <div class="tab-content">
+      <div class="card">
+        <div class="section-header">
+          <h2>⚙️ Cấu hình ký số</h2>
+          <button class="btn-secondary" (click)="loadConfig()">🔄 Tải lại</button>
+        </div>
+
+        @if (config()) {
+          <div class="config-grid">
+            <div class="config-section">
+              <h3>🔏 Tổng quan</h3>
+              <div class="config-item">
+                <label>Trạng thái</label>
+                <span
+                  class="config-value"
+                  [class.enabled]="config()!.enabled"
+                  [class.disabled]="!config()!.enabled"
+                >
+                  {{ config()!.enabled ? '✅ Đã bật' : '⏸️ Đã tắt' }}
+                </span>
+              </div>
+              <div class="config-item">
+                <label>SignServer URL</label>
+                <code>{{ config()!.signServerUrl }}</code>
+              </div>
+              <div class="config-item">
+                <label>EJBCA URL</label>
+                <code>{{ config()!.ejbcaUrl }}</code>
+              </div>
+              <div class="config-item">
+                <label>Timeout</label>
+                <span>{{ config()!.timeoutSeconds }} giây</span>
+              </div>
+              <div class="config-item">
+                <label>Bỏ qua TLS Validation</label>
+                <span>{{ config()!.skipTlsValidation ? 'Có (Dev mode)' : 'Không' }}</span>
+              </div>
+              <div class="config-item">
+                <label>Client Certificate</label>
+                <span>{{ config()!.hasClientCertificate ? 'Đã cấu hình' : 'Chưa có' }}</span>
+              </div>
+            </div>
+
+            <div class="config-section">
+              <h3>✍️ Worker</h3>
+              <div class="config-item">
+                <label>Worker Name</label>
+                <code>{{ config()!.workerName }}</code>
+              </div>
+              <div class="config-item">
+                <label>Worker ID</label>
+                <span>{{ config()!.workerId || 'Auto' }}</span>
+              </div>
+            </div>
+
+            <div class="config-section">
+              <h3>📝 Chữ ký PDF</h3>
+              <div class="config-item">
+                <label>Lý do ký mặc định</label>
+                <span>{{ config()!.defaultReason }}</span>
+              </div>
+              <div class="config-item">
+                <label>Vị trí mặc định</label>
+                <span>{{ config()!.defaultLocation }}</span>
+              </div>
+              <div class="config-item">
+                <label>Thông tin liên hệ</label>
+                <span>{{ config()!.defaultContactInfo }}</span>
+              </div>
+              <div class="config-item">
+                <label>Chữ ký hiển thị</label>
+                <span>{{ config()!.addVisibleSignature ? 'Có' : 'Không' }}</span>
+              </div>
+              <div class="config-item">
+                <label>Trang chữ ký</label>
+                <span>{{
+                  config()!.visibleSignaturePage === 0
+                    ? 'Trang cuối'
+                    : 'Trang ' + config()!.visibleSignaturePage
+                }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="config-note">
+            <p>
+              💡 <strong>Lưu ý:</strong> Để thay đổi cấu hình, chỉnh sửa mục
+              <code>DigitalSigning</code> trong <code>appsettings.json</code> hoặc thiết lập biến
+              môi trường Docker tương ứng, sau đó khởi động lại API.
+            </p>
+          </div>
+        } @else {
+          <p class="muted">Đang tải cấu hình...</p>
+        }
+      </div>
+
+      <!-- API Endpoints Reference -->
+      <div class="card">
+        <div class="section-header">
+          <h2>🔌 API Endpoints</h2>
+        </div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Method</th>
+              <th>Endpoint</th>
+              <th>Mô tả</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="method-badge get">GET</span></td>
+              <td class="mono">/api/signing/health</td>
+              <td>Kiểm tra sức khoẻ SignServer</td>
+            </tr>
+            <tr>
+              <td><span class="method-badge post">POST</span></td>
+              <td class="mono">/api/signing/sign-pdf</td>
+              <td>Upload & ký số PDF (multipart/form-data)</td>
+            </tr>
+            <tr>
+              <td><span class="method-badge get">GET</span></td>
+              <td class="mono">/api/forms/responses/{{ '{' }}id{{ '}' }}/export-pdf?sign=true</td>
+              <td>Xuất form response PDF có ký số</td>
+            </tr>
+            <tr>
+              <td><span class="method-badge get">GET</span></td>
+              <td class="mono">/api/forms/reports/{{ '{' }}id{{ '}' }}/export-pdf?sign=true</td>
+              <td>Xuất report PDF có ký số</td>
+            </tr>
+            <tr>
+              <td><span class="method-badge get">GET</span></td>
+              <td class="mono">/api/signing/config</td>
+              <td>Xem thông tin cấu hình ký số</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  }
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- TAB: User Signatures                              -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  @if (activeTab === 'signatures') {
+    <div class="tab-content">
+      <!-- Signatures List -->
+      <div class="card">
+        <div class="section-header">
+          <h2>✍️ Chữ ký người dùng</h2>
+          <button class="btn-secondary" (click)="loadUserSignatures()">🔄 Tải lại</button>
+        </div>
+
+        @if (userSignatures().length > 0) {
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Người dùng</th>
+                <th>Vai trò</th>
+                <th>Phòng ban</th>
+                <th>Chữ ký tay</th>
+                <th>Trạng thái chứng thư</th>
+                <th>Worker</th>
+                <th>Hết hạn</th>
+                <th>Thao tác</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (sig of userSignatures(); track sig.userId) {
+                <tr>
+                  <td>
+                    <strong>{{ sig.userFullName || 'N/A' }}</strong>
+                  </td>
+                  <td>{{ sig.userRole || '-' }}</td>
+                  <td>{{ sig.userDepartment || '-' }}</td>
+                  <td>
+                    @if (sig.hasSignatureImage) {
+                      <div class="sig-preview-cell">
+                        <img
+                          [src]="signatureService.getUserSignatureImageUrl(sig.userId)"
+                          alt="Chữ ký"
+                          class="sig-preview-thumb"
+                        />
+                      </div>
+                    } @else {
+                      <span class="muted">Chưa có</span>
+                    }
+                  </td>
+                  <td>
+                    <span class="cert-badge" [class]="getCertStatusClass(sig.certStatus)">
+                      {{ getCertStatusLabel(sig.certStatus) }}
+                    </span>
+                  </td>
+                  <td class="mono small">{{ sig.workerName || '-' }}</td>
+                  <td>{{ sig.certificateExpiry ? formatDateTime(sig.certificateExpiry) : '-' }}</td>
+                  <td>
+                    <div class="action-btns">
+                      <button
+                        class="btn-sm btn-outline"
+                        (click)="openSignaturePad(sig.userId)"
+                        [title]="sig.hasSignatureImage ? 'Cập nhật chữ ký tay' : 'Tải chữ ký tay'"
+                      >
+                        {{ sig.hasSignatureImage ? '🖊️' : '➕' }}
+                      </button>
+                      @if (sig.hasSignatureImage) {
+                        <button
+                          class="btn-sm btn-outline"
+                          (click)="provisionCertificate(sig.userId)"
+                          [disabled]="provisioningCert()"
+                          title="Cấp chứng thư số"
+                        >
+                          🔐
+                        </button>
+                      }
+                      @if (sig.certStatus === 'Active') {
+                        <button
+                          class="btn-sm btn-outline"
+                          (click)="testUserSign(sig.userId)"
+                          [disabled]="testingUserSign()"
+                          title="Kiểm tra ký số"
+                        >
+                          🧪
+                        </button>
+                      }
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        } @else {
+          <div class="empty-state-box">
+            <p>Không có người dùng nào trong hệ thống.</p>
+          </div>
+        }
+      </div>
+
+      <!-- Provision Result -->
+      @if (provisionResult()) {
+        <div class="card">
+          <div
+            class="test-result"
+            [class.success]="provisionResult()!.success"
+            [class.failure]="!provisionResult()!.success"
+          >
+            <div class="test-result-header">
+              <span class="test-result-icon">{{ provisionResult()!.success ? '✅' : '❌' }}</span>
+              <h3>{{ provisionResult()!.message }}</h3>
+            </div>
+            @if (provisionResult()!.success) {
+              <div class="test-result-body">
+                <div class="test-stat">
+                  <label>Subject</label>
+                  <span>{{ provisionResult()!.certificateSubject }}</span>
+                </div>
+                <div class="test-stat">
+                  <label>Worker</label>
+                  <span>{{ provisionResult()!.workerName }}</span>
+                </div>
+                @if (provisionResult()!.expiry) {
+                  <div class="test-stat">
+                    <label>Hết hạn</label>
+                    <span>{{ formatDateTime(provisionResult()!.expiry!) }}</span>
+                  </div>
+                }
+              </div>
+            } @else if (provisionResult()!.error) {
+              <div class="test-result-body">
+                <div class="test-error">
+                  <label>Chi tiết lỗi</label>
+                  <pre>{{ provisionResult()!.error }}</pre>
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+      }
+
+      <!-- User Test Sign Result -->
+      @if (userTestResult()) {
+        <div class="card">
+          <div
+            class="test-result"
+            [class.success]="userTestResult()!.success"
+            [class.failure]="!userTestResult()!.success"
+          >
+            <div class="test-result-header">
+              <span class="test-result-icon">{{ userTestResult()!.success ? '✅' : '❌' }}</span>
+              <h3>{{ userTestResult()!.success ? 'Ký số thành công!' : 'Ký số thất bại' }}</h3>
+            </div>
+            @if (userTestResult()!.success) {
+              <div class="test-result-body">
+                <div class="test-stat">
+                  <label>Worker</label>
+                  <span>{{ userTestResult()!.workerName }}</span>
+                </div>
+                <div class="test-stat">
+                  <label>PDF gốc</label>
+                  <span>{{ formatBytes(userTestResult()!.originalSize!) }}</span>
+                </div>
+                <div class="test-stat">
+                  <label>PDF đã ký</label>
+                  <span>{{ formatBytes(userTestResult()!.signedSize!) }}</span>
+                </div>
+                <div class="test-stat">
+                  <label>Thời gian</label>
+                  <span>{{ userTestResult()!.durationMs }} ms</span>
+                </div>
+                @if (userTestResult()!.signer) {
+                  <div class="test-stat">
+                    <label>Người ký</label>
+                    <span>{{ userTestResult()!.signer }}</span>
+                  </div>
+                }
+              </div>
+            } @else {
+              <div class="test-result-body">
+                <div class="test-error">
+                  <label>Lỗi</label>
+                  <pre>{{ userTestResult()!.error }}</pre>
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+      }
+
+      <!-- Usage Guide -->
+      <div class="card">
+        <div class="section-header">
+          <h2>📖 Hướng dẫn</h2>
+        </div>
+        <div class="troubleshoot-list">
+          <div class="troubleshoot-item">
+            <h4>1. 🖊️ Tải chữ ký tay</h4>
+            <p>
+              Nhấn nút 🖊️ để vẽ hoặc cập nhật chữ ký tay cho người dùng. Chữ ký sẽ hiển thị trên PDF
+              khi ký số.
+            </p>
+          </div>
+          <div class="troubleshoot-item">
+            <h4>2. 🔐 Cấp chứng thư số</h4>
+            <p>
+              Nhấn nút 🔐 để tạo keystore và worker SignServer riêng cho user. Mỗi user sẽ ký bằng
+              chứng thư riêng.
+            </p>
+          </div>
+          <div class="troubleshoot-item">
+            <h4>3. 🧪 Kiểm tra ký số</h4>
+            <p>
+              Khi chứng thư <span class="cert-badge cert-active">Hoạt động</span>, nhấn 🧪 để kiểm
+              tra ký PDF với worker riêng của user.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- Signature Pad Modal -->
+  @if (showSignaturePad()) {
+    <div class="modal-overlay" (click)="closeSignaturePad()">
+      <div class="modal-content sig-modal" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h2>🖊️ Chữ ký tay</h2>
+          <button class="btn-icon" (click)="closeSignaturePad()">✕</button>
+        </div>
+        <div class="modal-body">
+          <app-signature-pad #signaturePad [width]="500" [height]="200"></app-signature-pad>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary" (click)="closeSignaturePad()">Huỷ</button>
+          <button class="btn-primary" (click)="saveSignature()" [disabled]="uploadingSignature()">
+            @if (uploadingSignature()) {
+              <span class="spinner-inline"></span> Đang lưu...
+            } @else {
+              💾 Lưu chữ ký
+            }
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- TAB: Test -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  @if (activeTab === 'test') {
+    <div class="tab-content">
+      <div class="card">
+        <div class="section-header">
+          <h2>🧪 Kiểm tra ký số</h2>
+        </div>
+
+        <div class="test-section">
+          <p>
+            Gửi một file PDF mẫu tới SignServer để kiểm tra toàn bộ quy trình ký số hoạt động chính
+            xác.
+          </p>
+
+          <button class="btn-primary btn-lg" (click)="testSigning()" [disabled]="testingSign()">
+            @if (testingSign()) {
+              <span class="spinner-inline"></span> Đang ký thử...
+            } @else {
+              🧪 Chạy kiểm tra ký số
+            }
+          </button>
+
+          @if (testResult()) {
+            <div
+              class="test-result"
+              [class.success]="testResult()!.success"
+              [class.failure]="!testResult()!.success"
+            >
+              <div class="test-result-header">
+                <span class="test-result-icon">{{ testResult()!.success ? '✅' : '❌' }}</span>
+                <h3>{{ testResult()!.success ? 'Ký số thành công!' : 'Ký số thất bại' }}</h3>
+              </div>
+
+              @if (testResult()!.success) {
+                <div class="test-result-body">
+                  <div class="test-stat">
+                    <label>PDF gốc</label>
+                    <span>{{ formatBytes(testResult()!.originalSize!) }}</span>
+                  </div>
+                  <div class="test-stat">
+                    <label>PDF đã ký</label>
+                    <span>{{ formatBytes(testResult()!.signedSize!) }}</span>
+                  </div>
+                  <div class="test-stat">
+                    <label>Thời gian</label>
+                    <span>{{ testResult()!.durationMs }} ms</span>
+                  </div>
+                  <div class="test-stat">
+                    <label>Có chữ ký</label>
+                    <span>{{ testResult()!.containsSignature ? '✅ Có' : '❌ Không' }}</span>
+                  </div>
+                  <div class="test-stat">
+                    <label>Thời điểm</label>
+                    <span>{{ formatDateTime(testResult()!.timestamp) }}</span>
+                  </div>
+                </div>
+              } @else {
+                <div class="test-result-body">
+                  <div class="test-error">
+                    <label>Lỗi</label>
+                    <pre>{{ testResult()!.error }}</pre>
+                  </div>
+                  @if (testResult()!.errorType) {
+                    <div class="test-stat">
+                      <label>Loại lỗi</label>
+                      <span>{{ testResult()!.errorType }}</span>
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+          }
+        </div>
+      </div>
+
+      <!-- Quick Troubleshooting -->
+      <div class="card">
+        <div class="section-header">
+          <h2>🔧 Xử lý sự cố</h2>
+        </div>
+        <div class="troubleshoot-list">
+          <div class="troubleshoot-item">
+            <h4>❌ SignServer không kết nối được</h4>
+            <p>Kiểm tra container đang chạy: <code>docker ps | findstr signserver</code></p>
+            <p>Kiểm tra logs: <code>docker logs ivf-signserver --tail=20</code></p>
+          </div>
+          <div class="troubleshoot-item">
+            <h4>⚠️ Crypto Token offline</h4>
+            <p>
+              Kích hoạt lại:
+              <code>docker exec ivf-signserver bin/signserver activatecryptotoken 1 changeit</code>
+            </p>
+          </div>
+          <div class="troubleshoot-item">
+            <h4>⚠️ EJBCA không phản hồi</h4>
+            <p>
+              EJBCA khởi động mất 2-3 phút. Kiểm tra: <code>docker logs ivf-ejbca --tail=20</code>
+            </p>
+          </div>
+          <div class="troubleshoot-item">
+            <h4>🔄 Khởi động lại toàn bộ</h4>
+            <p><code>docker compose restart signserver signserver-db ejbca ejbca-db</code></p>
+          </div>
+        </div>
+      </div>
+    </div>
+  }
+</div>

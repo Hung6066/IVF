@@ -2823,6 +2823,60 @@ namespace IVF.Infrastructure.Migrations
                     b.ToTable("user_permissions", (string)null);
                 });
 
+            modelBuilder.Entity("IVF.Domain.Entities.UserSignature", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("CertStatus")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("CertificateExpiry")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CertificateSerialNumber")
+                        .HasColumnType("text");
+
+                    b.Property<string>("CertificateSubject")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ImageMimeType")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("KeystorePath")
+                        .HasColumnType("text");
+
+                    b.Property<string>("SignatureImageBase64")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("WorkerName")
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("UserSignatures");
+                });
+
             modelBuilder.Entity("IVF.Domain.Entities.AdverseEventData", b =>
                 {
                     b.HasOne("IVF.Domain.Entities.TreatmentCycle", "Cycle")
@@ -3499,6 +3553,17 @@ namespace IVF.Infrastructure.Migrations
                 });
 
             modelBuilder.Entity("IVF.Domain.Entities.UserPermission", b =>
+                {
+                    b.HasOne("IVF.Domain.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("IVF.Domain.Entities.UserSignature", b =>
                 {
                     b.HasOne("IVF.Domain.Entities.User", "User")
                         .WithMany()

@@ -1,7 +1,9 @@
 using System.Text;
 using FluentValidation;
 using IVF.API.Endpoints;
+using IVF.API.Services;
 using IVF.Application;
+using IVF.Application.Common.Interfaces;
 using IVF.Infrastructure;
 using IVF.Infrastructure.Persistence;
 using IVF.Infrastructure.Seeding;
@@ -17,6 +19,41 @@ var builder = WebApplication.CreateBuilder(args);
 // Clean Architecture DI
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+
+// ─── Digital Signing Service (SignServer + EJBCA) ───
+var signingSection = builder.Configuration.GetSection(DigitalSigningOptions.SectionName);
+builder.Services.Configure<DigitalSigningOptions>(signingSection);
+var signingOptions = signingSection.Get<DigitalSigningOptions>() ?? new DigitalSigningOptions();
+
+if (signingOptions.Enabled)
+{
+    builder.Services.AddHttpClient<IDigitalSigningService, SignServerDigitalSigningService>(client =>
+    {
+        client.BaseAddress = new Uri(signingOptions.SignServerUrl);
+        client.Timeout = TimeSpan.FromSeconds(signingOptions.TimeoutSeconds);
+    })
+    .ConfigurePrimaryHttpMessageHandler(() =>
+    {
+        var handler = new HttpClientHandler();
+        if (signingOptions.SkipTlsValidation)
+        {
+            handler.ServerCertificateCustomValidationCallback =
+                HttpClientHandler.DangerousAcceptAnyServerCertificateValidator;
+        }
+        if (!string.IsNullOrEmpty(signingOptions.ClientCertificatePath))
+        {
+            handler.ClientCertificates.Add(
+                new System.Security.Cryptography.X509Certificates.X509Certificate2(
+                    signingOptions.ClientCertificatePath,
+                    signingOptions.ClientCertificatePassword));
+        }
+        return handler;
+    });
+}
+else
+{
+    builder.Services.AddSingleton<IDigitalSigningService, StubDigitalSigningService>();
+}
 
 // JSON Options
 builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(options =>
@@ -204,6 +241,9 @@ app.MapSeedEndpoints();
 app.MapLabEndpoints();
 app.MapFormEndpoints();
 app.MapConceptEndpoints();
+app.MapDigitalSigningEndpoints();
+app.MapSigningAdminEndpoints();
+app.MapUserSignatureEndpoints();
 
 // Auto-migrate and seed in dev
 if (app.Environment.IsDevelopment())

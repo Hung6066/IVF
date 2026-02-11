@@ -94,6 +94,246 @@ export interface ReportData {
   summary?: ReportSummary;
 }
 
+// ===== Report Configuration =====
+export interface ReportConfiguration {
+  columns: ReportColumnConfig[];
+  page: ReportPageConfig;
+  header?: ReportHeaderConfig;
+  footer?: ReportFooterConfig;
+  filters: ReportFilterConfig[];
+  groupBy?: string;
+  sortBy?: string;
+  sortDirection?: 'asc' | 'desc';
+  chart?: ReportChartConfig;
+  // Phase 2
+  conditionalFormats?: ConditionalFormatRule[];
+  calculatedFields?: CalculatedFieldConfig[];
+  showFooterAggregations?: boolean;
+  groupSummary?: GroupSummaryConfig;
+}
+
+export interface ReportColumnConfig {
+  fieldKey: string;
+  label: string;
+  width?: number;
+  visible: boolean;
+  format?: 'text' | 'number' | 'date' | 'datetime' | 'currency' | 'percentage';
+  aggregation?: 'none' | 'count' | 'sum' | 'avg' | 'min' | 'max';
+}
+
+export interface ReportPageConfig {
+  size: 'A4' | 'A5' | 'Letter';
+  orientation: 'portrait' | 'landscape';
+  margins: { top: number; right: number; bottom: number; left: number };
+}
+
+export interface ReportHeaderConfig {
+  title?: string;
+  subtitle?: string;
+  showLogo: boolean;
+  showDate: boolean;
+}
+
+export interface ReportFooterConfig {
+  text?: string;
+  showPageNumber: boolean;
+}
+
+export interface ReportFilterConfig {
+  fieldKey: string;
+  operator: 'eq' | 'neq' | 'gt' | 'lt' | 'gte' | 'lte' | 'contains';
+  value: string;
+}
+
+export interface ReportChartConfig {
+  categoryField: string;
+  valueField?: string;
+  aggregation: 'count' | 'sum' | 'avg';
+  showLegend: boolean;
+  showValues: boolean;
+  maxItems: number;
+}
+
+// ===== Phase 2: Conditional Formatting, Calculated Fields, Grouping =====
+export interface ConditionalFormatRule {
+  id: string;
+  name?: string;
+  fieldKey: string;
+  operator: 'eq' | 'neq' | 'gt' | 'lt' | 'gte' | 'lte' | 'contains' | 'empty' | 'notEmpty';
+  value: string;
+  applyTo: 'cell' | 'row';
+  style: ConditionalFormatStyle;
+}
+
+export interface ConditionalFormatStyle {
+  backgroundColor?: string;
+  textColor?: string;
+  fontWeight?: 'normal' | 'bold';
+  fontStyle?: 'normal' | 'italic';
+}
+
+export interface CalculatedFieldConfig {
+  fieldKey: string;
+  label: string;
+  expression: string; // e.g. "[field_1] + [field_2]", "COUNT()", "IF([status]='Draft','Nháp','Khác')"
+  format?: 'text' | 'number' | 'date' | 'currency' | 'percentage';
+}
+
+export interface GroupSummaryConfig {
+  showGroupHeaders: boolean;
+  showGroupFooters: boolean;
+  aggregations: GroupAggregation[];
+}
+
+export interface GroupAggregation {
+  fieldKey: string;
+  type: 'count' | 'sum' | 'avg' | 'min' | 'max';
+  label?: string;
+}
+
+// ===== Phase 2: Visual Band Designer =====
+
+export type BandType =
+  | 'pageHeader'
+  | 'groupHeader'
+  | 'detail'
+  | 'groupFooter'
+  | 'pageFooter'
+  | 'reportHeader'
+  | 'reportFooter';
+
+export interface ReportDesign {
+  bands: ReportBand[];
+  parameters: ReportParameter[];
+  dataSources: ReportDataSource[];
+  pageSettings: ReportPageConfig;
+  styles: ReportStyleDef[];
+  subReports?: SubReportConfig[];
+  tabs?: ReportTab[];
+  crossTab?: CrossTabConfig;
+}
+
+export interface ReportBand {
+  id: string;
+  type: BandType;
+  height: number;
+  visible: boolean;
+  groupField?: string;
+  controls: ReportControl[];
+  keepTogether?: boolean;
+  repeatOnEveryPage?: boolean;
+  backgroundColor?: string;
+}
+
+export type ControlType =
+  | 'label'
+  | 'field'
+  | 'image'
+  | 'shape'
+  | 'line'
+  | 'richText'
+  | 'barcode'
+  | 'chart'
+  | 'table'
+  | 'checkbox'
+  | 'pageNumber'
+  | 'totalPages'
+  | 'currentDate'
+  | 'expression'
+  | 'signatureZone';
+
+export interface ReportControl {
+  id: string;
+  type: ControlType;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  text?: string;
+  expression?: string; // e.g. [Data.fieldKey], Upper([Data.name]), Iif([Data.score]>80,'Pass','Fail')
+  format?: string;
+  style?: ReportControlStyle;
+  dataField?: string;
+  imageUrl?: string;
+  shapeType?: 'rectangle' | 'ellipse' | 'triangle';
+  barcodeType?: 'qr' | 'code128' | 'ean13';
+  barcodeValue?: string;
+  visible?: boolean;
+  canGrow?: boolean;
+  signatureRole?: string; // e.g. 'technician', 'department_head', 'doctor'
+}
+
+export interface ReportControlStyle {
+  fontFamily?: string;
+  fontSize?: number;
+  fontWeight?: 'normal' | 'bold';
+  fontStyle?: 'normal' | 'italic';
+  textAlign?: 'left' | 'center' | 'right';
+  verticalAlign?: 'top' | 'middle' | 'bottom';
+  color?: string;
+  backgroundColor?: string;
+  borderColor?: string;
+  borderWidth?: number;
+  borderStyle?: 'none' | 'solid' | 'dashed' | 'dotted';
+  padding?: number;
+}
+
+export interface ReportStyleDef {
+  name: string;
+  style: ReportControlStyle;
+}
+
+// ===== Phase 3: Advanced Features =====
+
+export interface ReportParameter {
+  name: string;
+  label: string;
+  type: 'text' | 'number' | 'date' | 'dropdown';
+  defaultValue?: string;
+  options?: { value: string; label: string }[];
+  required?: boolean;
+}
+
+export interface ReportDataSource {
+  name: string;
+  type: 'formTemplate' | 'custom';
+  formTemplateId?: string;
+  fields: { key: string; label: string; type: string }[];
+}
+
+export interface SubReportConfig {
+  id: string;
+  name: string;
+  reportDesignJson: string;
+  bandId: string;
+  parameterBindings: { paramName: string; expression: string }[];
+}
+
+export interface ReportTab {
+  id: string;
+  name: string;
+  designJson: string;
+}
+
+export interface CrossTabConfig {
+  rowFields: string[];
+  columnFields: string[];
+  dataField: string;
+  aggregation: 'count' | 'sum' | 'avg' | 'min' | 'max';
+  showRowTotals: boolean;
+  showColumnTotals: boolean;
+  showGrandTotal: boolean;
+}
+
+export interface ReportTemplateLibraryItem {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  previewUrl?: string;
+  designJson: string;
+}
+
 export interface ReportSummary {
   totalResponses: number;
   fieldValueCounts: { [key: string]: number };
@@ -469,29 +709,41 @@ export class FormsService {
     return this.http.delete<void>(`${this.baseUrl}/responses/${id}`);
   }
 
-  exportResponsePdf(id: string): Observable<Blob> {
-    return this.http.get(`${this.baseUrl}/responses/${id}/export-pdf`, {
+  exportResponsePdf(id: string, sign = false): Observable<Blob> {
+    const params = sign ? '?sign=true' : '';
+    return this.http.get(`${this.baseUrl}/responses/${id}/export-pdf${params}`, {
       responseType: 'blob',
     });
   }
 
   // Linked Data (cross-form concept pre-fill)
-  getLinkedData(templateId: string, patientId: string, cycleId?: string): Observable<LinkedDataValue[]> {
+  getLinkedData(
+    templateId: string,
+    patientId: string,
+    cycleId?: string,
+  ): Observable<LinkedDataValue[]> {
     let params = new HttpParams().set('patientId', patientId);
     if (cycleId) params = params.set('cycleId', cycleId);
-    return this.http.get<LinkedDataValue[]>(`${this.baseUrl}/linked-data/${templateId}`, { params });
+    return this.http.get<LinkedDataValue[]>(`${this.baseUrl}/linked-data/${templateId}`, {
+      params,
+    });
   }
 
   // Linked Field Sources (explicit field-to-field link configuration)
   getLinkedFieldSources(templateId: string): Observable<LinkedFieldSource[]> {
-    return this.http.get<LinkedFieldSource[]>(`${this.baseUrl}/templates/${templateId}/linked-sources`);
+    return this.http.get<LinkedFieldSource[]>(
+      `${this.baseUrl}/templates/${templateId}/linked-sources`,
+    );
   }
 
   createLinkedFieldSource(request: CreateLinkedFieldSourceRequest): Observable<LinkedFieldSource> {
     return this.http.post<LinkedFieldSource>(`${this.baseUrl}/linked-sources`, request);
   }
 
-  updateLinkedFieldSource(id: string, request: UpdateLinkedFieldSourceRequest): Observable<LinkedFieldSource> {
+  updateLinkedFieldSource(
+    id: string,
+    request: UpdateLinkedFieldSourceRequest,
+  ): Observable<LinkedFieldSource> {
     return this.http.put<LinkedFieldSource>(`${this.baseUrl}/linked-sources/${id}`, request);
   }
 
@@ -525,7 +777,6 @@ export class FormsService {
     description?: string;
     reportType: ReportType;
     configurationJson: string;
-    createdByUserId: string;
   }): Observable<ReportTemplate> {
     return this.http.post<ReportTemplate>(`${this.baseUrl}/reports`, request);
   }
@@ -563,6 +814,25 @@ export class FormsService {
 
     return this.http.get<ReportData>(`${this.baseUrl}/reports/${reportTemplateId}/generate`, {
       params,
+    });
+  }
+
+  exportReportPdf(
+    reportTemplateId: string,
+    from?: Date,
+    to?: Date,
+    patientId?: string,
+    sign = false,
+  ): Observable<Blob> {
+    let params = new HttpParams();
+    if (from) params = params.set('from', from.toISOString());
+    if (to) params = params.set('to', to.toISOString());
+    if (patientId) params = params.set('patientId', patientId);
+    if (sign) params = params.set('sign', 'true');
+
+    return this.http.get(`${this.baseUrl}/reports/${reportTemplateId}/export-pdf`, {
+      params,
+      responseType: 'blob',
     });
   }
 

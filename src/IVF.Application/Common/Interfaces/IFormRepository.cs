@@ -39,6 +39,7 @@ public interface IFormRepository
         int pageSize = 20,
         CancellationToken ct = default);
     Task<FormResponse?> GetResponseByIdAsync(Guid id, bool includeFieldValues = true, CancellationToken ct = default);
+    Task<FormResponse?> GetResponseForUpdateAsync(Guid id, CancellationToken ct = default);
     Task<(List<FormResponse> Items, int Total)> GetResponsesWithFieldValuesAsync(
         Guid templateId, Guid? patientId = null, DateTime? from = null, DateTime? to = null,
         CancellationToken ct = default);

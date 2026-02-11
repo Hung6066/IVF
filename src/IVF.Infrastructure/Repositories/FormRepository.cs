@@ -251,6 +251,19 @@ public class FormRepository : IFormRepository
         return await query.FirstOrDefaultAsync(r => r.Id == id, ct);
     }
 
+    /// <summary>
+    /// Loads a FormResponse WITH change tracking for mutation scenarios.
+    /// Only includes FieldValues + Details (no FormTemplate/FormField navigations)
+    /// to avoid duplicate entity tracking conflicts.
+    /// </summary>
+    public async Task<FormResponse?> GetResponseForUpdateAsync(Guid id, CancellationToken ct = default)
+    {
+        return await _context.FormResponses
+            .Include(r => r.FieldValues)
+                .ThenInclude(v => v.Details)
+            .FirstOrDefaultAsync(r => r.Id == id, ct);
+    }
+
     public async Task<(List<FormResponse> Items, int Total)> GetResponsesWithFieldValuesAsync(
         Guid templateId, Guid? patientId = null, DateTime? from = null, DateTime? to = null,
         CancellationToken ct = default)
@@ -296,40 +309,36 @@ public class FormRepository : IFormRepository
 
     public async Task UpdateResponseAsync(FormResponse response, CancellationToken ct = default)
     {
-        _context.FormResponses.Update(response);
+        // Fix entity states for entities with client-generated GUIDs.
+        //
+        // When new entities (FormFieldValue, FormFieldValueDetail) are added to tracked
+        // navigation collections, EF may track them as Modified instead of Added because
+        // they have non-default GUID keys. EF sets original values to defaults, making
+        // ALL properties appear modified — including CreatedAt.
+        //
+        // Distinction: existing entities loaded from DB never have CreatedAt modified
+        // (we never change CreatedAt). New entities always have CreatedAt "modified"
+        // (original = default vs current = DateTime set in Create()).
+        //
+        // Also: ClearDetails() soft-deletes old details → convert to hard deletes.
 
-        // Batch-check all detail IDs in one query — eliminates N+1
-        var allDetailIds = response.FieldValues
-            .Where(fv => fv.Details != null)
-            .SelectMany(fv => fv.Details)
-            .Select(d => d.Id)
-            .ToList();
-
-        var existingDetailIds = allDetailIds.Count > 0
-            ? await _context.FormFieldValueDetails
-                .IgnoreQueryFilters()
-                .Where(d => allDetailIds.Contains(d.Id))
-                .Select(d => d.Id)
-                .ToHashSetAsync(ct)
-            : new HashSet<Guid>();
-
-        // Handle details: soft-deleted ones stay Modified, new ones must be Added
-        foreach (var fieldValue in response.FieldValues)
+        foreach (var entry in _context.ChangeTracker.Entries<FormFieldValueDetail>().ToList())
         {
-            if (fieldValue.Details != null)
+            if (entry.Entity.IsDeleted)
             {
-                foreach (var detail in fieldValue.Details)
-                {
-                    var entry = _context.Entry(detail);
-                    if (detail.IsDeleted)
-                    {
-                        entry.State = EntityState.Modified;
-                    }
-                    else if (entry.State == EntityState.Detached || entry.State == EntityState.Modified)
-                    {
-                        entry.State = existingDetailIds.Contains(detail.Id) ? EntityState.Modified : EntityState.Added;
-                    }
-                }
+                entry.State = EntityState.Deleted;
+            }
+            else if (entry.State == EntityState.Modified && entry.Property("CreatedAt").IsModified)
+            {
+                entry.State = EntityState.Added;
+            }
+        }
+
+        foreach (var entry in _context.ChangeTracker.Entries<FormFieldValue>().ToList())
+        {
+            if (entry.State == EntityState.Modified && entry.Property("CreatedAt").IsModified)
+            {
+                entry.State = EntityState.Added;
             }
         }
 

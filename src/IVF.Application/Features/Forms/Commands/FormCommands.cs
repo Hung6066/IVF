@@ -665,7 +665,8 @@ public class FormResponseCommandsHandler :
 
     public async Task<Result<FormResponseDto>> Handle(UpdateFormResponseCommand request, CancellationToken ct)
     {
-        var response = await _repo.GetResponseByIdAsync(request.Id, true, ct);
+        // Use tracked query to avoid duplicate FormField entity tracking conflicts
+        var response = await _repo.GetResponseForUpdateAsync(request.Id, ct);
         if (response == null)
             return Result<FormResponseDto>.Failure("Response not found");
 
@@ -725,12 +726,15 @@ public class FormResponseCommandsHandler :
             }
         }
 
-        return Result<FormResponseDto>.Success(MapToDto(response));
+        // Reload with full navigations for DTO mapping
+        var updated = await _repo.GetResponseByIdAsync(response.Id, true, ct);
+        return Result<FormResponseDto>.Success(MapToDto(updated!));
     }
 
     public async Task<Result<FormResponseDto>> Handle(UpdateFormResponseStatusCommand request, CancellationToken ct)
     {
-        var response = await _repo.GetResponseByIdAsync(request.Id, true, ct);
+        // Use tracked query to avoid duplicate entity tracking conflicts
+        var response = await _repo.GetResponseForUpdateAsync(request.Id, ct);
         if (response == null)
             return Result<FormResponseDto>.Failure("Response not found");
 
@@ -749,7 +753,9 @@ public class FormResponseCommandsHandler :
 
         await _repo.UpdateResponseAsync(response, ct);
 
-        return Result<FormResponseDto>.Success(MapToDto(response));
+        // Reload with full navigations for DTO mapping
+        var updated = await _repo.GetResponseByIdAsync(response.Id, true, ct);
+        return Result<FormResponseDto>.Success(MapToDto(updated!));
     }
 
     public async Task<Result<bool>> Handle(DeleteFormResponseCommand request, CancellationToken ct)

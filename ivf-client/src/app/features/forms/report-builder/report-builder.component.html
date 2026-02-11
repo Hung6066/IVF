@@ -1,97 +1,126 @@
 <div class="report-builder-container">
-    <header class="page-header">
-        <div class="header-content">
-            <h1>📈 Trình tạo báo cáo</h1>
-            <p>Tạo báo cáo động từ dữ liệu biểu mẫu</p>
-        </div>
-    </header>
-
-    <!-- Existing Reports -->
-    <section class="reports-section">
-        <div class="section-header">
-            <h2>Báo cáo đã tạo</h2>
-            <button class="btn btn-primary" (click)="showCreateModal = true">
-                ➕ Tạo báo cáo mới
-            </button>
-        </div>
-
-        <div class="reports-grid">
-            @for (report of reports; track report.id) {
-            <div class="report-card" (click)="viewReport(report)">
-                <div class="report-icon">
-                    {{ getReportTypeIcon(report.reportType) }}
-                </div>
-                <div class="report-info">
-                    <h3>{{ report.name }}</h3>
-                    <p>{{ report.formTemplateName }}</p>
-                    <span class="report-type">{{ getReportTypeLabel(report.reportType) }}</span>
-                </div>
-                <div class="report-actions">
-                    <button class="btn-icon" title="Xem"
-                        (click)="viewReport(report); $event.stopPropagation()">👁️</button>
-                    <button class="btn-icon" title="Xóa"
-                        (click)="deleteReport(report); $event.stopPropagation()">🗑️</button>
-                </div>
-            </div>
-            }
-
-            @if (reports.length === 0) {
-            <div class="empty-state">
-                <span class="icon">📊</span>
-                <h3>Chưa có báo cáo nào</h3>
-                <p>Tạo báo cáo đầu tiên để phân tích dữ liệu</p>
-            </div>
-            }
-        </div>
-    </section>
-
-    <!-- Create Modal -->
-    @if (showCreateModal) {
-    <div class="modal-overlay" (click)="showCreateModal = false">
-        <div class="modal" (click)="$event.stopPropagation()">
-            <div class="modal-header">
-                <h3>Tạo báo cáo mới</h3>
-                <button class="close-btn" (click)="showCreateModal = false">✕</button>
-            </div>
-            <div class="modal-body">
-                <div class="form-group">
-                    <label>Chọn biểu mẫu *</label>
-                    <select [(ngModel)]="newReport.formTemplateId" required>
-                        <option value="">-- Chọn biểu mẫu --</option>
-                        @for (t of templates; track t.id) {
-                        <option [value]="t.id">{{ t.name }}</option>
-                        }
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Tên báo cáo *</label>
-                    <input type="text" [(ngModel)]="newReport.name" placeholder="VD: Thống kê tháng 1">
-                </div>
-                <div class="form-group">
-                    <label>Mô tả</label>
-                    <textarea [(ngModel)]="newReport.description" placeholder="Mô tả báo cáo..."></textarea>
-                </div>
-                <div class="form-group">
-                    <label>Loại báo cáo</label>
-                    <div class="report-type-grid">
-                        @for (type of reportTypes; track type.value) {
-                        <button type="button" class="type-option" [class.selected]="newReport.reportType === type.value"
-                            (click)="newReport.reportType = type.value">
-                            <span class="type-icon">{{ type.icon }}</span>
-                            <span>{{ type.label }}</span>
-                        </button>
-                        }
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" (click)="showCreateModal = false">Hủy</button>
-                <button class="btn btn-primary" (click)="createReport()"
-                    [disabled]="!newReport.formTemplateId || !newReport.name">
-                    Tạo báo cáo
-                </button>
-            </div>
-        </div>
+  <header class="page-header">
+    <div class="header-content">
+      <h1>📈 Trình tạo báo cáo</h1>
+      <p>Tạo báo cáo động từ dữ liệu biểu mẫu</p>
     </div>
-    }
+  </header>
+
+  <!-- Existing Reports -->
+  <section class="reports-section">
+    <div class="section-header">
+      <h2>Báo cáo đã tạo</h2>
+      <button class="btn btn-primary" (click)="showCreateModal = true">➕ Tạo báo cáo mới</button>
+    </div>
+
+    <div class="reports-grid">
+      @for (report of reports; track report.id) {
+        <div class="report-card" (click)="viewReport(report)">
+          <div class="report-icon">
+            {{ getReportTypeIcon(report.reportType) }}
+          </div>
+          <div class="report-info">
+            <h3>{{ report.name }}</h3>
+            <p>{{ report.formTemplateName }}</p>
+            <span class="report-type">{{ getReportTypeLabel(report.reportType) }}</span>
+          </div>
+          <div class="report-actions">
+            <button
+              class="btn-icon"
+              title="Thiết kế"
+              (click)="designReport(report); $event.stopPropagation()"
+            >
+              🎨
+            </button>
+            <button
+              class="btn-icon"
+              title="Cấu hình"
+              (click)="configReport(report); $event.stopPropagation()"
+            >
+              ⚙️
+            </button>
+            <button
+              class="btn-icon"
+              title="Xem"
+              (click)="viewReport(report); $event.stopPropagation()"
+            >
+              👁️
+            </button>
+            <button
+              class="btn-icon"
+              title="Xóa"
+              (click)="deleteReport(report); $event.stopPropagation()"
+            >
+              🗑️
+            </button>
+          </div>
+        </div>
+      }
+
+      @if (reports.length === 0) {
+        <div class="empty-state">
+          <span class="icon">📊</span>
+          <h3>Chưa có báo cáo nào</h3>
+          <p>Tạo báo cáo đầu tiên để phân tích dữ liệu</p>
+        </div>
+      }
+    </div>
+  </section>
+
+  <!-- Create Modal -->
+  @if (showCreateModal) {
+    <div class="modal-overlay" (click)="showCreateModal = false">
+      <div class="modal" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h3>Tạo báo cáo mới</h3>
+          <button class="close-btn" (click)="showCreateModal = false">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Chọn biểu mẫu *</label>
+            <select [(ngModel)]="newReport.formTemplateId" required>
+              <option value="">-- Chọn biểu mẫu --</option>
+              @for (t of templates; track t.id) {
+                <option [value]="t.id">{{ t.name }}</option>
+              }
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Tên báo cáo *</label>
+            <input type="text" [(ngModel)]="newReport.name" placeholder="VD: Thống kê tháng 1" />
+          </div>
+          <div class="form-group">
+            <label>Mô tả</label>
+            <textarea [(ngModel)]="newReport.description" placeholder="Mô tả báo cáo..."></textarea>
+          </div>
+          <div class="form-group">
+            <label>Loại báo cáo</label>
+            <div class="report-type-grid">
+              @for (type of reportTypes; track type.value) {
+                <button
+                  type="button"
+                  class="type-option"
+                  [class.selected]="newReport.reportType === type.value"
+                  (click)="newReport.reportType = type.value"
+                >
+                  <span class="type-icon">{{ type.icon }}</span>
+                  <span>{{ type.label }}</span>
+                </button>
+              }
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" (click)="showCreateModal = false">Hủy</button>
+          <button
+            class="btn btn-primary"
+            (click)="createReport()"
+            [disabled]="!newReport.formTemplateId || !newReport.name"
+          >
+            Tạo báo cáo
+          </button>
+        </div>
+      </div>
+    </div>
+  }
 </div>

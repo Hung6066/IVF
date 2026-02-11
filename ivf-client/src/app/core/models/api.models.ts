@@ -10,3 +10,4 @@ export * from './appointment.models';
 export * from './notification.models';
 export * from './audit.models';
 export * from './catalog.models';
+export * from './signing.models';

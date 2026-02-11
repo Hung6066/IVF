@@ -1,0 +1,15 @@
+<div class="signature-pad-container">
+  <div class="signature-pad-header">
+    <span class="sig-label">✍️ Vẽ chữ ký tay</span>
+    <button class="btn-clear" (click)="clear()" [disabled]="isEmpty()">🗑️ Xoá</button>
+  </div>
+  <div class="canvas-wrapper" [class.has-content]="!isEmpty()">
+    <canvas #signatureCanvas class="signature-canvas"></canvas>
+    @if (isEmpty()) {
+      <div class="placeholder-text">Vẽ chữ ký tại đây...</div>
+    }
+  </div>
+  <div class="signature-pad-footer">
+    <small>Sử dụng chuột hoặc bút cảm ứng để ký</small>
+  </div>
+</div>

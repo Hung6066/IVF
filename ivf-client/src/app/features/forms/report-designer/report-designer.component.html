@@ -1,0 +1,1522 @@
+<div class="designer-container">
+  @if (report) {
+    <!-- ===== Top Toolbar ===== -->
+    <header class="designer-toolbar">
+      <div class="toolbar-left">
+        <button class="btn btn-ghost" (click)="goBack()">← Quay lại</button>
+        <div class="toolbar-title">
+          <h1>🎨 Report Designer</h1>
+          <span class="report-name">{{ report.name }}</span>
+        </div>
+      </div>
+
+      <div class="toolbar-center">
+        <div class="toolbar-history">
+          <button
+            class="btn-icon-toolbar"
+            (click)="undo()"
+            [disabled]="!canUndo"
+            title="Hoàn tác (Ctrl+Z)"
+          >
+            ↩
+          </button>
+          <button
+            class="btn-icon-toolbar"
+            (click)="redo()"
+            [disabled]="!canRedo"
+            title="Làm lại (Ctrl+Y)"
+          >
+            ↪
+          </button>
+        </div>
+        <button class="btn mode-btn" [class.active]="mode === 'design'" (click)="mode = 'design'">
+          🖊️ DESIGN
+        </button>
+        <button class="btn mode-btn" [class.active]="mode === 'preview'" (click)="toggleMode()">
+          👁️ PREVIEW
+        </button>
+      </div>
+
+      <div class="toolbar-right">
+        @if (isDirty) {
+          <span class="unsaved-badge">● Chưa lưu</span>
+        }
+        <button class="btn btn-secondary" (click)="exportPdf()">📄 PDF</button>
+        <button class="btn btn-secondary" (click)="save()" [disabled]="isSaving || !isDirty">
+          💾 Lưu
+        </button>
+        <button class="btn btn-primary" (click)="saveAndPreview()" [disabled]="isSaving">
+          ▶️ Lưu & Xem
+        </button>
+      </div>
+    </header>
+
+    <!-- ===== Multi-tab bar (Phase 3) ===== -->
+    @if (design.tabs?.length) {
+      <div class="tab-bar">
+        <button class="tab-item" [class.active]="!activeTabId" (click)="selectTab(null)">
+          📋 Chính
+        </button>
+        @for (tab of design.tabs; track tab.id; let i = $index) {
+          <button
+            class="tab-item"
+            [class.active]="activeTabId === tab.id"
+            (click)="selectTab(tab.id)"
+          >
+            {{ tab.name }}
+            <span class="tab-close" (click)="removeTab(i); $event.stopPropagation()">✕</span>
+          </button>
+        }
+        <button class="tab-add" (click)="addTab()">+ Tab</button>
+      </div>
+    }
+
+    <div class="designer-body">
+      <!-- ===== LEFT: Side Panel ===== -->
+      <aside class="side-panel" [class.collapsed]="sidePanelCollapsed">
+        <!-- Side panel tabs -->
+        <div class="side-tabs">
+          <button
+            class="side-tab"
+            [class.active]="sidePanel === 'toolbox'"
+            (click)="sidePanel = 'toolbox'"
+            title="Công cụ"
+          >
+            🧰
+          </button>
+          <button
+            class="side-tab"
+            [class.active]="sidePanel === 'properties'"
+            (click)="sidePanel = 'properties'"
+            title="Thuộc tính"
+          >
+            ⚙️
+          </button>
+          <button
+            class="side-tab"
+            [class.active]="sidePanel === 'data'"
+            (click)="sidePanel = 'data'"
+            title="Dữ liệu"
+          >
+            📊
+          </button>
+          <button
+            class="side-tab"
+            [class.active]="sidePanel === 'parameters'"
+            (click)="sidePanel = 'parameters'"
+            title="Tham số"
+          >
+            🔧
+          </button>
+          <button
+            class="side-tab"
+            [class.active]="sidePanel === 'templates'"
+            (click)="sidePanel = 'templates'"
+            title="Mẫu"
+          >
+            📚
+          </button>
+          <button
+            class="side-tab"
+            [class.active]="sidePanel === 'tabs'"
+            (click)="sidePanel = 'tabs'"
+            title="Tab"
+          >
+            📑
+          </button>
+          <button
+            class="side-tab"
+            [class.active]="sidePanel === 'crosstab'"
+            (click)="sidePanel = 'crosstab'"
+            title="Cross-tab"
+          >
+            📐
+          </button>
+        </div>
+
+        <div class="side-content">
+          <!-- ===== TOOLBOX PANEL ===== -->
+          @if (sidePanel === 'toolbox') {
+            <div class="panel-section">
+              <h3>🧰 Công cụ</h3>
+              <div class="toolbox-grid">
+                @for (item of TOOLBOX_ITEMS; track item.type) {
+                  <div
+                    class="toolbox-item"
+                    draggable="true"
+                    (dragstart)="
+                      $event.dataTransfer?.setData('toolboxType', item.type);
+                      onToolboxDragStart(item)
+                    "
+                    (dragend)="onToolboxDragEnd()"
+                    (dblclick)="selectedBandId ? addControlToBand(selectedBandId, item) : null"
+                  >
+                    <span class="toolbox-icon">{{ item.icon }}</span>
+                    <span class="toolbox-label">{{ item.label }}</span>
+                  </div>
+                }
+              </div>
+
+              <h4>Thêm band</h4>
+              <div class="band-add-btns">
+                @for (bt of getAvailableBandTypes(); track bt) {
+                  <button class="btn-sm btn-outline" (click)="addBand(bt)">
+                    + {{ getBandLabel(bt) }}
+                  </button>
+                }
+              </div>
+            </div>
+          }
+
+          <!-- ===== PROPERTIES PANEL ===== -->
+          @if (sidePanel === 'properties') {
+            <div class="panel-section">
+              @if (selectedControl) {
+                <!-- Property Grid Header -->
+                <div class="pgrid-header">
+                  <span class="pgrid-header-icon">{{ getControlIcon(selectedControl.type) }}</span>
+                  <span class="pgrid-header-name">{{ selectedControl.type }}</span>
+                  <span class="pgrid-header-id">{{ selectedControl.id }}</span>
+                </div>
+
+                <!-- ── General Section ── -->
+                <div class="pgrid-section" [class.collapsed]="propSections['general']">
+                  <div
+                    class="pgrid-section-header"
+                    (click)="propSections['general'] = !propSections['general']"
+                  >
+                    <span class="pgrid-arrow">{{ propSections['general'] ? '▶' : '▼' }}</span>
+                    Chung
+                  </div>
+                  @if (!propSections['general']) {
+                    <div class="pgrid-row">
+                      <div class="pgrid-label">Loại</div>
+                      <div class="pgrid-value">
+                        <input
+                          type="text"
+                          [value]="selectedControl.type"
+                          disabled
+                          class="pgrid-input"
+                        />
+                      </div>
+                    </div>
+
+                    @if (selectedControl.type === 'label' || selectedControl.type === 'richText') {
+                      <div class="pgrid-row pgrid-row-tall">
+                        <div class="pgrid-label">Nội dung</div>
+                        <div class="pgrid-value">
+                          <textarea
+                            [(ngModel)]="selectedControl.text"
+                            (ngModelChange)="markDirty()"
+                            class="pgrid-textarea"
+                            rows="3"
+                          ></textarea>
+                        </div>
+                      </div>
+                    }
+
+                    @if (selectedControl.type === 'field') {
+                      <div class="pgrid-row">
+                        <div class="pgrid-label">Trường</div>
+                        <div class="pgrid-value">
+                          <select
+                            [(ngModel)]="selectedControl.dataField"
+                            (ngModelChange)="markDirty()"
+                            class="pgrid-select"
+                          >
+                            @for (f of dataFieldOptions; track f.key) {
+                              <option [value]="f.key">{{ f.label }}</option>
+                            }
+                          </select>
+                        </div>
+                      </div>
+                    }
+
+                    @if (selectedControl.type === 'expression') {
+                      <div class="pgrid-row">
+                        <div class="pgrid-label">Biểu thức</div>
+                        <div class="pgrid-value pgrid-value-btn">
+                          <input
+                            type="text"
+                            [(ngModel)]="selectedControl.expression"
+                            (ngModelChange)="markDirty()"
+                            class="pgrid-input"
+                          />
+                          <button
+                            class="pgrid-fx"
+                            (click)="openExpressionEditor(selectedControl.expression ?? '')"
+                          >
+                            fx
+                          </button>
+                        </div>
+                      </div>
+                    }
+
+                    @if (selectedControl.type === 'image') {
+                      <div class="pgrid-row">
+                        <div class="pgrid-label">URL ảnh</div>
+                        <div class="pgrid-value">
+                          <input
+                            type="text"
+                            [(ngModel)]="selectedControl.imageUrl"
+                            (ngModelChange)="markDirty()"
+                            class="pgrid-input"
+                            placeholder="https://..."
+                          />
+                        </div>
+                      </div>
+                    }
+
+                    @if (selectedControl.type === 'shape') {
+                      <div class="pgrid-row">
+                        <div class="pgrid-label">Hình</div>
+                        <div class="pgrid-value">
+                          <select
+                            [(ngModel)]="selectedControl.shapeType"
+                            (ngModelChange)="markDirty()"
+                            class="pgrid-select"
+                          >
+                            <option value="rectangle">Chữ nhật</option>
+                            <option value="ellipse">Elip</option>
+                            <option value="triangle">Tam giác</option>
+                          </select>
+                        </div>
+                      </div>
+                    }
+
+                    @if (selectedControl.type === 'barcode') {
+                      <div class="pgrid-row">
+                        <div class="pgrid-label">Barcode</div>
+                        <div class="pgrid-value">
+                          <select
+                            [(ngModel)]="selectedControl.barcodeType"
+                            (ngModelChange)="markDirty()"
+                            class="pgrid-select"
+                          >
+                            <option value="qr">QR Code</option>
+                            <option value="code128">Code 128</option>
+                            <option value="ean13">EAN-13</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div class="pgrid-row">
+                        <div class="pgrid-label">Giá trị</div>
+                        <div class="pgrid-value">
+                          <input
+                            type="text"
+                            [(ngModel)]="selectedControl.barcodeValue"
+                            (ngModelChange)="markDirty()"
+                            class="pgrid-input"
+                          />
+                        </div>
+                      </div>
+                    }
+
+                    @if (selectedControl.type === 'signatureZone') {
+                      <div class="pgrid-row">
+                        <div class="pgrid-label">Vai trò ký</div>
+                        <div class="pgrid-value">
+                          <select
+                            [(ngModel)]="selectedControl.signatureRole"
+                            (ngModelChange)="markDirty()"
+                            class="pgrid-select"
+                          >
+                            <option value="current_user">Người ký hiện tại</option>
+                            <option value="technician">Kỹ thuật viên</option>
+                            <option value="department_head">Trưởng khoa</option>
+                            <option value="doctor">Bác sĩ chỉ định</option>
+                            <option value="director">Giám đốc</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div class="pgrid-row">
+                        <div class="pgrid-label">Tiêu đề</div>
+                        <div class="pgrid-value">
+                          <input
+                            type="text"
+                            [(ngModel)]="selectedControl.text"
+                            (ngModelChange)="markDirty()"
+                            class="pgrid-input"
+                            placeholder="VD: KỸ THUẬT VIÊN"
+                          />
+                        </div>
+                      </div>
+                    }
+
+                    @if (
+                      selectedControl.format !== undefined ||
+                      selectedControl.type === 'field' ||
+                      selectedControl.type === 'currentDate'
+                    ) {
+                      <div class="pgrid-row">
+                        <div class="pgrid-label">Định dạng</div>
+                        <div class="pgrid-value">
+                          <input
+                            type="text"
+                            [(ngModel)]="selectedControl.format"
+                            (ngModelChange)="markDirty()"
+                            class="pgrid-input"
+                            placeholder="dd/MM/yyyy"
+                          />
+                        </div>
+                      </div>
+                    }
+                  }
+                </div>
+
+                <!-- ── Layout Section ── -->
+                <div class="pgrid-section" [class.collapsed]="propSections['layout']">
+                  <div
+                    class="pgrid-section-header"
+                    (click)="propSections['layout'] = !propSections['layout']"
+                  >
+                    <span class="pgrid-arrow">{{ propSections['layout'] ? '▶' : '▼' }}</span>
+                    Vị trí & Kích thước
+                  </div>
+                  @if (!propSections['layout']) {
+                    <div class="pgrid-row">
+                      <div class="pgrid-label">X</div>
+                      <div class="pgrid-value">
+                        <input
+                          type="number"
+                          [(ngModel)]="selectedControl.x"
+                          (ngModelChange)="markDirty()"
+                          class="pgrid-input"
+                        />
+                      </div>
+                    </div>
+                    <div class="pgrid-row">
+                      <div class="pgrid-label">Y</div>
+                      <div class="pgrid-value">
+                        <input
+                          type="number"
+                          [(ngModel)]="selectedControl.y"
+                          (ngModelChange)="markDirty()"
+                          class="pgrid-input"
+                        />
+                      </div>
+                    </div>
+                    <div class="pgrid-row">
+                      <div class="pgrid-label">Rộng</div>
+                      <div class="pgrid-value">
+                        <input
+                          type="number"
+                          [(ngModel)]="selectedControl.width"
+                          (ngModelChange)="markDirty()"
+                          class="pgrid-input"
+                        />
+                      </div>
+                    </div>
+                    <div class="pgrid-row">
+                      <div class="pgrid-label">Cao</div>
+                      <div class="pgrid-value">
+                        <input
+                          type="number"
+                          [(ngModel)]="selectedControl.height"
+                          (ngModelChange)="markDirty()"
+                          class="pgrid-input"
+                        />
+                      </div>
+                    </div>
+                  }
+                </div>
+
+                <!-- ── Style Section ── -->
+                @if (selectedControl.style) {
+                  <div class="pgrid-section" [class.collapsed]="propSections['style']">
+                    <div
+                      class="pgrid-section-header"
+                      (click)="propSections['style'] = !propSections['style']"
+                    >
+                      <span class="pgrid-arrow">{{ propSections['style'] ? '▶' : '▼' }}</span>
+                      Kiểu dáng
+                    </div>
+                    @if (!propSections['style']) {
+                      <div class="pgrid-row">
+                        <div class="pgrid-label">Cỡ chữ</div>
+                        <div class="pgrid-value">
+                          <input
+                            type="number"
+                            [(ngModel)]="selectedControl.style.fontSize"
+                            (ngModelChange)="markDirty()"
+                            class="pgrid-input"
+                            min="6"
+                            max="72"
+                          />
+                        </div>
+                      </div>
+                      <div class="pgrid-row">
+                        <div class="pgrid-label">Font</div>
+                        <div class="pgrid-value">
+                          <select
+                            [(ngModel)]="selectedControl.style.fontFamily"
+                            (ngModelChange)="markDirty()"
+                            class="pgrid-select"
+                          >
+                            <option value="">Mặc định</option>
+                            <option value="Arial">Arial</option>
+                            <option value="Times New Roman">Times New Roman</option>
+                            <option value="Courier New">Courier New</option>
+                            <option value="Roboto">Roboto</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div class="pgrid-row">
+                        <div class="pgrid-label">Đậm</div>
+                        <div class="pgrid-value">
+                          <select
+                            [(ngModel)]="selectedControl.style.fontWeight"
+                            (ngModelChange)="markDirty()"
+                            class="pgrid-select"
+                          >
+                            <option value="normal">Thường</option>
+                            <option value="bold">Đậm</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div class="pgrid-row">
+                        <div class="pgrid-label">Nghiêng</div>
+                        <div class="pgrid-value">
+                          <select
+                            [(ngModel)]="selectedControl.style.fontStyle"
+                            (ngModelChange)="markDirty()"
+                            class="pgrid-select"
+                          >
+                            <option value="normal">Thường</option>
+                            <option value="italic">Nghiêng</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div class="pgrid-row">
+                        <div class="pgrid-label">Căn chỉnh</div>
+                        <div class="pgrid-value">
+                          <div class="pgrid-align-btns">
+                            <button
+                              class="pgrid-align"
+                              [class.active]="selectedControl.style.textAlign === 'left'"
+                              (click)="selectedControl.style.textAlign = 'left'; markDirty()"
+                            >
+                              ⬅
+                            </button>
+                            <button
+                              class="pgrid-align"
+                              [class.active]="selectedControl.style.textAlign === 'center'"
+                              (click)="selectedControl.style.textAlign = 'center'; markDirty()"
+                            >
+                              ≡
+                            </button>
+                            <button
+                              class="pgrid-align"
+                              [class.active]="selectedControl.style.textAlign === 'right'"
+                              (click)="selectedControl.style.textAlign = 'right'; markDirty()"
+                            >
+                              ➡
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="pgrid-row">
+                        <div class="pgrid-label">Màu chữ</div>
+                        <div class="pgrid-value pgrid-value-color">
+                          <input
+                            type="color"
+                            [ngModel]="selectedControl.style.color || '#000000'"
+                            (ngModelChange)="selectedControl.style.color = $event; markDirty()"
+                            class="pgrid-color"
+                          />
+                          <span class="pgrid-color-hex">{{
+                            selectedControl.style.color || '#000000'
+                          }}</span>
+                        </div>
+                      </div>
+                      <div class="pgrid-row">
+                        <div class="pgrid-label">Màu nền</div>
+                        <div class="pgrid-value pgrid-value-color">
+                          <input
+                            type="color"
+                            [ngModel]="selectedControl.style.backgroundColor || '#ffffff'"
+                            (ngModelChange)="
+                              selectedControl.style.backgroundColor = $event; markDirty()
+                            "
+                            class="pgrid-color"
+                          />
+                          <span class="pgrid-color-hex">{{
+                            selectedControl.style.backgroundColor || '#ffffff'
+                          }}</span>
+                        </div>
+                      </div>
+                      <div class="pgrid-row">
+                        <div class="pgrid-label">Viền</div>
+                        <div class="pgrid-value">
+                          <select
+                            [(ngModel)]="selectedControl.style.borderStyle"
+                            (ngModelChange)="markDirty()"
+                            class="pgrid-select"
+                          >
+                            <option value="none">Không</option>
+                            <option value="solid">Liền</option>
+                            <option value="dashed">Nét đứt</option>
+                            <option value="dotted">Chấm</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div class="pgrid-row">
+                        <div class="pgrid-label">Nét viền</div>
+                        <div class="pgrid-value">
+                          <input
+                            type="number"
+                            [(ngModel)]="selectedControl.style.borderWidth"
+                            (ngModelChange)="markDirty()"
+                            class="pgrid-input"
+                            min="0"
+                            max="10"
+                          />
+                        </div>
+                      </div>
+                      @if (
+                        selectedControl.style.borderStyle &&
+                        selectedControl.style.borderStyle !== 'none'
+                      ) {
+                        <div class="pgrid-row">
+                          <div class="pgrid-label">Màu viền</div>
+                          <div class="pgrid-value pgrid-value-color">
+                            <input
+                              type="color"
+                              [ngModel]="selectedControl.style.borderColor || '#000000'"
+                              (ngModelChange)="
+                                selectedControl.style.borderColor = $event; markDirty()
+                              "
+                              class="pgrid-color"
+                            />
+                            <span class="pgrid-color-hex">{{
+                              selectedControl.style.borderColor || '#000000'
+                            }}</span>
+                          </div>
+                        </div>
+                      }
+                      <div class="pgrid-row">
+                        <div class="pgrid-label">Padding</div>
+                        <div class="pgrid-value">
+                          <input
+                            type="number"
+                            [(ngModel)]="selectedControl.style.padding"
+                            (ngModelChange)="markDirty()"
+                            class="pgrid-input"
+                            min="0"
+                            max="40"
+                          />
+                        </div>
+                      </div>
+                    }
+                  </div>
+                }
+
+                <!-- ── Actions ── -->
+                <div class="pgrid-actions">
+                  <button
+                    class="btn-sm btn-secondary"
+                    (click)="duplicateControl(selectedControl.id)"
+                  >
+                    📋 Nhân bản
+                  </button>
+                  <button class="btn-sm btn-danger" (click)="removeControl(selectedControl.id)">
+                    🗑️ Xóa
+                  </button>
+                </div>
+              } @else if (selectedBand) {
+                <!-- Band Properties Grid -->
+                <div class="pgrid-header">
+                  <span class="pgrid-header-icon">📐</span>
+                  <span class="pgrid-header-name">{{ getBandLabel(selectedBand.type) }}</span>
+                </div>
+                <div class="pgrid-section">
+                  <div class="pgrid-section-header">
+                    <span class="pgrid-arrow">▼</span>
+                    Thuộc tính band
+                  </div>
+                  <div class="pgrid-row">
+                    <div class="pgrid-label">Loại</div>
+                    <div class="pgrid-value">
+                      <input
+                        type="text"
+                        [value]="getBandLabel(selectedBand.type)"
+                        disabled
+                        class="pgrid-input"
+                      />
+                    </div>
+                  </div>
+                  <div class="pgrid-row">
+                    <div class="pgrid-label">Cao (px)</div>
+                    <div class="pgrid-value">
+                      <input
+                        type="number"
+                        [(ngModel)]="selectedBand.height"
+                        (ngModelChange)="markDirty()"
+                        class="pgrid-input"
+                        min="20"
+                        max="800"
+                      />
+                    </div>
+                  </div>
+                  <div class="pgrid-row">
+                    <div class="pgrid-label">Hiển thị</div>
+                    <div class="pgrid-value pgrid-value-check">
+                      <input
+                        type="checkbox"
+                        [(ngModel)]="selectedBand.visible"
+                        (ngModelChange)="markDirty()"
+                      />
+                    </div>
+                  </div>
+                  @if (selectedBand.type === 'groupHeader' || selectedBand.type === 'groupFooter') {
+                    <div class="pgrid-row">
+                      <div class="pgrid-label">Nhóm theo</div>
+                      <div class="pgrid-value">
+                        <select
+                          [(ngModel)]="selectedBand.groupField"
+                          (ngModelChange)="markDirty()"
+                          class="pgrid-select"
+                        >
+                          <option value="">-- Chọn --</option>
+                          @for (f of dataFieldOptions; track f.key) {
+                            <option [value]="f.key">{{ f.label }}</option>
+                          }
+                        </select>
+                      </div>
+                    </div>
+                  }
+                  <div class="pgrid-row">
+                    <div class="pgrid-label">Màu nền</div>
+                    <div class="pgrid-value pgrid-value-color">
+                      <input
+                        type="color"
+                        [ngModel]="selectedBand.backgroundColor || '#ffffff'"
+                        (ngModelChange)="selectedBand.backgroundColor = $event; markDirty()"
+                        class="pgrid-color"
+                      />
+                      <span class="pgrid-color-hex">{{
+                        selectedBand.backgroundColor || 'none'
+                      }}</span>
+                    </div>
+                  </div>
+                  <div class="pgrid-row">
+                    <div class="pgrid-label">Giữ trang</div>
+                    <div class="pgrid-value pgrid-value-check">
+                      <input
+                        type="checkbox"
+                        [(ngModel)]="selectedBand.keepTogether"
+                        (ngModelChange)="markDirty()"
+                      />
+                    </div>
+                  </div>
+                  @if (selectedBand.type === 'pageHeader' || selectedBand.type === 'pageFooter') {
+                    <div class="pgrid-row">
+                      <div class="pgrid-label">Lặp trang</div>
+                      <div class="pgrid-value pgrid-value-check">
+                        <input
+                          type="checkbox"
+                          [(ngModel)]="selectedBand.repeatOnEveryPage"
+                          (ngModelChange)="markDirty()"
+                        />
+                      </div>
+                    </div>
+                  }
+                </div>
+                <div class="pgrid-actions">
+                  <button class="btn-sm btn-secondary" (click)="addSubReport(selectedBand.id)">
+                    📎 Sub-report
+                  </button>
+                  <button class="btn-sm btn-danger" (click)="removeBand(selectedBand.id)">
+                    🗑️ Xóa band
+                  </button>
+                </div>
+              } @else {
+                <!-- Page Settings Grid -->
+                <div class="pgrid-header">
+                  <span class="pgrid-header-icon">📄</span>
+                  <span class="pgrid-header-name">Cài đặt trang</span>
+                </div>
+                <div class="pgrid-section">
+                  <div class="pgrid-section-header">
+                    <span class="pgrid-arrow">▼</span>
+                    Trang
+                  </div>
+                  <div class="pgrid-row">
+                    <div class="pgrid-label">Khổ giấy</div>
+                    <div class="pgrid-value">
+                      <select
+                        [(ngModel)]="design.pageSettings.size"
+                        (ngModelChange)="markDirty()"
+                        class="pgrid-select"
+                      >
+                        <option value="A4">A4</option>
+                        <option value="A5">A5</option>
+                        <option value="Letter">Letter</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="pgrid-row">
+                    <div class="pgrid-label">Hướng</div>
+                    <div class="pgrid-value">
+                      <select
+                        [(ngModel)]="design.pageSettings.orientation"
+                        (ngModelChange)="markDirty()"
+                        class="pgrid-select"
+                      >
+                        <option value="portrait">Dọc</option>
+                        <option value="landscape">Ngang</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+                <div class="pgrid-section">
+                  <div class="pgrid-section-header">
+                    <span class="pgrid-arrow">▼</span>
+                    Lề (pt)
+                  </div>
+                  <div class="pgrid-row">
+                    <div class="pgrid-label">Trên</div>
+                    <div class="pgrid-value">
+                      <input
+                        type="number"
+                        [(ngModel)]="design.pageSettings.margins.top"
+                        (ngModelChange)="markDirty()"
+                        class="pgrid-input"
+                      />
+                    </div>
+                  </div>
+                  <div class="pgrid-row">
+                    <div class="pgrid-label">Dưới</div>
+                    <div class="pgrid-value">
+                      <input
+                        type="number"
+                        [(ngModel)]="design.pageSettings.margins.bottom"
+                        (ngModelChange)="markDirty()"
+                        class="pgrid-input"
+                      />
+                    </div>
+                  </div>
+                  <div class="pgrid-row">
+                    <div class="pgrid-label">Trái</div>
+                    <div class="pgrid-value">
+                      <input
+                        type="number"
+                        [(ngModel)]="design.pageSettings.margins.left"
+                        (ngModelChange)="markDirty()"
+                        class="pgrid-input"
+                      />
+                    </div>
+                  </div>
+                  <div class="pgrid-row">
+                    <div class="pgrid-label">Phải</div>
+                    <div class="pgrid-value">
+                      <input
+                        type="number"
+                        [(ngModel)]="design.pageSettings.margins.right"
+                        (ngModelChange)="markDirty()"
+                        class="pgrid-input"
+                      />
+                    </div>
+                  </div>
+                </div>
+              }
+            </div>
+          }
+
+          <!-- ===== DATA SOURCE PANEL ===== -->
+          @if (sidePanel === 'data') {
+            <div class="panel-section">
+              <h3>📊 Trường dữ liệu</h3>
+              <p class="hint-text">Kéo trường vào band hoặc double-click để thêm</p>
+              <div class="data-fields-list">
+                @for (f of dataFieldOptions; track f.key) {
+                  <div
+                    class="data-field-item"
+                    draggable="true"
+                    (dragstart)="
+                      $event.dataTransfer?.setData('toolboxType', 'field');
+                      $event.dataTransfer?.setData('dataField', f.key)
+                    "
+                    (dblclick)="
+                      selectedBandId
+                        ? addControlToBand(selectedBandId, {
+                            type: 'field',
+                            icon: '📊',
+                            label: f.label,
+                            defaultWidth: 150,
+                            defaultHeight: 24,
+                          })
+                        : null
+                    "
+                  >
+                    <span class="df-icon">📊</span>
+                    <span class="df-name">{{ f.label }}</span>
+                    <span class="df-key">{{ f.key }}</span>
+                  </div>
+                }
+              </div>
+
+              @if (design.subReports?.length) {
+                <h4>📎 Sub-reports</h4>
+                @for (sr of design.subReports; track sr.id; let i = $index) {
+                  <div class="sub-report-item">
+                    <input
+                      type="text"
+                      [(ngModel)]="sr.name"
+                      (ngModelChange)="markDirty()"
+                      class="prop-input"
+                    />
+                    <button class="btn-icon-sm btn-danger" (click)="removeSubReport(i)">✕</button>
+                  </div>
+                }
+              }
+            </div>
+          }
+
+          <!-- ===== PARAMETERS PANEL (Phase 3) ===== -->
+          @if (sidePanel === 'parameters') {
+            <div class="panel-section">
+              <h3>🔧 Tham số báo cáo</h3>
+              <button class="btn-sm btn-primary" (click)="addParameter()">+ Thêm tham số</button>
+
+              @if (!design.parameters.length) {
+                <p class="hint-text">Tham số cho phép người dùng nhập giá trị khi xem báo cáo.</p>
+              }
+
+              @for (param of design.parameters; track param.name; let i = $index) {
+                <div class="param-card">
+                  <div class="param-header">
+                    <input
+                      type="text"
+                      [(ngModel)]="param.name"
+                      (ngModelChange)="markDirty()"
+                      class="prop-input"
+                      placeholder="Tên..."
+                    />
+                    <button class="btn-icon-sm btn-danger" (click)="removeParameter(i)">✕</button>
+                  </div>
+                  <div class="prop-group">
+                    <label>Nhãn hiển thị</label>
+                    <input
+                      type="text"
+                      [(ngModel)]="param.label"
+                      (ngModelChange)="markDirty()"
+                      class="prop-input"
+                    />
+                  </div>
+                  <div class="prop-row">
+                    <div class="prop-group half">
+                      <label>Kiểu</label>
+                      <select
+                        [(ngModel)]="param.type"
+                        (ngModelChange)="markDirty()"
+                        class="prop-select"
+                      >
+                        <option value="text">Văn bản</option>
+                        <option value="number">Số</option>
+                        <option value="date">Ngày</option>
+                        <option value="dropdown">Dropdown</option>
+                      </select>
+                    </div>
+                    <div class="prop-group half">
+                      <label>Giá trị mặc định</label>
+                      <input
+                        type="text"
+                        [(ngModel)]="param.defaultValue"
+                        (ngModelChange)="markDirty()"
+                        class="prop-input"
+                      />
+                    </div>
+                  </div>
+                  <div class="prop-group">
+                    <label class="checkbox-prop">
+                      <input
+                        type="checkbox"
+                        [(ngModel)]="param.required"
+                        (ngModelChange)="markDirty()"
+                      />
+                      Bắt buộc
+                    </label>
+                  </div>
+                </div>
+              }
+            </div>
+          }
+
+          <!-- ===== TEMPLATES PANEL (Phase 3) ===== -->
+          @if (sidePanel === 'templates') {
+            <div class="panel-section">
+              <h3>📚 Thư viện mẫu</h3>
+              <p class="hint-text">Chọn mẫu để áp dụng thiết kế có sẵn.</p>
+              @for (cat of templateCategories; track cat) {
+                <h4>{{ cat }}</h4>
+                @for (tpl of templateLibrary; track tpl.id) {
+                  @if (tpl.category === cat) {
+                    <div class="template-card" (click)="applyTemplate(tpl)">
+                      <div class="tpl-icon">📄</div>
+                      <div class="tpl-info">
+                        <span class="tpl-name">{{ tpl.name }}</span>
+                        <span class="tpl-desc">{{ tpl.description }}</span>
+                      </div>
+                    </div>
+                  }
+                }
+              }
+            </div>
+          }
+
+          <!-- ===== TABS PANEL (Phase 3: multi-page) ===== -->
+          @if (sidePanel === 'tabs') {
+            <div class="panel-section">
+              <h3>📑 Đa trang (Tabs)</h3>
+              <button class="btn-sm btn-primary" (click)="addTab()">+ Thêm tab</button>
+              <p class="hint-text">Mỗi tab là một trang báo cáo riêng.</p>
+              @if (design.tabs?.length) {
+                @for (tab of design.tabs; track tab.id; let i = $index) {
+                  <div
+                    class="tab-card"
+                    [class.active]="activeTabId === tab.id"
+                    (click)="selectTab(tab.id)"
+                  >
+                    <input
+                      type="text"
+                      [(ngModel)]="tab.name"
+                      (ngModelChange)="markDirty()"
+                      class="prop-input"
+                    />
+                    <button
+                      class="btn-icon-sm btn-danger"
+                      (click)="removeTab(i); $event.stopPropagation()"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                }
+              }
+            </div>
+          }
+
+          <!-- ===== CROSS-TAB PANEL (Phase 3) ===== -->
+          @if (sidePanel === 'crosstab') {
+            <div class="panel-section">
+              <h3>📐 Cross-Tab / Pivot</h3>
+              @if (!design.crossTab) {
+                <button class="btn-sm btn-primary" (click)="initCrossTab()">+ Tạo Cross-Tab</button>
+                <p class="hint-text">Bảng chéo để phân tích dữ liệu theo 2 chiều.</p>
+              } @else {
+                <div class="prop-group">
+                  <label>Trường hàng (Row)</label>
+                  <select
+                    [(ngModel)]="design.crossTab.rowFields[0]"
+                    (ngModelChange)="markDirty()"
+                    class="prop-select"
+                  >
+                    <option value="">-- Chọn --</option>
+                    @for (f of dataFieldOptions; track f.key) {
+                      <option [value]="f.key">{{ f.label }}</option>
+                    }
+                  </select>
+                </div>
+                <div class="prop-group">
+                  <label>Trường cột (Column)</label>
+                  <select
+                    [(ngModel)]="design.crossTab.columnFields[0]"
+                    (ngModelChange)="markDirty()"
+                    class="prop-select"
+                  >
+                    <option value="">-- Chọn --</option>
+                    @for (f of dataFieldOptions; track f.key) {
+                      <option [value]="f.key">{{ f.label }}</option>
+                    }
+                  </select>
+                </div>
+                <div class="prop-group">
+                  <label>Trường giá trị</label>
+                  <select
+                    [(ngModel)]="design.crossTab.dataField"
+                    (ngModelChange)="markDirty()"
+                    class="prop-select"
+                  >
+                    <option value="">-- Chọn --</option>
+                    @for (f of dataFieldOptions; track f.key) {
+                      <option [value]="f.key">{{ f.label }}</option>
+                    }
+                  </select>
+                </div>
+                <div class="prop-group">
+                  <label>Phép tổng hợp</label>
+                  <select
+                    [(ngModel)]="design.crossTab.aggregation"
+                    (ngModelChange)="markDirty()"
+                    class="prop-select"
+                  >
+                    <option value="count">Đếm</option>
+                    <option value="sum">Tổng</option>
+                    <option value="avg">Trung bình</option>
+                    <option value="min">Min</option>
+                    <option value="max">Max</option>
+                  </select>
+                </div>
+                <div class="prop-group">
+                  <label class="checkbox-prop">
+                    <input
+                      type="checkbox"
+                      [(ngModel)]="design.crossTab.showRowTotals"
+                      (ngModelChange)="markDirty()"
+                    />
+                    Tổng hàng
+                  </label>
+                </div>
+                <div class="prop-group">
+                  <label class="checkbox-prop">
+                    <input
+                      type="checkbox"
+                      [(ngModel)]="design.crossTab.showColumnTotals"
+                      (ngModelChange)="markDirty()"
+                    />
+                    Tổng cột
+                  </label>
+                </div>
+                <div class="prop-group">
+                  <label class="checkbox-prop">
+                    <input
+                      type="checkbox"
+                      [(ngModel)]="design.crossTab.showGrandTotal"
+                      (ngModelChange)="markDirty()"
+                    />
+                    Tổng cộng
+                  </label>
+                </div>
+                <button class="btn-sm btn-danger" (click)="removeCrossTab()">
+                  🗑️ Xóa Cross-Tab
+                </button>
+              }
+            </div>
+          }
+        </div>
+      </aside>
+
+      <!-- ===== Canvas wrapper with toggle ===== -->
+      <div class="canvas-wrapper">
+        <button
+          class="panel-toggle"
+          (click)="toggleSidePanel()"
+          [title]="sidePanelCollapsed ? 'Mở panel' : 'Thu gọn panel'"
+        >
+          {{ sidePanelCollapsed ? '▶' : '◀' }}
+        </button>
+
+        <!-- ===== CENTER: Canvas (DESIGN mode) ===== -->
+        @if (mode === 'design') {
+          <main class="design-canvas-area">
+            <div class="canvas-scroll">
+              <div
+                class="page-canvas"
+                [style.width]="design.pageSettings.orientation === 'landscape' ? '1100px' : '800px'"
+              >
+                @for (band of design.bands; track band.id) {
+                  <div
+                    class="band-wrapper"
+                    [class.selected]="selectedBandId === band.id"
+                    [class.hidden-band]="!band.visible"
+                    (click)="selectBand(band.id); $event.stopPropagation()"
+                  >
+                    <!-- Band label -->
+                    <div
+                      class="band-label"
+                      [class.band-header]="
+                        band.type === 'pageHeader' || band.type === 'reportHeader'
+                      "
+                      [class.band-detail]="band.type === 'detail'"
+                      [class.band-footer]="
+                        band.type === 'pageFooter' || band.type === 'reportFooter'
+                      "
+                      [class.band-group-h]="band.type === 'groupHeader'"
+                      [class.band-group-f]="band.type === 'groupFooter'"
+                    >
+                      <span>{{ getBandLabel(band.type) }}</span>
+                      @if (band.groupField) {
+                        <span class="band-group-field"
+                          >: {{ getDataFieldLabel(band.groupField) }}</span
+                        >
+                      }
+                      <span class="band-size">{{ band.height }}px</span>
+                      <div class="band-actions">
+                        <button
+                          class="band-btn"
+                          (click)="toggleBandVisibility(band); $event.stopPropagation()"
+                          title="Ẩn/Hiện"
+                        >
+                          {{ band.visible ? '👁️' : '🚫' }}
+                        </button>
+                        <button
+                          class="band-btn"
+                          (click)="resizeBand(band, -10); $event.stopPropagation()"
+                          title="Thu nhỏ"
+                        >
+                          −
+                        </button>
+                        <button
+                          class="band-btn"
+                          (click)="resizeBand(band, 10); $event.stopPropagation()"
+                          title="Phóng to"
+                        >
+                          +
+                        </button>
+                        <button
+                          class="band-btn danger"
+                          (click)="removeBand(band.id); $event.stopPropagation()"
+                          title="Xóa"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+
+                    <!-- Band canvas (drop zone) -->
+                    <div
+                      class="band-canvas"
+                      [style.height.px]="band.height"
+                      [style.background-color]="band.backgroundColor || 'transparent'"
+                      (dragover)="onBandDragOver($event)"
+                      (drop)="onBandDrop($event, band.id)"
+                    >
+                      @for (ctrl of band.controls; track ctrl.id) {
+                        <div
+                          class="control-wrapper"
+                          [class.selected]="selectedControlId === ctrl.id"
+                          [ngStyle]="getControlStyle(ctrl)"
+                          (click)="selectControl(ctrl.id, band.id); $event.stopPropagation()"
+                          cdkDrag
+                          [cdkDragFreeDragPosition]="{ x: 0, y: 0 }"
+                          (cdkDragEnded)="onControlDragEnd(ctrl, $event)"
+                        >
+                          <!-- Control content preview -->
+                          @switch (ctrl.type) {
+                            @case ('label') {
+                              <span class="ctrl-label">{{ ctrl.text }}</span>
+                            }
+                            @case ('field') {
+                              <span class="ctrl-field"
+                                >[{{ getDataFieldLabel(ctrl.dataField ?? '') }}]</span
+                              >
+                            }
+                            @case ('expression') {
+                              <span class="ctrl-expr">fx: {{ ctrl.expression }}</span>
+                            }
+                            @case ('image') {
+                              <span class="ctrl-image">🖼️ Image</span>
+                            }
+                            @case ('shape') {
+                              <div class="ctrl-shape" [class]="'shape-' + ctrl.shapeType"></div>
+                            }
+                            @case ('line') {
+                              <hr
+                                class="ctrl-line"
+                                [style.border-color]="ctrl.style?.borderColor ?? '#94a3b8'"
+                              />
+                            }
+                            @case ('barcode') {
+                              <span class="ctrl-barcode"
+                                >{{ ctrl.barcodeType === 'qr' ? '⊞' : '|||' }}
+                                {{ ctrl.barcodeType?.toUpperCase() }}</span
+                              >
+                            }
+                            @case ('chart') {
+                              <span class="ctrl-chart">📈 Chart</span>
+                            }
+                            @case ('table') {
+                              <span class="ctrl-table">▦ Table</span>
+                            }
+                            @case ('checkbox') {
+                              <span class="ctrl-checkbox">☑ Checkbox</span>
+                            }
+                            @case ('pageNumber') {
+                              <span class="ctrl-system">Trang #</span>
+                            }
+                            @case ('totalPages') {
+                              <span class="ctrl-system">##</span>
+                            }
+                            @case ('currentDate') {
+                              <span class="ctrl-system">📅 {{ ctrl.format || 'dd/MM/yyyy' }}</span>
+                            }
+                            @case ('richText') {
+                              <span class="ctrl-richtext">{{ ctrl.text || 'Rich Text...' }}</span>
+                            }
+                            @case ('signatureZone') {
+                              <div class="ctrl-signature-zone">
+                                <span class="sig-icon">✍️</span>
+                                <span class="sig-label">{{ ctrl.text || 'Chữ ký' }}</span>
+                                <span class="sig-hint">(Ký và ghi rõ họ tên)</span>
+                              </div>
+                            }
+                            @default {
+                              <span>{{ ctrl.type }}</span>
+                            }
+                          }
+
+                          <!-- Resize handles on selected -->
+                          @if (selectedControlId === ctrl.id) {
+                            <div class="resize-handle resize-se"></div>
+                          }
+                        </div>
+                      }
+
+                      @if (!band.controls.length) {
+                        <div class="band-empty-hint">Kéo thả control vào đây</div>
+                      }
+                    </div>
+                  </div>
+                }
+              </div>
+            </div>
+          </main>
+        }
+
+        <!-- ===== CENTER: Preview mode ===== -->
+        @if (mode === 'preview') {
+          <main class="preview-area">
+            @if (isLoadingPreview) {
+              <div class="preview-loading">
+                <div class="spinner"></div>
+                <p>Đang tải dữ liệu...</p>
+              </div>
+            } @else if (previewData?.data?.length) {
+              <!-- Parameters dialog -->
+              @if (showParametersDialog) {
+                <div class="params-dialog-overlay" (click)="showParametersDialog = false">
+                  <div class="params-dialog" (click)="$event.stopPropagation()">
+                    <h3>🔧 Nhập tham số</h3>
+                    @for (p of design.parameters; track p.name) {
+                      <div class="param-input-group">
+                        <label
+                          >{{ p.label }}
+                          @if (p.required) {
+                            <span class="required">*</span>
+                          }
+                        </label>
+                        @if (p.type === 'date') {
+                          <input
+                            type="date"
+                            [(ngModel)]="parameterValues[p.name]"
+                            class="prop-input"
+                          />
+                        } @else if (p.type === 'number') {
+                          <input
+                            type="number"
+                            [(ngModel)]="parameterValues[p.name]"
+                            class="prop-input"
+                          />
+                        } @else if (p.type === 'dropdown') {
+                          <select [(ngModel)]="parameterValues[p.name]" class="prop-select">
+                            @for (opt of p.options ?? []; track opt.value) {
+                              <option [value]="opt.value">{{ opt.label }}</option>
+                            }
+                          </select>
+                        } @else {
+                          <input
+                            type="text"
+                            [(ngModel)]="parameterValues[p.name]"
+                            class="prop-input"
+                          />
+                        }
+                      </div>
+                    }
+                    <div class="params-actions">
+                      <button class="btn btn-primary" (click)="showParametersDialog = false">
+                        Áp dụng
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              }
+
+              <div
+                class="preview-page"
+                [style.width]="design.pageSettings.orientation === 'landscape' ? '1100px' : '800px'"
+              >
+                <!-- Render each band -->
+                @for (band of design.bands; track band.id) {
+                  @if (band.visible) {
+                    @if (band.type === 'detail') {
+                      <!-- Detail band repeats for each data row -->
+                      @for (row of previewData!.data; track $index) {
+                        <div
+                          class="preview-band preview-detail"
+                          [style.min-height.px]="band.height"
+                        >
+                          @for (ctrl of band.controls; track ctrl.id) {
+                            <div class="preview-control" [ngStyle]="getControlStyle(ctrl)">
+                              {{ renderControlPreview(ctrl, row, previewData!.data) }}
+                            </div>
+                          }
+                        </div>
+                      }
+                    } @else if (band.type === 'groupHeader' && band.groupField) {
+                      <!-- Group header renders once per unique group value -->
+                      <!-- Simplified: show all unique group values -->
+                    } @else {
+                      <!-- Static bands: pageHeader, pageFooter, reportHeader, reportFooter -->
+                      <div
+                        class="preview-band"
+                        [class]="'preview-' + band.type"
+                        [style.min-height.px]="band.height"
+                        [style.background-color]="band.backgroundColor || 'transparent'"
+                      >
+                        @for (ctrl of band.controls; track ctrl.id) {
+                          <div class="preview-control" [ngStyle]="getControlStyle(ctrl)">
+                            {{
+                              renderControlPreview(
+                                ctrl,
+                                previewData!.data[0] ?? {},
+                                previewData!.data
+                              )
+                            }}
+                          </div>
+                        }
+                      </div>
+                    }
+                  }
+                }
+
+                <!-- Cross-Tab preview -->
+                @if (crossTabData) {
+                  <div class="crosstab-preview">
+                    <h4>📐 Cross-Tab</h4>
+                    <table class="crosstab-table">
+                      <thead>
+                        <tr>
+                          <th></th>
+                          @for (hdr of crossTabData.headers; track hdr) {
+                            <th>{{ hdr }}</th>
+                          }
+                          @if (design.crossTab?.showRowTotals) {
+                            <th>Tổng</th>
+                          }
+                        </tr>
+                      </thead>
+                      <tbody>
+                        @for (row of crossTabData.rows; track row.label) {
+                          <tr>
+                            <td class="crosstab-row-label">{{ row.label }}</td>
+                            @for (val of row.values; track $index) {
+                              <td>{{ val }}</td>
+                            }
+                            @if (design.crossTab?.showRowTotals) {
+                              <td class="crosstab-total">{{ sumArray(row.values) }}</td>
+                            }
+                          </tr>
+                        }
+                      </tbody>
+                      @if (design.crossTab?.showColumnTotals) {
+                        <tfoot>
+                          <tr>
+                            <td class="crosstab-total">Tổng</td>
+                            @for (t of crossTabData.totals; track $index) {
+                              <td class="crosstab-total">{{ t }}</td>
+                            }
+                            @if (design.crossTab?.showGrandTotal) {
+                              <td class="crosstab-grand">Σ</td>
+                            }
+                          </tr>
+                        </tfoot>
+                      }
+                    </table>
+                  </div>
+                }
+              </div>
+            } @else {
+              <div class="preview-empty">
+                <p>Không có dữ liệu để xem trước.</p>
+                <button class="btn btn-primary" (click)="loadPreviewData()">🔄 Tải lại</button>
+              </div>
+            }
+          </main>
+        }
+      </div>
+      <!-- end canvas-wrapper -->
+    </div>
+
+    <!-- ===== Expression Editor Dialog ===== -->
+    @if (showExpressionEditor) {
+      <div class="expr-dialog-overlay" (click)="showExpressionEditor = false">
+        <div class="expr-dialog" (click)="$event.stopPropagation()">
+          <h3>📝 Trình soạn biểu thức</h3>
+          <textarea
+            [(ngModel)]="expressionValue"
+            class="expr-textarea"
+            rows="4"
+            placeholder='VD: [Data.patientName], Iif([Data.score]>80,"Pass","Fail")'
+          ></textarea>
+
+          <div class="expr-snippets">
+            <h4>Trường dữ liệu</h4>
+            <div class="snippet-grid">
+              @for (f of dataFieldOptions; track f.key) {
+                <button
+                  class="snippet-btn"
+                  (click)="insertExpressionSnippet('[Data.' + f.key + ']')"
+                >
+                  {{ f.label }}
+                </button>
+              }
+            </div>
+
+            <h4>Hàm</h4>
+            <div class="snippet-grid">
+              <button class="snippet-btn" (click)="insertExpressionSnippet('Count()')">
+                Count()
+              </button>
+              <button class="snippet-btn" (click)="insertExpressionSnippet('Sum(fieldKey)')">
+                Sum()
+              </button>
+              <button class="snippet-btn" (click)="insertExpressionSnippet('Avg(fieldKey)')">
+                Avg()
+              </button>
+              <button class="snippet-btn" (click)="insertExpressionSnippet('Min(fieldKey)')">
+                Min()
+              </button>
+              <button class="snippet-btn" (click)="insertExpressionSnippet('Max(fieldKey)')">
+                Max()
+              </button>
+              <button class="snippet-btn" (click)="insertExpressionSnippet('Upper(text)')">
+                Upper()
+              </button>
+              <button class="snippet-btn" (click)="insertExpressionSnippet('Lower(text)')">
+                Lower()
+              </button>
+              <button
+                class="snippet-btn"
+                (click)="insertExpressionSnippet('Iif(condition,trueVal,falseVal)')"
+              >
+                Iif()
+              </button>
+            </div>
+
+            <h4>Toán tử</h4>
+            <div class="snippet-grid">
+              <button class="snippet-btn" (click)="insertExpressionSnippet(' + ')">+</button>
+              <button class="snippet-btn" (click)="insertExpressionSnippet(' - ')">−</button>
+              <button class="snippet-btn" (click)="insertExpressionSnippet(' * ')">×</button>
+              <button class="snippet-btn" (click)="insertExpressionSnippet(' / ')">/</button>
+              <button class="snippet-btn" (click)="insertExpressionSnippet(' &gt; ')">&gt;</button>
+              <button class="snippet-btn" (click)="insertExpressionSnippet(' &lt; ')">&lt;</button>
+              <button class="snippet-btn" (click)="insertExpressionSnippet(' == ')">=</button>
+              <button class="snippet-btn" (click)="insertExpressionSnippet(' != ')">≠</button>
+            </div>
+          </div>
+
+          <div class="expr-actions">
+            <button class="btn btn-secondary" (click)="showExpressionEditor = false">Hủy</button>
+            <button class="btn btn-primary" (click)="applyExpression()">Áp dụng</button>
+          </div>
+        </div>
+      </div>
+    }
+  } @else {
+    <div class="loading">
+      <div class="spinner"></div>
+      <p>Đang tải thiết kế...</p>
+    </div>
+  }
+</div>

@@ -1,107 +1,122 @@
 <div class="cycle-detail">
-    <header class="page-header">
-        <div class="header-info">
-            <a routerLink="/couples" class="back-link">← Quay lại</a>
-            <h1>Chu kỳ {{ cycle()?.cycleCode }}</h1>
-            <div class="cycle-meta">
-                <span class="badge method">{{ getMethodName(cycle()?.method) }}</span>
-                <span class="badge phase">{{ getPhaseName(cycle()?.currentPhase) }}</span>
-                <span class="badge outcome" [class]="(cycle()?.outcome || '').toLowerCase()">
-                    {{ getOutcomeName(cycle()?.outcome) }}
-                </span>
-            </div>
-        </div>
-    </header>
-
-    <!-- Phase Timeline -->
-    <section class="timeline-section card">
-        <div class="phase-timeline">
-            @for (phase of phases; track phase.key; let i = $index) {
-            <div class="phase-item" [class.active]="isActivePhase(phase.key)"
-                [class.completed]="isCompletedPhase(phase.key, i)">
-                <div class="phase-dot"></div>
-                <span class="phase-label">{{ phase.name }}</span>
-            </div>
-            }
-        </div>
-        @if (cycle()?.outcome === 'Ongoing') {
-        <button class="btn btn-primary btn-advance" (click)="advancePhase()">⏭️ Chuyển giai đoạn tiếp</button>
-        }
-    </section>
-
-    <!-- Tab Navigation -->
-    <nav class="tab-nav">
-        @for (tab of tabs; track tab.key) {
-        <button class="tab-btn" [class.active]="activeTab() === tab.key" (click)="selectTab(tab.key)">
-            <span class="tab-icon">{{ tab.icon }}</span>
-            <span class="tab-label">{{ tab.label }}</span>
-        </button>
-        }
-    </nav>
-
-    <!-- Tab Content -->
-    <section class="tab-content card">
-        @switch (activeTab()) {
-        @case ('indication') {
-        <app-indication-tab [cycleId]="cycleId()" (saved)="onTabSaved()"></app-indication-tab>
-        }
-        @case ('stimulation') {
-        <app-stimulation-tab [cycleId]="cycleId()" (saved)="onTabSaved()"></app-stimulation-tab>
-        }
-        @case ('culture') {
-        <app-culture-tab [cycleId]="cycleId()" (saved)="onTabSaved()"></app-culture-tab>
-        }
-        @case ('transfer') {
-        <app-transfer-tab [cycleId]="cycleId()" (saved)="onTabSaved()"></app-transfer-tab>
-        }
-        @case ('luteal') {
-        <app-luteal-tab [cycleId]="cycleId()" (saved)="onTabSaved()"></app-luteal-tab>
-        }
-        @case ('pregnancy') {
-        <app-pregnancy-tab [cycleId]="cycleId()" (saved)="onTabSaved()"></app-pregnancy-tab>
-        }
-        @case ('birth') {
-        <app-birth-tab [cycleId]="cycleId()" (saved)="onTabSaved()"></app-birth-tab>
-        }
-        @case ('adverse') {
-        <app-adverse-events-tab [cycleId]="cycleId()" (saved)="onTabSaved()"></app-adverse-events-tab>
-        }
-        }
-    </section>
-
-    <!-- Summary Cards -->
-    <div class="summary-grid">
-        <!-- Ultrasounds -->
-        <section class="summary-card card">
-            <h3>🔬 Siêu âm ({{ ultrasounds().length }})</h3>
-            <div class="summary-list">
-                @for (us of ultrasounds().slice(0, 3); track us.id) {
-                <div class="summary-item">
-                    <span class="item-date">{{ formatDate(us.examDate) }}</span>
-                    <span class="item-detail">T: {{ us.leftOvaryCount || 0 }} | P: {{ us.rightOvaryCount || 0 }} | NMTC:
-                        {{ us.endometriumThickness || 0 }}mm</span>
-                </div>
-                } @empty {
-                <p class="empty-state-text">Chưa có siêu âm</p>
-                }
-            </div>
-        </section>
-
-        <!-- Embryos -->
-        <section class="summary-card card">
-            <h3>🧬 Phôi ({{ embryos().length }})</h3>
-            <div class="embryo-mini-grid">
-                @for (embryo of embryos().slice(0, 6); track embryo.id) {
-                <div class="embryo-mini" [class]="(embryo.status || '').toLowerCase()"
-                    [title]="getEmbryoStatus(embryo.status)">
-                    <span class="em-num">#{{ embryo.embryoNumber }}</span>
-                    <span class="em-grade">{{ embryo.grade || '?' }}</span>
-                </div>
-                } @empty {
-                <p class="empty-state-text">Chưa có phôi</p>
-                }
-            </div>
-        </section>
+  <header class="page-header">
+    <div class="header-info">
+      <a routerLink="/couples" class="back-link">← Quay lại</a>
+      <h1>Chu kỳ {{ cycle()?.cycleCode }}</h1>
+      <div class="cycle-meta">
+        <span class="badge method">{{ getMethodName(cycle()?.method) }}</span>
+        <span class="badge phase">{{ getPhaseName(cycle()?.currentPhase) }}</span>
+        <span class="badge outcome" [class]="(cycle()?.outcome || '').toLowerCase()">
+          {{ getOutcomeName(cycle()?.outcome) }}
+        </span>
+      </div>
     </div>
+  </header>
 
+  <!-- Phase Timeline -->
+  <section class="timeline-section card">
+    <div class="phase-timeline">
+      @for (phase of phases; track phase.key; let i = $index) {
+        <div
+          class="phase-item"
+          [class.active]="isActivePhase(phase.key)"
+          [class.completed]="isCompletedPhase(phase.key, i)"
+        >
+          <div class="phase-dot"></div>
+          <span class="phase-label">{{ phase.name }}</span>
+        </div>
+      }
+    </div>
+    @if (cycle()?.outcome === 'Ongoing') {
+      <button class="btn btn-primary btn-advance" (click)="advancePhase()">
+        ⏭️ Chuyển giai đoạn tiếp
+      </button>
+    }
+  </section>
+
+  <!-- Tab Navigation -->
+  <nav class="tab-nav">
+    @for (tab of tabs; track tab.key) {
+      <button class="tab-btn" [class.active]="activeTab() === tab.key" (click)="selectTab(tab.key)">
+        <span class="tab-icon">{{ tab.icon }}</span>
+        <span class="tab-label">{{ tab.label }}</span>
+      </button>
+    }
+  </nav>
+
+  <!-- Tab Content -->
+  <section class="tab-content card">
+    @switch (activeTab()) {
+      @case ('indication') {
+        <app-indication-tab [cycleId]="cycleId()" (saved)="onTabSaved()"></app-indication-tab>
+      }
+      @case ('stimulation') {
+        <app-stimulation-tab [cycleId]="cycleId()" (saved)="onTabSaved()"></app-stimulation-tab>
+      }
+      @case ('culture') {
+        <app-culture-tab [cycleId]="cycleId()" (saved)="onTabSaved()"></app-culture-tab>
+      }
+      @case ('transfer') {
+        <app-transfer-tab [cycleId]="cycleId()" (saved)="onTabSaved()"></app-transfer-tab>
+      }
+      @case ('luteal') {
+        <app-luteal-tab [cycleId]="cycleId()" (saved)="onTabSaved()"></app-luteal-tab>
+      }
+      @case ('pregnancy') {
+        <app-pregnancy-tab [cycleId]="cycleId()" (saved)="onTabSaved()"></app-pregnancy-tab>
+      }
+      @case ('birth') {
+        <app-birth-tab [cycleId]="cycleId()" (saved)="onTabSaved()"></app-birth-tab>
+      }
+      @case ('adverse') {
+        <app-adverse-events-tab
+          [cycleId]="cycleId()"
+          (saved)="onTabSaved()"
+        ></app-adverse-events-tab>
+      }
+      @case ('forms') {
+        <app-forms-tab [cycleId]="cycleId()" [coupleId]="cycle()?.coupleId || ''"></app-forms-tab>
+      }
+    }
+  </section>
+
+  <!-- Summary Cards -->
+  <div class="summary-grid">
+    <!-- Ultrasounds -->
+    <section class="summary-card card">
+      <h3>🔬 Siêu âm ({{ ultrasounds().length }})</h3>
+      <div class="summary-list">
+        @for (us of ultrasounds().slice(0, 3); track us.id) {
+          <div class="summary-item">
+            <span class="item-date">{{ formatDate(us.examDate) }}</span>
+            <span class="item-detail"
+              >T: {{ us.leftOvaryCount || 0 }} | P: {{ us.rightOvaryCount || 0 }} | NMTC:
+              {{ us.endometriumThickness || 0 }}mm</span
+            >
+          </div>
+        } @empty {
+          <p class="empty-state-text">Chưa có siêu âm</p>
+        }
+      </div>
+    </section>
+
+    <!-- Embryos -->
+    <section class="summary-card card">
+      <h3>🧬 Phôi ({{ embryos().length }})</h3>
+      <div class="embryo-mini-grid">
+        @for (embryo of embryos().slice(0, 6); track embryo.id) {
+          <div
+            class="embryo-mini"
+            [class]="(embryo.status || '').toLowerCase()"
+            [title]="getEmbryoStatus(embryo.status)"
+          >
+            <span class="em-num">#{{ embryo.embryoNumber }}</span>
+            <span class="em-grade">{{ embryo.grade || '?' }}</span>
+          </div>
+        } @empty {
+          <p class="empty-state-text">Chưa có phôi</p>
+        }
+      </div>
+    </section>
+  </div>
 </div>

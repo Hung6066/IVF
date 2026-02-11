@@ -1,143 +1,223 @@
 <div class="report-viewer-container">
-    @if (reportData) {
+  @if (reportData) {
     <header class="report-header">
-        <div class="header-content">
-            <h1>{{ reportData.template.name }}</h1>
-            <p>{{ reportData.template.description }}</p>
-        </div>
-        <div class="header-actions">
-            <button class="btn btn-secondary" (click)="exportCSV()">📥 Xuất CSV</button>
-            <button class="btn btn-secondary" (click)="print()">🖨️ In</button>
-        </div>
+      <div class="header-content">
+        <h1>{{ reportData.template.name }}</h1>
+        <p>{{ reportData.template.description }}</p>
+      </div>
+      <div class="header-actions">
+        <button class="btn btn-config" (click)="openConfig()">⚙️ Cấu hình</button>
+        <button class="btn btn-pdf" (click)="exportPdf()" [disabled]="isExportingPdf">
+          @if (isExportingPdf) {
+            <span class="btn-spinner"></span> Đang xuất...
+          } @else {
+            📄 Xuất PDF
+          }
+        </button>
+        <button class="btn btn-pdf" (click)="exportPdf(true)" [disabled]="isExportingPdf" title="Xuất PDF có ký số">
+          @if (isExportingPdf) {
+            <span class="btn-spinner"></span> Đang ký...
+          } @else {
+            ✍️ Ký số PDF
+          }
+        </button>
+        <button class="btn btn-secondary" (click)="exportCSV()">📥 Xuất CSV</button>
+        <button class="btn btn-secondary" (click)="print()">🖨️ In</button>
+      </div>
     </header>
 
     <!-- Filters -->
     <div class="filters-bar">
-        <div class="filter-group">
-            <label>Từ ngày:</label>
-            <input type="date" [(ngModel)]="filterFrom" (change)="reload()">
-        </div>
-        <div class="filter-group">
-            <label>Đến ngày:</label>
-            <input type="date" [(ngModel)]="filterTo" (change)="reload()">
-        </div>
-        <button class="btn btn-primary" (click)="reload()">🔄 Tải lại</button>
+      <div class="filter-group">
+        <label>Từ ngày:</label>
+        <input type="date" [(ngModel)]="filterFrom" (change)="reload()" />
+      </div>
+      <div class="filter-group">
+        <label>Đến ngày:</label>
+        <input type="date" [(ngModel)]="filterTo" (change)="reload()" />
+      </div>
+      <button class="btn btn-primary" (click)="reload()">🔄 Tải lại</button>
     </div>
 
     <!-- Summary Cards -->
     @if (reportData.summary) {
-    <div class="summary-cards">
+      <div class="summary-cards">
         <div class="summary-card">
-            <span class="card-icon">📊</span>
-            <div class="card-content">
-                <h3>{{ reportData.summary.totalResponses }}</h3>
-                <p>Tổng phản hồi</p>
-            </div>
+          <span class="card-icon">📊</span>
+          <div class="card-content">
+            <h3>{{ reportData.summary.totalResponses }}</h3>
+            <p>Tổng phản hồi</p>
+          </div>
         </div>
         @for (avg of getAverages(); track avg.key) {
-        <div class="summary-card">
+          <div class="summary-card">
             <span class="card-icon">📈</span>
             <div class="card-content">
-                <h3>{{ avg.value | number:'1.2-2' }}</h3>
-                <p>TB {{ avg.key }}</p>
+              <h3>{{ avg.value | number: '1.2-2' }}</h3>
+              <p>TB {{ avg.key }}</p>
             </div>
-        </div>
+          </div>
         }
-    </div>
+      </div>
     }
 
     <!-- Report Content -->
     <div class="report-content">
-        @switch (reportData.template.reportType) {
+      @switch (reportData.template.reportType) {
         @case (ReportType.Table) {
-        <div class="table-wrapper">
-            <table class="data-table">
-                <thead>
-                    <tr>
+          @if (isGrouped) {
+            <!-- Grouped table -->
+            @for (group of getGroupedData(); track group.groupValue) {
+              <div class="group-section">
+                @if (config?.groupSummary?.showGroupHeaders) {
+                  <div class="group-header">
+                    📂 {{ getGroupLabel() }}: <strong>{{ group.groupValue }}</strong>
+                    <span class="group-count">({{ group.rows.length }} dòng)</span>
+                  </div>
+                }
+                <div class="table-wrapper">
+                  <table class="data-table">
+                    <thead>
+                      <tr>
                         @for (col of getColumns(); track col) {
-                        <th>{{ col }}</th>
+                          <th>{{ getColumnLabel(col) }}</th>
                         }
-                    </tr>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (row of group.rows; track $index) {
+                        <tr [ngStyle]="getRowStyles(row)">
+                          @for (col of getColumns(); track col) {
+                            <td [ngStyle]="getCellStyles(row, col)">{{ formatValue(row[col]) }}</td>
+                          }
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+                @if (
+                  config?.groupSummary?.showGroupFooters &&
+                  config?.groupSummary?.aggregations?.length
+                ) {
+                  <div class="group-footer">
+                    @for (agg of config!.groupSummary!.aggregations!; track $index) {
+                      <span class="agg-badge">
+                        {{ agg.label || agg.fieldKey }} {{ agg.type }}:
+                        {{ computeGroupAggregation(agg, group.rows) }}
+                      </span>
+                    }
+                  </div>
+                }
+              </div>
+            }
+          } @else {
+            <!-- Ungrouped table -->
+            <div class="table-wrapper">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    @for (col of getColumns(); track col) {
+                      <th>{{ getColumnLabel(col) }}</th>
+                    }
+                  </tr>
                 </thead>
                 <tbody>
-                    @for (row of reportData.data; track $index) {
-                    <tr>
-                        @for (col of getColumns(); track col) {
-                        <td>{{ formatValue(row[col]) }}</td>
-                        }
+                  @for (row of reportData.data; track $index) {
+                    <tr [ngStyle]="getRowStyles(row)">
+                      @for (col of getColumns(); track col) {
+                        <td [ngStyle]="getCellStyles(row, col)">{{ formatValue(row[col]) }}</td>
+                      }
                     </tr>
-                    }
+                  }
                 </tbody>
-            </table>
-        </div>
+                @if (hasFooterAggregations) {
+                  <tfoot>
+                    <tr class="agg-footer">
+                      @for (col of getColumns(); track col) {
+                        <td>
+                          @if (computeColumnAggregation(col)) {
+                            <strong>{{ computeColumnAggregation(col) }}</strong>
+                          }
+                        </td>
+                      }
+                    </tr>
+                  </tfoot>
+                }
+              </table>
+            </div>
+          }
         }
         @case (ReportType.BarChart) {
-        <div class="chart-container">
+          <div class="chart-container">
             <div class="simple-bar-chart">
-                @for (item of getChartData(); track item.label) {
+              @for (item of getChartData(); track item.label) {
                 <div class="bar-item">
-                    <span class="bar-label">{{ item.label }}</span>
-                    <div class="bar-track">
-                        <div class="bar-fill" [style.width.%]="item.percentage"></div>
-                    </div>
-                    <span class="bar-value">{{ item.value }}</span>
+                  <span class="bar-label">{{ item.label }}</span>
+                  <div class="bar-track">
+                    <div class="bar-fill" [style.width.%]="item.percentage"></div>
+                  </div>
+                  <span class="bar-value">{{ item.value }}</span>
                 </div>
-                }
+              }
             </div>
-        </div>
+          </div>
         }
         @case (ReportType.PieChart) {
-        <div class="chart-container">
+          <div class="chart-container">
             <div class="pie-legend">
-                @for (item of getChartData(); track item.label) {
+              @for (item of getChartData(); track item.label) {
                 <div class="legend-item">
-                    <span class="legend-color" [style.background]="item.color"></span>
-                    <span>{{ item.label }}: {{ item.value }} ({{ item.percentage | number:'1.1-1' }}%)</span>
+                  <span class="legend-color" [style.background]="item.color"></span>
+                  <span
+                    >{{ item.label }}: {{ item.value }} ({{
+                      item.percentage | number: '1.1-1'
+                    }}%)</span
+                  >
                 </div>
-                }
+              }
             </div>
-        </div>
+          </div>
         }
         @case (ReportType.Summary) {
-        <div class="summary-report">
+          <div class="summary-report">
             <div class="stat-grid">
-                @for (stat of getValueCounts(); track stat.key) {
+              @for (stat of getValueCounts(); track stat.key) {
                 <div class="stat-item">
-                    <span class="stat-value">{{ stat.count }}</span>
-                    <span class="stat-label">{{ stat.key }}</span>
+                  <span class="stat-value">{{ stat.count }}</span>
+                  <span class="stat-label">{{ stat.key }}</span>
                 </div>
-                }
+              }
             </div>
-        </div>
+          </div>
         }
         @default {
-        <div class="table-wrapper">
+          <div class="table-wrapper">
             <table class="data-table">
-                <thead>
-                    <tr>
-                        @for (col of getColumns(); track col) {
-                        <th>{{ col }}</th>
-                        }
-                    </tr>
-                </thead>
-                <tbody>
-                    @for (row of reportData.data; track $index) {
-                    <tr>
-                        @for (col of getColumns(); track col) {
-                        <td>{{ formatValue(row[col]) }}</td>
-                        }
-                    </tr>
+              <thead>
+                <tr>
+                  @for (col of getColumns(); track col) {
+                    <th>{{ getColumnLabel(col) }}</th>
+                  }
+                </tr>
+              </thead>
+              <tbody>
+                @for (row of reportData.data; track $index) {
+                  <tr [ngStyle]="getRowStyles(row)">
+                    @for (col of getColumns(); track col) {
+                      <td [ngStyle]="getCellStyles(row, col)">{{ formatValue(row[col]) }}</td>
                     }
-                </tbody>
+                  </tr>
+                }
+              </tbody>
             </table>
-        </div>
+          </div>
         }
-        }
+      }
     </div>
-    } @else {
+  } @else {
     <div class="loading">
-        <div class="spinner"></div>
-        <p>Đang tải báo cáo...</p>
+      <div class="spinner"></div>
+      <p>Đang tải báo cáo...</p>
     </div>
-    }
+  }
 </div>

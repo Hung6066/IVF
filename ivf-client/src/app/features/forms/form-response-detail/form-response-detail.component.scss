@@ -377,6 +377,119 @@
   }
 }
 
+// Spinner for PDF loading
+.btn-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 4px;
+}
+
+// PDF Preview Modal
+.pdf-backdrop {
+  backdrop-filter: blur(4px);
+}
+
+.pdf-preview-modal {
+  background: white;
+  border-radius: 16px;
+  width: 92vw;
+  max-width: 960px;
+  height: 88vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+}
+
+.pdf-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  border-bottom: 1px solid #e2e8f0;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+
+  h3 {
+    margin: 0;
+    font-size: 16px;
+    color: white;
+    font-weight: 600;
+  }
+}
+
+.pdf-preview-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-pdf-download {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  &:hover {
+    background: rgba(255, 255, 255, 0.3);
+  }
+}
+
+.btn-pdf-print {
+  background: rgba(255, 255, 255, 0.15);
+  color: white;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  &:hover {
+    background: rgba(255, 255, 255, 0.25);
+  }
+}
+
+.btn-pdf-close {
+  background: rgba(255, 255, 255, 0.15);
+  color: white;
+  padding: 8px 14px;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  &:hover {
+    background: rgba(255, 255, 255, 0.3);
+  }
+}
+
+.pdf-preview-body {
+  flex: 1;
+  overflow: hidden;
+  background: #f1f5f9;
+}
+
+.pdf-iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+.modal-btn {
+  background: #f1f5f9 !important;
+  color: #475569 !important;
+  &:hover {
+    background: #e2e8f0 !important;
+  }
+}
+
 .btn-primary {
   background: rgba(255, 255, 255, 0.25);
   color: white;

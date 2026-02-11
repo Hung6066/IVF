@@ -111,19 +111,37 @@
 .checkbox-group {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 
 .radio-option,
 .checkbox-option {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  align-items: flex-start;
+  gap: 12px;
   cursor: pointer;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  transition: all 0.15s;
+
+  &:hover {
+    background: #f8fafc;
+    border-color: #e2e8f0;
+  }
 
   input {
-    width: 18px;
-    height: 18px;
+    width: 20px;
+    height: 20px;
+    margin-top: 1px;
+    accent-color: #667eea;
+    flex-shrink: 0;
+  }
+
+  span {
+    font-size: 14px;
+    line-height: 1.5;
+    color: #334155;
   }
 }
 
@@ -149,28 +167,47 @@
 
 // ===== Section & Label =====
 .section-header {
-  padding: 20px 0 12px;
-  border-bottom: 2px solid #e2e8f0;
-  margin-top: 8px;
+  padding: 24px 0 14px;
+  border-bottom: 3px solid #667eea;
+  margin-top: 12px;
+  position: relative;
+
+  &::before {
+    content: '';
+    position: absolute;
+    bottom: -3px;
+    left: 0;
+    width: 60px;
+    height: 3px;
+    background: #764ba2;
+  }
 
   h3 {
-    margin: 0 0 4px;
+    margin: 0 0 6px;
     color: #1e293b;
-    font-size: 16px;
-    font-weight: 600;
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -0.2px;
   }
 
   p {
     margin: 0;
     color: #64748b;
     font-size: 14px;
+    line-height: 1.5;
   }
 }
 
 .label-field p {
   margin: 0;
-  color: #64748b;
+  color: #475569;
   font-style: italic;
+  font-size: 14px;
+  line-height: 1.6;
+  padding: 8px 14px;
+  background: #f8fafc;
+  border-left: 3px solid #cbd5e1;
+  border-radius: 4px;
 }
 
 // ===== Tags / Mention =====
@@ -428,7 +465,7 @@
 .signature-field {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 
   .signature-canvas {
     border: 2px dashed #cbd5e1;
@@ -437,6 +474,7 @@
     touch-action: none;
     background: #fafbfc;
     transition: border-color 0.2s;
+    position: relative;
 
     &:hover {
       border-color: #667eea;
@@ -449,12 +487,13 @@
     gap: 12px;
 
     .btn-clear-sig {
-      padding: 6px 14px;
+      padding: 8px 16px;
       background: #fee2e2;
       color: #dc2626;
       border: none;
       border-radius: 8px;
       font-size: 13px;
+      font-weight: 500;
       cursor: pointer;
       transition: background 0.2s;
 
@@ -466,7 +505,7 @@
     .sig-status {
       font-size: 13px;
       color: #16a34a;
-      font-weight: 500;
+      font-weight: 600;
     }
   }
 }

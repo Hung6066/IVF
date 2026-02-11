@@ -15,7 +15,7 @@ services:
       - ivf-network
     restart: unless-stopped
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -34,8 +34,12 @@ services:
       - JwtSettings__Secret=SuperSecretKeyForDevelopmentOnly123!@#
       - JwtSettings__Issuer=IVF_System
       - JwtSettings__Audience=IVF_Users
-    ports:
+      - DigitalSigning__SignServerUrl=http://signserver:8080/signserver
+      - DigitalSigning__WorkerName=PDFSigner
+      - DigitalSigning__Enabled=true    ports:
       - "5000:8080"
+    volumes:
+      - ./certs/ejbca-admin.p12:/app/certs/ejbca-admin.p12:ro
     depends_on:
       db:
         condition: service_healthy
@@ -55,9 +59,133 @@ services:
       - ivf-network
     restart: unless-stopped
 
+  # =============================================
+  # EJBCA - Certificate Authority
+  # Quản lý chứng thư số (CA, phát hành, thu hồi)
+  # Admin UI: https://localhost:8443/ejbca/adminweb/
+  # Public UI: https://localhost:8443/ejbca/
+  # =============================================
+  ejbca:
+    image: keyfactor/ejbca-ce:latest
+    container_name: ivf-ejbca
+    hostname: ejbca.ivf.local
+    environment:
+      - DATABASE_JDBC_URL=jdbc:postgresql://ejbca-db:5432/ejbca
+      - DATABASE_USER=ejbca
+      - DATABASE_PASSWORD=ejbca_secret
+      - TLS_SETUP_ENABLED=simple
+      # Initial admin setup
+      - INITIAL_ADMIN=;PublicAccessAuthenticationToken:TRANSPORT_ANY;
+    ports:
+      - "8443:8443" # HTTPS Admin/Public web (EJBCA admin)
+      - "8442:8080" # HTTP (public enrollment)
+    volumes:
+      - ejbca_persistent:/opt/keyfactor/persistent
+    depends_on:
+      ejbca-db:
+        condition: service_healthy
+    networks:
+      - ivf-network
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "curl",
+          "-fk",
+          "https://localhost:8443/ejbca/publicweb/healthcheck/ejbcahealth",
+        ]
+      interval: 30s
+      timeout: 15s
+      retries: 10
+      start_period: 120s
+
+  # EJBCA Database (separate from IVF DB)
+  ejbca-db:
+    image: postgres:16-alpine
+    container_name: ivf-ejbca-db
+    environment:
+      - POSTGRES_USER=ejbca
+      - POSTGRES_PASSWORD=ejbca_secret
+      - POSTGRES_DB=ejbca
+    volumes:
+      - ejbca_db_data:/var/lib/postgresql/data
+    networks:
+      - ivf-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ejbca"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # =============================================
+  # SignServer - Document Signing Service
+  # Ký số PDF sử dụng chứng thư từ EJBCA
+  # Admin UI: https://localhost:9443/signserver/adminweb/
+  # REST API: http://localhost:9080/signserver/process
+  # =============================================
+  signserver:
+    image: keyfactor/signserver-ce:latest
+    container_name: ivf-signserver
+    hostname: signserver.ivf.local
+    environment:
+      - DATABASE_JDBC_URL=jdbc:postgresql://signserver-db:5432/signserver
+      - DATABASE_USER=signserver
+      - DATABASE_PASSWORD=signserver_secret
+      - TLS_SETUP_ENABLED=simple
+      - INITIAL_ADMIN=;PublicAccessAuthenticationToken:TRANSPORT_ANY;
+    ports:
+      - "9443:8443" # HTTPS Admin web
+      - "9080:8080" # HTTP REST API for signing
+    volumes:
+      - signserver_persistent:/opt/keyfactor/persistent
+    depends_on:
+      signserver-db:
+        condition: service_healthy
+      ejbca:
+        condition: service_healthy
+    networks:
+      - ivf-network
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "curl",
+          "-fk",
+          "https://localhost:8443/signserver/healthcheck/signserverhealth",
+        ]
+      interval: 30s
+      timeout: 15s
+      retries: 10
+      start_period: 120s
+
+  # SignServer Database
+  signserver-db:
+    image: postgres:16-alpine
+    container_name: ivf-signserver-db
+    environment:
+      - POSTGRES_USER=signserver
+      - POSTGRES_PASSWORD=signserver_secret
+      - POSTGRES_DB=signserver
+    volumes:
+      - signserver_db_data:/var/lib/postgresql/data
+    networks:
+      - ivf-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U signserver"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
 volumes:
   postgres_data:
-
+  ejbca_persistent:
+  ejbca_db_data:
+  signserver_persistent:
+  signserver_db_data:
 
 networks:
   ivf-network:

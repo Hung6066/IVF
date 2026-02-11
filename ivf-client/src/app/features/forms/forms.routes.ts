@@ -61,4 +61,16 @@ export const FORMS_ROUTES: Routes = [
     loadComponent: () =>
       import('./report-viewer/report-viewer.component').then((m) => m.ReportViewerComponent),
   },
+  {
+    path: 'reports/:id/config',
+    loadComponent: () =>
+      import('./report-config-editor/report-config-editor.component').then(
+        (m) => m.ReportConfigEditorComponent,
+      ),
+  },
+  {
+    path: 'reports/:id/designer',
+    loadComponent: () =>
+      import('./report-designer/report-designer.component').then((m) => m.ReportDesignerComponent),
+  },
 ];

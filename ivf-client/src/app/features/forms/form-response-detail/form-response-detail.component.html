@@ -30,7 +30,22 @@
           <a class="btn btn-primary" [routerLink]="['/forms/edit', response.id]">✏️ Sửa</a>
         }
         <button class="btn btn-secondary" (click)="print()">🖨️ In</button>
-        <button class="btn btn-secondary" (click)="exportPdf()">📄 PDF</button>
+        <button class="btn btn-secondary" (click)="exportPdf()" [disabled]="isLoadingPdf">
+          @if (isLoadingPdf) {
+            <span class="btn-spinner"></span>
+          } @else {
+            📄
+          }
+          PDF
+        </button>
+        <button class="btn btn-secondary" (click)="exportPdf(true)" [disabled]="isLoadingPdf" title="Xuất PDF có ký số">
+          @if (isLoadingPdf) {
+            <span class="btn-spinner"></span>
+          } @else {
+            ✍️
+          }
+          Ký số
+        </button>
         <button class="btn btn-danger-outline" (click)="deleteResponse()">🗑️ Xóa</button>
       </div>
     </header>
@@ -131,10 +146,29 @@
             class="reject-textarea"
           ></textarea>
           <div class="modal-actions">
-            <button class="btn btn-secondary" (click)="cancelReject()">Hủy</button>
+            <button class="btn btn-secondary modal-btn" (click)="cancelReject()">Hủy</button>
             <button class="btn btn-danger" (click)="confirmReject()" [disabled]="isProcessing">
               Xác nhận từ chối
             </button>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- PDF Preview Modal -->
+    @if (showPdfPreview && pdfPreviewUrl) {
+      <div class="modal-backdrop pdf-backdrop" (click)="closePdfPreview()">
+        <div class="pdf-preview-modal" (click)="$event.stopPropagation()">
+          <div class="pdf-preview-header">
+            <h3>📄 {{ response.formTemplateName }}</h3>
+            <div class="pdf-preview-actions">
+              <button class="btn btn-pdf-download" (click)="downloadPdf()">⬇️ Tải xuống</button>
+              <button class="btn btn-pdf-print" (click)="print()">🖨️ In</button>
+              <button class="btn btn-pdf-close" (click)="closePdfPreview()">✕</button>
+            </div>
+          </div>
+          <div class="pdf-preview-body">
+            <iframe [src]="pdfPreviewUrl" class="pdf-iframe"></iframe>
           </div>
         </div>
       </div>

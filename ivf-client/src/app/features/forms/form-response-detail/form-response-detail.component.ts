@@ -2,6 +2,7 @@ import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import {
   FormsService,
   FormResponse,
@@ -23,6 +24,7 @@ export class FormResponseDetailComponent implements OnInit {
   private readonly formsService = inject(FormsService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly sanitizer = inject(DomSanitizer);
 
   ResponseStatus = ResponseStatus;
   response: FormResponse | null = null;
@@ -33,6 +35,12 @@ export class FormResponseDetailComponent implements OnInit {
   showRejectDialog = false;
   rejectNotes = '';
   isProcessing = false;
+
+  // PDF preview
+  showPdfPreview = false;
+  pdfPreviewUrl: SafeResourceUrl | null = null;
+  isLoadingPdf = false;
+  private pdfBlob: Blob | null = null;
 
   // Status workflow steps
   get workflowSteps() {
@@ -350,19 +358,56 @@ export class FormResponseDetailComponent implements OnInit {
     window.print();
   }
 
-  exportPdf() {
+  exportPdf(sign = false) {
     if (!this.response) return;
-    this.formsService.exportResponsePdf(this.response.id).subscribe({
+    this.isLoadingPdf = true;
+    this.formsService.exportResponsePdf(this.response.id, sign).subscribe({
       next: (blob) => {
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${this.response!.formTemplateName.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`;
-        a.click();
-        window.URL.revokeObjectURL(url);
+        // Ensure correct MIME type for PDF rendering in iframe
+        const pdfBlob = new Blob([blob], { type: 'application/pdf' });
+        this.pdfBlob = pdfBlob;
+        const url = URL.createObjectURL(pdfBlob);
+        this.pdfPreviewUrl = this.sanitizer.bypassSecurityTrustResourceUrl(url);
+        this.showPdfPreview = true;
+        this.isLoadingPdf = false;
       },
-      error: () => alert('Có lỗi khi xuất PDF'),
+      error: (err) => {
+        this.isLoadingPdf = false;
+        // Try to extract error message from JSON response
+        if (err.error instanceof Blob) {
+          const reader = new FileReader();
+          reader.onload = () => {
+            try {
+              const json = JSON.parse(reader.result as string);
+              alert(json.error || json.detail || 'Có lỗi khi xuất PDF');
+            } catch {
+              alert('Có lỗi khi xuất PDF');
+            }
+          };
+          reader.readAsText(err.error);
+        } else if (err.error?.error) {
+          alert(err.error.error);
+        } else {
+          alert('Có lỗi khi xuất PDF');
+        }
+      },
     });
+  }
+
+  closePdfPreview() {
+    this.showPdfPreview = false;
+    this.pdfPreviewUrl = null;
+    this.pdfBlob = null;
+  }
+
+  downloadPdf() {
+    if (!this.pdfBlob || !this.response) return;
+    const url = URL.createObjectURL(this.pdfBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${this.response.formTemplateName.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   markAsReviewed() {

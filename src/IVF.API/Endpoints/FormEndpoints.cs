@@ -1,9 +1,11 @@
+using System.Security.Claims;
 using IVF.API.Services;
 using IVF.Application.Common.Interfaces;
 using IVF.Application.Features.Forms.Commands;
 using IVF.Application.Features.Forms.Queries;
 using IVF.Domain.Enums;
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 
 namespace IVF.API.Endpoints;
 
@@ -184,17 +186,167 @@ public static class FormEndpoints
             return r.IsSuccess ? Results.NoContent() : Results.NotFound();
         });
 
-        group.MapGet("/responses/{id:guid}/export-pdf", async (Guid id, IMediator m) =>
+        group.MapGet("/responses/{id:guid}/export-pdf", async (Guid id, IMediator m, IDigitalSigningService signingService, ClaimsPrincipal principal, IVF.Infrastructure.Persistence.IvfDbContext db, Guid? reportTemplateId = null, bool sign = false) =>
         {
-            var response = await m.Send(new GetFormResponseByIdQuery(id));
-            if (response == null) return Results.NotFound();
+            try
+            {
+                var response = await m.Send(new GetFormResponseByIdQuery(id));
+                if (response == null) return Results.NotFound();
 
-            var template = await m.Send(new GetFormTemplateByIdQuery(response.FormTemplateId));
-            if (template == null) return Results.NotFound();
+                var template = await m.Send(new GetFormTemplateByIdQuery(response.FormTemplateId));
+                if (template == null) return Results.NotFound();
 
-            var pdfBytes = FormPdfService.GeneratePdf(response, template);
-            var fileName = $"{template.Name.Replace(" ", "_")}_{response.CreatedAt:yyyyMMdd}.pdf";
-            return Results.File(pdfBytes, "application/pdf", fileName);
+                // Check for band-based report designer template
+                ReportTemplateDto? reportTemplate = null;
+                if (reportTemplateId.HasValue)
+                {
+                    reportTemplate = await m.Send(new GetReportTemplateByIdQuery(reportTemplateId.Value));
+                }
+                else
+                {
+                    // Auto-discover: find the first band-based report template for this form
+                    var reportTemplates = await m.Send(new GetReportTemplatesQuery(response.FormTemplateId));
+                    reportTemplate = reportTemplates.FirstOrDefault(rt =>
+                        !string.IsNullOrWhiteSpace(rt.ConfigurationJson)
+                        && rt.ConfigurationJson.Contains("\"bands\""));
+                }
+
+                // If a band-based report template exists, use ReportPdfService
+                if (reportTemplate != null
+                    && !string.IsNullOrWhiteSpace(reportTemplate.ConfigurationJson)
+                    && reportTemplate.ConfigurationJson.Contains("\"bands\""))
+                {
+                    // Convert single response to the data format ReportPdfService expects
+                    var dataRow = new Dictionary<string, object?>
+                    {
+                        ["patientName"] = response.PatientName ?? "",
+                        ["submittedAt"] = response.SubmittedAt?.ToString("o") ?? response.CreatedAt.ToString("o"),
+                        ["status"] = response.Status.ToString()
+                    };
+
+                    // Add all field values as flat key-value pairs
+                    if (response.FieldValues != null)
+                    {
+                        foreach (var fv in response.FieldValues)
+                        {
+                            var key = fv.FieldKey ?? fv.FormFieldId.ToString();
+                            object? value = fv.NumericValue.HasValue ? fv.NumericValue.Value
+                                : fv.DateValue.HasValue ? fv.DateValue.Value
+                                : fv.BooleanValue.HasValue ? fv.BooleanValue.Value
+                                : !string.IsNullOrEmpty(fv.JsonValue) ? fv.JsonValue
+                                : fv.TextValue;
+                            dataRow[key] = value;
+                        }
+                    }
+
+                    var reportData = new ReportDataDto(
+                        reportTemplate,
+                        [dataRow],
+                        null
+                    );
+
+                    // Load user signature for embedding in signatureZone controls
+                    IVF.Domain.Entities.UserSignature? userSig = null;
+                    var userId = Guid.TryParse(principal.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var uid) ? uid : (Guid?)null;
+                    if (sign)
+                    {
+                        if (!userId.HasValue)
+                            return Results.BadRequest(new { error = "Không xác định được người dùng. Vui lòng đăng nhập lại." });
+
+                        userSig = await db.UserSignatures
+                            .Include(s => s.User)
+                            .Where(s => s.UserId == userId.Value && !s.IsDeleted && s.IsActive)
+                            .FirstOrDefaultAsync();
+
+                        if (userSig == null || string.IsNullOrEmpty(userSig.SignatureImageBase64))
+                            return Results.BadRequest(new { error = "Bạn chưa tải lên chữ ký số. Vui lòng vào Quản trị → Ký số → tab Chữ ký để tải lên chữ ký của bạn." });
+                    }
+
+                    // Build signature context for rendering handwritten signatures in signatureZone controls
+                    ReportPdfService.SignatureContext? sigContext = null;
+                    if (sign && userSig != null)
+                    {
+                        // Strip data URI prefix if present (e.g. "data:image/png;base64,...")
+                        var base64 = userSig.SignatureImageBase64;
+                        if (base64.Contains(","))
+                            base64 = base64[(base64.IndexOf(',') + 1)..];
+
+                        sigContext = new ReportPdfService.SignatureContext(
+                            SignerName: userSig.User?.FullName,
+                            SignatureImageBytes: Convert.FromBase64String(base64),
+                            SignedDate: DateTime.Now.ToString("dd/MM/yyyy"));
+                    }
+
+                    var pdfBytes = ReportPdfService.GenerateReportPdf(reportData, signatureContext: sigContext);
+
+                    // Cryptographic digital signing via SignServer (after visible signature is embedded)
+                    if (sign && signingService.IsEnabled)
+                    {
+                        var metadata = new SigningMetadata(
+                            Reason: $"Xác nhận phiếu: {template.Name}",
+                            Location: "IVF Clinic",
+                            SignerName: userSig?.User?.FullName ?? response.PatientName);
+
+                        if (userSig != null && userSig.CertStatus == IVF.Domain.Entities.CertificateStatus.Active
+                            && !string.IsNullOrEmpty(userSig.WorkerName))
+                        {
+                            // Per-user worker signing (signature already embedded, no need for overlay)
+                            pdfBytes = await signingService.SignPdfWithUserAsync(
+                                pdfBytes, userSig.WorkerName, metadata);
+                        }
+                        else
+                        {
+                            pdfBytes = await signingService.SignPdfAsync(pdfBytes, metadata);
+                        }
+                    }
+
+                    var fileName = $"{template.Name.Replace(" ", "_")}_{response.CreatedAt:yyyyMMdd}.pdf";
+                    return Results.File(pdfBytes, "application/pdf", fileName);
+                }
+                else
+                {
+                    // Fallback to hardcoded FormPdfService
+                    var pdfBytes = FormPdfService.GeneratePdf(response, template);
+
+                    // Digitally sign if requested and signing is enabled
+                    if (sign && signingService.IsEnabled)
+                    {
+                        var metadata = new SigningMetadata(
+                            Reason: $"Xác nhận phiếu: {template.Name}",
+                            Location: "IVF Clinic",
+                            SignerName: response.PatientName);
+
+                        var userId2 = Guid.TryParse(principal.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var uid2) ? uid2 : (Guid?)null;
+                        var userSig2 = userId2.HasValue
+                            ? await db.UserSignatures
+                                .Where(s => s.UserId == userId2.Value && !s.IsDeleted && s.IsActive && s.WorkerName != null)
+                                .FirstOrDefaultAsync()
+                            : null;
+
+                        if (userSig2 != null && userSig2.CertStatus == IVF.Domain.Entities.CertificateStatus.Active)
+                        {
+                            byte[]? sigImage2 = !string.IsNullOrEmpty(userSig2.SignatureImageBase64)
+                                ? Convert.FromBase64String(userSig2.SignatureImageBase64) : null;
+                            pdfBytes = await signingService.SignPdfWithUserAsync(
+                                pdfBytes, userSig2.WorkerName!, metadata, sigImage2);
+                        }
+                        else
+                        {
+                            pdfBytes = await signingService.SignPdfAsync(pdfBytes, metadata);
+                        }
+                    }
+
+                    var fileName = $"{template.Name.Replace(" ", "_")}_{response.CreatedAt:yyyyMMdd}.pdf";
+                    return Results.File(pdfBytes, "application/pdf", fileName);
+                }
+            }
+            catch (Exception ex)
+            {
+                return Results.Problem(
+                    detail: ex.ToString(),
+                    statusCode: 500,
+                    title: "PDF generation failed");
+            }
         });
 
         #endregion
@@ -216,10 +368,14 @@ public static class FormEndpoints
             return result != null ? Results.Ok(result) : Results.NotFound();
         });
 
-        group.MapPost("/reports", async (CreateReportTemplateRequest req, IMediator m) =>
+        group.MapPost("/reports", async (CreateReportTemplateRequest req, ClaimsPrincipal principal, IMediator m) =>
         {
+            var userIdClaim = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
+                return Results.Unauthorized();
+
             var r = await m.Send(new CreateReportTemplateCommand(
-                req.FormTemplateId, req.Name, req.Description, req.ReportType, req.ConfigurationJson, req.CreatedByUserId));
+                req.FormTemplateId, req.Name, req.Description, req.ReportType, req.ConfigurationJson, userId));
             return r.IsSuccess ? Results.Created($"/api/forms/reports/{r.Value!.Id}", r.Value) : Results.BadRequest(r.Error);
         });
 
@@ -247,6 +403,74 @@ public static class FormEndpoints
             {
                 var result = await m.Send(new GenerateReportQuery(id, from, to, patientId));
                 return Results.Ok(result);
+            }
+            catch (ArgumentException ex)
+            {
+                return Results.NotFound(ex.Message);
+            }
+        });
+
+        group.MapGet("/reports/{id:guid}/export-pdf", async (Guid id, IMediator m, IDigitalSigningService signingService, ClaimsPrincipal principal, IVF.Infrastructure.Persistence.IvfDbContext db, DateTime? from = null, DateTime? to = null, Guid? patientId = null, bool sign = false) =>
+        {
+            try
+            {
+                var result = await m.Send(new GenerateReportQuery(id, from, to, patientId));
+
+                // Load user signature for embedding in signatureZone controls
+                IVF.Domain.Entities.UserSignature? userSig = null;
+                var userId = Guid.TryParse(principal.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var uid) ? uid : (Guid?)null;
+                if (sign)
+                {
+                    if (!userId.HasValue)
+                        return Results.BadRequest(new { error = "Không xác định được người dùng. Vui lòng đăng nhập lại." });
+
+                    userSig = await db.UserSignatures
+                        .Include(s => s.User)
+                        .Where(s => s.UserId == userId.Value && !s.IsDeleted && s.IsActive)
+                        .FirstOrDefaultAsync();
+
+                    if (userSig == null || string.IsNullOrEmpty(userSig.SignatureImageBase64))
+                        return Results.BadRequest(new { error = "Bạn chưa tải lên chữ ký số. Vui lòng vào Quản trị → Ký số → tab Chữ ký để tải lên chữ ký của bạn." });
+                }
+
+                ReportPdfService.SignatureContext? sigContext = null;
+                if (sign && userSig != null)
+                {
+                    // Strip data URI prefix if present
+                    var base64 = userSig.SignatureImageBase64;
+                    if (base64.Contains(","))
+                        base64 = base64[(base64.IndexOf(',') + 1)..];
+
+                    sigContext = new ReportPdfService.SignatureContext(
+                        SignerName: userSig.User?.FullName,
+                        SignatureImageBytes: Convert.FromBase64String(base64),
+                        SignedDate: DateTime.Now.ToString("dd/MM/yyyy"));
+                }
+
+                var pdfBytes = ReportPdfService.GenerateReportPdf(result, from, to, sigContext);
+
+                // Cryptographic digital signing via SignServer
+                if (sign && signingService.IsEnabled)
+                {
+                    var metadata = new SigningMetadata(
+                        Reason: $"Xác nhận báo cáo: {result.Template.Name}",
+                        Location: "IVF Clinic",
+                        SignerName: userSig?.User?.FullName);
+
+                    if (userSig != null && userSig.CertStatus == IVF.Domain.Entities.CertificateStatus.Active
+                        && !string.IsNullOrEmpty(userSig.WorkerName))
+                    {
+                        pdfBytes = await signingService.SignPdfWithUserAsync(
+                            pdfBytes, userSig.WorkerName, metadata);
+                    }
+                    else
+                    {
+                        pdfBytes = await signingService.SignPdfAsync(pdfBytes, metadata);
+                    }
+                }
+
+                var fileName = $"Report_{result.Template.Name.Replace(" ", "_")}_{DateTime.Now:yyyyMMdd_HHmm}.pdf";
+                return Results.File(pdfBytes, "application/pdf", fileName);
             }
             catch (ArgumentException ex)
             {
@@ -367,7 +591,7 @@ public record UpdateResponseStatusRequest(ResponseStatus NewStatus, string? Note
 
 public record CreateReportTemplateRequest(
     Guid FormTemplateId, string Name, string? Description,
-    ReportType ReportType, string ConfigurationJson, Guid CreatedByUserId);
+    ReportType ReportType, string ConfigurationJson);
 
 public record UpdateReportTemplateRequest(
     string Name, string? Description, ReportType ReportType, string ConfigurationJson);

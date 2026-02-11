@@ -1,0 +1,713 @@
+<div class="config-editor-container">
+  @if (report) {
+    <!-- Header -->
+    <header class="editor-header">
+      <div class="header-left">
+        <button class="btn btn-ghost" (click)="goBack()">← Quay lai</button>
+        <div class="header-info">
+          <h1>⚙️ Cau hinh bao cao</h1>
+          <p>{{ report.name }} — {{ getReportTypeName() }}</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        @if (isDirty) {
+          <span class="unsaved-badge">● Chua luu</span>
+        }
+        <button class="btn btn-secondary" (click)="save()" [disabled]="isSaving || !isDirty">
+          @if (isSaving) { <span class="spinner-sm"></span> }
+          💾 Luu
+        </button>
+        <button class="btn btn-primary" (click)="saveAndPreview()" [disabled]="isSaving">
+          ▶️ Luu & Xem
+        </button>
+      </div>
+    </header>
+
+    <!-- Tab Navigation -->
+    <nav class="tabs">
+      <button class="tab" [class.active]="activeTab === 'columns'" (click)="activeTab = 'columns'">
+        📋 Cot hien thi
+      </button>
+      <button class="tab" [class.active]="activeTab === 'filters'" (click)="activeTab = 'filters'">
+        🔍 Bo loc
+      </button>
+      @if (isChartType) {
+        <button class="tab" [class.active]="activeTab === 'chart'" (click)="activeTab = 'chart'">
+          📊 Bieu do
+        </button>
+      }
+      <button class="tab" [class.active]="activeTab === 'formatting'" (click)="activeTab = 'formatting'">
+        🎨 Dinh dang
+      </button>
+      <button class="tab" [class.active]="activeTab === 'computed'" (click)="activeTab = 'computed'">
+        🧮 Tinh toan
+      </button>
+      <button class="tab" [class.active]="activeTab === 'page'" (click)="activeTab = 'page'">
+        📄 Trang
+      </button>
+      <button class="tab" [class.active]="activeTab === 'header'" (click)="activeTab = 'header'">
+        📝 Dau/Cuoi trang
+      </button>
+      <button class="tab" [class.active]="activeTab === 'preview'" (click)="activeTab = 'preview'; loadPreview()">
+        👁️ Xem truoc
+      </button>
+    </nav>
+
+    <!-- Tab Content -->
+    <div class="tab-content">
+
+      <!-- ========== COLUMNS TAB (CDK DragDrop) ========== -->
+      @if (activeTab === 'columns') {
+        <div class="panel">
+          <div class="panel-header">
+            <h3>Cot hien thi trong bao cao</h3>
+            <div class="panel-actions">
+              <button class="btn-sm btn-outline" (click)="toggleAllColumns(true)">Chon tat ca</button>
+              <button class="btn-sm btn-outline" (click)="toggleAllColumns(false)">Bo chon tat ca</button>
+            </div>
+          </div>
+
+          <div class="columns-list" cdkDropList (cdkDropListDropped)="dropColumn($event)">
+            @for (col of config.columns; track col.fieldKey; let i = $index) {
+              <div class="column-item" [class.disabled]="!col.visible" cdkDrag>
+                <div class="drag-handle" cdkDragHandle>
+                  <span class="drag-icon">⠿</span>
+                </div>
+
+                <div class="column-toggle">
+                  <label class="checkbox-label">
+                    <input type="checkbox" [checked]="col.visible" (change)="toggleColumn(col)" />
+                    <span class="checkmark"></span>
+                  </label>
+                </div>
+
+                <div class="column-info">
+                  <span class="column-label">{{ col.label }}</span>
+                  <span class="column-key">{{ col.fieldKey }}</span>
+                </div>
+
+                <div class="column-format">
+                  <select [(ngModel)]="col.format" (ngModelChange)="markDirty()">
+                    <option value="text">Van ban</option>
+                    <option value="number">So</option>
+                    <option value="date">Ngay</option>
+                    <option value="datetime">Ngay gio</option>
+                    <option value="currency">Tien te</option>
+                    <option value="percentage">Phan tram</option>
+                  </select>
+                </div>
+
+                <div class="column-label-edit">
+                  <input type="text" [(ngModel)]="col.label" (ngModelChange)="markDirty()" placeholder="Nhan cot" />
+                </div>
+
+                <div class="column-aggregation">
+                  <select [(ngModel)]="col.aggregation" (ngModelChange)="markDirty()">
+                    <option value="none">-- Tong hop --</option>
+                    <option value="count">Dem</option>
+                    <option value="sum">Tong</option>
+                    <option value="avg">Trung binh</option>
+                    <option value="min">Min</option>
+                    <option value="max">Max</option>
+                  </select>
+                </div>
+              </div>
+            }
+          </div>
+
+          <!-- Sort -->
+          <div class="sort-section">
+            <h4>Sap xep</h4>
+            <div class="sort-row">
+              <select [(ngModel)]="config.sortBy" (ngModelChange)="markDirty()">
+                <option value="">-- Khong sap xep --</option>
+                @for (col of visibleColumns; track col.fieldKey) {
+                  <option [value]="col.fieldKey">{{ col.label }}</option>
+                }
+              </select>
+              <select [(ngModel)]="config.sortDirection" (ngModelChange)="markDirty()">
+                <option value="asc">Tang dan ↑</option>
+                <option value="desc">Giam dan ↓</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Group By -->
+          <div class="group-section">
+            <h4>Nhom theo</h4>
+            <select [(ngModel)]="config.groupBy" (ngModelChange)="markDirty()">
+              <option value="">-- Khong nhom --</option>
+              @for (col of visibleColumns; track col.fieldKey) {
+                <option [value]="col.fieldKey">{{ col.label }}</option>
+              }
+            </select>
+
+            @if (config.groupBy) {
+              <div class="group-aggregations">
+                <div class="agg-header">
+                  <h5>Tong hop nhom</h5>
+                  <button class="btn-sm btn-primary" (click)="addGroupAggregation()">+ Them</button>
+                </div>
+                @if (config.groupSummary) {
+                  <div class="agg-options">
+                    <label class="checkbox-label">
+                      <input type="checkbox" [(ngModel)]="config.groupSummary.showGroupHeaders" (ngModelChange)="markDirty()" />
+                      Hien tieu de nhom
+                    </label>
+                    <label class="checkbox-label">
+                      <input type="checkbox" [(ngModel)]="config.groupSummary.showGroupFooters" (ngModelChange)="markDirty()" />
+                      Hien tong hop nhom
+                    </label>
+                  </div>
+                  @for (agg of config.groupSummary!.aggregations; track $index; let i = $index) {
+                    <div class="agg-item">
+                      <select [(ngModel)]="agg.fieldKey" (ngModelChange)="markDirty()">
+                        @for (col of visibleColumns; track col.fieldKey) {
+                          <option [value]="col.fieldKey">{{ col.label }}</option>
+                        }
+                      </select>
+                      <select [(ngModel)]="agg.type" (ngModelChange)="markDirty()">
+                        <option value="count">Dem</option>
+                        <option value="sum">Tong</option>
+                        <option value="avg">Trung binh</option>
+                        <option value="min">Min</option>
+                        <option value="max">Max</option>
+                      </select>
+                      <input type="text" [(ngModel)]="agg.label" (ngModelChange)="markDirty()" placeholder="Nhan..." />
+                      <button class="btn-icon-sm btn-danger" (click)="removeGroupAggregation(i)">✕</button>
+                    </div>
+                  }
+                }
+              </div>
+            }
+          </div>
+
+          <!-- Footer Aggregation toggle -->
+          <div class="footer-agg-section">
+            <label class="checkbox-label">
+              <input type="checkbox" [(ngModel)]="config.showFooterAggregations" (ngModelChange)="markDirty()" />
+              Hien dong tong hop o cuoi bang
+            </label>
+          </div>
+        </div>
+      }
+
+      <!-- ========== FILTERS TAB ========== -->
+      @if (activeTab === 'filters') {
+        <div class="panel">
+          <div class="panel-header">
+            <h3>Bo loc du lieu</h3>
+            <button class="btn-sm btn-primary" (click)="addFilter()">+ Them bo loc</button>
+          </div>
+
+          @if (config.filters.length === 0) {
+            <div class="empty-section">
+              <p>Chua co bo loc. Nhan "Them bo loc" de loc du lieu bao cao.</p>
+            </div>
+          }
+
+          <div class="filters-list">
+            @for (filter of config.filters; track $index; let i = $index) {
+              <div class="filter-item">
+                <select [(ngModel)]="filter.fieldKey" (ngModelChange)="markDirty()">
+                  @for (f of dataFields; track f.id) {
+                    <option [value]="f.fieldKey">{{ f.label }}</option>
+                  }
+                  <option value="patientName">Benh nhan</option>
+                  <option value="status">Trang thai</option>
+                </select>
+
+                <select [(ngModel)]="filter.operator" (ngModelChange)="markDirty()">
+                  <option value="eq">Bang (=)</option>
+                  <option value="neq">Khac (≠)</option>
+                  <option value="contains">Chua</option>
+                  <option value="gt">Lon hon (>)</option>
+                  <option value="lt">Nho hon (<)</option>
+                  <option value="gte">≥</option>
+                  <option value="lte">≤</option>
+                </select>
+
+                <input type="text" [(ngModel)]="filter.value" (ngModelChange)="markDirty()" placeholder="Gia tri..." />
+                <button class="btn-icon-sm btn-danger" (click)="removeFilter(i)" title="Xoa">✕</button>
+              </div>
+            }
+          </div>
+        </div>
+      }
+
+      <!-- ========== CHART TAB ========== -->
+      @if (activeTab === 'chart' && isChartType && config.chart) {
+        <div class="panel">
+          <div class="panel-header"><h3>Cau hinh bieu do</h3></div>
+          <div class="chart-config">
+            <div class="form-group">
+              <label>Truong phan nhom (truc X / danh muc)</label>
+              <select [(ngModel)]="config.chart.categoryField" (ngModelChange)="markDirty()">
+                <option value="">-- Chon truong --</option>
+                @for (f of dataFields; track f.id) { <option [value]="f.fieldKey">{{ f.label }}</option> }
+                <option value="status">Trang thai</option>
+                <option value="patientName">Benh nhan</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Truong gia tri (truc Y) — bo trong de dem</label>
+              <select [(ngModel)]="config.chart.valueField" (ngModelChange)="markDirty()">
+                <option value="">Dem so luong</option>
+                @for (f of dataFields; track f.id) { <option [value]="f.fieldKey">{{ f.label }}</option> }
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Phep tong hop</label>
+              <select [(ngModel)]="config.chart.aggregation" (ngModelChange)="markDirty()">
+                <option value="count">Dem (Count)</option>
+                <option value="sum">Tong (Sum)</option>
+                <option value="avg">Trung binh (Avg)</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>So muc toi da</label>
+                <input type="number" [(ngModel)]="config.chart.maxItems" (ngModelChange)="markDirty()" min="1" max="50" />
+              </div>
+            </div>
+            <div class="form-row">
+              <label class="checkbox-label">
+                <input type="checkbox" [(ngModel)]="config.chart.showLegend" (ngModelChange)="markDirty()" />
+                Hien chu thich (Legend)
+              </label>
+              <label class="checkbox-label">
+                <input type="checkbox" [(ngModel)]="config.chart.showValues" (ngModelChange)="markDirty()" />
+                Hien gia tri tren bieu do
+              </label>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- ========== CONDITIONAL FORMATTING TAB ========== -->
+      @if (activeTab === 'formatting') {
+        <div class="panel formatting-panel">
+          <div class="panel-header">
+            <h3>🎨 Dinh dang co dieu kien</h3>
+            <button class="btn-sm btn-primary" (click)="addConditionalFormat()">+ Them quy tac</button>
+          </div>
+
+          @if (!config.conditionalFormats?.length) {
+            <div class="empty-section">
+              <p>Chua co quy tac dinh dang. Them quy tac de lam noi bat du lieu theo dieu kien.</p>
+            </div>
+          }
+
+          <div class="formatting-layout">
+            <!-- Rules list -->
+            <div class="rules-list">
+              @for (rule of config.conditionalFormats; track rule.id; let i = $index) {
+                <div class="rule-card" [class.active]="editingRule === rule" (click)="selectRule(rule)">
+                  <div class="rule-preview" [ngStyle]="{'background-color': rule.style.backgroundColor, 'color': rule.style.textColor}">
+                    Aa
+                  </div>
+                  <div class="rule-summary">
+                    <span class="rule-name">{{ rule.name }}</span>
+                    <span class="rule-desc">
+                      @if (rule.operator === 'empty' || rule.operator === 'notEmpty') {
+                        {{ rule.fieldKey }} {{ getOperatorLabel(rule.operator) }}
+                      } @else {
+                        {{ rule.fieldKey }} {{ getOperatorLabel(rule.operator) }} "{{ rule.value }}"
+                      }
+                    </span>
+                  </div>
+                  <button class="btn-icon-sm btn-danger" (click)="removeConditionalFormat(i); $event.stopPropagation()">✕</button>
+                </div>
+              }
+            </div>
+
+            <!-- Rule editor -->
+            @if (editingRule) {
+              <div class="rule-editor">
+                <h4>Chinh sua quy tac</h4>
+
+                <div class="form-group">
+                  <label>Ten quy tac</label>
+                  <input type="text" [(ngModel)]="editingRule.name" (ngModelChange)="markDirty()" />
+                </div>
+
+                <div class="form-group">
+                  <label>Truong dieu kien</label>
+                  <select [(ngModel)]="editingRule.fieldKey" (ngModelChange)="markDirty()">
+                    @for (fk of allFieldKeys; track fk.key) {
+                      <option [value]="fk.key">{{ fk.label }}</option>
+                    }
+                  </select>
+                </div>
+
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>Toan tu</label>
+                    <select [(ngModel)]="editingRule.operator" (ngModelChange)="markDirty()">
+                      <option value="eq">Bang (=)</option>
+                      <option value="neq">Khac (≠)</option>
+                      <option value="contains">Chua</option>
+                      <option value="gt">Lon hon (>)</option>
+                      <option value="lt">Nho hon (<)</option>
+                      <option value="gte">≥</option>
+                      <option value="lte">≤</option>
+                      <option value="empty">Trong</option>
+                      <option value="notEmpty">Khong trong</option>
+                    </select>
+                  </div>
+
+                  @if (editingRule.operator !== 'empty' && editingRule.operator !== 'notEmpty') {
+                    <div class="form-group">
+                      <label>Gia tri</label>
+                      <input type="text" [(ngModel)]="editingRule.value" (ngModelChange)="markDirty()" placeholder="Gia tri so sanh..." />
+                    </div>
+                  }
+                </div>
+
+                <div class="form-group">
+                  <label>Ap dung cho</label>
+                  <select [(ngModel)]="editingRule.applyTo" (ngModelChange)="markDirty()">
+                    <option value="row">Toan bo dong</option>
+                    <option value="cell">Chi o du lieu</option>
+                  </select>
+                </div>
+
+                <!-- Color presets -->
+                <div class="color-presets">
+                  <label>Mau nhanh</label>
+                  <div class="preset-grid">
+                    @for (p of presetColors; track p.label) {
+                      <button class="preset-btn" [ngStyle]="{'background-color': p.bg, 'color': p.text}" (click)="applyPresetColor(editingRule, p)">
+                        {{ p.label }}
+                      </button>
+                    }
+                  </div>
+                </div>
+
+                <!-- Custom colors -->
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>Mau nen</label>
+                    <div class="color-input">
+                      <input type="color" [(ngModel)]="editingRule.style.backgroundColor" (ngModelChange)="markDirty()" />
+                      <input type="text" [(ngModel)]="editingRule.style.backgroundColor" (ngModelChange)="markDirty()" class="color-hex" />
+                    </div>
+                  </div>
+                  <div class="form-group">
+                    <label>Mau chu</label>
+                    <div class="color-input">
+                      <input type="color" [(ngModel)]="editingRule.style.textColor" (ngModelChange)="markDirty()" />
+                      <input type="text" [(ngModel)]="editingRule.style.textColor" (ngModelChange)="markDirty()" class="color-hex" />
+                    </div>
+                  </div>
+                </div>
+
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>Do dam</label>
+                    <select [(ngModel)]="editingRule.style.fontWeight" (ngModelChange)="markDirty()">
+                      <option value="normal">Thuong</option>
+                      <option value="bold">Dam</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label>Kieu chu</label>
+                    <select [(ngModel)]="editingRule.style.fontStyle" (ngModelChange)="markDirty()">
+                      <option value="normal">Thuong</option>
+                      <option value="italic">Nghieng</option>
+                    </select>
+                  </div>
+                </div>
+
+                <!-- Rule preview -->
+                <div class="rule-live-preview">
+                  <label>Xem truoc:</label>
+                  <div class="preview-sample" [ngStyle]="buildStyleObj(editingRule.style)">
+                    Du lieu mau — noi bat theo quy tac
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+      }
+
+      <!-- ========== CALCULATED FIELDS TAB ========== -->
+      @if (activeTab === 'computed') {
+        <div class="panel">
+          <div class="panel-header">
+            <h3>🧮 Truong tinh toan</h3>
+            <button class="btn-sm btn-primary" (click)="addCalculatedField()">+ Them truong</button>
+          </div>
+
+          @if (!config.calculatedFields?.length) {
+            <div class="empty-section">
+              <p>Chua co truong tinh toan. Them truong moi de tao cot tinh toan tu du lieu.</p>
+              <p class="hint">Vi du: Tong diem = [field_1] + [field_2]</p>
+            </div>
+          }
+
+          <div class="calc-fields-list">
+            @for (cf of config.calculatedFields; track cf.fieldKey; let i = $index) {
+              <div class="calc-field-card">
+                <div class="calc-field-header">
+                  <span class="calc-badge">fx</span>
+                  <input type="text" [(ngModel)]="cf.label" (ngModelChange)="markDirty()" class="calc-name-input" placeholder="Ten truong..." />
+                  <button class="btn-icon-sm btn-danger" (click)="removeCalculatedField(i)">✕</button>
+                </div>
+
+                <div class="form-group">
+                  <label>Bieu thuc</label>
+                  <input type="text" [(ngModel)]="cf.expression" (ngModelChange)="markDirty()" placeholder="VD: [field_1] + [field_2]" class="expression-input" />
+                </div>
+
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>Dinh dang</label>
+                    <select [(ngModel)]="cf.format" (ngModelChange)="markDirty()">
+                      <option value="text">Van ban</option>
+                      <option value="number">So</option>
+                      <option value="currency">Tien te</option>
+                      <option value="percentage">Phan tram</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label>Key</label>
+                    <input type="text" [value]="cf.fieldKey" disabled class="key-display" />
+                  </div>
+                </div>
+
+                <!-- Available fields reference -->
+                <div class="field-reference">
+                  <span class="ref-label">Truong co san:</span>
+                  @for (fk of allFieldKeys; track fk.key) {
+                    <code class="field-token">[{{ fk.key }}]</code>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+      }
+
+      <!-- ========== PAGE TAB ========== -->
+      @if (activeTab === 'page') {
+        <div class="panel">
+          <div class="panel-header"><h3>Cai dat trang</h3></div>
+          <div class="page-config">
+            <div class="form-row">
+              <div class="form-group">
+                <label>Kho giay</label>
+                <select [(ngModel)]="config.page.size" (ngModelChange)="markDirty()">
+                  <option value="A4">A4 (210 × 297 mm)</option>
+                  <option value="A5">A5 (148 × 210 mm)</option>
+                  <option value="Letter">Letter (216 × 279 mm)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Huong giay</label>
+                <select [(ngModel)]="config.page.orientation" (ngModelChange)="markDirty()">
+                  <option value="portrait">Doc (Portrait)</option>
+                  <option value="landscape">Ngang (Landscape)</option>
+                </select>
+              </div>
+            </div>
+            <h4>Le trang (pt)</h4>
+            <div class="margins-grid">
+              <div class="form-group">
+                <label>Tren</label>
+                <input type="number" [(ngModel)]="config.page.margins.top" (ngModelChange)="markDirty()" min="0" max="100" />
+              </div>
+              <div class="form-group">
+                <label>Phai</label>
+                <input type="number" [(ngModel)]="config.page.margins.right" (ngModelChange)="markDirty()" min="0" max="100" />
+              </div>
+              <div class="form-group">
+                <label>Duoi</label>
+                <input type="number" [(ngModel)]="config.page.margins.bottom" (ngModelChange)="markDirty()" min="0" max="100" />
+              </div>
+              <div class="form-group">
+                <label>Trai</label>
+                <input type="number" [(ngModel)]="config.page.margins.left" (ngModelChange)="markDirty()" min="0" max="100" />
+              </div>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- ========== HEADER/FOOTER TAB ========== -->
+      @if (activeTab === 'header') {
+        <div class="panel">
+          <div class="panel-header"><h3>Dau trang (Header)</h3></div>
+          @if (config.header) {
+            <div class="header-config">
+              <div class="form-group">
+                <label>Tieu de bao cao</label>
+                <input type="text" [(ngModel)]="config.header.title" (ngModelChange)="markDirty()" placeholder="De trong se dung ten bao cao" />
+              </div>
+              <div class="form-group">
+                <label>Phu de</label>
+                <input type="text" [(ngModel)]="config.header.subtitle" (ngModelChange)="markDirty()" placeholder="VD: Phong xet nghiem – Thang 1/2026" />
+              </div>
+              <div class="form-row">
+                <label class="checkbox-label">
+                  <input type="checkbox" [(ngModel)]="config.header.showLogo" (ngModelChange)="markDirty()" />
+                  Hien logo
+                </label>
+                <label class="checkbox-label">
+                  <input type="checkbox" [(ngModel)]="config.header.showDate" (ngModelChange)="markDirty()" />
+                  Hien ngay xuat
+                </label>
+              </div>
+            </div>
+          }
+
+          <div class="panel-header" style="margin-top: 24px"><h3>Cuoi trang (Footer)</h3></div>
+          @if (config.footer) {
+            <div class="footer-config">
+              <div class="form-group">
+                <label>Noi dung cuoi trang</label>
+                <input type="text" [(ngModel)]="config.footer.text" (ngModelChange)="markDirty()" placeholder="VD: IVF Report System" />
+              </div>
+              <label class="checkbox-label">
+                <input type="checkbox" [(ngModel)]="config.footer.showPageNumber" (ngModelChange)="markDirty()" />
+                Hien so trang
+              </label>
+            </div>
+          }
+        </div>
+      }
+
+      <!-- ========== LIVE PREVIEW TAB ========== -->
+      @if (activeTab === 'preview') {
+        <div class="panel preview-panel">
+          <div class="panel-header">
+            <h3>👁️ Xem truoc bao cao</h3>
+            <div class="panel-actions">
+              <button class="btn-sm btn-primary" (click)="loadPreview()" [disabled]="isLoadingPreview">
+                @if (isLoadingPreview) { <span class="spinner-sm"></span> }
+                🔄 Tai lai
+              </button>
+            </div>
+          </div>
+
+          @if (isLoadingPreview) {
+            <div class="loading-preview">
+              <div class="spinner"></div>
+              <p>Dang tai du lieu xem truoc...</p>
+            </div>
+          } @else if (previewData?.data?.length) {
+            <div class="preview-report">
+              <!-- Report header preview -->
+              @if (config.header) {
+                <div class="preview-header">
+                  @if (config.header.title || report.name) {
+                    <h2>{{ config.header.title || report.name }}</h2>
+                  }
+                  @if (config.header.subtitle) {
+                    <p class="preview-subtitle">{{ config.header.subtitle }}</p>
+                  }
+                </div>
+              }
+
+              <!-- Data table preview -->
+              @if (!config.groupBy) {
+                <!-- Ungrouped table -->
+                <div class="preview-table-wrapper">
+                  <table class="preview-table">
+                    <thead>
+                      <tr>
+                        @for (key of getPreviewColumns(); track key) {
+                          <th>{{ getPreviewColumnLabel(key) }}</th>
+                        }
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (row of previewData!.data; track $index) {
+                        <tr [ngStyle]="getRowStyles(row)">
+                          @for (key of getPreviewColumns(); track key) {
+                            <td [ngStyle]="getCellStyles(row, key)">{{ formatPreviewValue(row[key]) }}</td>
+                          }
+                        </tr>
+                      }
+                    </tbody>
+                    @if (config.showFooterAggregations) {
+                      <tfoot>
+                        <tr class="agg-footer-row">
+                          @for (key of getPreviewColumns(); track key) {
+                            <td>
+                              @for (col of config.columns; track col.fieldKey) {
+                                @if (col.fieldKey === key && col.aggregation && col.aggregation !== 'none') {
+                                  <strong>{{ computeAggregation(col) }}</strong>
+                                }
+                              }
+                            </td>
+                          }
+                        </tr>
+                      </tfoot>
+                    }
+                  </table>
+                </div>
+              } @else {
+                <!-- Grouped table -->
+                @for (group of getGroupedData(); track group.groupValue) {
+                  <div class="preview-group">
+                    @if (config.groupSummary?.showGroupHeaders) {
+                      <div class="group-header-row">
+                        📂 {{ config.groupBy }}: <strong>{{ group.groupValue }}</strong>
+                        <span class="group-count">({{ group.rows.length }} dong)</span>
+                      </div>
+                    }
+                    <div class="preview-table-wrapper">
+                      <table class="preview-table">
+                        <thead>
+                          <tr>
+                            @for (key of getPreviewColumns(); track key) {
+                              <th>{{ getPreviewColumnLabel(key) }}</th>
+                            }
+                          </tr>
+                        </thead>
+                        <tbody>
+                          @for (row of group.rows; track $index) {
+                            <tr [ngStyle]="getRowStyles(row)">
+                              @for (key of getPreviewColumns(); track key) {
+                                <td [ngStyle]="getCellStyles(row, key)">{{ formatPreviewValue(row[key]) }}</td>
+                              }
+                            </tr>
+                          }
+                        </tbody>
+                      </table>
+                    </div>
+                    @if (config.groupSummary?.showGroupFooters && config.groupSummary?.aggregations?.length) {
+                      <div class="group-footer-row">
+                        @for (agg of config.groupSummary!.aggregations; track $index) {
+                          <span class="group-agg-badge">
+                            {{ agg.label || agg.fieldKey }} {{ agg.type }}: {{ computeGroupAggregation(agg, group.rows) }}
+                          </span>
+                        }
+                      </div>
+                    }
+                  </div>
+                }
+              }
+
+              <div class="preview-info">
+                <span>Tong so: {{ previewData?.data?.length ?? 0 }} dong</span>
+              </div>
+            </div>
+          } @else {
+            <div class="empty-section">
+              <p>Khong co du lieu de xem truoc. Nhan "Tai lai" de tai du lieu.</p>
+            </div>
+          }
+        </div>
+      }
+
+    </div>
+  } @else {
+    <div class="loading">
+      <div class="spinner"></div>
+      <p>Dang tai cau hinh...</p>
+    </div>
+  }
+</div>

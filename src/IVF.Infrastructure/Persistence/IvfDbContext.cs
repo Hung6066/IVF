@@ -66,6 +66,9 @@ public class IvfDbContext : DbContext
     public DbSet<PatientConceptSnapshot> PatientConceptSnapshots => Set<PatientConceptSnapshot>();
     public DbSet<LinkedFieldSource> LinkedFieldSources => Set<LinkedFieldSource>();
 
+    // Digital Signing
+    public DbSet<UserSignature> UserSignatures => Set<UserSignature>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
