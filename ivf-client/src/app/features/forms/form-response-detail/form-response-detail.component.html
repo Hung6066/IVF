@@ -38,7 +38,12 @@
           }
           PDF
         </button>
-        <button class="btn btn-secondary" (click)="exportPdf(true)" [disabled]="isLoadingPdf" title="Xuất PDF có ký số">
+        <button
+          class="btn btn-secondary"
+          (click)="exportPdf(true)"
+          [disabled]="isLoadingPdf"
+          title="Xuất PDF có ký số"
+        >
           @if (isLoadingPdf) {
             <span class="btn-spinner"></span>
           } @else {

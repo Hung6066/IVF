@@ -1842,7 +1842,14 @@ const TEMPLATE_LIBRARY: ReportTemplateLibraryItem[] = [
               height: 55,
               text: 'KỸ THUẬT VIÊN',
               signatureRole: 'technician',
-              style: { fontSize: 9, fontWeight: 'bold', textAlign: 'center', color: '#616161', borderColor: '#E0E0E0', borderWidth: 1 },
+              style: {
+                fontSize: 9,
+                fontWeight: 'bold',
+                textAlign: 'center',
+                color: '#616161',
+                borderColor: '#E0E0E0',
+                borderWidth: 1,
+              },
             },
             {
               id: 'sa_f3',
@@ -1853,7 +1860,14 @@ const TEMPLATE_LIBRARY: ReportTemplateLibraryItem[] = [
               height: 55,
               text: 'TRƯỞNG KHOA XN',
               signatureRole: 'department_head',
-              style: { fontSize: 9, fontWeight: 'bold', textAlign: 'center', color: '#616161', borderColor: '#E0E0E0', borderWidth: 1 },
+              style: {
+                fontSize: 9,
+                fontWeight: 'bold',
+                textAlign: 'center',
+                color: '#616161',
+                borderColor: '#E0E0E0',
+                borderWidth: 1,
+              },
             },
             {
               id: 'sa_f5',
@@ -1864,7 +1878,14 @@ const TEMPLATE_LIBRARY: ReportTemplateLibraryItem[] = [
               height: 55,
               text: 'BÁC SĨ CHỈ ĐỊNH',
               signatureRole: 'doctor',
-              style: { fontSize: 9, fontWeight: 'bold', textAlign: 'center', color: '#616161', borderColor: '#E0E0E0', borderWidth: 1 },
+              style: {
+                fontSize: 9,
+                fontWeight: 'bold',
+                textAlign: 'center',
+                color: '#616161',
+                borderColor: '#E0E0E0',
+                borderWidth: 1,
+              },
             },
 
             // Footer line

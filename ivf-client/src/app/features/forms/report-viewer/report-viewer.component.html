@@ -14,7 +14,12 @@
             📄 Xuất PDF
           }
         </button>
-        <button class="btn btn-pdf" (click)="exportPdf(true)" [disabled]="isExportingPdf" title="Xuất PDF có ký số">
+        <button
+          class="btn btn-pdf"
+          (click)="exportPdf(true)"
+          [disabled]="isExportingPdf"
+          title="Xuất PDF có ký số"
+        >
           @if (isExportingPdf) {
             <span class="btn-spinner"></span> Đang ký...
           } @else {
