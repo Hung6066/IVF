@@ -1028,6 +1028,10 @@ public static class ReportPdfService
     /// Uses QuestPDF Layers for control positioning.
     /// Horizontal scaling only: X and Width are scaled to fit A4 content width.
     /// Y, Height, FontSize, Padding, Border remain at original designer values.
+    /// 
+    /// Positioning: uses four-sided padding (left, top, right, bottom) to create an
+    /// exact bounding box for each control. This is more reliable than PaddingLeft+Width
+    /// because it eliminates any default alignment ambiguity.
     /// </summary>
     private static void RenderBandContainer(
         ColumnDescriptor col,
@@ -1046,7 +1050,6 @@ public static class ReportPdfService
         var scaleX = pdfContentWidth / Math.Max(pageWidth, 1);
 
         // Use original band height (no vertical scaling)
-        // Total bands (header 140 + detail 530 + footer 90 = 760) fit within A4 portrait (782pt)
         col.Item().Height(bandHeight).Layers(layers =>
         {
             // Primary layer with explicit size to anchor overlay positioning
@@ -1060,11 +1063,16 @@ public static class ReportPdfService
                 var w = Math.Max(ctrl.Width * scaleX, 10); // Scale Width horizontally
                 var h = Math.Max((float)ctrl.Height, 10);  // Keep Height at original
 
+                // Four-sided padding to create exact bounding box at (x, y, w, h)
+                // This eliminates any default alignment ambiguity within the layer
+                var pRight = Math.Max(pdfContentWidth - x - w, 0);
+                var pBottom = Math.Max(bandHeight - y - h, 0);
+
                 layers.Layer()
                     .PaddingLeft(x)
                     .PaddingTop(y)
-                    .Width(w)
-                    .Height(h)
+                    .PaddingRight(pRight)
+                    .PaddingBottom(pBottom)
                     .Element(container =>
                     {
                         // Handle line controls
@@ -1495,6 +1503,9 @@ public static class ReportPdfService
     /// Renders a signature zone control in the PDF.
     /// If a SignatureContext is provided (sign=true), renders the handwritten signature image
     /// with signer name and date. Otherwise renders a placeholder with dotted line.
+    /// 
+    /// The container is already sized and positioned by the parent RenderBandContainer.
+    /// Content is rendered as a simple vertical stack that fits within the bounding box.
     /// </summary>
     private static void RenderSignatureZone(
         IContainer container,
@@ -1515,54 +1526,42 @@ public static class ReportPdfService
             || ctrl.SignatureRole == "department_head"
             || ctrl.SignatureRole == "director");
 
-        // Use Layers to avoid Column height overflow issues inside the fixed-size container
-        container.Layers(layers =>
-        {
-            // Background layer
-            layers.PrimaryLayer().MinWidth(width).MinHeight(height);
+        var fontSize = ctrl.Style?.FontSize ?? 9;
+        var fontColor = !string.IsNullOrEmpty(ctrl.Style?.Color)
+            ? Color.FromHex(ctrl.Style!.Color!)
+            : Colors.Grey.Darken2;
 
-            // Role title at the top
-            layers.Layer()
-                .PaddingTop(0)
-                .AlignCenter()
+        // Render using a Row with a single RelativeItem to get a vertical stack
+        // that fills the available space from the parent's bounding box.
+        container.Column(col =>
+        {
+            // ── Title ──
+            col.Item().AlignCenter()
                 .Text(roleLabel)
-                .FontSize(ctrl.Style?.FontSize ?? 9)
-                .Bold()
-                .FontColor(!string.IsNullOrEmpty(ctrl.Style?.Color)
-                    ? Color.FromHex(ctrl.Style!.Color!)
-                    : Colors.Grey.Darken2);
+                .FontSize(fontSize).Bold().FontColor(fontColor);
 
             if (shouldSign)
             {
-                // Signature image in the middle area (below title, above name)
-                var titleHeight = (ctrl.Style?.FontSize ?? 9) + 4;   // ~13px
-                var nameHeight = 12f;  // name + date rows
-                var imgHeight = Math.Max(height - titleHeight - nameHeight - 4, 16);
-
-                layers.Layer()
-                    .PaddingTop(titleHeight)
-                    .AlignCenter()
-                    .Height(imgHeight)
-                    .Width(width * 0.8f)
+                // ── Signature image (constrained to not overflow) ──
+                col.Item().AlignCenter()
+                    .MaxWidth(width * 0.8f)
+                    .MaxHeight(Math.Max(height - 30, 10))
                     .Image(signatureContext!.SignatureImageBytes!)
                     .FitArea();
 
-                // Signer name near bottom
+                // ── Signer name ──
                 if (!string.IsNullOrEmpty(signatureContext.SignerName))
                 {
-                    layers.Layer()
-                        .PaddingTop(height - nameHeight)
-                        .AlignCenter()
+                    col.Item().AlignCenter()
                         .Text(signatureContext.SignerName)
                         .FontSize(7).Bold();
                 }
             }
             else
             {
-                // Placeholder hint at the bottom
-                layers.Layer()
-                    .PaddingTop(height - 14)
-                    .AlignCenter()
+                // ── Placeholder ──
+                col.Item().AlignCenter()
+                    .PaddingTop(Math.Max(height - 30, 2))
                     .Text("(Ký và ghi rõ họ tên)")
                     .FontSize(7).FontColor(Colors.Grey.Medium).Italic();
             }
