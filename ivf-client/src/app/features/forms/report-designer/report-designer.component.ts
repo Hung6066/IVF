@@ -10,7 +10,7 @@ import {
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
-import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
+import { CdkDragDrop, CdkDragMove, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 import {
   FormsService,
   FormField,
@@ -2137,8 +2137,15 @@ export class ReportDesignerComponent implements OnInit, OnDestroy {
   isSaving = false;
   isDirty = false;
   mode: 'design' | 'preview' = 'design';
-  sidePanel: 'toolbox' | 'properties' | 'data' | 'parameters' | 'templates' | 'tabs' | 'crosstab' =
-    'toolbox';
+  sidePanel:
+    | 'toolbox'
+    | 'properties'
+    | 'data'
+    | 'parameters'
+    | 'templates'
+    | 'tabs'
+    | 'crosstab'
+    | 'explorer' = 'toolbox';
   sidePanelCollapsed = false;
 
   // The report design
@@ -2147,6 +2154,8 @@ export class ReportDesignerComponent implements OnInit, OnDestroy {
   // Selection state
   selectedBandId: string | null = null;
   selectedControlId: string | null = null;
+  /** Multi-select: IDs of all selected controls (within the same band) */
+  selectedControlIds: Set<string> = new Set();
 
   // Preview
   previewData: ReportData | null = null;
@@ -2155,6 +2164,39 @@ export class ReportDesignerComponent implements OnInit, OnDestroy {
   // Dragging
   isDraggingControl = false;
   draggedToolboxItem: ToolboxItem | null = null;
+
+  // Rubber-band (lasso) selection
+  isRubberBanding = false;
+  rubberBandStart: { x: number; y: number } | null = null;
+  rubberBandRect = { x: 0, y: 0, w: 0, h: 0 };
+  rubberBandBandId: string | null = null;
+
+  // Resize via drag handle
+  isResizing = false;
+  resizeHandle: string | null = null; // 'n','s','e','w','ne','nw','se','sw'
+  resizeStart: {
+    x: number;
+    y: number;
+    ctrlX: number;
+    ctrlY: number;
+    ctrlW: number;
+    ctrlH: number;
+  } | null = null;
+  resizeControlId: string | null = null;
+
+  // Context menu
+  showContextMenu = false;
+  contextMenuPos = { x: 0, y: 0 };
+
+  // Snap-to-grid
+  snapToGrid = true;
+  gridSize = 5;
+  showGrid = true;
+
+  // Smart guides (alignment snap lines)
+  guideLines: { orientation: 'h' | 'v'; pos: number; bandId: string }[] = [];
+  draggedControlRef: ReportControl | null = null;
+  readonly GUIDE_SNAP_THRESHOLD = 3; // px threshold to show guide
 
   // Parameters at runtime
   parameterValues: Record<string, string> = {};
@@ -2181,7 +2223,15 @@ export class ReportDesignerComponent implements OnInit, OnDestroy {
     general: false,
     layout: false,
     style: false,
+    layoutOps: false,
+    arrangement: false,
   };
+
+  // Report Explorer state
+  explorerCollapsedBands: Set<string> = new Set();
+  explorerEditingId: string | null = null;
+  explorerEditingName: string = '';
+  controlNames: Record<string, string> = {};
 
   // Constants
   readonly TOOLBOX_ITEMS = TOOLBOX_ITEMS;
@@ -2244,6 +2294,10 @@ export class ReportDesignerComponent implements OnInit, OnDestroy {
 
   @HostListener('window:keydown', ['$event'])
   onKeyDown(e: KeyboardEvent) {
+    // Don't intercept if user is typing in input/textarea/select
+    const tag = (e.target as HTMLElement).tagName?.toLowerCase();
+    if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+
     if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
       e.preventDefault();
       this.undo();
@@ -2253,6 +2307,97 @@ export class ReportDesignerComponent implements OnInit, OnDestroy {
     ) {
       e.preventDefault();
       this.redo();
+    } else if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+      // Ctrl+A: Select all controls in current band
+      e.preventDefault();
+      this.selectAllInBand();
+    } else if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+      e.preventDefault();
+      this.copySelected();
+    } else if ((e.ctrlKey || e.metaKey) && e.key === 'x') {
+      e.preventDefault();
+      this.cutSelected();
+    } else if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+      e.preventDefault();
+      this.pasteControls();
+    } else if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
+      // Ctrl+D: Duplicate selected
+      e.preventDefault();
+      if (this.selectedControlIds.size > 0) {
+        const ctrls = this.selectedControls;
+        const band = this.design.bands.find((b) => b.id === this.selectedBandId);
+        if (band) {
+          this.selectedControlIds.clear();
+          for (const orig of ctrls) {
+            const copy: ReportControl = {
+              ...JSON.parse(JSON.stringify(orig)),
+              id: crypto.randomUUID(),
+              x: orig.x + 10,
+              y: orig.y + 10,
+            };
+            band.controls.push(copy);
+            this.selectedControlIds.add(copy.id);
+          }
+          this.selectedControlId = [...this.selectedControlIds][0];
+          this.markDirty();
+        }
+      }
+    } else if (e.key === 'Delete' || e.key === 'Backspace') {
+      e.preventDefault();
+      this.deleteSelected();
+    } else if (e.key === 'Escape') {
+      this.clearSelection();
+    } else if (
+      e.key === 'ArrowLeft' ||
+      e.key === 'ArrowRight' ||
+      e.key === 'ArrowUp' ||
+      e.key === 'ArrowDown'
+    ) {
+      // Arrow keys: nudge selected controls
+      // Shift = large step (10px), Ctrl = fine step (1px), default = gridSize when snap enabled
+      let ctrls = this.selectedControls;
+      // Fallback: single selected control
+      if (ctrls.length === 0 && this.selectedControlId && this.selectedBandId) {
+        const band = this.design.bands.find((b) => b.id === this.selectedBandId);
+        const ctrl = band?.controls.find((c) => c.id === this.selectedControlId);
+        if (ctrl) ctrls = [ctrl];
+      }
+      if (ctrls.length > 0) {
+        e.preventDefault();
+        let delta: number;
+        if (e.shiftKey) {
+          delta = 10;
+        } else if (e.ctrlKey) {
+          delta = 1;
+        } else {
+          delta = this.snapToGrid ? this.gridSize : 1;
+        }
+        for (const ctrl of ctrls) {
+          switch (e.key) {
+            case 'ArrowLeft':
+              ctrl.x = Math.max(
+                0,
+                this.snapToGrid && !e.ctrlKey ? this.snapValue(ctrl.x - delta) : ctrl.x - delta,
+              );
+              break;
+            case 'ArrowRight':
+              ctrl.x =
+                this.snapToGrid && !e.ctrlKey ? this.snapValue(ctrl.x + delta) : ctrl.x + delta;
+              break;
+            case 'ArrowUp':
+              ctrl.y = Math.max(
+                0,
+                this.snapToGrid && !e.ctrlKey ? this.snapValue(ctrl.y - delta) : ctrl.y - delta,
+              );
+              break;
+            case 'ArrowDown':
+              ctrl.y =
+                this.snapToGrid && !e.ctrlKey ? this.snapValue(ctrl.y + delta) : ctrl.y + delta;
+              break;
+          }
+        }
+        this.markDirty();
+      }
     }
   }
 
@@ -2426,10 +2571,506 @@ export class ReportDesignerComponent implements OnInit, OnDestroy {
   selectBand(bandId: string) {
     this.selectedBandId = bandId;
     this.selectedControlId = null;
+    this.selectedControlIds.clear();
     this.sidePanel = 'properties';
+    this.showContextMenu = false;
   }
 
-  // ===== Control Management =====
+  // ===== Multi-select helpers =====
+
+  get selectedControls(): ReportControl[] {
+    if (!this.selectedBandId || this.selectedControlIds.size === 0) return [];
+    const band = this.design.bands.find((b) => b.id === this.selectedBandId);
+    if (!band) return [];
+    return band.controls.filter((c) => this.selectedControlIds.has(c.id));
+  }
+
+  get hasMultipleSelected(): boolean {
+    return this.selectedControlIds.size > 1;
+  }
+
+  isControlSelected(controlId: string): boolean {
+    return this.selectedControlIds.has(controlId);
+  }
+
+  selectAllInBand() {
+    if (!this.selectedBandId) return;
+    const band = this.design.bands.find((b) => b.id === this.selectedBandId);
+    if (!band) return;
+    this.selectedControlIds.clear();
+    for (const ctrl of band.controls) {
+      this.selectedControlIds.add(ctrl.id);
+    }
+    if (band.controls.length > 0) {
+      this.selectedControlId = band.controls[0].id;
+    }
+  }
+
+  clearSelection() {
+    this.selectedControlId = null;
+    this.selectedControlIds.clear();
+    this.showContextMenu = false;
+  }
+
+  // ===== Rubber-band (lasso) selection =====
+
+  onBandCanvasMouseDown(event: MouseEvent, bandId: string) {
+    // Only start rubber-band if clicking on the band canvas itself (not on a control)
+    if ((event.target as HTMLElement).closest('.control-wrapper')) return;
+    if (event.button !== 0) return; // left click only
+
+    const bandCanvas = (event.target as HTMLElement).closest('.band-canvas') as HTMLElement;
+    if (!bandCanvas) return;
+
+    const rect = bandCanvas.getBoundingClientRect();
+    this.rubberBandStart = {
+      x: event.clientX - rect.left,
+      y: event.clientY - rect.top,
+    };
+    this.rubberBandBandId = bandId;
+    this.isRubberBanding = false;
+
+    // Clear selection unless Ctrl/Shift held
+    if (!event.ctrlKey && !event.shiftKey && !event.metaKey) {
+      this.selectedControlIds.clear();
+      this.selectedControlId = null;
+      this.selectedBandId = bandId;
+    }
+  }
+
+  onBandCanvasMouseMove(event: MouseEvent, bandId: string) {
+    if (!this.rubberBandStart || this.rubberBandBandId !== bandId) return;
+
+    const bandCanvas = (event.target as HTMLElement).closest('.band-canvas') as HTMLElement;
+    if (!bandCanvas) return;
+
+    const rect = bandCanvas.getBoundingClientRect();
+    const curX = event.clientX - rect.left;
+    const curY = event.clientY - rect.top;
+
+    const dx = Math.abs(curX - this.rubberBandStart.x);
+    const dy = Math.abs(curY - this.rubberBandStart.y);
+
+    if (dx > 3 || dy > 3) {
+      this.isRubberBanding = true;
+    }
+
+    if (this.isRubberBanding) {
+      this.rubberBandRect = {
+        x: Math.min(this.rubberBandStart.x, curX),
+        y: Math.min(this.rubberBandStart.y, curY),
+        w: Math.abs(curX - this.rubberBandStart.x),
+        h: Math.abs(curY - this.rubberBandStart.y),
+      };
+
+      // Select controls within the rubber-band rectangle
+      const band = this.design.bands.find((b) => b.id === bandId);
+      if (band) {
+        if (!event.ctrlKey && !event.shiftKey) {
+          this.selectedControlIds.clear();
+        }
+        for (const ctrl of band.controls) {
+          if (
+            this.rectsIntersect(
+              this.rubberBandRect.x,
+              this.rubberBandRect.y,
+              this.rubberBandRect.w,
+              this.rubberBandRect.h,
+              ctrl.x,
+              ctrl.y,
+              ctrl.width,
+              ctrl.height,
+            )
+          ) {
+            this.selectedControlIds.add(ctrl.id);
+          }
+        }
+        this.selectedBandId = bandId;
+        if (this.selectedControlIds.size > 0) {
+          this.selectedControlId = [...this.selectedControlIds][0];
+        }
+      }
+    }
+  }
+
+  onBandCanvasMouseUp(event: MouseEvent) {
+    this.isRubberBanding = false;
+    this.rubberBandStart = null;
+    this.rubberBandRect = { x: 0, y: 0, w: 0, h: 0 };
+    this.rubberBandBandId = null;
+  }
+
+  private rectsIntersect(
+    ax: number,
+    ay: number,
+    aw: number,
+    ah: number,
+    bx: number,
+    by: number,
+    bw: number,
+    bh: number,
+  ): boolean {
+    return ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by;
+  }
+
+  // ===== Alignment operations (DevExpress-style) =====
+
+  alignLeft() {
+    const ctrls = this.selectedControls;
+    if (ctrls.length < 2) return;
+    const minX = Math.min(...ctrls.map((c) => c.x));
+    ctrls.forEach((c) => (c.x = minX));
+    this.markDirty();
+  }
+
+  alignCenter() {
+    const ctrls = this.selectedControls;
+    if (ctrls.length < 2) return;
+    const centers = ctrls.map((c) => c.x + c.width / 2);
+    const avgCenter = centers.reduce((a, b) => a + b, 0) / centers.length;
+    ctrls.forEach((c) => (c.x = Math.round(avgCenter - c.width / 2)));
+    this.markDirty();
+  }
+
+  alignRight() {
+    const ctrls = this.selectedControls;
+    if (ctrls.length < 2) return;
+    const maxRight = Math.max(...ctrls.map((c) => c.x + c.width));
+    ctrls.forEach((c) => (c.x = maxRight - c.width));
+    this.markDirty();
+  }
+
+  alignTop() {
+    const ctrls = this.selectedControls;
+    if (ctrls.length < 2) return;
+    const minY = Math.min(...ctrls.map((c) => c.y));
+    ctrls.forEach((c) => (c.y = minY));
+    this.markDirty();
+  }
+
+  alignMiddle() {
+    const ctrls = this.selectedControls;
+    if (ctrls.length < 2) return;
+    const middles = ctrls.map((c) => c.y + c.height / 2);
+    const avgMiddle = middles.reduce((a, b) => a + b, 0) / middles.length;
+    ctrls.forEach((c) => (c.y = Math.round(avgMiddle - c.height / 2)));
+    this.markDirty();
+  }
+
+  alignBottom() {
+    const ctrls = this.selectedControls;
+    if (ctrls.length < 2) return;
+    const maxBottom = Math.max(...ctrls.map((c) => c.y + c.height));
+    ctrls.forEach((c) => (c.y = maxBottom - c.height));
+    this.markDirty();
+  }
+
+  // Distribute evenly
+  distributeHorizontal() {
+    const ctrls = this.selectedControls;
+    if (ctrls.length < 3) return;
+    const sorted = [...ctrls].sort((a, b) => a.x - b.x);
+    const first = sorted[0];
+    const last = sorted[sorted.length - 1];
+    const totalSpace = last.x + last.width - first.x;
+    const totalControlWidth = sorted.reduce((s, c) => s + c.width, 0);
+    const gap = (totalSpace - totalControlWidth) / (sorted.length - 1);
+    let x = first.x;
+    for (const ctrl of sorted) {
+      ctrl.x = Math.round(x);
+      x += ctrl.width + gap;
+    }
+    this.markDirty();
+  }
+
+  distributeVertical() {
+    const ctrls = this.selectedControls;
+    if (ctrls.length < 3) return;
+    const sorted = [...ctrls].sort((a, b) => a.y - b.y);
+    const first = sorted[0];
+    const last = sorted[sorted.length - 1];
+    const totalSpace = last.y + last.height - first.y;
+    const totalControlHeight = sorted.reduce((s, c) => s + c.height, 0);
+    const gap = (totalSpace - totalControlHeight) / (sorted.length - 1);
+    let y = first.y;
+    for (const ctrl of sorted) {
+      ctrl.y = Math.round(y);
+      y += ctrl.height + gap;
+    }
+    this.markDirty();
+  }
+
+  // Make same size
+  makeSameWidth() {
+    const ctrls = this.selectedControls;
+    if (ctrls.length < 2) return;
+    // Use the first selected control as reference
+    const refWidth = ctrls[0].width;
+    ctrls.forEach((c) => (c.width = refWidth));
+    this.markDirty();
+  }
+
+  makeSameHeight() {
+    const ctrls = this.selectedControls;
+    if (ctrls.length < 2) return;
+    const refHeight = ctrls[0].height;
+    ctrls.forEach((c) => (c.height = refHeight));
+    this.markDirty();
+  }
+
+  makeSameSize() {
+    const ctrls = this.selectedControls;
+    if (ctrls.length < 2) return;
+    const refW = ctrls[0].width;
+    const refH = ctrls[0].height;
+    ctrls.forEach((c) => {
+      c.width = refW;
+      c.height = refH;
+    });
+    this.markDirty();
+  }
+
+  // Center in band (works for single or multi)
+  centerInBandHorizontal() {
+    const ctrls = this.selectedControls;
+    if (ctrls.length === 0) return;
+    const pageWidth = this.design.pageSettings.orientation === 'landscape' ? 1100 : 800;
+    if (ctrls.length === 1) {
+      ctrls[0].x = Math.round((pageWidth - ctrls[0].width) / 2);
+    } else {
+      const totalWidth = ctrls.reduce((s, c) => s + c.width, 0);
+      const gap = 4;
+      const totalWithGap = totalWidth + gap * (ctrls.length - 1);
+      let x = Math.round((pageWidth - totalWithGap) / 2);
+      const sorted = [...ctrls].sort((a, b) => a.x - b.x);
+      for (const ctrl of sorted) {
+        ctrl.x = x;
+        x += ctrl.width + gap;
+      }
+    }
+    this.markDirty();
+  }
+
+  centerInBandVertical() {
+    const ctrls = this.selectedControls;
+    if (ctrls.length === 0 || !this.selectedBandId) return;
+    const band = this.design.bands.find((b) => b.id === this.selectedBandId);
+    if (!band) return;
+    if (ctrls.length === 1) {
+      ctrls[0].y = Math.round((band.height - ctrls[0].height) / 2);
+    } else {
+      const totalHeight = ctrls.reduce((s, c) => s + c.height, 0);
+      const gap = 2;
+      const totalWithGap = totalHeight + gap * (ctrls.length - 1);
+      let y = Math.round((band.height - totalWithGap) / 2);
+      const sorted = [...ctrls].sort((a, b) => a.y - b.y);
+      for (const ctrl of sorted) {
+        ctrl.y = Math.max(0, y);
+        y += ctrl.height + gap;
+      }
+    }
+    this.markDirty();
+  }
+
+  // ===== Arrangement (z-order) =====
+
+  bringToFront() {
+    if (!this.selectedBandId || this.selectedControlIds.size === 0) return;
+    const band = this.design.bands.find((b) => b.id === this.selectedBandId);
+    if (!band) return;
+    const selected = band.controls.filter((c) => this.selectedControlIds.has(c.id));
+    const rest = band.controls.filter((c) => !this.selectedControlIds.has(c.id));
+    band.controls = [...rest, ...selected];
+    this.markDirty();
+  }
+
+  sendToBack() {
+    if (!this.selectedBandId || this.selectedControlIds.size === 0) return;
+    const band = this.design.bands.find((b) => b.id === this.selectedBandId);
+    if (!band) return;
+    const selected = band.controls.filter((c) => this.selectedControlIds.has(c.id));
+    const rest = band.controls.filter((c) => !this.selectedControlIds.has(c.id));
+    band.controls = [...selected, ...rest];
+    this.markDirty();
+  }
+
+  bringForward() {
+    if (!this.selectedBandId || this.selectedControlIds.size !== 1) return;
+    const band = this.design.bands.find((b) => b.id === this.selectedBandId);
+    if (!band) return;
+    const idx = band.controls.findIndex((c) => this.selectedControlIds.has(c.id));
+    if (idx >= 0 && idx < band.controls.length - 1) {
+      [band.controls[idx], band.controls[idx + 1]] = [band.controls[idx + 1], band.controls[idx]];
+      this.markDirty();
+    }
+  }
+
+  sendBackward() {
+    if (!this.selectedBandId || this.selectedControlIds.size !== 1) return;
+    const band = this.design.bands.find((b) => b.id === this.selectedBandId);
+    if (!band) return;
+    const idx = band.controls.findIndex((c) => this.selectedControlIds.has(c.id));
+    if (idx > 0) {
+      [band.controls[idx], band.controls[idx - 1]] = [band.controls[idx - 1], band.controls[idx]];
+      this.markDirty();
+    }
+  }
+
+  // ===== Resize via drag handles =====
+
+  onResizeStart(event: MouseEvent, handle: string, ctrl: ReportControl) {
+    event.preventDefault();
+    event.stopPropagation();
+    this.isResizing = true;
+    this.resizeHandle = handle;
+    this.resizeControlId = ctrl.id;
+    this.resizeStart = {
+      x: event.clientX,
+      y: event.clientY,
+      ctrlX: ctrl.x,
+      ctrlY: ctrl.y,
+      ctrlW: ctrl.width,
+      ctrlH: ctrl.height,
+    };
+  }
+
+  @HostListener('window:mousemove', ['$event'])
+  onWindowMouseMove(event: MouseEvent) {
+    if (this.isResizing && this.resizeStart && this.resizeControlId) {
+      const ctrl = this.findControlById(this.resizeControlId);
+      if (!ctrl) return;
+
+      const dx = event.clientX - this.resizeStart.x;
+      const dy = event.clientY - this.resizeStart.y;
+      const h = this.resizeHandle;
+
+      if (h?.includes('e')) {
+        ctrl.width = Math.max(10, this.snapValue(this.resizeStart.ctrlW + dx));
+      }
+      if (h?.includes('w')) {
+        const newW = Math.max(10, this.resizeStart.ctrlW - dx);
+        ctrl.x = this.snapValue(this.resizeStart.ctrlX + (this.resizeStart.ctrlW - newW));
+        ctrl.width = newW;
+      }
+      if (h?.includes('s')) {
+        ctrl.height = Math.max(6, this.snapValue(this.resizeStart.ctrlH + dy));
+      }
+      if (h?.includes('n')) {
+        const newH = Math.max(6, this.resizeStart.ctrlH - dy);
+        ctrl.y = this.snapValue(this.resizeStart.ctrlY + (this.resizeStart.ctrlH - newH));
+        ctrl.height = newH;
+      }
+    }
+  }
+
+  @HostListener('window:mouseup', ['$event'])
+  onWindowMouseUp(event: MouseEvent) {
+    if (this.isResizing) {
+      this.isResizing = false;
+      this.resizeHandle = null;
+      this.resizeControlId = null;
+      this.resizeStart = null;
+      this.markDirty();
+    }
+    // Also end rubber-band
+    if (this.rubberBandStart) {
+      this.onBandCanvasMouseUp(event);
+    }
+  }
+
+  private findControlById(id: string): ReportControl | null {
+    for (const band of this.design.bands) {
+      const ctrl = band.controls.find((c) => c.id === id);
+      if (ctrl) return ctrl;
+    }
+    return null;
+  }
+
+  // ===== Snap-to-grid =====
+
+  snapValue(val: number): number {
+    if (!this.snapToGrid) return val;
+    return Math.round(val / this.gridSize) * this.gridSize;
+  }
+
+  toggleSnapToGrid() {
+    this.snapToGrid = !this.snapToGrid;
+  }
+
+  toggleShowGrid() {
+    this.showGrid = !this.showGrid;
+  }
+
+  // ===== Context menu =====
+
+  onContextMenu(event: MouseEvent, controlId: string, bandId: string) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!this.selectedControlIds.has(controlId)) {
+      this.selectedControlIds.clear();
+      this.selectedControlIds.add(controlId);
+      this.selectedControlId = controlId;
+      this.selectedBandId = bandId;
+    }
+    this.contextMenuPos = { x: event.clientX, y: event.clientY };
+    this.showContextMenu = true;
+  }
+
+  onBandContextMenu(event: MouseEvent, bandId: string) {
+    event.preventDefault();
+    this.selectBand(bandId);
+    this.contextMenuPos = { x: event.clientX, y: event.clientY };
+    this.showContextMenu = true;
+  }
+
+  closeContextMenu() {
+    this.showContextMenu = false;
+  }
+
+  // ===== Delete selected controls =====
+
+  deleteSelected() {
+    if (this.selectedControlIds.size === 0) return;
+    for (const band of this.design.bands) {
+      band.controls = band.controls.filter((c) => !this.selectedControlIds.has(c.id));
+    }
+    this.selectedControlIds.clear();
+    this.selectedControlId = null;
+    this.markDirty();
+  }
+
+  // ===== Copy/Paste =====
+  clipboard: ReportControl[] = [];
+
+  copySelected() {
+    this.clipboard = this.selectedControls.map((c) => JSON.parse(JSON.stringify(c)));
+  }
+
+  cutSelected() {
+    this.copySelected();
+    this.deleteSelected();
+  }
+
+  pasteControls() {
+    if (!this.clipboard.length || !this.selectedBandId) return;
+    const band = this.design.bands.find((b) => b.id === this.selectedBandId);
+    if (!band) return;
+    this.selectedControlIds.clear();
+    for (const orig of this.clipboard) {
+      const copy: ReportControl = {
+        ...JSON.parse(JSON.stringify(orig)),
+        id: crypto.randomUUID(),
+        x: orig.x + 15,
+        y: orig.y + 15,
+      };
+      band.controls.push(copy);
+      this.selectedControlIds.add(copy.id);
+    }
+    if (this.selectedControlIds.size > 0) {
+      this.selectedControlId = [...this.selectedControlIds][0];
+    }
+    this.markDirty();
+  }
 
   addControlToBand(bandId: string, toolboxItem: ToolboxItem) {
     const band = this.design.bands.find((b) => b.id === bandId);
@@ -2482,6 +3123,7 @@ export class ReportDesignerComponent implements OnInit, OnDestroy {
       if (idx >= 0) {
         band.controls.splice(idx, 1);
         if (this.selectedControlId === controlId) this.selectedControlId = null;
+        this.selectedControlIds.delete(controlId);
         this.markDirty();
         return;
       }
@@ -2500,24 +3142,143 @@ export class ReportDesignerComponent implements OnInit, OnDestroy {
         };
         band.controls.push(copy);
         this.selectedControlId = copy.id;
+        this.selectedControlIds.clear();
+        this.selectedControlIds.add(copy.id);
         this.markDirty();
         return;
       }
     }
   }
 
-  selectControl(controlId: string, bandId: string) {
-    this.selectedControlId = controlId;
-    this.selectedBandId = bandId;
+  selectControl(controlId: string, bandId: string, event?: MouseEvent) {
+    if (event && (event.ctrlKey || event.metaKey)) {
+      // Toggle selection (Ctrl+Click)
+      if (this.selectedBandId !== bandId) {
+        // Switching bands → reset
+        this.selectedControlIds.clear();
+      }
+      this.selectedBandId = bandId;
+      if (this.selectedControlIds.has(controlId)) {
+        this.selectedControlIds.delete(controlId);
+        if (this.selectedControlIds.size > 0) {
+          this.selectedControlId = [...this.selectedControlIds][this.selectedControlIds.size - 1];
+        } else {
+          this.selectedControlId = null;
+        }
+      } else {
+        this.selectedControlIds.add(controlId);
+        this.selectedControlId = controlId;
+      }
+    } else if (event && event.shiftKey) {
+      // Add to selection (Shift+Click)
+      if (this.selectedBandId !== bandId) {
+        this.selectedControlIds.clear();
+      }
+      this.selectedBandId = bandId;
+      this.selectedControlIds.add(controlId);
+      this.selectedControlId = controlId;
+    } else {
+      // Normal click → single select
+      this.selectedControlIds.clear();
+      this.selectedControlIds.add(controlId);
+      this.selectedControlId = controlId;
+      this.selectedBandId = bandId;
+    }
     this.sidePanel = 'properties';
+    this.showContextMenu = false;
+  }
+
+  onControlDragStart(ctrl: ReportControl) {
+    this.draggedControlRef = ctrl;
+  }
+
+  onControlDragMove(ctrl: ReportControl, event: CdkDragMove, bandId: string) {
+    // Calculate current dragged position
+    const dx = event.distance.x;
+    const dy = event.distance.y;
+    const dragX = ctrl.x + dx;
+    const dragY = ctrl.y + dy;
+    const dragRight = dragX + ctrl.width;
+    const dragBottom = dragY + ctrl.height;
+    const dragCenterX = dragX + ctrl.width / 2;
+    const dragCenterY = dragY + ctrl.height / 2;
+
+    const band = this.design.bands.find(b => b.id === bandId);
+    if (!band) return;
+
+    const guides: { orientation: 'h' | 'v'; pos: number; bandId: string }[] = [];
+    const threshold = this.GUIDE_SNAP_THRESHOLD;
+
+    for (const other of band.controls) {
+      if (other.id === ctrl.id) continue;
+      if (this.selectedControlIds.has(other.id)) continue; // skip co-selected
+
+      const oLeft = other.x;
+      const oRight = other.x + other.width;
+      const oTop = other.y;
+      const oBottom = other.y + other.height;
+      const oCenterX = other.x + other.width / 2;
+      const oCenterY = other.y + other.height / 2;
+
+      // Vertical guides (x-axis alignment)
+      // Left ↔ Left
+      if (Math.abs(dragX - oLeft) <= threshold) guides.push({ orientation: 'v', pos: oLeft, bandId });
+      // Right ↔ Right
+      if (Math.abs(dragRight - oRight) <= threshold) guides.push({ orientation: 'v', pos: oRight, bandId });
+      // Left ↔ Right
+      if (Math.abs(dragX - oRight) <= threshold) guides.push({ orientation: 'v', pos: oRight, bandId });
+      // Right ↔ Left
+      if (Math.abs(dragRight - oLeft) <= threshold) guides.push({ orientation: 'v', pos: oLeft, bandId });
+      // Center ↔ Center
+      if (Math.abs(dragCenterX - oCenterX) <= threshold) guides.push({ orientation: 'v', pos: oCenterX, bandId });
+
+      // Horizontal guides (y-axis alignment)
+      // Top ↔ Top
+      if (Math.abs(dragY - oTop) <= threshold) guides.push({ orientation: 'h', pos: oTop, bandId });
+      // Bottom ↔ Bottom
+      if (Math.abs(dragBottom - oBottom) <= threshold) guides.push({ orientation: 'h', pos: oBottom, bandId });
+      // Top ↔ Bottom
+      if (Math.abs(dragY - oBottom) <= threshold) guides.push({ orientation: 'h', pos: oBottom, bandId });
+      // Bottom ↔ Top
+      if (Math.abs(dragBottom - oTop) <= threshold) guides.push({ orientation: 'h', pos: oTop, bandId });
+      // Center ↔ Center
+      if (Math.abs(dragCenterY - oCenterY) <= threshold) guides.push({ orientation: 'h', pos: oCenterY, bandId });
+    }
+
+    // Deduplicate
+    const seen = new Set<string>();
+    this.guideLines = guides.filter(g => {
+      const key = `${g.orientation}-${Math.round(g.pos)}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
   }
 
   onControlDragEnd(ctrl: ReportControl, event: any) {
-    // Update position from CDK drag
+    // Update position from CDK drag, with snap-to-grid
     if (event?.distance) {
-      ctrl.x = Math.max(0, ctrl.x + event.distance.x);
-      ctrl.y = Math.max(0, ctrl.y + event.distance.y);
+      const dx = event.distance.x;
+      const dy = event.distance.y;
+
+      // If this control is part of a multi-selection, move all selected
+      if (this.selectedControlIds.has(ctrl.id) && this.selectedControlIds.size > 1) {
+        for (const c of this.selectedControls) {
+          c.x = Math.max(0, this.snapValue(c.x + dx));
+          c.y = Math.max(0, this.snapValue(c.y + dy));
+        }
+      } else {
+        ctrl.x = Math.max(0, this.snapValue(ctrl.x + dx));
+        ctrl.y = Math.max(0, this.snapValue(ctrl.y + dy));
+      }
       this.markDirty();
+    }
+    // Clear alignment guides
+    this.guideLines = [];
+    this.draggedControlRef = null;
+    // Reset CDK drag transform so position matches the updated left/top
+    if (event?.source) {
+      event.source.reset();
     }
   }
 
@@ -2911,6 +3672,143 @@ export class ReportDesignerComponent implements OnInit, OnDestroy {
   getControlIcon(type: string): string {
     const item = TOOLBOX_ITEMS.find((t) => t.type === type);
     return item?.icon ?? '📦';
+  }
+
+  // ===== Report Explorer helpers =====
+
+  toggleExplorerBand(bandId: string) {
+    if (this.explorerCollapsedBands.has(bandId)) {
+      this.explorerCollapsedBands.delete(bandId);
+    } else {
+      this.explorerCollapsedBands.add(bandId);
+    }
+  }
+
+  isExplorerBandExpanded(bandId: string): boolean {
+    return !this.explorerCollapsedBands.has(bandId);
+  }
+
+  getControlDisplayName(ctrl: ReportControl): string {
+    if (this.controlNames[ctrl.id]) return this.controlNames[ctrl.id];
+    // Auto-generate a display name
+    switch (ctrl.type) {
+      case 'label':
+        return ctrl.text?.substring(0, 30) || 'Label';
+      case 'field':
+        return `[${this.getDataFieldLabel(ctrl.dataField ?? '')}]`;
+      case 'expression':
+        return `fx: ${ctrl.expression?.substring(0, 25) || 'Expression'}`;
+      case 'image':
+        return 'Image';
+      case 'shape':
+        return `Shape (${ctrl.shapeType || 'rect'})`;
+      case 'line':
+        return 'Line';
+      case 'barcode':
+        return `Barcode (${ctrl.barcodeType || 'qr'})`;
+      case 'chart':
+        return 'Chart';
+      case 'table':
+        return 'Table';
+      case 'checkbox':
+        return 'Checkbox';
+      case 'pageNumber':
+        return 'Page Number';
+      case 'totalPages':
+        return 'Total Pages';
+      case 'currentDate':
+        return 'Current Date';
+      case 'richText':
+        return ctrl.text?.substring(0, 30) || 'Rich Text';
+      case 'signatureZone':
+        return ctrl.text || 'Signature Zone';
+      default:
+        return ctrl.type;
+    }
+  }
+
+  startRenameControl(ctrl: ReportControl, event: MouseEvent) {
+    event.stopPropagation();
+    this.explorerEditingId = ctrl.id;
+    this.explorerEditingName = this.controlNames[ctrl.id] || this.getControlDisplayName(ctrl);
+  }
+
+  finishRenameControl(ctrl: ReportControl) {
+    if (this.explorerEditingName.trim()) {
+      this.controlNames[ctrl.id] = this.explorerEditingName.trim();
+    }
+    this.explorerEditingId = null;
+    this.explorerEditingName = '';
+  }
+
+  cancelRenameControl() {
+    this.explorerEditingId = null;
+    this.explorerEditingName = '';
+  }
+
+  moveControlUp(bandId: string, controlId: string) {
+    const band = this.design.bands.find((b) => b.id === bandId);
+    if (!band) return;
+    const idx = band.controls.findIndex((c) => c.id === controlId);
+    if (idx > 0) {
+      [band.controls[idx - 1], band.controls[idx]] = [band.controls[idx], band.controls[idx - 1]];
+      this.markDirty();
+    }
+  }
+
+  moveControlDown(bandId: string, controlId: string) {
+    const band = this.design.bands.find((b) => b.id === bandId);
+    if (!band) return;
+    const idx = band.controls.findIndex((c) => c.id === controlId);
+    if (idx >= 0 && idx < band.controls.length - 1) {
+      [band.controls[idx], band.controls[idx + 1]] = [band.controls[idx + 1], band.controls[idx]];
+      this.markDirty();
+    }
+  }
+
+  moveBandUp(bandId: string) {
+    const idx = this.design.bands.findIndex((b) => b.id === bandId);
+    if (idx > 0) {
+      [this.design.bands[idx - 1], this.design.bands[idx]] = [
+        this.design.bands[idx],
+        this.design.bands[idx - 1],
+      ];
+      this.markDirty();
+    }
+  }
+
+  moveBandDown(bandId: string) {
+    const idx = this.design.bands.findIndex((b) => b.id === bandId);
+    if (idx >= 0 && idx < this.design.bands.length - 1) {
+      [this.design.bands[idx], this.design.bands[idx + 1]] = [
+        this.design.bands[idx + 1],
+        this.design.bands[idx],
+      ];
+      this.markDirty();
+    }
+  }
+
+  getControlSizeInfo(ctrl: ReportControl): string {
+    return `${ctrl.x},${ctrl.y} ${ctrl.width}×${ctrl.height}`;
+  }
+
+  getBandIconClass(type: BandType): string {
+    switch (type) {
+      case 'reportHeader':
+      case 'pageHeader':
+        return 'explorer-band-header';
+      case 'detail':
+        return 'explorer-band-detail';
+      case 'reportFooter':
+      case 'pageFooter':
+        return 'explorer-band-footer';
+      case 'groupHeader':
+        return 'explorer-band-group-h';
+      case 'groupFooter':
+        return 'explorer-band-group-f';
+      default:
+        return '';
+    }
   }
 
   // ===== Undo / Redo =====

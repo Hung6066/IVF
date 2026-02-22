@@ -29,6 +29,27 @@
             ↪
           </button>
         </div>
+
+        <!-- Snap-to-grid & grid toggles -->
+        <div class="toolbar-snap">
+          <button
+            class="btn-icon-toolbar"
+            [class.active]="snapToGrid"
+            (click)="toggleSnapToGrid()"
+            title="Bắt lưới (Snap to Grid)"
+          >
+            ⊞
+          </button>
+          <button
+            class="btn-icon-toolbar"
+            [class.active]="showGrid"
+            (click)="toggleShowGrid()"
+            title="Hiện lưới"
+          >
+            ⊟
+          </button>
+        </div>
+
         <button class="btn mode-btn" [class.active]="mode === 'design'" (click)="mode = 'design'">
           🖊️ DESIGN
         </button>
@@ -131,6 +152,14 @@
             title="Cross-tab"
           >
             📐
+          </button>
+          <button
+            class="side-tab"
+            [class.active]="sidePanel === 'explorer'"
+            (click)="sidePanel = 'explorer'"
+            title="Report Explorer"
+          >
+            🗂️
           </button>
         </div>
 
@@ -623,6 +652,402 @@
                     🗑️ Xóa
                   </button>
                 </div>
+
+                <!-- ── Layout Section (DevExpress-style) ── -->
+                <div class="pgrid-section" [class.collapsed]="propSections['layoutOps']">
+                  <div
+                    class="pgrid-section-header"
+                    (click)="propSections['layoutOps'] = !propSections['layoutOps']"
+                  >
+                    <span class="pgrid-arrow">{{ propSections['layoutOps'] ? '▶' : '▼' }}</span>
+                    Layout
+                  </div>
+                  @if (!propSections['layoutOps']) {
+                    <div class="pgrid-layout-toolbar">
+                      <div class="layout-group">
+                        <span class="layout-group-label">Alignment</span>
+                        <div class="layout-btn-row">
+                          <button
+                            class="layout-btn"
+                            (click)="alignLeft()"
+                            [disabled]="!hasMultipleSelected"
+                            title="Căn trái (Align Left)"
+                          >
+                            <svg width="16" height="16" viewBox="0 0 16 16">
+                              <line
+                                x1="2"
+                                y1="1"
+                                x2="2"
+                                y2="15"
+                                stroke="currentColor"
+                                stroke-width="1.5"
+                              />
+                              <rect
+                                x="4"
+                                y="3"
+                                width="10"
+                                height="3"
+                                fill="currentColor"
+                                rx="0.5"
+                              />
+                              <rect x="4" y="9" width="6" height="3" fill="currentColor" rx="0.5" />
+                            </svg>
+                          </button>
+                          <button
+                            class="layout-btn"
+                            (click)="alignCenter()"
+                            [disabled]="!hasMultipleSelected"
+                            title="Căn giữa ngang (Align Center)"
+                          >
+                            <svg width="16" height="16" viewBox="0 0 16 16">
+                              <line
+                                x1="8"
+                                y1="1"
+                                x2="8"
+                                y2="15"
+                                stroke="currentColor"
+                                stroke-width="1.5"
+                                stroke-dasharray="2,1"
+                              />
+                              <rect
+                                x="3"
+                                y="3"
+                                width="10"
+                                height="3"
+                                fill="currentColor"
+                                rx="0.5"
+                              />
+                              <rect x="5" y="9" width="6" height="3" fill="currentColor" rx="0.5" />
+                            </svg>
+                          </button>
+                          <button
+                            class="layout-btn"
+                            (click)="alignRight()"
+                            [disabled]="!hasMultipleSelected"
+                            title="Căn phải (Align Right)"
+                          >
+                            <svg width="16" height="16" viewBox="0 0 16 16">
+                              <line
+                                x1="14"
+                                y1="1"
+                                x2="14"
+                                y2="15"
+                                stroke="currentColor"
+                                stroke-width="1.5"
+                              />
+                              <rect
+                                x="2"
+                                y="3"
+                                width="10"
+                                height="3"
+                                fill="currentColor"
+                                rx="0.5"
+                              />
+                              <rect x="6" y="9" width="6" height="3" fill="currentColor" rx="0.5" />
+                            </svg>
+                          </button>
+                          <button
+                            class="layout-btn"
+                            (click)="alignTop()"
+                            [disabled]="!hasMultipleSelected"
+                            title="Căn trên (Align Top)"
+                          >
+                            <svg width="16" height="16" viewBox="0 0 16 16">
+                              <line
+                                x1="1"
+                                y1="2"
+                                x2="15"
+                                y2="2"
+                                stroke="currentColor"
+                                stroke-width="1.5"
+                              />
+                              <rect
+                                x="3"
+                                y="4"
+                                width="3"
+                                height="10"
+                                fill="currentColor"
+                                rx="0.5"
+                              />
+                              <rect x="9" y="4" width="3" height="6" fill="currentColor" rx="0.5" />
+                            </svg>
+                          </button>
+                          <button
+                            class="layout-btn"
+                            (click)="alignMiddle()"
+                            [disabled]="!hasMultipleSelected"
+                            title="Căn giữa dọc (Align Middle)"
+                          >
+                            <svg width="16" height="16" viewBox="0 0 16 16">
+                              <line
+                                x1="1"
+                                y1="8"
+                                x2="15"
+                                y2="8"
+                                stroke="currentColor"
+                                stroke-width="1.5"
+                                stroke-dasharray="2,1"
+                              />
+                              <rect
+                                x="3"
+                                y="3"
+                                width="3"
+                                height="10"
+                                fill="currentColor"
+                                rx="0.5"
+                              />
+                              <rect x="9" y="5" width="3" height="6" fill="currentColor" rx="0.5" />
+                            </svg>
+                          </button>
+                          <button
+                            class="layout-btn"
+                            (click)="alignBottom()"
+                            [disabled]="!hasMultipleSelected"
+                            title="Căn dưới (Align Bottom)"
+                          >
+                            <svg width="16" height="16" viewBox="0 0 16 16">
+                              <line
+                                x1="1"
+                                y1="14"
+                                x2="15"
+                                y2="14"
+                                stroke="currentColor"
+                                stroke-width="1.5"
+                              />
+                              <rect
+                                x="3"
+                                y="2"
+                                width="3"
+                                height="10"
+                                fill="currentColor"
+                                rx="0.5"
+                              />
+                              <rect x="9" y="6" width="3" height="6" fill="currentColor" rx="0.5" />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                      <div class="layout-group">
+                        <span class="layout-group-label">Distribute</span>
+                        <div class="layout-btn-row">
+                          <button
+                            class="layout-btn"
+                            (click)="distributeHorizontal()"
+                            [disabled]="selectedControlIds.size < 3"
+                            title="Phân bố đều ngang"
+                          >
+                            <svg width="16" height="16" viewBox="0 0 16 16">
+                              <rect x="1" y="4" width="3" height="8" fill="currentColor" rx="0.5" />
+                              <rect
+                                x="6.5"
+                                y="4"
+                                width="3"
+                                height="8"
+                                fill="currentColor"
+                                rx="0.5"
+                              />
+                              <rect
+                                x="12"
+                                y="4"
+                                width="3"
+                                height="8"
+                                fill="currentColor"
+                                rx="0.5"
+                              />
+                            </svg>
+                          </button>
+                          <button
+                            class="layout-btn"
+                            (click)="distributeVertical()"
+                            [disabled]="selectedControlIds.size < 3"
+                            title="Phân bố đều dọc"
+                          >
+                            <svg width="16" height="16" viewBox="0 0 16 16">
+                              <rect x="4" y="1" width="8" height="3" fill="currentColor" rx="0.5" />
+                              <rect
+                                x="4"
+                                y="6.5"
+                                width="8"
+                                height="3"
+                                fill="currentColor"
+                                rx="0.5"
+                              />
+                              <rect
+                                x="4"
+                                y="12"
+                                width="8"
+                                height="3"
+                                fill="currentColor"
+                                rx="0.5"
+                              />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                      <div class="layout-group">
+                        <span class="layout-group-label">Kích thước</span>
+                        <div class="layout-btn-row">
+                          <button
+                            class="layout-btn layout-btn-text"
+                            (click)="makeSameWidth()"
+                            [disabled]="!hasMultipleSelected"
+                            title="Cùng rộng"
+                          >
+                            W=
+                          </button>
+                          <button
+                            class="layout-btn layout-btn-text"
+                            (click)="makeSameHeight()"
+                            [disabled]="!hasMultipleSelected"
+                            title="Cùng cao"
+                          >
+                            H=
+                          </button>
+                          <button
+                            class="layout-btn layout-btn-text"
+                            (click)="makeSameSize()"
+                            [disabled]="!hasMultipleSelected"
+                            title="Cùng kích thước"
+                          >
+                            WH=
+                          </button>
+                        </div>
+                      </div>
+                      <div class="layout-group">
+                        <span class="layout-group-label">Center in band</span>
+                        <div class="layout-btn-row">
+                          <button
+                            class="layout-btn"
+                            (click)="centerInBandHorizontal()"
+                            title="Giữa ngang trong band"
+                          >
+                            <svg width="16" height="16" viewBox="0 0 16 16">
+                              <rect
+                                x="1"
+                                y="1"
+                                width="14"
+                                height="14"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="1"
+                                rx="1"
+                              />
+                              <rect x="5" y="6" width="6" height="4" fill="currentColor" rx="0.5" />
+                            </svg>
+                          </button>
+                          <button
+                            class="layout-btn"
+                            (click)="centerInBandVertical()"
+                            title="Giữa dọc trong band"
+                          >
+                            <svg width="16" height="16" viewBox="0 0 16 16">
+                              <rect
+                                x="1"
+                                y="1"
+                                width="14"
+                                height="14"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="1"
+                                rx="1"
+                              />
+                              <rect x="6" y="4" width="4" height="8" fill="currentColor" rx="0.5" />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  }
+                </div>
+
+                <!-- ── Arrangement Section ── -->
+                <div class="pgrid-section" [class.collapsed]="propSections['arrangement']">
+                  <div
+                    class="pgrid-section-header"
+                    (click)="propSections['arrangement'] = !propSections['arrangement']"
+                  >
+                    <span class="pgrid-arrow">{{ propSections['arrangement'] ? '▶' : '▼' }}</span>
+                    Arrangement
+                  </div>
+                  @if (!propSections['arrangement']) {
+                    <div class="pgrid-layout-toolbar">
+                      <div class="layout-btn-row">
+                        <button
+                          class="layout-btn"
+                          (click)="bringToFront()"
+                          title="Đưa lên trên cùng (Bring to Front)"
+                        >
+                          <svg width="16" height="16" viewBox="0 0 16 16">
+                            <rect
+                              x="1"
+                              y="6"
+                              width="8"
+                              height="8"
+                              fill="#ccc"
+                              stroke="#999"
+                              stroke-width="0.5"
+                              rx="0.5"
+                            />
+                            <rect
+                              x="5"
+                              y="2"
+                              width="8"
+                              height="8"
+                              fill="currentColor"
+                              stroke="currentColor"
+                              stroke-width="0.5"
+                              rx="0.5"
+                            />
+                          </svg>
+                        </button>
+                        <button
+                          class="layout-btn"
+                          (click)="sendToBack()"
+                          title="Đưa xuống dưới cùng (Send to Back)"
+                        >
+                          <svg width="16" height="16" viewBox="0 0 16 16">
+                            <rect
+                              x="5"
+                              y="2"
+                              width="8"
+                              height="8"
+                              fill="#ccc"
+                              stroke="#999"
+                              stroke-width="0.5"
+                              rx="0.5"
+                            />
+                            <rect
+                              x="1"
+                              y="6"
+                              width="8"
+                              height="8"
+                              fill="currentColor"
+                              stroke="currentColor"
+                              stroke-width="0.5"
+                              rx="0.5"
+                            />
+                          </svg>
+                        </button>
+                        <button
+                          class="layout-btn"
+                          (click)="bringForward()"
+                          [disabled]="hasMultipleSelected"
+                          title="Đưa lên 1 lớp"
+                        >
+                          ↑
+                        </button>
+                        <button
+                          class="layout-btn"
+                          (click)="sendBackward()"
+                          [disabled]="hasMultipleSelected"
+                          title="Đưa xuống 1 lớp"
+                        >
+                          ↓
+                        </button>
+                      </div>
+                    </div>
+                  }
+                </div>
               } @else if (selectedBand) {
                 <!-- Band Properties Grid -->
                 <div class="pgrid-header">
@@ -1093,6 +1518,215 @@
               }
             </div>
           }
+          <!-- ===== REPORT EXPLORER PANEL ===== -->
+          @if (sidePanel === 'explorer') {
+            <div class="panel-section explorer-panel">
+              <h3>🗂️ Report Explorer</h3>
+              <p class="hint-text">Cấu trúc cây hiển thị tất cả band và control</p>
+
+              <div class="explorer-tree">
+                <!-- Report root -->
+                <div class="explorer-node explorer-root">
+                  <span class="explorer-toggle">▼</span>
+                  <span class="explorer-icon">📄</span>
+                  <span class="explorer-name">Report</span>
+                  <span class="explorer-meta"
+                    >{{ design.pageSettings.size }}
+                    {{ design.pageSettings.orientation === 'landscape' ? 'Ngang' : 'Dọc' }}</span
+                  >
+                </div>
+
+                <!-- Bands -->
+                @for (band of design.bands; track band.id; let bi = $index) {
+                  <div class="explorer-band-group">
+                    <!-- Band node -->
+                    <div
+                      class="explorer-node explorer-band-node"
+                      [class.selected]="selectedBandId === band.id && selectedControlIds.size === 0"
+                      [class.hidden-node]="!band.visible"
+                      (click)="selectBand(band.id)"
+                    >
+                      <span
+                        class="explorer-toggle"
+                        (click)="toggleExplorerBand(band.id); $event.stopPropagation()"
+                      >
+                        {{ isExplorerBandExpanded(band.id) ? '▼' : '▶' }}
+                      </span>
+                      <span
+                        class="explorer-icon explorer-band-icon"
+                        [class]="getBandIconClass(band.type)"
+                        >▦</span
+                      >
+                      <span class="explorer-name">{{ getBandLabel(band.type) }}</span>
+                      @if (band.groupField) {
+                        <span class="explorer-group-field"
+                          >: {{ getDataFieldLabel(band.groupField) }}</span
+                        >
+                      }
+                      <span class="explorer-meta">{{ band.height }}px</span>
+                      <span class="explorer-badge">{{ band.controls.length }}</span>
+
+                      <!-- Band actions on hover -->
+                      <div class="explorer-actions">
+                        <button
+                          class="explorer-action-btn"
+                          (click)="toggleBandVisibility(band); $event.stopPropagation()"
+                          [title]="band.visible ? 'Ẩn' : 'Hiện'"
+                        >
+                          {{ band.visible ? '👁️' : '🚫' }}
+                        </button>
+                        <button
+                          class="explorer-action-btn"
+                          (click)="moveBandUp(band.id); $event.stopPropagation()"
+                          [disabled]="bi === 0"
+                          title="Di chuyển lên"
+                        >
+                          ▲
+                        </button>
+                        <button
+                          class="explorer-action-btn"
+                          (click)="moveBandDown(band.id); $event.stopPropagation()"
+                          [disabled]="bi === design.bands.length - 1"
+                          title="Di chuyển xuống"
+                        >
+                          ▼
+                        </button>
+                        <button
+                          class="explorer-action-btn explorer-action-danger"
+                          (click)="removeBand(band.id); $event.stopPropagation()"
+                          title="Xóa band"
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    </div>
+
+                    <!-- Controls within band -->
+                    @if (isExplorerBandExpanded(band.id)) {
+                      <div class="explorer-children">
+                        @for (ctrl of band.controls; track ctrl.id; let ci = $index) {
+                          <div
+                            class="explorer-node explorer-control-node"
+                            [class.selected]="isControlSelected(ctrl.id)"
+                            (click)="
+                              selectControl(ctrl.id, band.id, $event); $event.stopPropagation()
+                            "
+                          >
+                            <span class="explorer-icon">{{ getControlIcon(ctrl.type) }}</span>
+
+                            @if (explorerEditingId === ctrl.id) {
+                              <input
+                                class="explorer-rename-input"
+                                [(ngModel)]="explorerEditingName"
+                                (blur)="finishRenameControl(ctrl)"
+                                (keydown.enter)="finishRenameControl(ctrl)"
+                                (keydown.escape)="cancelRenameControl()"
+                                (click)="$event.stopPropagation()"
+                                autofocus
+                              />
+                            } @else {
+                              <span class="explorer-name" [title]="getControlDisplayName(ctrl)">
+                                {{ getControlDisplayName(ctrl) }}
+                              </span>
+                            }
+
+                            <span class="explorer-size-info">{{ getControlSizeInfo(ctrl) }}</span>
+
+                            <!-- Control actions on hover -->
+                            <div class="explorer-actions">
+                              <button
+                                class="explorer-action-btn"
+                                (click)="startRenameControl(ctrl, $event)"
+                                title="Đổi tên"
+                              >
+                                ✏️
+                              </button>
+                              <button
+                                class="explorer-action-btn"
+                                (click)="moveControlUp(band.id, ctrl.id); $event.stopPropagation()"
+                                [disabled]="ci === 0"
+                                title="Di chuyển lên"
+                              >
+                                ▲
+                              </button>
+                              <button
+                                class="explorer-action-btn"
+                                (click)="
+                                  moveControlDown(band.id, ctrl.id); $event.stopPropagation()
+                                "
+                                [disabled]="ci === band.controls.length - 1"
+                                title="Di chuyển xuống"
+                              >
+                                ▼
+                              </button>
+                              <button
+                                class="explorer-action-btn"
+                                (click)="duplicateControl(ctrl.id); $event.stopPropagation()"
+                                title="Nhân bản"
+                              >
+                                📋
+                              </button>
+                              <button
+                                class="explorer-action-btn explorer-action-danger"
+                                (click)="removeControl(ctrl.id); $event.stopPropagation()"
+                                title="Xóa"
+                              >
+                                🗑️
+                              </button>
+                            </div>
+                          </div>
+                        }
+
+                        @if (band.controls.length === 0) {
+                          <div class="explorer-node explorer-empty">
+                            <span class="explorer-icon">—</span>
+                            <span class="explorer-name empty-text">(trống)</span>
+                          </div>
+                        }
+                      </div>
+                    }
+                  </div>
+                }
+
+                <!-- Styles node -->
+                @if (design.styles?.length) {
+                  <div class="explorer-node explorer-section-node">
+                    <span class="explorer-toggle">▶</span>
+                    <span class="explorer-icon">🎨</span>
+                    <span class="explorer-name">Styles</span>
+                    <span class="explorer-badge">{{ design.styles.length }}</span>
+                  </div>
+                }
+
+                <!-- Cross-Band Controls -->
+                @if (design.crossTab) {
+                  <div class="explorer-node explorer-section-node">
+                    <span class="explorer-toggle">▶</span>
+                    <span class="explorer-icon">📐</span>
+                    <span class="explorer-name">Cross-Tab</span>
+                  </div>
+                }
+
+                <!-- Sub-Reports -->
+                @if (design.subReports?.length) {
+                  <div class="explorer-node explorer-section-node">
+                    <span class="explorer-toggle">▶</span>
+                    <span class="explorer-icon">📎</span>
+                    <span class="explorer-name">Sub-Reports</span>
+                    <span class="explorer-badge">{{ design.subReports?.length }}</span>
+                  </div>
+                }
+
+                <!-- Data Sources -->
+                <div class="explorer-node explorer-section-node">
+                  <span class="explorer-toggle">▶</span>
+                  <span class="explorer-icon">🗄️</span>
+                  <span class="explorer-name">Data Sources</span>
+                  <span class="explorer-badge">{{ dataFieldOptions.length }}</span>
+                </div>
+              </div>
+            </div>
+          }
         </div>
       </aside>
 
@@ -1176,19 +1810,30 @@
                     <!-- Band canvas (drop zone) -->
                     <div
                       class="band-canvas"
+                      [class.show-grid]="showGrid"
                       [style.height.px]="band.height"
                       [style.background-color]="band.backgroundColor || 'transparent'"
+                      [style.--grid-size]="gridSize + 'px'"
                       (dragover)="onBandDragOver($event)"
                       (drop)="onBandDrop($event, band.id)"
+                      (mousedown)="onBandCanvasMouseDown($event, band.id)"
+                      (mousemove)="onBandCanvasMouseMove($event, band.id)"
+                      (contextmenu)="onBandContextMenu($event, band.id)"
                     >
                       @for (ctrl of band.controls; track ctrl.id) {
                         <div
                           class="control-wrapper"
-                          [class.selected]="selectedControlId === ctrl.id"
+                          [class.selected]="isControlSelected(ctrl.id)"
+                          [class.multi-selected]="isControlSelected(ctrl.id) && hasMultipleSelected"
                           [ngStyle]="getControlStyle(ctrl)"
-                          (click)="selectControl(ctrl.id, band.id); $event.stopPropagation()"
+                          (click)="
+                            selectControl(ctrl.id, band.id, $event); $event.stopPropagation()
+                          "
+                          (contextmenu)="onContextMenu($event, ctrl.id, band.id)"
                           cdkDrag
                           [cdkDragFreeDragPosition]="{ x: 0, y: 0 }"
+                          (cdkDragStarted)="onControlDragStart(ctrl)"
+                          (cdkDragMoved)="onControlDragMove(ctrl, $event, band.id)"
                           (cdkDragEnded)="onControlDragEnd(ctrl, $event)"
                         >
                           <!-- Control content preview -->
@@ -1255,15 +1900,68 @@
                             }
                           }
 
-                          <!-- Resize handles on selected -->
-                          @if (selectedControlId === ctrl.id) {
-                            <div class="resize-handle resize-se"></div>
+                          <!-- Resize handles on selected (all 8 directions) -->
+                          @if (isControlSelected(ctrl.id) && !hasMultipleSelected) {
+                            <div
+                              class="resize-handle resize-n"
+                              (mousedown)="onResizeStart($event, 'n', ctrl)"
+                            ></div>
+                            <div
+                              class="resize-handle resize-s"
+                              (mousedown)="onResizeStart($event, 's', ctrl)"
+                            ></div>
+                            <div
+                              class="resize-handle resize-e"
+                              (mousedown)="onResizeStart($event, 'e', ctrl)"
+                            ></div>
+                            <div
+                              class="resize-handle resize-w"
+                              (mousedown)="onResizeStart($event, 'w', ctrl)"
+                            ></div>
+                            <div
+                              class="resize-handle resize-ne"
+                              (mousedown)="onResizeStart($event, 'ne', ctrl)"
+                            ></div>
+                            <div
+                              class="resize-handle resize-nw"
+                              (mousedown)="onResizeStart($event, 'nw', ctrl)"
+                            ></div>
+                            <div
+                              class="resize-handle resize-se"
+                              (mousedown)="onResizeStart($event, 'se', ctrl)"
+                            ></div>
+                            <div
+                              class="resize-handle resize-sw"
+                              (mousedown)="onResizeStart($event, 'sw', ctrl)"
+                            ></div>
                           }
                         </div>
                       }
 
                       @if (!band.controls.length) {
                         <div class="band-empty-hint">Kéo thả control vào đây</div>
+                      }
+
+                      <!-- Alignment snap guide lines -->
+                      @for (guide of guideLines; track $index) {
+                        @if (guide.bandId === band.id) {
+                          @if (guide.orientation === 'v') {
+                            <div class="snap-guide snap-guide-v" [style.left.px]="guide.pos"></div>
+                          } @else {
+                            <div class="snap-guide snap-guide-h" [style.top.px]="guide.pos"></div>
+                          }
+                        }
+                      }
+
+                      <!-- Rubber-band selection rectangle -->
+                      @if (isRubberBanding && rubberBandBandId === band.id) {
+                        <div
+                          class="rubber-band"
+                          [style.left.px]="rubberBandRect.x"
+                          [style.top.px]="rubberBandRect.y"
+                          [style.width.px]="rubberBandRect.w"
+                          [style.height.px]="rubberBandRect.h"
+                        ></div>
                       }
                     </div>
                   </div>
@@ -1436,6 +2134,114 @@
       </div>
       <!-- end canvas-wrapper -->
     </div>
+
+    <!-- ===== Context Menu ===== -->
+    @if (showContextMenu) {
+      <div
+        class="context-menu-overlay"
+        (click)="closeContextMenu()"
+        (contextmenu)="$event.preventDefault(); closeContextMenu()"
+      >
+        <div
+          class="context-menu"
+          [style.left.px]="contextMenuPos.x"
+          [style.top.px]="contextMenuPos.y"
+          (click)="$event.stopPropagation()"
+        >
+          @if (selectedControlIds.size > 0) {
+            <button class="ctx-item" (click)="copySelected(); closeContextMenu()">
+              <span class="ctx-icon">📋</span> Sao chép <span class="ctx-shortcut">Ctrl+C</span>
+            </button>
+            <button class="ctx-item" (click)="cutSelected(); closeContextMenu()">
+              <span class="ctx-icon">✂️</span> Cắt <span class="ctx-shortcut">Ctrl+X</span>
+            </button>
+            <button
+              class="ctx-item"
+              (click)="pasteControls(); closeContextMenu()"
+              [disabled]="clipboard.length === 0"
+            >
+              <span class="ctx-icon">📄</span> Dán <span class="ctx-shortcut">Ctrl+V</span>
+            </button>
+            <div class="ctx-separator"></div>
+            <button
+              class="ctx-item"
+              (click)="duplicateControl(selectedControlId!); closeContextMenu()"
+              [disabled]="hasMultipleSelected"
+            >
+              <span class="ctx-icon">📋</span> Nhân bản <span class="ctx-shortcut">Ctrl+D</span>
+            </button>
+            <button class="ctx-item ctx-danger" (click)="deleteSelected(); closeContextMenu()">
+              <span class="ctx-icon">🗑️</span> Xóa <span class="ctx-shortcut">Del</span>
+            </button>
+            <div class="ctx-separator"></div>
+            <button class="ctx-item" (click)="bringToFront(); closeContextMenu()">
+              <span class="ctx-icon">⬆️</span> Đưa lên trên cùng
+            </button>
+            <button class="ctx-item" (click)="sendToBack(); closeContextMenu()">
+              <span class="ctx-icon">⬇️</span> Đưa xuống dưới cùng
+            </button>
+            @if (hasMultipleSelected) {
+              <div class="ctx-separator"></div>
+              <button class="ctx-item" (click)="alignLeft(); closeContextMenu()">
+                <span class="ctx-icon">⫷</span> Căn trái
+              </button>
+              <button class="ctx-item" (click)="alignTop(); closeContextMenu()">
+                <span class="ctx-icon">⫠</span> Căn trên
+              </button>
+              <button class="ctx-item" (click)="makeSameSize(); closeContextMenu()">
+                <span class="ctx-icon">⊞</span> Cùng kích thước
+              </button>
+            }
+          } @else {
+            <button
+              class="ctx-item"
+              (click)="pasteControls(); closeContextMenu()"
+              [disabled]="clipboard.length === 0"
+            >
+              <span class="ctx-icon">📄</span> Dán <span class="ctx-shortcut">Ctrl+V</span>
+            </button>
+            <button class="ctx-item" (click)="selectAllInBand(); closeContextMenu()">
+              <span class="ctx-icon">☑</span> Chọn tất cả <span class="ctx-shortcut">Ctrl+A</span>
+            </button>
+          }
+        </div>
+      </div>
+    }
+
+    <!-- ===== Multi-selection status bar ===== -->
+    @if (mode === 'design' && selectedControlIds.size > 1) {
+      <div class="multi-select-bar">
+        <span class="ms-badge">{{ selectedControlIds.size }} controls đã chọn</span>
+        <button class="btn-sm btn-secondary" (click)="alignLeft()" title="Căn trái">
+          ⫷ Căn trái
+        </button>
+        <button class="btn-sm btn-secondary" (click)="alignTop()" title="Căn trên">
+          ⫠ Căn trên
+        </button>
+        <button
+          class="btn-sm btn-secondary"
+          (click)="distributeHorizontal()"
+          [disabled]="selectedControlIds.size < 3"
+          title="Phân bố đều ngang"
+        >
+          ↔ Phân bố H
+        </button>
+        <button
+          class="btn-sm btn-secondary"
+          (click)="distributeVertical()"
+          [disabled]="selectedControlIds.size < 3"
+          title="Phân bố đều dọc"
+        >
+          ↕ Phân bố V
+        </button>
+        <button class="btn-sm btn-secondary" (click)="makeSameSize()" title="Cùng kích thước">
+          ⊞ Cùng size
+        </button>
+        <button class="btn-sm btn-danger" (click)="deleteSelected()" title="Xóa tất cả đã chọn">
+          🗑️ Xóa
+        </button>
+      </div>
+    }
 
     <!-- ===== Expression Editor Dialog ===== -->
     @if (showExpressionEditor) {
