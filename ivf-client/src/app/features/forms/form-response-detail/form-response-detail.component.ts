@@ -11,6 +11,8 @@ import {
   FormTemplate,
   FormField,
   FieldType,
+  SigningStatus,
+  DocumentSignatureInfo,
 } from '../forms.service';
 
 @Component({
@@ -41,6 +43,11 @@ export class FormResponseDetailComponent implements OnInit {
   pdfPreviewUrl: SafeResourceUrl | null = null;
   isLoadingPdf = false;
   private pdfBlob: Blob | null = null;
+
+  // Multi-signature
+  signingStatus: SigningStatus | null = null;
+  isSigning = false;
+  showSigningPanel = false;
 
   // Status workflow steps
   get workflowSteps() {
@@ -82,9 +89,70 @@ export class FormResponseDetailComponent implements OnInit {
               };
             });
           }
+          // Load signing status
+          this.loadSigningStatus(r.id);
         });
       }
     });
+  }
+
+  // ── Multi-Signature Methods ──
+
+  loadSigningStatus(responseId: string) {
+    this.formsService.getSigningStatus(responseId).subscribe({
+      next: (status) => (this.signingStatus = status),
+      error: () => {}, // ignore if endpoint not available
+    });
+  }
+
+  signForRole(role: string) {
+    if (!this.response) return;
+    this.isSigning = true;
+    this.formsService.signResponse(this.response.id, role).subscribe({
+      next: (result) => {
+        this.isSigning = false;
+        this.loadSigningStatus(this.response!.id);
+        alert(result.message || 'Ký thành công!');
+      },
+      error: (err) => {
+        this.isSigning = false;
+        const msg = err.error?.error || err.error?.detail || 'Có lỗi khi ký. Vui lòng thử lại.';
+        alert(msg);
+      },
+    });
+  }
+
+  revokeSignature(sig: DocumentSignatureInfo) {
+    if (!this.response) return;
+    if (!confirm(`Thu hồi chữ ký "${this.getRoleLabel(sig.signatureRole)}" của ${sig.signerName}?`))
+      return;
+    this.formsService.revokeSignature(this.response.id, sig.id).subscribe({
+      next: () => {
+        this.loadSigningStatus(this.response!.id);
+      },
+      error: (err) => {
+        alert(err.error?.error || 'Không thể thu hồi chữ ký.');
+      },
+    });
+  }
+
+  getRoleLabel(role: string): string {
+    const labels: Record<string, string> = {
+      technician: 'Kỹ thuật viên',
+      department_head: 'Trưởng khoa',
+      doctor: 'Bác sĩ',
+      director: 'Giám đốc',
+      current_user: 'Người dùng',
+    };
+    return labels[role] || role;
+  }
+
+  isRoleSigned(role: string): boolean {
+    return this.signingStatus?.signatures?.some((s) => s.signatureRole === role) ?? false;
+  }
+
+  getSignerForRole(role: string): DocumentSignatureInfo | undefined {
+    return this.signingStatus?.signatures?.find((s) => s.signatureRole === role);
   }
 
   // Convert string field type from API to numeric enum value

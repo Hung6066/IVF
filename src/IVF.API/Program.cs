@@ -27,6 +27,20 @@ var signingOptions = signingSection.Get<DigitalSigningOptions>() ?? new DigitalS
 
 if (signingOptions.Enabled)
 {
+    // Validate production security constraints
+    if (!builder.Environment.IsDevelopment())
+    {
+        signingOptions.ValidateProduction();
+    }
+
+    // Certificate expiry monitoring (Phase 3)
+    builder.Services.AddSingleton<CertificateExpiryMonitorService>();
+    builder.Services.AddHostedService(sp => sp.GetRequiredService<CertificateExpiryMonitorService>());
+
+    // Security compliance audit (Phase 4)
+    builder.Services.AddSingleton<SecurityComplianceService>();
+    builder.Services.AddSingleton<SecurityAuditService>();
+
     builder.Services.AddHttpClient<IDigitalSigningService, SignServerDigitalSigningService>(client =>
     {
         client.BaseAddress = new Uri(signingOptions.SignServerUrl);
@@ -35,18 +49,51 @@ if (signingOptions.Enabled)
     .ConfigurePrimaryHttpMessageHandler(() =>
     {
         var handler = new HttpClientHandler();
+
+        // TLS validation
         if (signingOptions.SkipTlsValidation)
         {
             handler.ServerCertificateCustomValidationCallback =
                 HttpClientHandler.DangerousAcceptAnyServerCertificateValidator;
         }
+        else if (!string.IsNullOrEmpty(signingOptions.TrustedCaCertPath)
+                 && File.Exists(signingOptions.TrustedCaCertPath))
+        {
+            // Custom CA validation — trust our internal CA chain
+            var trustedCa = System.Security.Cryptography.X509Certificates.X509CertificateLoader
+                .LoadCertificateFromFile(signingOptions.TrustedCaCertPath);
+            handler.ServerCertificateCustomValidationCallback = (message, cert, chain, errors) =>
+            {
+                if (errors == System.Net.Security.SslPolicyErrors.None)
+                    return true;
+
+                // Validate against our trusted CA
+                if (cert != null)
+                {
+                    chain ??= new System.Security.Cryptography.X509Certificates.X509Chain();
+                    chain.ChainPolicy.ExtraStore.Add(trustedCa);
+                    chain.ChainPolicy.RevocationMode =
+                        System.Security.Cryptography.X509Certificates.X509RevocationMode.NoCheck;
+                    chain.ChainPolicy.VerificationFlags =
+                        System.Security.Cryptography.X509Certificates.X509VerificationFlags
+                            .AllowUnknownCertificateAuthority;
+                    return chain.Build(
+                        System.Security.Cryptography.X509Certificates.X509CertificateLoader
+                            .LoadCertificate(cert.GetRawCertData()));
+                }
+                return false;
+            };
+        }
+
+        // Client certificate for mTLS
         if (!string.IsNullOrEmpty(signingOptions.ClientCertificatePath))
         {
+            var certPassword = signingOptions.ResolveClientCertificatePassword();
             handler.ClientCertificates.Add(
-                new System.Security.Cryptography.X509Certificates.X509Certificate2(
-                    signingOptions.ClientCertificatePath,
-                    signingOptions.ClientCertificatePassword));
+                System.Security.Cryptography.X509Certificates.X509CertificateLoader
+                    .LoadPkcs12FromFile(signingOptions.ClientCertificatePath, certPassword));
         }
+
         return handler;
     });
 }
@@ -136,6 +183,26 @@ builder.Services.AddRateLimiter(options =>
                 QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
                 QueueLimit = 5
             }));
+
+    // Signing-specific rate limit (Phase 3) — protect SignServer from abuse
+    options.AddFixedWindowLimiter("signing", limiterOptions =>
+    {
+        limiterOptions.AutoReplenishment = true;
+        limiterOptions.PermitLimit = signingOptions.SigningRateLimitPerMinute;
+        limiterOptions.Window = TimeSpan.FromMinutes(1);
+        limiterOptions.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+        limiterOptions.QueueLimit = 2;
+    });
+
+    // Strict limit for certificate provisioning (expensive operation)
+    options.AddFixedWindowLimiter("signing-provision", limiterOptions =>
+    {
+        limiterOptions.AutoReplenishment = true;
+        limiterOptions.PermitLimit = 3;
+        limiterOptions.Window = TimeSpan.FromMinutes(1);
+        limiterOptions.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+        limiterOptions.QueueLimit = 0;
+    });
 });
 
 builder.Services.AddSignalR();
@@ -154,6 +221,8 @@ else
     builder.Services.AddHostedService(sp => sp.GetRequiredService<IVF.API.Services.StubBiometricMatcherService>());
     builder.Services.AddSingleton<IVF.Application.Common.Interfaces.IBiometricMatcher>(sp => sp.GetRequiredService<IVF.API.Services.StubBiometricMatcherService>());
 }
+builder.Services.AddScoped<IVF.API.Services.SignedPdfGenerationService>();
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -196,14 +265,39 @@ if (app.Environment.IsDevelopment())
 
 // app.UseHttpsRedirection();
 
-// OWASP Secure Headers
+// OWASP Secure Headers (Phase 1-3) + Phase 4 Compliance Hardening
 app.Use(async (context, next) =>
 {
+    // Phase 1: Core OWASP headers
     context.Response.Headers.Append("X-Content-Type-Options", "nosniff");
     context.Response.Headers.Append("X-Frame-Options", "DENY");
-    context.Response.Headers.Append("X-XSS-Protection", "1; mode=block");
+    context.Response.Headers.Append("X-XSS-Protection", "0"); // Modern browsers: CSP replaces this
     context.Response.Headers.Append("Referrer-Policy", "strict-origin-when-cross-origin");
-    context.Response.Headers.Append("Content-Security-Policy", "default-src 'self'; img-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline';");
+    context.Response.Headers.Append("Content-Security-Policy",
+        "default-src 'self'; img-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline'; " +
+        "frame-ancestors 'none'; base-uri 'self'; form-action 'self';");
+
+    // Phase 4: HSTS — enforce HTTPS (max-age=2 years, includeSubDomains, preload-ready)
+    if (context.Request.IsHttps || app.Environment.IsProduction())
+    {
+        context.Response.Headers.Append("Strict-Transport-Security",
+            "max-age=63072000; includeSubDomains; preload");
+    }
+
+    // Phase 4: Permissions-Policy — restrict browser features
+    context.Response.Headers.Append("Permissions-Policy",
+        "camera=(), microphone=(), geolocation=(), payment=(), usb=(), " +
+        "accelerometer=(), gyroscope=(), magnetometer=(), autoplay=()");
+
+    // Phase 4: Additional hardening headers
+    context.Response.Headers.Append("Cross-Origin-Embedder-Policy", "require-corp");
+    context.Response.Headers.Append("Cross-Origin-Opener-Policy", "same-origin");
+    context.Response.Headers.Append("Cross-Origin-Resource-Policy", "same-origin");
+
+    // Remove server identification header
+    context.Response.Headers.Remove("Server");
+    context.Response.Headers.Remove("X-Powered-By");
+
     await next();
 });
 
@@ -237,6 +331,8 @@ app.MapAuditEndpoints();
 app.MapDoctorEndpoints();
 app.MapUserEndpoints();
 app.MapServiceCatalogEndpoints();
+app.MapMenuEndpoints();
+app.MapPermissionDefinitionEndpoints();
 app.MapSeedEndpoints();
 app.MapLabEndpoints();
 app.MapFormEndpoints();
@@ -244,6 +340,8 @@ app.MapConceptEndpoints();
 app.MapDigitalSigningEndpoints();
 app.MapSigningAdminEndpoints();
 app.MapUserSignatureEndpoints();
+app.MapPatientDocumentEndpoints();
+app.MapDocumentSignatureEndpoints();
 
 // Auto-migrate and seed in dev
 if (app.Environment.IsDevelopment())
@@ -253,6 +351,13 @@ if (app.Environment.IsDevelopment())
     await db.Database.MigrateAsync();
     await DatabaseSeeder.SeedAsync(app.Services);
     await FormTemplateSeeder.SeedFormTemplatesAsync(app.Services);
+    await FormTemplateCodeSeeder.RegenerateCodesAsync(app.Services); // Backfill codes sau migration
+    await MenuSeeder.SeedAsync(db); // Seed default menu items
+
+    // Seed permission definitions
+    var permDefRepo = scope.ServiceProvider.GetRequiredService<IPermissionDefinitionRepository>();
+    var permUow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+    await PermissionDefinitionSeeder.SeedAsync(permDefRepo, permUow);
 }
 
 // QuestPDF community license

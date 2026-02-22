@@ -36,14 +36,16 @@ public record CreateFormTemplateCommand(
     string Name,
     string? Description,
     Guid? CreatedByUserId,
-    List<CreateFormFieldDto>? Fields
+    List<CreateFormFieldDto>? Fields,
+    string? Code = null  // Nếu không truyền thì tự sinh từ Name
 ) : IRequest<Result<FormTemplateDto>>;
 
 public record UpdateFormTemplateCommand(
     Guid Id,
     string Name,
     string? Description,
-    Guid? CategoryId
+    Guid? CategoryId,
+    string? Code = null  // Nếu không truyền thì giữ nguyên code cũ
 ) : IRequest<Result<FormTemplateDto>>;
 
 public record PublishFormTemplateCommand(Guid Id) : IRequest<Result<FormTemplateDto>>;
@@ -190,6 +192,7 @@ public record FormTemplateDto(
     Guid CategoryId,
     string CategoryName,
     string Name,
+    string Code,
     string? Description,
     string Version,
     bool IsPublished,
@@ -379,7 +382,8 @@ public class FormTemplateCommandsHandler :
             categoryId,
             request.Name,
             createdByUserId,
-            request.Description);
+            request.Description,
+            request.Code);
 
         // Add fields if provided
         if (request.Fields != null)
@@ -416,7 +420,7 @@ public class FormTemplateCommandsHandler :
         if (template == null)
             return Result<FormTemplateDto>.Failure("Template not found");
 
-        template.Update(request.Name, request.Description);
+        template.Update(request.Name, request.Description, request.Code);
         if (request.CategoryId.HasValue)
             template.UpdateCategory(request.CategoryId.Value);
 
@@ -469,6 +473,7 @@ public class FormTemplateCommandsHandler :
             newName,
             source.CreatedByUserId,
             source.Description);
+        // Duplicate gets a new code auto-generated from new name (not copied from source)
 
         if (source.Fields != null)
         {
@@ -501,6 +506,7 @@ public class FormTemplateCommandsHandler :
         t.CategoryId,
         t.Category?.Name ?? "",
         t.Name,
+        t.Code,
         t.Description,
         t.Version,
         t.IsPublished,

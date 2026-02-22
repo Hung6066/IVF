@@ -1,0 +1,166 @@
+<div class="permission-management">
+  <!-- Header -->
+  <div class="page-header">
+    <div class="header-left">
+      <h2>🔐 Quản lý phân quyền</h2>
+      <p class="subtitle">Quản lý quyền truy cập cho từng người dùng trong hệ thống</p>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="filters-bar">
+    <div class="search-box">
+      <span class="search-icon">🔍</span>
+      <input
+        type="text"
+        [(ngModel)]="search"
+        placeholder="Tìm theo tên, username..."
+        (keyup.enter)="applyFilter()"
+      />
+    </div>
+    <select [(ngModel)]="roleFilter" (change)="applyFilter()">
+      <option value="">Tất cả vai trò</option>
+      @for (role of roles(); track role) {
+        <option [value]="role">{{ role }}</option>
+      }
+    </select>
+  </div>
+
+  <!-- Loading -->
+  @if (loading()) {
+    <div class="loading-container">
+      <div class="spinner"></div>
+      <span>Đang tải dữ liệu...</span>
+    </div>
+  }
+
+  <!-- Users Permission List -->
+  @if (!loading()) {
+    <div class="permission-list">
+      @for (user of users(); track user.id) {
+        <div
+          class="user-permission-card"
+          [class.expanded]="user.expanded"
+          [class.editing]="isEditing(user)"
+        >
+          <!-- User Row -->
+          <div class="user-row" (click)="toggleUserExpand(user)">
+            <div class="user-info">
+              <span class="user-avatar">{{ user.fullName?.charAt(0) || '?' }}</span>
+              <div class="user-details">
+                <strong>{{ user.fullName }}</strong>
+                <small>{{ user.username }}</small>
+              </div>
+            </div>
+            <div class="user-meta">
+              <span class="role-badge" [ngClass]="getRoleBadgeClass(user.role)">{{
+                user.role
+              }}</span>
+              @if (user.department) {
+                <span class="department-tag">{{ user.department }}</span>
+              }
+              @if (user.expanded) {
+                <span class="perm-count">{{ getPermissionCount(user) }} quyền</span>
+              }
+            </div>
+            <span class="expand-icon" [class.rotated]="user.expanded">▶</span>
+          </div>
+
+          <!-- Expanded Permission Panel -->
+          @if (user.expanded) {
+            <div class="permission-panel">
+              <!-- Actions -->
+              <div class="panel-actions">
+                @if (!isEditing(user)) {
+                  <button class="btn-edit" (click)="startEdit(user); $event.stopPropagation()">
+                    ✏️ Chỉnh sửa quyền
+                  </button>
+                } @else {
+                  <div class="edit-actions">
+                    <button class="btn-select-all" (click)="selectAll()">Chọn tất cả</button>
+                    <button class="btn-deselect-all" (click)="deselectAll()">Bỏ chọn tất cả</button>
+                    <span class="divider">|</span>
+                    <span class="selected-count"
+                      >{{ editingPermissions.length }} quyền đã chọn</span
+                    >
+                  </div>
+                }
+              </div>
+
+              <!-- Permission Groups -->
+              <div class="permission-groups">
+                @for (group of permissionGroups; track group.name) {
+                  <div class="permission-group">
+                    <div class="group-header">
+                      @if (isEditing(user)) {
+                        <label class="group-checkbox" (click)="$event.stopPropagation()">
+                          <input
+                            type="checkbox"
+                            [checked]="isGroupAllSelected(group)"
+                            [indeterminate]="isGroupPartialSelected(group)"
+                            (change)="selectAllGroup(group)"
+                          />
+                        </label>
+                      }
+                      <span class="group-icon">{{ group.icon }}</span>
+                      <h4 class="group-title">{{ group.name }}</h4>
+                    </div>
+                    <div class="permission-grid">
+                      @for (perm of group.permissions; track perm) {
+                        <label
+                          class="permission-item"
+                          [class.active]="hasPermission(user, perm)"
+                          [class.disabled]="!isEditing(user)"
+                        >
+                          @if (isEditing(user)) {
+                            <input
+                              type="checkbox"
+                              [checked]="hasPermission(user, perm)"
+                              (change)="togglePermission(perm)"
+                            />
+                          } @else {
+                            <span
+                              class="status-dot"
+                              [class.granted]="hasPermission(user, perm)"
+                            ></span>
+                          }
+                          <span class="perm-label">{{ formatPermission(perm) }}</span>
+                        </label>
+                      }
+                    </div>
+                  </div>
+                }
+              </div>
+
+              <!-- Save / Cancel -->
+              @if (isEditing(user)) {
+                <div class="panel-footer">
+                  <button class="btn-ghost" (click)="cancelEdit()">Hủy bỏ</button>
+                  <button class="btn-primary" [disabled]="saving()" (click)="savePermissions(user)">
+                    {{ saving() ? 'Đang lưu...' : '💾 Lưu phân quyền' }}
+                  </button>
+                </div>
+              }
+            </div>
+          }
+        </div>
+      }
+
+      @if (users().length === 0 && !loading()) {
+        <div class="empty-state">
+          <span class="empty-icon">🔍</span>
+          <p>Không tìm thấy người dùng nào</p>
+        </div>
+      }
+    </div>
+
+    <!-- Pagination -->
+    <div class="pagination">
+      <button class="btn-page" [disabled]="page <= 1" (click)="changePage(-1)">← Trước</button>
+      <span class="page-info">Trang {{ page }}</span>
+      <button class="btn-page" [disabled]="users().length < pageSize" (click)="changePage(1)">
+        Tiếp →
+      </button>
+    </div>
+  }
+</div>

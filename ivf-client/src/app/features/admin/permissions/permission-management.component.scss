@@ -1,0 +1,499 @@
+.permission-management {
+  padding: 0;
+}
+
+// ── Header ──────────────────────────────────────────
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 24px;
+
+  h2 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #1e293b;
+    margin: 0;
+  }
+
+  .subtitle {
+    color: #64748b;
+    font-size: 0.875rem;
+    margin-top: 4px;
+  }
+}
+
+// ── Filters ─────────────────────────────────────────
+.filters-bar {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+
+  .search-box {
+    display: flex;
+    align-items: center;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 0 12px;
+    flex: 1;
+    min-width: 220px;
+
+    .search-icon {
+      margin-right: 8px;
+      font-size: 0.875rem;
+    }
+
+    input {
+      border: none;
+      outline: none;
+      padding: 10px 0;
+      width: 100%;
+      font-size: 0.875rem;
+      background: transparent;
+    }
+  }
+
+  select {
+    padding: 10px 16px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    background: #fff;
+    cursor: pointer;
+    min-width: 160px;
+
+    &:focus {
+      outline: none;
+      border-color: #6366f1;
+    }
+  }
+}
+
+// ── Loading ─────────────────────────────────────────
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 48px;
+  color: #64748b;
+  gap: 12px;
+
+  .spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid #e2e8f0;
+    border-top-color: #6366f1;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+// ── Permission List ─────────────────────────────────
+.permission-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.user-permission-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+  transition: all 0.2s ease;
+
+  &.expanded {
+    border-color: #6366f1;
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.1);
+  }
+
+  &.editing {
+    border-color: #f59e0b;
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.15);
+  }
+}
+
+// ── User Row ────────────────────────────────────────
+.user-row {
+  display: flex;
+  align-items: center;
+  padding: 14px 20px;
+  cursor: pointer;
+  transition: background 0.15s;
+
+  &:hover {
+    background: #f8fafc;
+  }
+
+  .user-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+
+    .user-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      font-size: 1rem;
+    }
+
+    .user-details {
+      display: flex;
+      flex-direction: column;
+
+      strong {
+        font-size: 0.9rem;
+        color: #1e293b;
+      }
+
+      small {
+        font-size: 0.8rem;
+        color: #94a3b8;
+      }
+    }
+  }
+
+  .user-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .expand-icon {
+    font-size: 0.75rem;
+    color: #94a3b8;
+    transition: transform 0.2s ease;
+    margin-left: 12px;
+
+    &.rotated {
+      transform: rotate(90deg);
+    }
+  }
+}
+
+// ── Badges ──────────────────────────────────────────
+.role-badge {
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.badge-admin {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.badge-doctor {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.badge-nurse {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.badge-default {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.department-tag {
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.perm-count {
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  background: #ede9fe;
+  color: #6366f1;
+  font-weight: 600;
+}
+
+// ── Permission Panel ────────────────────────────────
+.permission-panel {
+  border-top: 1px solid #e2e8f0;
+  padding: 20px;
+  background: #fafbfc;
+  animation: slideDown 0.2s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.panel-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 16px;
+
+  .btn-edit {
+    padding: 6px 16px;
+    border: 1px solid #6366f1;
+    border-radius: 6px;
+    background: transparent;
+    color: #6366f1;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+
+    &:hover {
+      background: #6366f1;
+      color: #fff;
+    }
+  }
+
+  .edit-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.8rem;
+
+    .btn-select-all,
+    .btn-deselect-all {
+      padding: 4px 10px;
+      border: 1px solid #e2e8f0;
+      border-radius: 4px;
+      background: #fff;
+      color: #475569;
+      font-size: 0.75rem;
+      cursor: pointer;
+
+      &:hover {
+        background: #f1f5f9;
+      }
+    }
+
+    .divider {
+      color: #cbd5e1;
+    }
+
+    .selected-count {
+      color: #6366f1;
+      font-weight: 600;
+    }
+  }
+}
+
+// ── Permission Groups ───────────────────────────────
+.permission-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.permission-group {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 14px;
+
+  .group-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+
+    .group-checkbox {
+      cursor: pointer;
+
+      input {
+        width: 16px;
+        height: 16px;
+        cursor: pointer;
+        accent-color: #6366f1;
+      }
+    }
+
+    .group-icon {
+      font-size: 1rem;
+    }
+
+    .group-title {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #334155;
+      margin: 0;
+    }
+  }
+
+  .permission-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+}
+
+.permission-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  color: #475569;
+  cursor: pointer;
+  transition: background 0.15s;
+
+  &:hover {
+    background: #f1f5f9;
+  }
+
+  &.active {
+    color: #1e293b;
+  }
+
+  &.disabled {
+    cursor: default;
+  }
+
+  input[type='checkbox'] {
+    width: 15px;
+    height: 15px;
+    accent-color: #6366f1;
+    cursor: pointer;
+  }
+
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #e2e8f0;
+    flex-shrink: 0;
+
+    &.granted {
+      background: #22c55e;
+    }
+  }
+
+  .perm-label {
+    font-size: 0.8rem;
+  }
+}
+
+// ── Panel Footer ────────────────────────────────────
+.panel-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid #e2e8f0;
+
+  .btn-ghost {
+    padding: 8px 20px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    background: #fff;
+    color: #64748b;
+    font-size: 0.85rem;
+    cursor: pointer;
+
+    &:hover {
+      background: #f8fafc;
+    }
+  }
+
+  .btn-primary {
+    padding: 8px 24px;
+    border: none;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: #fff;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s;
+
+    &:hover {
+      opacity: 0.9;
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+}
+
+// ── Empty State ─────────────────────────────────────
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 48px;
+  color: #94a3b8;
+
+  .empty-icon {
+    font-size: 2.5rem;
+    margin-bottom: 12px;
+  }
+
+  p {
+    font-size: 0.9rem;
+  }
+}
+
+// ── Pagination ──────────────────────────────────────
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  margin-top: 20px;
+
+  .btn-page {
+    padding: 8px 16px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    background: #fff;
+    color: #475569;
+    font-size: 0.85rem;
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      background: #f1f5f9;
+    }
+
+    &:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+  }
+
+  .page-info {
+    font-size: 0.85rem;
+    color: #64748b;
+  }
+}

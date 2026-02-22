@@ -35,7 +35,8 @@ public static class ReportPdfService
         ReportDataDto reportData,
         DateTime? filterFrom = null,
         DateTime? filterTo = null,
-        SignatureContext? signatureContext = null)
+        SignatureContext? signatureContext = null,
+        Dictionary<string, SignatureContext>? roleSignatures = null)
     {
         var template = reportData.Template;
         var data = reportData.Data;
@@ -66,7 +67,7 @@ public static class ReportPdfService
         // If band-based design is present, use the band renderer
         if (design?.Bands is { Count: > 0 })
         {
-            return GenerateBandBasedPdf(template, data, summary, design, filterFrom, filterTo, signatureContext);
+            return GenerateBandBasedPdf(template, data, summary, design, filterFrom, filterTo, signatureContext, roleSignatures);
         }
 
         // Page settings from config
@@ -865,7 +866,8 @@ public static class ReportPdfService
         ReportDesignDto design,
         DateTime? filterFrom,
         DateTime? filterTo,
-        SignatureContext? signatureContext = null)
+        SignatureContext? signatureContext = null,
+        Dictionary<string, SignatureContext>? roleSignatures = null)
     {
         var pageWidth = design.PageWidth > 0 ? design.PageWidth : 800;
         var bands = design.Bands.Where(b => b.Visible).ToList();
@@ -905,7 +907,7 @@ public static class ReportPdfService
                     {
                         foreach (var band in pageHeaders)
                         {
-                            RenderBandContainer(col, band, firstRow, data, summary, paramValues, pageWidth, signatureContext);
+                            RenderBandContainer(col, band, firstRow, data, summary, paramValues, pageWidth, signatureContext, roleSignatures);
                         }
                     });
                 }
@@ -922,7 +924,7 @@ public static class ReportPdfService
                     // Report headers (once)
                     foreach (var band in reportHeaders)
                     {
-                        RenderBandContainer(col, band, firstRow, data, summary, paramValues, pageWidth, signatureContext);
+                        RenderBandContainer(col, band, firstRow, data, summary, paramValues, pageWidth, signatureContext, roleSignatures);
                     }
 
                     // Determine grouping
@@ -945,7 +947,7 @@ public static class ReportPdfService
                                     ["_groupKey"] = grp.Key,
                                     ["_groupCount"] = grp.Count()
                                 };
-                                RenderBandContainer(col, band, groupRow, data, summary, paramValues, pageWidth, signatureContext);
+                                RenderBandContainer(col, band, groupRow, data, summary, paramValues, pageWidth, signatureContext, roleSignatures);
                             }
 
                             // Detail rows
@@ -953,7 +955,7 @@ public static class ReportPdfService
                             {
                                 foreach (var band in detailBands)
                                 {
-                                    RenderBandContainer(col, band, row, data, summary, paramValues, pageWidth, signatureContext);
+                                    RenderBandContainer(col, band, row, data, summary, paramValues, pageWidth, signatureContext, roleSignatures);
                                 }
                             }
 
@@ -967,7 +969,7 @@ public static class ReportPdfService
                                     ["_groupCount"] = grp.Count(),
                                     ["_groupData"] = groupData
                                 };
-                                RenderBandContainer(col, band, footerRow, data, summary, paramValues, pageWidth, signatureContext);
+                                RenderBandContainer(col, band, footerRow, data, summary, paramValues, pageWidth, signatureContext, roleSignatures);
                             }
                         }
                     }
@@ -978,7 +980,7 @@ public static class ReportPdfService
                         {
                             foreach (var band in detailBands)
                             {
-                                RenderBandContainer(col, band, row, data, summary, paramValues, pageWidth, signatureContext);
+                                RenderBandContainer(col, band, row, data, summary, paramValues, pageWidth, signatureContext, roleSignatures);
                             }
                         }
                     }
@@ -986,7 +988,7 @@ public static class ReportPdfService
                     // Report footers (once)
                     foreach (var band in reportFooters)
                     {
-                        RenderBandContainer(col, band, firstRow, data, summary, paramValues, pageWidth, signatureContext);
+                        RenderBandContainer(col, band, firstRow, data, summary, paramValues, pageWidth, signatureContext, roleSignatures);
                     }
                 });
 
@@ -997,7 +999,7 @@ public static class ReportPdfService
                     {
                         foreach (var band in pageFooters)
                         {
-                            RenderBandContainer(col, band, firstRow, data, summary, paramValues, pageWidth, signatureContext);
+                            RenderBandContainer(col, band, firstRow, data, summary, paramValues, pageWidth, signatureContext, roleSignatures);
                         }
                     });
                 }
@@ -1041,7 +1043,8 @@ public static class ReportPdfService
         ReportSummaryDto? summary,
         Dictionary<string, object?> paramValues,
         int pageWidth,
-        SignatureContext? signatureContext = null)
+        SignatureContext? signatureContext = null,
+        Dictionary<string, SignatureContext>? roleSignatures = null)
     {
         var bandHeight = Math.Max(band.Height, 20);
         // Scale factor for HORIZONTAL axis only
@@ -1089,7 +1092,18 @@ public static class ReportPdfService
                         // Handle signatureZone controls
                         if (ctrl.Type == "signatureZone")
                         {
-                            RenderSignatureZone(container, ctrl, w, h, signatureContext);
+                            // Per-role: look up in roleSignatures first, fall back to single signatureContext
+                            SignatureContext? effectiveCtx = null;
+                            if (roleSignatures != null && !string.IsNullOrEmpty(ctrl.SignatureRole)
+                                && roleSignatures.TryGetValue(ctrl.SignatureRole, out var roleCtx))
+                            {
+                                effectiveCtx = roleCtx;
+                            }
+                            else
+                            {
+                                effectiveCtx = signatureContext;
+                            }
+                            RenderSignatureZone(container, ctrl, w, h, effectiveCtx);
                             return;
                         }
 

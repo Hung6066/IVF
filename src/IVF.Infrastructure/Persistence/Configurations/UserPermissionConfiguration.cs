@@ -11,8 +11,8 @@ public class UserPermissionConfiguration : IEntityTypeConfiguration<UserPermissi
         builder.ToTable("user_permissions");
         builder.HasKey(up => up.Id);
 
-        builder.Property(up => up.Permission)
-            .HasConversion<string>()
+        builder.Property(up => up.PermissionCode)
+            .HasColumnName("Permission")
             .HasMaxLength(50)
             .IsRequired();
 
@@ -21,8 +21,8 @@ public class UserPermissionConfiguration : IEntityTypeConfiguration<UserPermissi
             .HasForeignKey(up => up.UserId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        builder.HasIndex(up => new { up.UserId, up.Permission }).IsUnique();
-        builder.HasIndex(up => up.Permission);
+        builder.HasIndex(up => new { up.UserId, up.PermissionCode }).IsUnique();
+        builder.HasIndex(up => up.PermissionCode);
         builder.HasQueryFilter(up => !up.IsDeleted);
     }
 }

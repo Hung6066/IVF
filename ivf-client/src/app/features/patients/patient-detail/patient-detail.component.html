@@ -1,145 +1,162 @@
 <div class="patient-detail">
-    <header class="page-header">
-        <a routerLink="/patients" class="back-link">
-            <span>←</span> Danh sách bệnh nhân
-        </a>
-        <div class="patient-header">
-            <div class="avatar">{{ getInitials(patient()?.fullName) }}</div>
-            <div class="header-info">
-                <h1>{{ patient()?.fullName }}</h1>
-                <div class="meta-badges">
-                    <span class="code-tag">{{ patient()?.patientCode }}</span>
-                    <span class="badge gender" [class.male]="patient()?.gender === 'Male'"
-                        [class.female]="patient()?.gender === 'Female'">
-                        {{ patient()?.gender === 'Female' ? 'Nữ' : 'Nam' }}
-                    </span>
-                    <span class="badge type">{{ getTypeName(patient()?.patientType) }}</span>
-                </div>
-            </div>
+  <header class="page-header">
+    <a routerLink="/patients" class="back-link"> <span>←</span> Danh sách bệnh nhân </a>
+    <div class="patient-header">
+      <div class="avatar">{{ getInitials(patient()?.fullName) }}</div>
+      <div class="header-info">
+        <h1>{{ patient()?.fullName }}</h1>
+        <div class="meta-badges">
+          <span class="code-tag">{{ patient()?.patientCode }}</span>
+          <span
+            class="badge gender"
+            [class.male]="patient()?.gender === 'Male'"
+            [class.female]="patient()?.gender === 'Female'"
+          >
+            {{ patient()?.gender === 'Female' ? 'Nữ' : 'Nam' }}
+          </span>
+          <span class="badge type">{{ getTypeName(patient()?.patientType) }}</span>
         </div>
-    </header>
-
-    <div class="content-grid">
-        <!-- Basic Info Card -->
-        <section class="card info-card">
-            <h2 class="card-title">Thông tin cơ bản</h2>
-            <div class="info-grid">
-                <div class="info-item">
-                    <label>Ngày sinh</label>
-                    <span class="info-value">{{ formatDate(patient()?.dateOfBirth) }}</span>
-                </div>
-                <div class="info-item">
-                    <label>Điện thoại</label>
-                    <span class="info-value">{{ patient()?.phone || '—' }}</span>
-                </div>
-                <div class="info-item">
-                    <label>Địa chỉ</label>
-                    <span class="info-value">{{ patient()?.address || '—' }}</span>
-                </div>
-                <div class="info-item">
-                    <label>CCCD/CMND</label>
-                    <span class="info-value">{{ patient()?.identityNumber || '—' }}</span>
-                </div>
-            </div>
-        </section>
-
-        <!-- Quick Actions -->
-        <section class="card actions-card">
-            <h2 class="card-title">Thao tác nhanh</h2>
-            <div class="action-grid">
-                <a [routerLink]="['/patients', patientId, 'biometrics']" class="action-item biometrics">
-                    <span class="action-icon">📷</span>
-                    <div class="action-info">
-                        <span class="action-title">Sinh trắc học</span>
-                        <span class="action-desc">Ảnh chân dung & vân tay</span>
-                    </div>
-                    <span class="action-arrow">→</span>
-                </a>
-            </div>
-        </section>
-
-        <!-- Forms Section -->
-        @if (formTemplates().length > 0) {
-        <section class="card forms-card">
-            <div class="section-header">
-                <h2 class="card-title">📋 Biểu mẫu</h2>
-            </div>
-            <p class="forms-hint">Điền form cho bệnh nhân — dữ liệu sẽ tự động liên kết giữa các form cùng concept</p>
-            <div class="form-template-list">
-                @for (tmpl of formTemplates(); track tmpl.id) {
-                <a [routerLink]="['/forms/fill', tmpl.id]" [queryParams]="{ patientId: patientId }" class="form-template-item">
-                    <div class="form-template-info">
-                        <span class="form-template-name">{{ tmpl.name }}</span>
-                        @if (tmpl.description) {
-                        <span class="form-template-desc">{{ tmpl.description }}</span>
-                        }
-                    </div>
-                    <span class="action-arrow">→</span>
-                </a>
-                }
-            </div>
-        </section>
-        }
-
-        <!-- Partner Info (if exists) -->
-        @if (couple()) {
-        <section class="card info-card partner">
-            <h2 class="card-title">Thông tin cặp đôi</h2>
-            <div class="couple-display">
-                <div class="partner-box wife">
-                    <span class="role-label">Vợ</span>
-                    <span class="partner-name">{{ couple()?.wife?.fullName }}</span>
-                </div>
-                <div class="heart-connector">❤️</div>
-                <div class="partner-box husband">
-                    <span class="role-label">Chồng</span>
-                    <span class="partner-name">{{ couple()?.husband?.fullName }}</span>
-                </div>
-            </div>
-            <div class="couple-meta-info">
-                <div class="meta-item">
-                    <span class="icon">💍</span>
-                    <span>Ngày cưới: {{ formatDate(couple()?.marriageDate) || '—' }}</span>
-                </div>
-                <div class="meta-item">
-                    <span class="icon">⏳</span>
-                    <span>Hiếm muộn: <strong>{{ couple()?.infertilityYears || '?' }}</strong> năm</span>
-                </div>
-            </div>
-        </section>
-        }
-
-        <!-- Treatment Cycles -->
-        <section class="card cycles-card">
-            <div class="section-header">
-                <h2 class="card-title">Chu kỳ điều trị ({{ cycles().length }})</h2>
-                <button class="btn btn-primary btn-sm" (click)="createNewCycle()">➕ Tạo chu kỳ mới</button>
-            </div>
-
-            <div class="cycle-list">
-                @for (cycle of cycles(); track cycle.id) {
-                <a [routerLink]="['/cycles', cycle.id]" class="cycle-item">
-                    <div class="cycle-code-badge">{{ cycle.cycleCode }}</div>
-
-                    <div class="cycle-details">
-                        <span class="cycle-method">{{ getMethodName(cycle.method) }}</span>
-                        <span class="cycle-phase">{{ getPhaseName(cycle.currentPhase) }}</span>
-                    </div>
-
-                    <div class="cycle-status">
-                        <span class="date">{{ formatDate(cycle.startDate) }}</span>
-                        <span class="status-badge" [class]="(cycle.outcome || '').toLowerCase()">
-                            {{ getOutcomeName(cycle.outcome) }}
-                        </span>
-                    </div>
-                </a>
-                } @empty {
-                <div class="empty-state">
-                    <span class="empty-icon">🍃</span>
-                    <p>Chưa có chu kỳ điều trị nào</p>
-                </div>
-                }
-            </div>
-        </section>
+      </div>
     </div>
+  </header>
+
+  <div class="content-grid">
+    <!-- Basic Info Card -->
+    <section class="card info-card">
+      <h2 class="card-title">Thông tin cơ bản</h2>
+      <div class="info-grid">
+        <div class="info-item">
+          <label>Ngày sinh</label>
+          <span class="info-value">{{ formatDate(patient()?.dateOfBirth) }}</span>
+        </div>
+        <div class="info-item">
+          <label>Điện thoại</label>
+          <span class="info-value">{{ patient()?.phone || '—' }}</span>
+        </div>
+        <div class="info-item">
+          <label>Địa chỉ</label>
+          <span class="info-value">{{ patient()?.address || '—' }}</span>
+        </div>
+        <div class="info-item">
+          <label>CCCD/CMND</label>
+          <span class="info-value">{{ patient()?.identityNumber || '—' }}</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Quick Actions -->
+    <section class="card actions-card">
+      <h2 class="card-title">Thao tác nhanh</h2>
+      <div class="action-grid">
+        <a [routerLink]="['/patients', patientId, 'biometrics']" class="action-item biometrics">
+          <span class="action-icon">📷</span>
+          <div class="action-info">
+            <span class="action-title">Sinh trắc học</span>
+            <span class="action-desc">Ảnh chân dung & vân tay</span>
+          </div>
+          <span class="action-arrow">→</span>
+        </a>
+        <a [routerLink]="['/patients', patientId, 'documents']" class="action-item documents">
+          <span class="action-icon">📁</span>
+          <div class="action-info">
+            <span class="action-title">Hồ sơ bệnh án</span>
+            <span class="action-desc">Tài liệu, file ký số, lưu trữ S3</span>
+          </div>
+          <span class="action-arrow">→</span>
+        </a>
+      </div>
+    </section>
+
+    <!-- Forms Section -->
+    @if (formTemplates().length > 0) {
+      <section class="card forms-card">
+        <div class="section-header">
+          <h2 class="card-title">📋 Biểu mẫu</h2>
+        </div>
+        <p class="forms-hint">
+          Điền form cho bệnh nhân — dữ liệu sẽ tự động liên kết giữa các form cùng concept
+        </p>
+        <div class="form-template-list">
+          @for (tmpl of formTemplates(); track tmpl.id) {
+            <a
+              [routerLink]="['/forms/fill', tmpl.id]"
+              [queryParams]="{ patientId: patientId }"
+              class="form-template-item"
+            >
+              <div class="form-template-info">
+                <span class="form-template-name">{{ tmpl.name }}</span>
+                @if (tmpl.description) {
+                  <span class="form-template-desc">{{ tmpl.description }}</span>
+                }
+              </div>
+              <span class="action-arrow">→</span>
+            </a>
+          }
+        </div>
+      </section>
+    }
+
+    <!-- Partner Info (if exists) -->
+    @if (couple()) {
+      <section class="card info-card partner">
+        <h2 class="card-title">Thông tin cặp đôi</h2>
+        <div class="couple-display">
+          <div class="partner-box wife">
+            <span class="role-label">Vợ</span>
+            <span class="partner-name">{{ couple()?.wife?.fullName }}</span>
+          </div>
+          <div class="heart-connector">❤️</div>
+          <div class="partner-box husband">
+            <span class="role-label">Chồng</span>
+            <span class="partner-name">{{ couple()?.husband?.fullName }}</span>
+          </div>
+        </div>
+        <div class="couple-meta-info">
+          <div class="meta-item">
+            <span class="icon">💍</span>
+            <span>Ngày cưới: {{ formatDate(couple()?.marriageDate) || '—' }}</span>
+          </div>
+          <div class="meta-item">
+            <span class="icon">⏳</span>
+            <span
+              >Hiếm muộn: <strong>{{ couple()?.infertilityYears || '?' }}</strong> năm</span
+            >
+          </div>
+        </div>
+      </section>
+    }
+
+    <!-- Treatment Cycles -->
+    <section class="card cycles-card">
+      <div class="section-header">
+        <h2 class="card-title">Chu kỳ điều trị ({{ cycles().length }})</h2>
+        <button class="btn btn-primary btn-sm" (click)="createNewCycle()">➕ Tạo chu kỳ mới</button>
+      </div>
+
+      <div class="cycle-list">
+        @for (cycle of cycles(); track cycle.id) {
+          <a [routerLink]="['/cycles', cycle.id]" class="cycle-item">
+            <div class="cycle-code-badge">{{ cycle.cycleCode }}</div>
+
+            <div class="cycle-details">
+              <span class="cycle-method">{{ getMethodName(cycle.method) }}</span>
+              <span class="cycle-phase">{{ getPhaseName(cycle.currentPhase) }}</span>
+            </div>
+
+            <div class="cycle-status">
+              <span class="date">{{ formatDate(cycle.startDate) }}</span>
+              <span class="status-badge" [class]="(cycle.outcome || '').toLowerCase()">
+                {{ getOutcomeName(cycle.outcome) }}
+              </span>
+            </div>
+          </a>
+        } @empty {
+          <div class="empty-state">
+            <span class="empty-icon">🍃</span>
+            <p>Chưa có chu kỳ điều trị nào</p>
+          </div>
+        }
+      </div>
+    </section>
+  </div>
 </div>

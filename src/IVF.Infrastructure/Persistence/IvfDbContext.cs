@@ -68,6 +68,16 @@ public class IvfDbContext : DbContext
 
     // Digital Signing
     public DbSet<UserSignature> UserSignatures => Set<UserSignature>();
+    public DbSet<DocumentSignature> DocumentSignatures => Set<DocumentSignature>();
+
+    // Patient Document Storage (MinIO S3)
+    public DbSet<PatientDocument> PatientDocuments => Set<PatientDocument>();
+
+    // Navigation Menu Configuration
+    public DbSet<MenuItem> MenuItems => Set<MenuItem>();
+
+    // Permission Definitions (dynamic RBAC metadata)
+    public DbSet<PermissionDefinition> PermissionDefinitions => Set<PermissionDefinition>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -54,7 +54,7 @@ public static class AuthEndpoints
             var userId = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId)) return Results.Unauthorized();
             var permissions = await permRepo.GetByUserIdAsync(Guid.Parse(userId));
-            return Results.Ok(permissions.Select(p => p.Permission.ToString()));
+            return Results.Ok(permissions.Select(p => p.PermissionCode));
         }).RequireAuthorization();
     }
 

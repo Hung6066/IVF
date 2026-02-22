@@ -85,6 +85,69 @@
     }
 
     <!-- Review Actions -->
+
+    <!-- Signing Status Panel -->
+    @if (signingStatus && signingStatus.requiredRoles.length > 0) {
+      <div class="signing-status-panel">
+        <div class="signing-header">
+          <h3>✍️ Trạng thái ký số</h3>
+          @if (signingStatus.isFullySigned) {
+            <span class="badge badge-success">✅ Đã ký đầy đủ</span>
+          } @else {
+            <span class="badge badge-warning"
+              >⏳ Đang chờ ký ({{ signingStatus.pendingRoles.length }}/{{
+                signingStatus.requiredRoles.length
+              }})</span
+            >
+          }
+        </div>
+        <div class="signing-roles">
+          @for (role of signingStatus.requiredRoles; track role) {
+            <div class="signing-role-item" [class.signed]="isRoleSigned(role)">
+              <div class="role-info">
+                <span class="role-label">{{ getRoleLabel(role) }}</span>
+                @if (isRoleSigned(role)) {
+                  @let signer = getSignerForRole(role);
+                  @if (signer) {
+                    <span class="signer-info">
+                      ✅ {{ signer.signerName }} - {{ signer.signedAt | date: 'dd/MM/yyyy HH:mm' }}
+                    </span>
+                  }
+                } @else {
+                  <span class="pending-text">Chưa ký</span>
+                }
+              </div>
+              <div class="role-actions">
+                @if (!isRoleSigned(role)) {
+                  <button
+                    class="btn btn-primary btn-sm"
+                    (click)="signForRole(role)"
+                    [disabled]="isSigning"
+                  >
+                    @if (isSigning) {
+                      <span class="btn-spinner"></span>
+                    }
+                    Ký
+                  </button>
+                } @else {
+                  @let signerForRevoke = getSignerForRole(role);
+                  @if (signerForRevoke) {
+                    <button
+                      class="btn btn-danger-outline btn-sm"
+                      (click)="revokeSignature(signerForRevoke)"
+                      title="Thu hồi chữ ký"
+                    >
+                      ✖
+                    </button>
+                  }
+                }
+              </div>
+            </div>
+          }
+        </div>
+      </div>
+    }
+
     @if (
       response.status === ResponseStatus.Submitted || response.status === ResponseStatus.Reviewed
     ) {

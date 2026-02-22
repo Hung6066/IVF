@@ -28,12 +28,11 @@ public static class UserEndpoints
             return Results.Ok(roles);
         });
 
-        // Get All Available Permissions
-        group.MapGet("/permissions", () =>
+        // Get All Available Permissions (now from PermissionDefinition table)
+        group.MapGet("/permissions", async (IPermissionDefinitionRepository defRepo) =>
         {
-            var permissions = Enum.GetValues<Permission>()
-                .Select(p => new { name = p.ToString(), value = (int)p })
-                .ToList();
+            var defs = await defRepo.GetActiveAsync();
+            var permissions = defs.Select(p => new { name = p.Code, value = p.Code }).ToList();
             return Results.Ok(permissions);
         });
 
@@ -41,7 +40,7 @@ public static class UserEndpoints
         group.MapGet("/{id}/permissions", async (Guid id, IUserPermissionRepository repo) =>
         {
             var permissions = await repo.GetByUserIdAsync(id);
-            return Results.Ok(permissions.Select(p => p.Permission.ToString()));
+            return Results.Ok(permissions.Select(p => p.PermissionCode));
         });
 
         // Assign Permissions to User
@@ -49,24 +48,22 @@ public static class UserEndpoints
         {
             // Remove existing permissions
             await repo.DeleteAllByUserIdAsync(id);
-            
-            // Add new permissions
+
+            // Add new permissions (string-based, supports dynamic permissions)
             var permissions = request.Permissions
-                .Select(p => Enum.Parse<Permission>(p))
                 .Select(p => UserPermission.Create(id, p, request.GrantedBy))
                 .ToList();
-            
+
             await repo.AddRangeAsync(permissions);
             await uow.SaveChangesAsync();
-            
+
             return Results.Ok(new { message = "Permissions updated", count = permissions.Count });
         });
 
         // Revoke Single Permission
         group.MapDelete("/{id}/permissions/{permission}", async (Guid id, string permission, IUserPermissionRepository repo, IUnitOfWork uow) =>
         {
-            var perm = Enum.Parse<Permission>(permission);
-            await repo.DeleteAsync(id, perm);
+            await repo.DeleteAsync(id, permission);
             await uow.SaveChangesAsync();
             return Results.NoContent();
         });

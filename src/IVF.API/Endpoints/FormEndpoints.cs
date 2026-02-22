@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using IVF.API.Services;
 using IVF.Application.Common.Interfaces;
+using IVF.Application.Features.Documents.Commands;
 using IVF.Application.Features.Forms.Commands;
 using IVF.Application.Features.Forms.Queries;
 using IVF.Domain.Enums;
@@ -186,7 +187,7 @@ public static class FormEndpoints
             return r.IsSuccess ? Results.NoContent() : Results.NotFound();
         });
 
-        group.MapGet("/responses/{id:guid}/export-pdf", async (Guid id, IMediator m, IDigitalSigningService signingService, ClaimsPrincipal principal, IVF.Infrastructure.Persistence.IvfDbContext db, Guid? reportTemplateId = null, bool sign = false) =>
+        group.MapGet("/responses/{id:guid}/export-pdf", async (Guid id, IMediator m, IDigitalSigningService signingService, ClaimsPrincipal principal, IVF.Infrastructure.Persistence.IvfDbContext db, IObjectStorageService objectStorage, Guid? reportTemplateId = null, bool sign = false) =>
         {
             try
             {
@@ -248,7 +249,57 @@ public static class FormEndpoints
                     // Load user signature for embedding in signatureZone controls
                     IVF.Domain.Entities.UserSignature? userSig = null;
                     var userId = Guid.TryParse(principal.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var uid) ? uid : (Guid?)null;
-                    if (sign)
+
+                    // ── Multi-signature: load all DocumentSignature records for this response ──
+                    var docSignatures = sign
+                        ? await db.DocumentSignatures
+                            .Include(d => d.User)
+                            .Where(d => d.FormResponseId == id && !d.IsDeleted)
+                            .OrderBy(d => d.SignedAt)
+                            .ToListAsync()
+                        : new List<IVF.Domain.Entities.DocumentSignature>();
+
+                    // Build per-role signature contexts from all signers
+                    Dictionary<string, ReportPdfService.SignatureContext>? roleSignatures = null;
+                    var signerWorkers = new List<(string WorkerName, string? SignerName)>();
+
+                    if (sign && docSignatures.Count > 0)
+                    {
+                        roleSignatures = new();
+                        var signerUserIds = docSignatures.Select(d => d.UserId).Distinct().ToList();
+                        var signerSigs = await db.UserSignatures
+                            .Include(s => s.User)
+                            .Where(s => signerUserIds.Contains(s.UserId) && !s.IsDeleted && s.IsActive)
+                            .ToListAsync();
+                        var sigLookup = signerSigs.ToDictionary(s => s.UserId);
+
+                        foreach (var ds in docSignatures)
+                        {
+                            if (sigLookup.TryGetValue(ds.UserId, out var sig)
+                                && !string.IsNullOrEmpty(sig.SignatureImageBase64))
+                            {
+                                var base64 = sig.SignatureImageBase64;
+                                if (base64.Contains(","))
+                                    base64 = base64[(base64.IndexOf(',') + 1)..];
+
+                                roleSignatures[ds.SignatureRole] = new ReportPdfService.SignatureContext(
+                                    SignerName: ds.User?.FullName ?? sig.User?.FullName,
+                                    SignatureImageBytes: Convert.FromBase64String(base64),
+                                    SignedDate: ds.SignedAt.ToString("dd/MM/yyyy"));
+
+                                // Collect worker info for multi crypto signing
+                                var workerName = sig.CertStatus == IVF.Domain.Entities.CertificateStatus.Active
+                                    && !string.IsNullOrEmpty(sig.WorkerName)
+                                    ? sig.WorkerName
+                                    : null;
+                                signerWorkers.Add((workerName ?? "__default__", ds.User?.FullName));
+                            }
+                        }
+                    }
+
+                    // Fallback: if no DocumentSignatures exist but sign=true, use current user (backward compat)
+                    ReportPdfService.SignatureContext? sigContext = null;
+                    if (sign && (roleSignatures == null || roleSignatures.Count == 0))
                     {
                         if (!userId.HasValue)
                             return Results.BadRequest(new { error = "Không xác định được người dùng. Vui lòng đăng nhập lại." });
@@ -260,13 +311,7 @@ public static class FormEndpoints
 
                         if (userSig == null || string.IsNullOrEmpty(userSig.SignatureImageBase64))
                             return Results.BadRequest(new { error = "Bạn chưa tải lên chữ ký số. Vui lòng vào Quản trị → Ký số → tab Chữ ký để tải lên chữ ký của bạn." });
-                    }
 
-                    // Build signature context for rendering handwritten signatures in signatureZone controls
-                    ReportPdfService.SignatureContext? sigContext = null;
-                    if (sign && userSig != null)
-                    {
-                        // Strip data URI prefix if present (e.g. "data:image/png;base64,...")
                         var base64 = userSig.SignatureImageBase64;
                         if (base64.Contains(","))
                             base64 = base64[(base64.IndexOf(',') + 1)..];
@@ -275,28 +320,87 @@ public static class FormEndpoints
                             SignerName: userSig.User?.FullName,
                             SignatureImageBytes: Convert.FromBase64String(base64),
                             SignedDate: DateTime.Now.ToString("dd/MM/yyyy"));
+
+                        var workerName = userSig.CertStatus == IVF.Domain.Entities.CertificateStatus.Active
+                            && !string.IsNullOrEmpty(userSig.WorkerName)
+                            ? userSig.WorkerName
+                            : null;
+                        signerWorkers.Add((workerName ?? "__default__", userSig.User?.FullName));
                     }
 
-                    var pdfBytes = ReportPdfService.GenerateReportPdf(reportData, signatureContext: sigContext);
+                    var pdfBytes = ReportPdfService.GenerateReportPdf(reportData,
+                        signatureContext: sigContext,
+                        roleSignatures: roleSignatures);
 
-                    // Cryptographic digital signing via SignServer (after visible signature is embedded)
-                    if (sign && signingService.IsEnabled)
+                    // Cryptographic digital signing via SignServer — multiple incremental signatures
+                    if (sign && signingService.IsEnabled && signerWorkers.Count > 0)
                     {
-                        var metadata = new SigningMetadata(
-                            Reason: $"Xác nhận phiếu: {template.Name}",
-                            Location: "IVF Clinic",
-                            SignerName: userSig?.User?.FullName ?? response.PatientName);
+                        // Deduplicate workers (same certificate doesn't need to sign twice)
+                        var uniqueWorkers = signerWorkers
+                            .GroupBy(w => w.WorkerName)
+                            .Select(g => g.First())
+                            .ToList();
 
-                        if (userSig != null && userSig.CertStatus == IVF.Domain.Entities.CertificateStatus.Active
-                            && !string.IsNullOrEmpty(userSig.WorkerName))
+                        foreach (var (workerName, signerName) in uniqueWorkers)
                         {
-                            // Per-user worker signing (signature already embedded, no need for overlay)
-                            pdfBytes = await signingService.SignPdfWithUserAsync(
-                                pdfBytes, userSig.WorkerName, metadata);
+                            var metadata = new SigningMetadata(
+                                Reason: $"Xác nhận phiếu: {template.Name}",
+                                Location: "IVF Clinic",
+                                SignerName: signerName ?? response.PatientName);
+
+                            if (workerName != "__default__")
+                            {
+                                pdfBytes = await signingService.SignPdfWithUserAsync(
+                                    pdfBytes, workerName, metadata);
+                            }
+                            else
+                            {
+                                pdfBytes = await signingService.SignPdfAsync(pdfBytes, metadata);
+                            }
                         }
-                        else
+                    }
+
+                    // ─── Lưu PDF ký số vào MinIO (bệnh nhân) ───
+                    if (sign && response.PatientId.HasValue && pdfBytes.Length > 0)
+                    {
+                        var patientCode = response.PatientName ?? response.PatientId.Value.ToString("N")[..8];
+                        // Try to get actual patient code from DB
+                        var patient = await db.Patients
+                            .AsNoTracking()
+                            .Where(p => p.Id == response.PatientId.Value && !p.IsDeleted)
+                            .Select(p => new { p.PatientCode, p.FullName })
+                            .FirstOrDefaultAsync();
+
+                        if (patient != null)
+                            patientCode = patient.PatientCode;
+
+                        var signerNamesList = string.Join(", ",
+                            signerWorkers.Select(w => w.SignerName).Where(n => !string.IsNullOrEmpty(n)));
+
+                        var userId3 = Guid.TryParse(principal.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var uid3) ? uid3 : (Guid?)null;
+
+                        try
                         {
-                            pdfBytes = await signingService.SignPdfAsync(pdfBytes, metadata);
+                            var storeResult = await m.Send(new StoreSignedFormPdfCommand(
+                                FormResponseId: id,
+                                PatientId: response.PatientId!.Value,
+                                PatientCode: patientCode,
+                                TemplateName: template.Name,
+                                SignedPdfBytes: pdfBytes,
+                                SignerNames: signerNamesList,
+                                FormTemplateCode: template.Code,
+                                UploadedByUserId: userId3,
+                                CycleId: response.CycleId));
+
+                            if (!storeResult.IsSuccess)
+                            {
+                                // Log nhưng không fail response – PDF vẫn trả về cho user
+                                Console.Error.WriteLine($"[MinIO] Lưu PDF ký số thất bại: {storeResult.Error}");
+                            }
+                        }
+                        catch (Exception storeEx)
+                        {
+                            Console.Error.WriteLine($"[MinIO] Exception khi lưu PDF ký số: {storeEx.Message}");
                         }
                     }
 
@@ -333,6 +437,41 @@ public static class FormEndpoints
                         else
                         {
                             pdfBytes = await signingService.SignPdfAsync(pdfBytes, metadata);
+                        }
+
+                        // ─── Lưu PDF ký số vào MinIO (bệnh nhân) ───
+                        if (response.PatientId.HasValue && pdfBytes.Length > 0)
+                        {
+                            var patientForFallback = await db.Patients
+                                .AsNoTracking()
+                                .Where(p => p.Id == response.PatientId.Value && !p.IsDeleted)
+                                .Select(p => new { p.PatientCode })
+                                .FirstOrDefaultAsync();
+
+                            if (patientForFallback != null)
+                            {
+                                var signerNameFallback = userSig2?.User?.FullName ?? response.PatientName;
+                                try
+                                {
+                                    var storeResult2 = await m.Send(new StoreSignedFormPdfCommand(
+                                        FormResponseId: id,
+                                        PatientId: response.PatientId!.Value,
+                                        PatientCode: patientForFallback.PatientCode,
+                                        TemplateName: template.Name,
+                                        SignedPdfBytes: pdfBytes,
+                                        SignerNames: signerNameFallback,
+                                        FormTemplateCode: template.Code,
+                                        UploadedByUserId: userId2,
+                                        CycleId: response.CycleId));
+
+                                    if (!storeResult2.IsSuccess)
+                                        Console.Error.WriteLine($"[MinIO] Lưu PDF ký số thất bại (fallback): {storeResult2.Error}");
+                                }
+                                catch (Exception storeEx2)
+                                {
+                                    Console.Error.WriteLine($"[MinIO] Exception khi lưu PDF ký số (fallback): {storeEx2.Message}");
+                                }
+                            }
                         }
                     }
 
@@ -447,7 +586,7 @@ public static class FormEndpoints
                         SignedDate: DateTime.Now.ToString("dd/MM/yyyy"));
                 }
 
-                var pdfBytes = ReportPdfService.GenerateReportPdf(result, from, to, sigContext);
+                var pdfBytes = ReportPdfService.GenerateReportPdf(result, from, to, sigContext, roleSignatures: null);
 
                 // Cryptographic digital signing via SignServer
                 if (sign && signingService.IsEnabled)

@@ -219,7 +219,8 @@ public static class UserSignatureEndpoints
             }
         })
         .WithName("ProvisionUserCertificate")
-        .RequireAuthorization("AdminOnly");
+        .RequireAuthorization("AdminOnly")
+        .RequireRateLimiting("signing-provision");
 
         // ─── Upload signature for a specific user (admin) ───────
         group.MapPost("/users/{userId:guid}", async (
@@ -330,7 +331,8 @@ public static class UserSignatureEndpoints
             }
         })
         .WithName("TestUserSigning")
-        .RequireAuthorization("AdminOnly");
+        .RequireAuthorization("AdminOnly")
+        .RequireRateLimiting("signing");
     }
 
     // ─── Helper Methods ─────────────────────────────────────────
@@ -377,9 +379,13 @@ public static class UserSignatureEndpoints
     };
 
     /// <summary>
-    /// Provision a per-user PKCS12 keystore and SignServer worker.
-    /// Uses Java keytool inside the SignServer container to generate keys,
-    /// then configures a new PDFSigner worker for this user.
+    /// Provision a per-user signing certificate and SignServer worker.
+    /// Supports two crypto token types (Phase 4):
+    ///   - P12CryptoToken: PKCS#12 file-based keystore (default, Phase 1-3)
+    ///   - PKCS11CryptoToken: SoftHSM2 / hardware HSM (Phase 4, FIPS 140-2 Level 1)
+    /// 
+    /// For P12: Uses Java keytool to generate PKCS#12 keystore in persistent volume.
+    /// For PKCS#11: Generates key inside SoftHSM2 token via keytool -providerClass.
     /// </summary>
     private static async Task<CertProvisionResult> ProvisionUserCertificateAsync(
         User user,
@@ -389,40 +395,104 @@ public static class UserSignatureEndpoints
         var sanitizedName = SanitizeForDN(user.FullName);
         var workerName = $"PDFSigner_{SanitizeWorkerId(user.Username)}";
         var keyAlias = "signer";
-        var keystorePassword = "changeit";
-        var keystorePath = $"/tmp/{workerName.ToLowerInvariant()}.p12";
+        const string keyDir = "/opt/keyfactor/persistent/keys";
         var certValidity = 1095; // 3 years
-
-        // Calculate next worker ID (base ID + offset)
         var workerId = 100 + Math.Abs(user.Id.GetHashCode() % 900);
 
-        logger.LogInformation("Provisioning certificate for user {User}, worker {Worker} (ID: {WorkerId})",
-            user.FullName, workerName, workerId);
+        logger.LogInformation(
+            "Provisioning certificate for user {User}, worker {Worker} (ID: {WorkerId}), CryptoToken={TokenType}",
+            user.FullName, workerName, workerId, opts.CryptoTokenType);
 
-        // Step 1: Generate PKCS12 keystore with Java keytool inside SignServer container
+        // Step 0: Ensure key directory exists with proper permissions
+        await RunDockerExecAsRootAsync("ivf-signserver",
+            $"mkdir -p {keyDir} && chown 10001:root {keyDir} && chmod 700 {keyDir}", logger);
+
         var certDN = $"CN={sanitizedName},O=IVF Clinic,OU={user.Role ?? "Staff"},C=VN";
 
-        var keytoolCmd = $"keytool -genkeypair " +
-            $"-alias {keyAlias} " +
-            $"-keyalg RSA -keysize 2048 -sigalg SHA256withRSA " +
-            $"-validity {certValidity} " +
-            $"-dname \"{certDN}\" " +
-            $"-keystore {keystorePath} " +
-            $"-storetype PKCS12 " +
-            $"-storepass {keystorePassword} " +
-            $"-keypass {keystorePassword}";
+        string propsContent;
 
-        await RunDockerExecAsync("ivf-signserver", keytoolCmd, logger);
+        if (opts.CryptoTokenType == CryptoTokenType.PKCS11)
+        {
+            // ─── PKCS#11 (SoftHSM2 / HSM) provisioning ───
+            var pin = opts.ResolvePkcs11Pin() ?? "changeit";
+            var hsmKeyLabel = $"{workerName}_{keyAlias}";
 
-        // Step 2: Configure SignServer worker using properties file
-        var propsContent =
-            $"GLOB.WORKER{workerId}.CLASSPATH = org.signserver.module.pdfsigner.PDFSigner\n" +
-            $"GLOB.WORKER{workerId}.SIGNERTOKEN.CLASSPATH = org.signserver.server.cryptotokens.P12CryptoToken\n" +
-            $"WORKER{workerId}.NAME = {workerName}\n" +
-            $"WORKER{workerId}.AUTHTYPE = NOAUTH\n" +
-            $"WORKER{workerId}.DEFAULTKEY = {keyAlias}\n" +
-            $"WORKER{workerId}.KEYSTOREPATH = {keystorePath}\n" +
-            $"WORKER{workerId}.KEYSTOREPASSWORD = {keystorePassword}\n";
+            // Generate key pair inside PKCS#11 token using pkcs11-tool
+            var genKeyCmd = $"pkcs11-tool --module /usr/lib/softhsm/libsofthsm2.so " +
+                $"--login --pin {pin} " +
+                $"--keypairgen --key-type rsa:2048 " +
+                $"--label \"{hsmKeyLabel}\" " +
+                $"--id $(printf '%02x' {workerId}) " +
+                $"--usage-sign";
+
+            await RunDockerExecAsync("ivf-signserver", genKeyCmd, logger);
+
+            // Generate self-signed certificate for the key using keytool with PKCS#11 provider
+            var keytoolP11Cmd = $"keytool -selfcert " +
+                $"-alias \"{hsmKeyLabel}\" " +
+                $"-dname \"{certDN}\" " +
+                $"-validity {certValidity} " +
+                $"-sigalg SHA256withRSA " +
+                $"-storetype PKCS11 " +
+                $"-providerClass sun.security.pkcs11.SunPKCS11 " +
+                $"-providerArg /opt/keyfactor/persistent/softhsm/pkcs11-java.cfg " +
+                $"-storepass {pin} " +
+                $"-J-Djava.security.debug=none";
+
+            // Create PKCS#11 provider config for Java
+            var p11Config = $"name = SoftHSM\nlibrary = /usr/lib/softhsm/libsofthsm2.so\nslot = 0\n";
+            var p11ConfigPath = "/opt/keyfactor/persistent/softhsm/pkcs11-java.cfg";
+            await RunDockerExecAsync("ivf-signserver",
+                $"bash -c 'echo -e \"{p11Config}\" > {p11ConfigPath}'", logger);
+
+            await RunDockerExecAsync("ivf-signserver", keytoolP11Cmd, logger);
+
+            // Worker properties for PKCS#11
+            propsContent =
+                $"GLOB.WORKER{workerId}.CLASSPATH = org.signserver.module.pdfsigner.PDFSigner\n" +
+                $"GLOB.WORKER{workerId}.SIGNERTOKEN.CLASSPATH = org.signserver.server.cryptotokens.PKCS11CryptoToken\n" +
+                $"WORKER{workerId}.NAME = {workerName}\n" +
+                $"WORKER{workerId}.AUTHTYPE = org.signserver.server.ClientCertAuthorizer\n" +
+                $"WORKER{workerId}.SHAREDLIBRARYNAME = {opts.Pkcs11SharedLibraryName}\n" +
+                $"WORKER{workerId}.SLOT = {opts.Pkcs11SlotLabel}\n" +
+                $"WORKER{workerId}.PIN = {pin}\n" +
+                $"WORKER{workerId}.DEFAULTKEY = {hsmKeyLabel}\n" +
+                $"WORKER{workerId}.ATTRIBUTE.PRIVATE.RSA.CKA_EXTRACTABLE = FALSE\n" +
+                $"WORKER{workerId}.ATTRIBUTE.PRIVATE.RSA.CKA_SENSITIVE = TRUE\n";
+
+            logger.LogInformation("Using PKCS11CryptoToken with SoftHSM2 for worker {Worker}", workerName);
+        }
+        else
+        {
+            // ─── P12 (file-based) provisioning (original Phase 1-3 path) ───
+            var keystorePassword = "changeit";
+            var keystorePath = $"{keyDir}/{workerName.ToLowerInvariant()}.p12";
+
+            var keytoolCmd = $"keytool -genkeypair " +
+                $"-alias {keyAlias} " +
+                $"-keyalg RSA -keysize 2048 -sigalg SHA256withRSA " +
+                $"-validity {certValidity} " +
+                $"-dname \"{certDN}\" " +
+                $"-keystore {keystorePath} " +
+                $"-storetype PKCS12 " +
+                $"-storepass {keystorePassword} " +
+                $"-keypass {keystorePassword}";
+
+            await RunDockerExecAsync("ivf-signserver", keytoolCmd, logger);
+
+            // Set restrictive permissions on the new keystore (owner read-only)
+            await RunDockerExecAsRootAsync("ivf-signserver",
+                $"chmod 400 {keystorePath} && chown 10001:root {keystorePath}", logger);
+
+            propsContent =
+                $"GLOB.WORKER{workerId}.CLASSPATH = org.signserver.module.pdfsigner.PDFSigner\n" +
+                $"GLOB.WORKER{workerId}.SIGNERTOKEN.CLASSPATH = org.signserver.server.cryptotokens.P12CryptoToken\n" +
+                $"WORKER{workerId}.NAME = {workerName}\n" +
+                $"WORKER{workerId}.AUTHTYPE = org.signserver.server.ClientCertAuthorizer\n" +
+                $"WORKER{workerId}.DEFAULTKEY = {keyAlias}\n" +
+                $"WORKER{workerId}.KEYSTOREPATH = {keystorePath}\n" +
+                $"WORKER{workerId}.KEYSTOREPASSWORD = {keystorePassword}\n";
+        }
 
         // Write properties to a temp file and copy to container
         var tempFile = Path.GetTempFileName();
@@ -435,7 +505,10 @@ public static class UserSignatureEndpoints
         // Load properties
         await RunDockerExecAsync("ivf-signserver", $"bin/signserver setproperties {containerPropsPath}", logger);
 
-        // Step 3: Fix TYPE (setproperties bug) and set additional properties
+        // Clean up temp properties file (contains keystore password / PIN)
+        await RunDockerExecAsync("ivf-signserver", $"rm -f {containerPropsPath}", logger);
+
+        // Step 3: Fix TYPE and set additional properties
         await RunDockerExecAsync("ivf-signserver", $"bin/signserver setproperty {workerId} TYPE PROCESSABLE", logger);
         await RunDockerExecAsync("ivf-signserver",
             $"bin/signserver setproperty {workerId} CERTIFICATION_LEVEL NOT_CERTIFIED", logger);
@@ -446,21 +519,48 @@ public static class UserSignatureEndpoints
         await RunDockerExecAsync("ivf-signserver",
             $"bin/signserver setproperty {workerId} LOCATION \"IVF Clinic\"", logger);
 
-        // Step 4: Reload and activate
+        // Step 4: Add authorized API client certificate (mTLS) if configured
+        if (!string.IsNullOrEmpty(opts.ClientCertificatePath) && File.Exists(opts.ClientCertificatePath))
+        {
+            try
+            {
+                using var apiCert = System.Security.Cryptography.X509Certificates.X509CertificateLoader
+                    .LoadPkcs12FromFile(opts.ClientCertificatePath, opts.ResolveClientCertificatePassword());
+                var serial = apiCert.SerialNumber;
+                var issuerDN = apiCert.Issuer;
+                await RunDockerExecAsync("ivf-signserver",
+                    $"bin/signserver addauthorizedclient {workerId} {serial} \"{issuerDN}\"", logger);
+                logger.LogInformation("Added authorized client {Serial} to worker {WorkerId}", serial, workerId);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Failed to add authorized client to worker {WorkerId}. " +
+                    "Manual configuration may be needed via: signserver addauthorizedclient {EscapedWorkerId} <serial> <issuerDN>", workerId, workerId);
+            }
+        }
+
+        // Step 5: Reload and activate
         await RunDockerExecAsync("ivf-signserver", $"bin/signserver reload {workerId}", logger);
+        var activationPin = opts.CryptoTokenType == CryptoTokenType.PKCS11
+            ? (opts.ResolvePkcs11Pin() ?? "changeit")
+            : "changeit";
         await RunDockerExecAsync("ivf-signserver",
-            $"bin/signserver activatecryptotoken {workerId} {keystorePassword}", logger);
+            $"bin/signserver activatecryptotoken {workerId} {activationPin}", logger);
 
         var expiry = DateTime.UtcNow.AddDays(certValidity);
+        var keystoreInfo = opts.CryptoTokenType == CryptoTokenType.PKCS11
+            ? $"PKCS11:{opts.Pkcs11SharedLibraryName}/{opts.Pkcs11SlotLabel}"
+            : $"{keyDir}/{workerName.ToLowerInvariant()}.p12";
 
-        logger.LogInformation("Certificate provisioned: {Subject}, worker {Worker}, expires {Expiry}",
-            certDN, workerName, expiry);
+        logger.LogInformation("Certificate provisioned: {Subject}, worker {Worker}, type {TokenType}, expires {Expiry}",
+            certDN, workerName, opts.CryptoTokenType, expiry);
 
-        return new CertProvisionResult(certDN, null, expiry, workerName, keystorePath);
+        return new CertProvisionResult(certDN, null, expiry, workerName, keystoreInfo);
     }
 
     /// <summary>
     /// Sign a PDF using a specific SignServer worker (for per-user signing).
+    /// Supports mTLS client certificate authentication when configured.
     /// </summary>
     internal static async Task<byte[]> SignPdfWithWorkerAsync(
         byte[] pdfBytes,
@@ -473,6 +573,15 @@ public static class UserSignatureEndpoints
         if (opts.SkipTlsValidation)
             handler.ServerCertificateCustomValidationCallback =
                 HttpClientHandler.DangerousAcceptAnyServerCertificateValidator;
+
+        // mTLS: attach client certificate if configured
+        if (!string.IsNullOrEmpty(opts.ClientCertificatePath) && File.Exists(opts.ClientCertificatePath))
+        {
+            var certPassword = opts.ResolveClientCertificatePassword();
+            handler.ClientCertificates.Add(
+                System.Security.Cryptography.X509Certificates.X509CertificateLoader
+                    .LoadPkcs12FromFile(opts.ClientCertificatePath, certPassword));
+        }
 
         using var client = new HttpClient(handler);
         client.Timeout = TimeSpan.FromSeconds(opts.TimeoutSeconds);
@@ -505,6 +614,11 @@ public static class UserSignatureEndpoints
     private static async Task RunDockerExecAsync(string container, string command, ILogger logger)
     {
         await RunProcessAsync("docker", $"exec {container} {command}", logger);
+    }
+
+    private static async Task RunDockerExecAsRootAsync(string container, string command, ILogger logger)
+    {
+        await RunProcessAsync("docker", $"exec -u root {container} bash -c \"{command}\"", logger);
     }
 
     private static async Task<string> RunProcessAsync(string fileName, string arguments, ILogger logger)

@@ -1,0 +1,299 @@
+# =====================================================
+# IVF System — Production Docker Compose Override
+# =====================================================
+# Usage: docker compose -f docker-compose.yml -f docker-compose.production.yml up -d
+#
+# This file overrides insecure development defaults:
+#   - Docker Secrets instead of plaintext env vars
+#   - Network isolation (public / signing / data)
+#   - SignServer: no HTTP port exposed, keystore mounted read-only
+#   - EJBCA/SignServer: certificate-based admin (no PublicAccess)
+#   - MinIO: strong password, TLS-ready
+#   - Containers: read-only filesystem, no-new-privileges
+# =====================================================
+
+services:
+  # ─── PostgreSQL (IVF Main DB) ───
+  db:
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD_FILE=/run/secrets/ivf_db_password
+    secrets:
+      - ivf_db_password
+    ports: [] # Remove host port exposure in production
+    networks:
+      - ivf-data
+    security_opt:
+      - no-new-privileges:true
+
+  # ─── IVF API ───
+  api:
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_HTTP_PORTS=8080
+      # Database — password from Docker Secret
+      - ConnectionStrings__DefaultConnection=Host=db;Database=ivf_db;Username=postgres;Password=FILE:/run/secrets/ivf_db_password
+      - ConnectionStrings__Redis=redis:6379,abortConnect=false
+      # JWT — secret from file
+      - JwtSettings__SecretFile=/run/secrets/jwt_secret
+      - JwtSettings__Issuer=IVF_System
+      - JwtSettings__Audience=IVF_Users
+      # SignServer — HTTPS with mTLS (Phase 2+3)
+      - DigitalSigning__SignServerUrl=https://signserver:8443/signserver
+      - DigitalSigning__WorkerName=PDFSigner
+      - DigitalSigning__Enabled=true
+      - DigitalSigning__SkipTlsValidation=false
+      - DigitalSigning__ClientCertificatePath=/app/certs/api-client.p12
+      - DigitalSigning__ClientCertificatePasswordFile=/run/secrets/api_cert_password
+      - DigitalSigning__TrustedCaCertPath=/app/certs/ca-chain.pem
+      - DigitalSigning__RequireMtls=true
+      - DigitalSigning__EnableAuditLogging=true
+      - DigitalSigning__CertExpiryWarningDays=30
+      - DigitalSigning__CertExpiryCheckIntervalMinutes=60
+      - DigitalSigning__SigningRateLimitPerMinute=30
+      # Phase 4: PKCS#11 / SoftHSM2 — use PKCS11 token type in production
+      - DigitalSigning__CryptoTokenType=PKCS11
+      - DigitalSigning__Pkcs11SharedLibraryName=SOFTHSM
+      - DigitalSigning__Pkcs11SlotLabel=SignServerToken
+      - DigitalSigning__Pkcs11PinFile=/run/secrets/softhsm_pin
+      # MinIO — credentials from secrets
+      - MinIO__Endpoint=minio:9000
+      - MinIO__AccessKeyFile=/run/secrets/minio_access_key
+      - MinIO__SecretKeyFile=/run/secrets/minio_secret_key
+      - MinIO__UseSSL=false
+      - MinIO__DocumentsBucket=ivf-documents
+      - MinIO__SignedPdfsBucket=ivf-signed-pdfs
+      - MinIO__MedicalImagesBucket=ivf-medical-images
+    secrets:
+      - ivf_db_password
+      - jwt_secret
+      - api_cert_password
+      - minio_access_key
+      - minio_secret_key
+      - softhsm_pin
+    volumes:
+      - ./certs/api/api-client.p12:/app/certs/api-client.p12:ro
+      - ./certs/ca-chain.pem:/app/certs/ca-chain.pem:ro
+    ports:
+      - "5000:8080"
+    networks:
+      - ivf-public
+      - ivf-signing
+      - ivf-data
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  # ─── Redis ───
+  redis:
+    ports: [] # Remove host port
+    networks:
+      - ivf-data
+    command: >
+      redis-server
+      --requirepass "${REDIS_PASSWORD:-}"
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+    security_opt:
+      - no-new-privileges:true
+
+  # ─── EJBCA (Certificate Authority) ───
+  ejbca:
+    environment:
+      - DATABASE_JDBC_URL=jdbc:postgresql://ejbca-db:5432/ejbca
+      - DATABASE_USER=ejbca
+      - DATABASE_PASSWORD_FILE=/run/secrets/ejbca_db_password
+      - TLS_SETUP_ENABLED=later
+      # Certificate-based admin — NO public access
+      # Replace serialno/issuerdn with actual admin cert values after initial setup
+      - INITIAL_ADMIN=;CertificateAuthenticationToken:WITH_ISSUER_SERIAL;CN=ManagementCA,O=IVF Clinic;${EJBCA_ADMIN_CERT_SERIAL:-0};
+    secrets:
+      - ejbca_db_password
+    ports:
+      - "8443:8443" # HTTPS Admin only — restrict with firewall
+      # REMOVED: 8442:8080 (HTTP enrollment) — not needed externally
+    volumes:
+      - ejbca_persistent:/opt/keyfactor/persistent
+      - ./certs/ejbca/tls.p12:/opt/keyfactor/persistent/tls.p12:ro
+    networks:
+      - ivf-signing
+      - ivf-data
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+
+  # ─── EJBCA Database ───
+  ejbca-db:
+    environment:
+      - POSTGRES_USER=ejbca
+      - POSTGRES_PASSWORD_FILE=/run/secrets/ejbca_db_password
+      - POSTGRES_DB=ejbca
+    secrets:
+      - ejbca_db_password
+    ports: [] # No host port
+    networks:
+      - ivf-data
+    security_opt:
+      - no-new-privileges:true
+
+  # ─── SignServer (Document Signing) — Phase 4: SoftHSM2 PKCS#11 ───
+  signserver:
+    build:
+      context: ./docker/signserver-softhsm
+    environment:
+      - DATABASE_JDBC_URL=jdbc:postgresql://signserver-db:5432/signserver
+      - DATABASE_USER=signserver
+      - DATABASE_PASSWORD_FILE=/run/secrets/signserver_db_password
+      - TLS_SETUP_ENABLED=later
+      # Certificate-based admin — NO public access
+      - INITIAL_ADMIN=;CertificateAuthenticationToken:WITH_ISSUER_SERIAL;CN=ManagementCA,O=IVF Clinic;${SIGNSERVER_ADMIN_CERT_SERIAL:-0};
+      # Node identification for clustering
+      - SIGNSERVER_NODEID=node1
+      # Phase 4: SoftHSM2 PKCS#11 configuration
+      - SOFTHSM_TOKEN_LABEL=SignServerToken
+      - SOFTHSM_SO_PIN_FILE=/run/secrets/softhsm_so_pin
+      - SOFTHSM_USER_PIN_FILE=/run/secrets/softhsm_pin
+    secrets:
+      - signserver_db_password
+      - keystore_password
+      - softhsm_pin
+      - softhsm_so_pin
+    ports:
+      - "9443:8443" # HTTPS Admin only — restrict with firewall
+      # Port 9080 completely REMOVED (Phase 3)
+    volumes:
+      - signserver_persistent:/opt/keyfactor/persistent
+      # Mount keystores read-only
+      - ./keys/signserver:/opt/keyfactor/persistent/keys:ro
+      # TLS certificate
+      - ./certs/signserver/signserver-tls.p12:/opt/keyfactor/persistent/tls.p12:ro
+      # CA cert for mTLS truststore
+      - ./certs/ca/ca.pem:/opt/keyfactor/persistent/keys/ivf-ca.pem:ro
+      # mTLS init script (need-client-auth for production)
+      - ./scripts/init-mtls-production.sh:/opt/keyfactor/persistent/init-mtls.sh:ro
+      # Phase 4: SoftHSM2 & PKCS#11 scripts
+      - softhsm_tokens:/opt/keyfactor/persistent/softhsm/tokens
+      - ./scripts/init-softhsm.sh:/opt/keyfactor/persistent/init-softhsm.sh:ro
+      - ./scripts/migrate-p12-to-pkcs11.sh:/opt/keyfactor/persistent/migrate-p12-to-pkcs11.sh:ro
+    networks:
+      - ivf-signing
+      - ivf-data
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:size=100M,mode=1777
+      - /opt/keyfactor/wildfly-35.0.1.Final/standalone/tmp:size=200M
+      - /opt/keyfactor/wildfly-35.0.1.Final/standalone/data:size=100M
+      - /opt/keyfactor/wildfly-35.0.1.Final/standalone/log:size=50M
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+
+  # ─── SignServer Database ───
+  signserver-db:
+    environment:
+      - POSTGRES_USER=signserver
+      - POSTGRES_PASSWORD_FILE=/run/secrets/signserver_db_password
+      - POSTGRES_DB=signserver
+    secrets:
+      - signserver_db_password
+    ports: [] # No host port
+    networks:
+      - ivf-data
+    security_opt:
+      - no-new-privileges:true
+
+  # ─── MinIO (Object Storage) ───
+  minio:
+    environment:
+      - MINIO_ROOT_USER_FILE=/run/secrets/minio_access_key
+      - MINIO_ROOT_PASSWORD_FILE=/run/secrets/minio_secret_key
+    secrets:
+      - minio_access_key
+      - minio_secret_key
+    ports:
+      # Only expose MinIO API — console behind reverse proxy
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+    networks:
+      - ivf-data
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  # ─── MinIO Init ───
+  minio-init:
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set ivf http://minio:9000 $$(cat /run/secrets/minio_access_key) $$(cat /run/secrets/minio_secret_key);
+      mc mb ivf/ivf-documents --ignore-existing;
+      mc mb ivf/ivf-signed-pdfs --ignore-existing;
+      mc mb ivf/ivf-medical-images --ignore-existing;
+      echo 'MinIO buckets initialized successfully';
+      exit 0;
+      "
+    secrets:
+      - minio_access_key
+      - minio_secret_key
+    networks:
+      - ivf-data
+
+  # ─── Object Browser — DISABLED in production ───
+  object-browser:
+    profiles:
+      - debug # Only start with: docker compose --profile debug up object-browser
+
+# ─── Docker Secrets ───
+secrets:
+  ivf_db_password:
+    file: ./secrets/ivf_db_password.txt
+  ejbca_db_password:
+    file: ./secrets/ejbca_db_password.txt
+  signserver_db_password:
+    file: ./secrets/signserver_db_password.txt
+  keystore_password:
+    file: ./secrets/keystore_password.txt
+  jwt_secret:
+    file: ./secrets/jwt_secret.txt
+  minio_access_key:
+    file: ./secrets/minio_access_key.txt
+  minio_secret_key:
+    file: ./secrets/minio_secret_key.txt
+  api_cert_password:
+    file: ./secrets/api_cert_password.txt
+  softhsm_pin:
+    file: ./secrets/softhsm_pin.txt
+  softhsm_so_pin:
+    file: ./secrets/softhsm_so_pin.txt
+
+# ─── Network Isolation ───
+networks:
+  # Public network: only services that need external access
+  ivf-public:
+    driver: bridge
+
+  # Signing network: API ↔ SignServer ↔ EJBCA (no internet)
+  ivf-signing:
+    driver: bridge
+    internal: true
+
+  # Data network: databases + storage (no internet)
+  ivf-data:
+    driver: bridge
+    internal: true
+
+  # Override default network — remove it
+  ivf-network:
+    driver: bridge
+    name: ivf-network-legacy

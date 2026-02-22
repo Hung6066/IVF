@@ -1,6 +1,5 @@
 using IVF.Application.Common.Interfaces;
 using IVF.Domain.Entities;
-using IVF.Domain.Enums;
 using IVF.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -22,10 +21,10 @@ public class UserPermissionRepository : IUserPermissionRepository
             .ToListAsync(ct);
     }
 
-    public async Task<bool> HasPermissionAsync(Guid userId, Permission permission, CancellationToken ct = default)
+    public async Task<bool> HasPermissionAsync(Guid userId, string permissionCode, CancellationToken ct = default)
     {
         return await _context.UserPermissions
-            .AnyAsync(p => p.UserId == userId && p.Permission == permission, ct);
+            .AnyAsync(p => p.UserId == userId && p.PermissionCode == permissionCode, ct);
     }
 
     public async Task AddAsync(UserPermission permission, CancellationToken ct = default)
@@ -38,11 +37,11 @@ public class UserPermissionRepository : IUserPermissionRepository
         await _context.UserPermissions.AddRangeAsync(permissions, ct);
     }
 
-    public async Task DeleteAsync(Guid userId, Permission permission, CancellationToken ct = default)
+    public async Task DeleteAsync(Guid userId, string permissionCode, CancellationToken ct = default)
     {
         var entity = await _context.UserPermissions
-            .FirstOrDefaultAsync(p => p.UserId == userId && p.Permission == permission, ct);
-        
+            .FirstOrDefaultAsync(p => p.UserId == userId && p.PermissionCode == permissionCode, ct);
+
         if (entity != null)
         {
             _context.UserPermissions.Remove(entity);
@@ -54,7 +53,7 @@ public class UserPermissionRepository : IUserPermissionRepository
         var permissions = await _context.UserPermissions
             .Where(p => p.UserId == userId)
             .ToListAsync(ct);
-        
+
         _context.UserPermissions.RemoveRange(permissions);
     }
 }

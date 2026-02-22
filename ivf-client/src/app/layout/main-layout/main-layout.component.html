@@ -6,183 +6,25 @@
     </div>
 
     <nav class="sidebar-nav">
-      <a routerLink="/dashboard" routerLinkActive="active" class="nav-item">
-        <span class="icon">📊</span> Dashboard
-      </a>
-      <a
-        *ngIf="canView('ViewPatients')"
-        routerLink="/reception"
-        routerLinkActive="active"
-        class="nav-item"
-      >
-        <span class="icon">🏥</span> Tiếp đón
-      </a>
-      <a
-        *ngIf="canView('ViewPatients')"
-        routerLink="/patients"
-        routerLinkActive="active"
-        class="nav-item"
-      >
-        <span class="icon">👥</span> Bệnh nhân
-      </a>
-      <a
-        *ngIf="canView('ViewCouples')"
-        routerLink="/couples"
-        routerLinkActive="active"
-        class="nav-item"
-      >
-        <span class="icon">💑</span> Cặp đôi
-      </a>
-      <a
-        *ngIf="canView('ViewQueue')"
-        routerLink="/queue/all"
-        routerLinkActive="active"
-        class="nav-item"
-      >
-        <span class="icon">🎫</span> Hàng đợi
-      </a>
-      <a
-        *ngIf="canView('ViewCycles')"
-        routerLink="/consultation"
-        routerLinkActive="active"
-        class="nav-item"
-      >
-        <span class="icon">🗣️</span> Tư vấn
-      </a>
-      <a
-        *ngIf="canView('ViewUltrasounds')"
-        routerLink="/ultrasound"
-        routerLinkActive="active"
-        class="nav-item"
-      >
-        <span class="icon">🔬</span> Siêu âm
-      </a>
-      <a
-        *ngIf="canView('ViewLabResults')"
-        routerLink="/lab"
-        routerLinkActive="active"
-        class="nav-item"
-      >
-        <span class="icon">🧫</span> Phòng Lab
-      </a>
-      <a
-        *ngIf="canView('ViewAndrology')"
-        routerLink="/andrology"
-        routerLinkActive="active"
-        class="nav-item"
-      >
-        <span class="icon">🔬</span> Nam khoa
-      </a>
-      <a
-        *ngIf="canView('ViewCycles')"
-        routerLink="/injection"
-        routerLinkActive="active"
-        class="nav-item"
-      >
-        <span class="icon">💉</span> Tiêm
-      </a>
-      <a
-        *ngIf="canView('ViewSpermBank')"
-        routerLink="/sperm-bank"
-        routerLinkActive="active"
-        class="nav-item"
-      >
-        <span class="icon">🏦</span> NHTT
-      </a>
-      <a
-        *ngIf="canView('ViewPrescriptions')"
-        routerLink="/pharmacy"
-        routerLinkActive="active"
-        class="nav-item"
-      >
-        <span class="icon">💊</span> Nhà thuốc
-      </a>
-      <a
-        *ngIf="canView('ViewBilling')"
-        routerLink="/billing"
-        routerLinkActive="active"
-        class="nav-item"
-      >
-        <span class="icon">💰</span> Hoá đơn
-      </a>
-      <a
-        *ngIf="canView('ViewSchedule')"
-        routerLink="/appointments"
-        routerLinkActive="active"
-        class="nav-item"
-      >
-        <span class="icon">📅</span> Lịch hẹn
-      </a>
-      <a
-        *ngIf="canView('ViewReports')"
-        routerLink="/reports"
-        routerLinkActive="active"
-        class="nav-item"
-      >
-        <span class="icon">📈</span> Báo cáo
-      </a>
+      @for (section of menuSections; track section.header ?? 'main') {
+        @if (isSectionVisible(section)) {
+          <!-- Section Header -->
+          @if (section.header) {
+            <div class="nav-section-header">
+              {{ section.header }}
+            </div>
+          }
 
-      <div
-        *ngIf="isAdmin()"
-        style="
-          margin-top: 16px;
-          padding: 0 16px;
-          font-size: 0.75rem;
-          color: #94a3b8;
-          font-weight: 600;
-          text-transform: uppercase;
-          margin-bottom: 8px;
-        "
-      >
-        Quản trị
-      </div>
-
-      <a
-        *ngIf="canView('ManageUsers')"
-        routerLink="/admin/users"
-        routerLinkActive="active"
-        class="nav-item"
-      >
-        <span class="icon">👥</span> Người dùng
-      </a>
-      <a *ngIf="isAdmin()" routerLink="/admin/services" routerLinkActive="active" class="nav-item">
-        <span class="icon">📋</span> Danh mục DV
-      </a>
-      <a *ngIf="isAdmin()" routerLink="/forms" routerLinkActive="active" class="nav-item">
-        <span class="icon">📝</span> Biểu mẫu
-      </a>
-      <a
-        *ngIf="isAdmin()"
-        routerLink="/forms/categories"
-        routerLinkActive="active"
-        class="nav-item"
-      >
-        <span class="icon">📁</span> Danh mục BM
-      </a>
-      <a
-        *ngIf="canView('ViewAuditLog')"
-        routerLink="/admin/audit-logs"
-        routerLinkActive="active"
-        class="nav-item"
-      >
-        <span class="icon">📝</span> Nhật ký
-      </a>
-      <a
-        *ngIf="isAdmin()"
-        routerLink="/admin/notifications"
-        routerLinkActive="active"
-        class="nav-item"
-      >
-        <span class="icon">🔔</span> Thông báo
-      </a>
-      <a
-        *ngIf="isAdmin()"
-        routerLink="/admin/digital-signing"
-        routerLinkActive="active"
-        class="nav-item"
-      >
-        <span class="icon">🔏</span> Ký số
-      </a>
+          <!-- Menu Items -->
+          @for (item of section.items; track item.route) {
+            @if (isMenuItemVisible(item)) {
+              <a [routerLink]="item.route" routerLinkActive="active" class="nav-item">
+                <span class="icon">{{ item.icon }}</span> {{ item.label }}
+              </a>
+            }
+          }
+        }
+      }
     </nav>
 
     <div class="sidebar-footer">

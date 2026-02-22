@@ -1,11 +1,15 @@
 using IVF.Application.Common.Interfaces;
+using IVF.Application.Features.Documents.Commands;
+using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace IVF.API.Endpoints;
 
 /// <summary>
 /// API endpoints for digital signing operations.
 /// Manages PDF signing via SignServer/EJBCA infrastructure.
+/// Signed PDFs are automatically stored in MinIO when patientId is provided.
 /// </summary>
 public static class DigitalSigningEndpoints
 {
@@ -27,7 +31,9 @@ public static class DigitalSigningEndpoints
         // ─── Sign an existing PDF ──────────────────────────────────
         group.MapPost("/sign-pdf", async (
             HttpRequest request,
-            IDigitalSigningService signingService) =>
+            IDigitalSigningService signingService,
+            IMediator mediator,
+            IVF.Infrastructure.Persistence.IvfDbContext db) =>
         {
             if (!signingService.IsEnabled)
                 return Results.BadRequest(new { error = "Digital signing is not enabled" });
@@ -53,12 +59,41 @@ public static class DigitalSigningEndpoints
             var location = form["location"].FirstOrDefault();
             var contactInfo = form["contactInfo"].FirstOrDefault();
             var signerName = form["signerName"].FirstOrDefault();
+            var patientIdStr = form["patientId"].FirstOrDefault();
 
             var metadata = new SigningMetadata(reason, location, contactInfo, signerName);
 
             try
             {
                 var signedPdf = await signingService.SignPdfAsync(pdfBytes, metadata);
+
+                // ─── Lưu vào MinIO nếu có patientId ───
+                if (!string.IsNullOrEmpty(patientIdStr) && Guid.TryParse(patientIdStr, out var patientId))
+                {
+                    var patient = await db.Patients
+                        .Where(p => p.Id == patientId && !p.IsDeleted)
+                        .Select(p => new { p.PatientCode })
+                        .FirstOrDefaultAsync();
+
+                    if (patient != null)
+                    {
+                        try
+                        {
+                            await mediator.Send(new StoreSignedFormPdfCommand(
+                                FormResponseId: Guid.Empty, // Direct signing, no form response
+                                PatientId: patientId,
+                                PatientCode: patient.PatientCode,
+                                TemplateName: file.FileName.Replace(".pdf", ""),
+                                SignedPdfBytes: signedPdf,
+                                SignerNames: signerName));
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.Error.WriteLine($"[DigitalSigning] Store signed PDF to MinIO failed: {ex.Message}");
+                        }
+                    }
+                }
+
                 var fileName = $"signed_{file.FileName}";
                 return Results.File(signedPdf, "application/pdf", fileName);
             }

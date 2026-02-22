@@ -1,0 +1,183 @@
+<div class="menu-config">
+  <!-- Header -->
+  <div class="page-header">
+    <div class="header-left">
+      <h2>⚙️ Cấu hình menu</h2>
+      <p class="subtitle">
+        Quản lý các mục menu hiển thị trên sidebar. Thay đổi sẽ áp dụng cho tất cả người dùng.
+      </p>
+    </div>
+    <button class="btn-primary" (click)="openModal()">+ Thêm menu</button>
+  </div>
+
+  <!-- Loading -->
+  @if (loading()) {
+    <div class="loading-container">
+      <div class="spinner"></div>
+      <span>Đang tải...</span>
+    </div>
+  }
+
+  <!-- Menu Items by Section -->
+  @if (!loading()) {
+    @for (group of groupedItems; track group.section) {
+      <div class="section-card">
+        <div class="section-header">
+          <h3>{{ group.section }}</h3>
+          <span class="item-count">{{ group.items.length }} mục</span>
+        </div>
+
+        <div class="items-table">
+          <div class="table-header">
+            <span class="col-order">#</span>
+            <span class="col-icon">Icon</span>
+            <span class="col-label">Tên hiển thị</span>
+            <span class="col-route">Route</span>
+            <span class="col-permission">Quyền</span>
+            <span class="col-status">Trạng thái</span>
+            <span class="col-actions">Thao tác</span>
+          </div>
+
+          @for (item of group.items; track item.id) {
+            <div class="table-row" [class.inactive]="!item.isActive">
+              <span class="col-order">{{ item.sortOrder }}</span>
+              <span class="col-icon">{{ item.icon }}</span>
+              <span class="col-label">
+                <strong>{{ item.label }}</strong>
+                @if (item.adminOnly) {
+                  <span class="badge admin-badge">Admin</span>
+                }
+              </span>
+              <span class="col-route">
+                <code>{{ item.route }}</code>
+              </span>
+              <span class="col-permission">
+                @if (item.permission) {
+                  <span class="badge perm-badge">{{ item.permission }}</span>
+                } @else if (item.adminOnly) {
+                  <span class="badge admin-badge">Admin only</span>
+                } @else {
+                  <span class="text-muted">—</span>
+                }
+              </span>
+              <span class="col-status">
+                <button
+                  class="toggle-btn"
+                  [class.active]="item.isActive"
+                  (click)="toggleActive(item)"
+                  [title]="item.isActive ? 'Đang hiển thị' : 'Đang ẩn'"
+                >
+                  {{ item.isActive ? '✅' : '❌' }}
+                </button>
+              </span>
+              <span class="col-actions">
+                <button class="btn-icon" title="Di chuyển lên" (click)="moveUp(item, group.items)">
+                  ⬆️
+                </button>
+                <button
+                  class="btn-icon"
+                  title="Di chuyển xuống"
+                  (click)="moveDown(item, group.items)"
+                >
+                  ⬇️
+                </button>
+                <button class="btn-icon" title="Chỉnh sửa" (click)="openModal(item)">✏️</button>
+                <button class="btn-icon btn-danger" title="Xoá" (click)="deleteItem(item)">
+                  🗑️
+                </button>
+              </span>
+            </div>
+          }
+        </div>
+      </div>
+    }
+
+    @if (items().length === 0) {
+      <div class="empty-state">
+        <span class="empty-icon">📋</span>
+        <p>Chưa có menu item nào. Nhấn "Thêm menu" để bắt đầu.</p>
+      </div>
+    }
+  }
+</div>
+
+<!-- Modal -->
+@if (showModal) {
+  <div class="modal-backdrop" (click)="closeModal()">
+    <div class="modal-card" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>{{ editingItem ? '✏️ Sửa menu item' : '➕ Thêm menu item' }}</h3>
+        <button class="close-btn" (click)="closeModal()">×</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Icon (emoji)</label>
+            <input type="text" [(ngModel)]="formData.icon" placeholder="📊" maxlength="4" />
+          </div>
+          <div class="form-group flex-2">
+            <label>Tên hiển thị *</label>
+            <input type="text" [(ngModel)]="formData.label" placeholder="Dashboard" required />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Route *</label>
+          <input type="text" [(ngModel)]="formData.route" placeholder="/dashboard" required />
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Section</label>
+            <input type="text" [(ngModel)]="formData.section" placeholder="admin" />
+            <small>Để trống = menu chính. "admin" = phần quản trị.</small>
+          </div>
+          <div class="form-group">
+            <label>Tiêu đề section</label>
+            <input type="text" [(ngModel)]="formData.sectionHeader" placeholder="Quản trị" />
+            <small>Chỉ cần điền ở item đầu tiên của section.</small>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Quyền truy cập</label>
+          <select [(ngModel)]="formData.permission">
+            <option value="">-- Không yêu cầu --</option>
+            @for (p of availablePermissions; track p) {
+              <option [value]="p">{{ formatPermission(p) }}</option>
+            }
+          </select>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Thứ tự hiển thị</label>
+            <input type="number" [(ngModel)]="formData.sortOrder" min="0" />
+          </div>
+          <div class="form-group checkbox-group">
+            <label>
+              <input type="checkbox" [(ngModel)]="formData.adminOnly" />
+              Chỉ Admin
+            </label>
+            <label>
+              <input type="checkbox" [(ngModel)]="formData.isActive" />
+              Hiển thị
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-ghost" (click)="closeModal()">Hủy</button>
+        <button
+          class="btn-primary"
+          [disabled]="saving() || !formData.label || !formData.route"
+          (click)="saveItem()"
+        >
+          {{ saving() ? 'Đang lưu...' : '💾 Lưu' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

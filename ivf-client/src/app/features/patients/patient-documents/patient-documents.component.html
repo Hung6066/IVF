@@ -1,0 +1,389 @@
+<div class="patient-documents">
+  <!-- Header -->
+  <header class="page-header">
+    <a [routerLink]="['/patients', patientId]" class="back-link">
+      <span>←</span> Hồ sơ bệnh nhân
+    </a>
+    <div class="header-row">
+      <div class="header-info">
+        <h1>📁 Hồ sơ bệnh án điện tử</h1>
+        @if (patient()) {
+          <p class="subtitle">{{ patient().patientCode }} — {{ patient().fullName }}</p>
+        }
+      </div>
+      <button class="btn btn-primary" (click)="openUploadDialog()">
+        <span class="icon">+</span> Tải lên tài liệu
+      </button>
+    </div>
+  </header>
+
+  <!-- Messages -->
+  @if (successMessage()) {
+    <div class="alert alert-success">✓ {{ successMessage() }}</div>
+  }
+  @if (error()) {
+    <div class="alert alert-error">⚠ {{ error() }}</div>
+  }
+
+  <!-- Summary Cards -->
+  @if (summary()) {
+    <div class="summary-grid">
+      <div class="summary-card">
+        <span class="summary-icon">📄</span>
+        <div class="summary-info">
+          <span class="summary-value">{{ summary()!.totalDocuments }}</span>
+          <span class="summary-label">Tài liệu</span>
+        </div>
+      </div>
+      <div class="summary-card">
+        <span class="summary-icon">💾</span>
+        <div class="summary-info">
+          <span class="summary-value">{{ storageUsed() }}</span>
+          <span class="summary-label">Dung lượng</span>
+        </div>
+      </div>
+      @for (entry of summary()!.documentCountsByType | keyvalue; track entry.key) {
+        <div class="summary-card mini">
+          <span class="summary-icon material-icon">{{ getDocTypeIcon(entry.key) }}</span>
+          <div class="summary-info">
+            <span class="summary-value">{{ entry.value }}</span>
+            <span class="summary-label">{{ getDocTypeLabel(entry.key) }}</span>
+          </div>
+        </div>
+      }
+    </div>
+  }
+
+  <!-- Filters -->
+  <div class="filters-bar">
+    <div class="search-box">
+      <input
+        type="text"
+        placeholder="Tìm kiếm tài liệu..."
+        [ngModel]="searchTerm()"
+        (ngModelChange)="onSearch($event)"
+      />
+    </div>
+    <select [ngModel]="selectedType()" (ngModelChange)="onTypeChange($event)">
+      <option value="">Tất cả loại</option>
+      @for (type of documentTypes(); track type.value) {
+        <option [value]="type.value">{{ type.label }}</option>
+      }
+    </select>
+  </div>
+
+  <!-- Document List -->
+  <div class="document-list">
+    @if (loading()) {
+      <div class="loading">Đang tải...</div>
+    } @else if (documents().length === 0) {
+      <div class="empty-state">
+        <span class="empty-icon">📂</span>
+        <p>Chưa có tài liệu nào</p>
+        <button class="btn btn-outline" (click)="openUploadDialog()">
+          Tải lên tài liệu đầu tiên
+        </button>
+      </div>
+    } @else {
+      <table class="doc-table">
+        <thead>
+          <tr>
+            <th>Tài liệu</th>
+            <th>Loại</th>
+            <th>Kích thước</th>
+            <th>Trạng thái</th>
+            <th>Ký số</th>
+            <th>Ngày tạo</th>
+            <th>Thao tác</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (doc of documents(); track doc.id) {
+            <tr (click)="viewDocument(doc)" class="doc-row" [class.signed]="doc.isSigned">
+              <td class="doc-name">
+                <span class="doc-icon">{{ getDocTypeIcon(doc.documentType) }}</span>
+                <div>
+                  <span class="doc-title">{{ doc.title }}</span>
+                  <span class="doc-filename">{{ doc.originalFileName }}</span>
+                </div>
+              </td>
+              <td>
+                <span class="badge type">{{ getDocTypeLabel(doc.documentType) }}</span>
+              </td>
+              <td>{{ formatSize(doc.fileSizeBytes) }}</td>
+              <td>
+                <span class="badge status" [class]="getStatusClass(doc.status)">{{
+                  getStatusLabel(doc.status)
+                }}</span>
+              </td>
+              <td>
+                @if (doc.isSigned) {
+                  <span class="signed-badge" title="Đã ký bởi {{ doc.signedByName }}">✓ Đã ký</span>
+                } @else {
+                  <span class="unsigned-badge">—</span>
+                }
+              </td>
+              <td>{{ formatDate(doc.createdAt) }}</td>
+              <td class="actions" (click)="$event.stopPropagation()">
+                <button class="btn-icon" title="Tải xuống" (click)="downloadDocument(doc)">
+                  ⬇
+                </button>
+                @if (doc.isSigned) {
+                  <button
+                    class="btn-icon signed"
+                    title="Tải bản ký số"
+                    (click)="downloadDocument(doc, true)"
+                  >
+                    🔏
+                  </button>
+                }
+                @if (!doc.isSigned && doc.contentType === 'application/pdf') {
+                  <button class="btn-icon" title="Ký số" (click)="signDocument(doc)">✍</button>
+                }
+                <button class="btn-icon danger" title="Xóa" (click)="deleteDocument(doc)">
+                  🗑
+                </button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+
+      <!-- Pagination -->
+      @if (totalPages > 1) {
+        <div class="pagination">
+          <button
+            class="btn btn-sm"
+            [disabled]="currentPage() === 1"
+            (click)="onPageChange(currentPage() - 1)"
+          >
+            ← Trước
+          </button>
+          <span class="page-info">Trang {{ currentPage() }} / {{ totalPages }}</span>
+          <button
+            class="btn btn-sm"
+            [disabled]="currentPage() >= totalPages"
+            (click)="onPageChange(currentPage() + 1)"
+          >
+            Sau →
+          </button>
+        </div>
+      }
+    }
+  </div>
+
+  <!-- Detail Panel (Slide-in) -->
+  @if (showDetailPanel() && selectedDocument()) {
+    <div class="overlay" (click)="closeDetailPanel()"></div>
+    <aside class="detail-panel">
+      <div class="panel-header">
+        <h2>Chi tiết tài liệu</h2>
+        <button class="btn-close" (click)="closeDetailPanel()">×</button>
+      </div>
+      <div class="panel-body">
+        <div class="detail-section">
+          <h3>{{ selectedDocument()!.title }}</h3>
+          @if (selectedDocument()!.description) {
+            <p class="description">{{ selectedDocument()!.description }}</p>
+          }
+        </div>
+
+        <div class="detail-grid">
+          <div class="detail-item">
+            <label>Loại</label>
+            <span>{{ getDocTypeLabel(selectedDocument()!.documentType) }}</span>
+          </div>
+          <div class="detail-item">
+            <label>Trạng thái</label>
+            <span class="badge status" [class]="getStatusClass(selectedDocument()!.status)">{{
+              getStatusLabel(selectedDocument()!.status)
+            }}</span>
+          </div>
+          <div class="detail-item">
+            <label>File gốc</label>
+            <span>{{ selectedDocument()!.originalFileName }}</span>
+          </div>
+          <div class="detail-item">
+            <label>Kích thước</label>
+            <span>{{ formatSize(selectedDocument()!.fileSizeBytes) }}</span>
+          </div>
+          <div class="detail-item">
+            <label>Mức bảo mật</label>
+            <span>{{ getConfidentialityLabel(selectedDocument()!.confidentiality) }}</span>
+          </div>
+          <div class="detail-item">
+            <label>Phiên bản</label>
+            <span>v{{ selectedDocument()!.version }}</span>
+          </div>
+          <div class="detail-item">
+            <label>Ngày tạo</label>
+            <span>{{ formatDate(selectedDocument()!.createdAt) }}</span>
+          </div>
+          @if (selectedDocument()!.checksum) {
+            <div class="detail-item full-width">
+              <label>SHA-256</label>
+              <span class="checksum">{{ selectedDocument()!.checksum }}</span>
+            </div>
+          }
+        </div>
+
+        <!-- Signing Info -->
+        @if (selectedDocument()!.isSigned) {
+          <div class="detail-section signed-info">
+            <h4>🔏 Thông tin ký số</h4>
+            <div class="detail-grid">
+              <div class="detail-item">
+                <label>Người ký</label>
+                <span>{{ selectedDocument()!.signedByName }}</span>
+              </div>
+              <div class="detail-item">
+                <label>Ngày ký</label>
+                <span>{{ formatDate(selectedDocument()!.signedAt) }}</span>
+              </div>
+            </div>
+          </div>
+        }
+
+        <!-- Version History -->
+        @if (versionHistory().length > 1) {
+          <div class="detail-section">
+            <h4>📋 Lịch sử phiên bản</h4>
+            <div class="version-list">
+              @for (ver of versionHistory(); track ver.id) {
+                <div class="version-item" [class.current]="ver.id === selectedDocument()!.id">
+                  <span class="version-badge">v{{ ver.version }}</span>
+                  <span class="version-name">{{ ver.originalFileName }}</span>
+                  <span class="version-date">{{ formatDate(ver.createdAt) }}</span>
+                  <span class="version-status badge status" [class]="getStatusClass(ver.status)">{{
+                    getStatusLabel(ver.status)
+                  }}</span>
+                </div>
+              }
+            </div>
+          </div>
+        }
+
+        <!-- Actions -->
+        <div class="panel-actions">
+          <button class="btn btn-primary" (click)="downloadDocument(selectedDocument()!)">
+            ⬇ Tải xuống
+          </button>
+          @if (selectedDocument()!.isSigned) {
+            <button class="btn btn-success" (click)="downloadDocument(selectedDocument()!, true)">
+              🔏 Tải bản ký số
+            </button>
+          }
+          @if (
+            !selectedDocument()!.isSigned && selectedDocument()!.contentType === 'application/pdf'
+          ) {
+            <button class="btn btn-warning" (click)="signDocument(selectedDocument()!)">
+              ✍ Ký số
+            </button>
+          }
+          <button class="btn btn-danger" (click)="deleteDocument(selectedDocument()!)">
+            🗑 Xóa
+          </button>
+        </div>
+      </div>
+    </aside>
+  }
+
+  <!-- Upload Dialog -->
+  @if (showUploadDialog()) {
+    <div class="overlay" (click)="closeUploadDialog()"></div>
+    <div class="dialog upload-dialog">
+      <div class="dialog-header">
+        <h2>Tải lên tài liệu mới</h2>
+        <button class="btn-close" (click)="closeUploadDialog()">×</button>
+      </div>
+      <div class="dialog-body">
+        <!-- Drop zone -->
+        <div class="drop-zone" (click)="fileInput.click()">
+          @if (selectedFile()) {
+            <span class="file-preview"
+              >📄 {{ selectedFile()!.name }} ({{ formatSize(selectedFile()!.size) }})</span
+            >
+          } @else {
+            <span class="drop-icon">☁️</span>
+            <span>Kéo thả file hoặc nhấp để chọn</span>
+            <span class="drop-hint">Hỗ trợ: PDF, DOC, DOCX, XLS, XLSX, PNG, JPG (tối đa 50MB)</span>
+          }
+          <input
+            #fileInput
+            type="file"
+            hidden
+            (change)="onFileSelected($event)"
+            accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.gif,.csv,.txt,.dicom,.dcm"
+          />
+        </div>
+
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Tiêu đề *</label>
+            <input
+              type="text"
+              [ngModel]="uploadTitle()"
+              (ngModelChange)="uploadTitle.set($event)"
+              placeholder="Nhập tiêu đề tài liệu"
+            />
+          </div>
+
+          <div class="form-group">
+            <label>Loại tài liệu</label>
+            <select [ngModel]="uploadDocType()" (ngModelChange)="uploadDocType.set($event)">
+              @for (type of documentTypes(); track type.value) {
+                <option [value]="type.value">{{ type.label }}</option>
+              }
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Mô tả</label>
+            <textarea
+              [ngModel]="uploadDescription()"
+              (ngModelChange)="uploadDescription.set($event)"
+              rows="3"
+              placeholder="Mô tả nội dung tài liệu..."
+            ></textarea>
+          </div>
+
+          <div class="form-group">
+            <label>Mức bảo mật</label>
+            <select
+              [ngModel]="uploadConfidentiality()"
+              (ngModelChange)="uploadConfidentiality.set($event)"
+            >
+              <option value="Normal">Bình thường</option>
+              <option value="Restricted">Hạn chế</option>
+              <option value="VeryRestricted">Rất hạn chế</option>
+            </select>
+          </div>
+
+          <div class="form-group full-width">
+            <label>Tags (phân cách bởi dấu phẩy)</label>
+            <input
+              type="text"
+              [ngModel]="uploadTags()"
+              (ngModelChange)="uploadTags.set($event)"
+              placeholder="xét nghiệm, kết quả, 2026"
+            />
+          </div>
+        </div>
+      </div>
+      <div class="dialog-footer">
+        <button class="btn btn-outline" (click)="closeUploadDialog()">Hủy</button>
+        <button
+          class="btn btn-primary"
+          (click)="uploadDocument()"
+          [disabled]="!selectedFile() || uploading()"
+        >
+          @if (uploading()) {
+            <span class="spinner"></span> Đang tải lên...
+          } @else {
+            📤 Tải lên
+          }
+        </button>
+      </div>
+    </div>
+  }
+</div>

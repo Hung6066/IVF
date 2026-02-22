@@ -1,0 +1,178 @@
+<div class="permission-config-page">
+  <!-- Header -->
+  <div class="page-header">
+    <div class="header-left">
+      <h2>⚙️ Cấu hình quyền hạn</h2>
+      <p class="subtitle">Quản lý danh sách quyền hạn trong hệ thống</p>
+    </div>
+    <div class="header-actions">
+      <select class="filter-select" [(ngModel)]="groupFilter">
+        <option value="">Tất cả nhóm</option>
+        @for (g of groups; track g) {
+          <option [value]="g">{{ g }}</option>
+        }
+      </select>
+      <button class="btn btn-primary" (click)="openAdd()"><span>＋</span> Thêm quyền</button>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  @if (loading()) {
+    <div class="loading-bar">Đang tải...</div>
+  }
+
+  <!-- Groups -->
+  @for (group of groupedItems; track group.groupCode) {
+    <div class="group-section">
+      <div class="group-header">
+        <span class="group-icon">{{ group.groupIcon }}</span>
+        <span class="group-name">{{ group.groupName }}</span>
+        <span class="group-code">({{ group.groupCode }})</span>
+        <span class="badge">{{ group.items.length }}</span>
+      </div>
+
+      <div class="permission-table">
+        <table>
+          <thead>
+            <tr>
+              <th class="col-code">Mã quyền</th>
+              <th class="col-name">Tên hiển thị</th>
+              <th class="col-sort">Thứ tự</th>
+              <th class="col-status">Trạng thái</th>
+              <th class="col-actions">Thao tác</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (item of group.items; track item.id) {
+              <tr [class.inactive]="!item.isActive">
+                <td class="col-code">
+                  <code>{{ item.code }}</code>
+                </td>
+                <td class="col-name">{{ item.displayName }}</td>
+                <td class="col-sort">{{ item.sortOrder }}</td>
+                <td class="col-status">
+                  <button
+                    class="toggle-btn"
+                    [class.active]="item.isActive"
+                    (click)="toggleActive(item)"
+                    [title]="item.isActive ? 'Đang bật' : 'Đang tắt'"
+                  >
+                    {{ item.isActive ? '✅' : '❌' }}
+                  </button>
+                </td>
+                <td class="col-actions">
+                  <button class="btn-icon" title="Sửa" (click)="openEdit(item)">✏️</button>
+                  <button class="btn-icon btn-danger" title="Xoá" (click)="deleteItem(item)">
+                    🗑️
+                  </button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  }
+
+  @if (!loading() && groupedItems.length === 0) {
+    <div class="empty-state">
+      <p>Không có quyền nào{{ groupFilter ? ' trong nhóm này' : '' }}.</p>
+    </div>
+  }
+</div>
+
+<!-- Modal -->
+@if (showModal) {
+  <div class="modal-backdrop" (click)="closeModal()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>{{ editingItem ? 'Sửa quyền' : 'Thêm quyền mới' }}</h3>
+        <button class="btn-close" (click)="closeModal()">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Mã quyền (Code) <span class="required">*</span></label>
+          <input
+            type="text"
+            [(ngModel)]="formData.code"
+            [disabled]="!!editingItem"
+            placeholder="VD: ViewReports"
+            class="form-control"
+          />
+          @if (!editingItem) {
+            <small class="hint">Không thể thay đổi sau khi tạo. Dùng PascalCase.</small>
+          }
+        </div>
+
+        <div class="form-group">
+          <label>Tên hiển thị <span class="required">*</span></label>
+          <input
+            type="text"
+            [(ngModel)]="formData.displayName"
+            placeholder="VD: Xem báo cáo"
+            class="form-control"
+          />
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Mã nhóm <span class="required">*</span></label>
+            <input
+              type="text"
+              [(ngModel)]="formData.groupCode"
+              placeholder="VD: report"
+              class="form-control"
+            />
+          </div>
+          <div class="form-group">
+            <label>Tên nhóm <span class="required">*</span></label>
+            <input
+              type="text"
+              [(ngModel)]="formData.groupDisplayName"
+              placeholder="VD: Báo cáo"
+              class="form-control"
+            />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Icon nhóm</label>
+            <input
+              type="text"
+              [(ngModel)]="formData.groupIcon"
+              placeholder="VD: 📊"
+              class="form-control"
+            />
+          </div>
+          <div class="form-group">
+            <label>Thứ tự trong nhóm</label>
+            <input type="number" [(ngModel)]="formData.sortOrder" class="form-control" />
+          </div>
+          <div class="form-group">
+            <label>Thứ tự nhóm</label>
+            <input type="number" [(ngModel)]="formData.groupSortOrder" class="form-control" />
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" (click)="closeModal()">Huỷ</button>
+        <button
+          class="btn btn-primary"
+          (click)="save()"
+          [disabled]="
+            saving() ||
+            !formData.code ||
+            !formData.displayName ||
+            !formData.groupCode ||
+            !formData.groupDisplayName
+          "
+        >
+          {{ saving() ? 'Đang lưu...' : editingItem ? 'Cập nhật' : 'Tạo mới' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

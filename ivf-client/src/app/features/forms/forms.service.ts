@@ -716,6 +716,26 @@ export class FormsService {
     });
   }
 
+  // ── Multi-Signature Endpoints ──
+
+  /** Sign a form response for a specific role */
+  signResponse(responseId: string, signatureRole: string, notes?: string): Observable<any> {
+    return this.http.post(`${this.baseUrl}/responses/${responseId}/sign`, {
+      signatureRole,
+      notes,
+    });
+  }
+
+  /** Get signing status (who has signed, pending roles) */
+  getSigningStatus(responseId: string): Observable<SigningStatus> {
+    return this.http.get<SigningStatus>(`${this.baseUrl}/responses/${responseId}/signing-status`);
+  }
+
+  /** Revoke a signature */
+  revokeSignature(responseId: string, signatureId: string): Observable<any> {
+    return this.http.delete(`${this.baseUrl}/responses/${responseId}/sign/${signatureId}`);
+  }
+
   // Linked Data (cross-form concept pre-fill)
   getLinkedData(
     templateId: string,
@@ -863,4 +883,23 @@ export class FormsService {
       return [];
     }
   }
+}
+
+// ── Multi-Signature Types ──
+
+export interface SigningStatus {
+  formResponseId: string;
+  signatures: DocumentSignatureInfo[];
+  requiredRoles: string[];
+  pendingRoles: string[];
+  isFullySigned: boolean;
+}
+
+export interface DocumentSignatureInfo {
+  id: string;
+  signatureRole: string;
+  userId: string;
+  signerName: string;
+  signedAt: string;
+  notes?: string;
 }

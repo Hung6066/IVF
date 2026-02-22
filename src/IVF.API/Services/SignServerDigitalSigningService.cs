@@ -198,6 +198,7 @@ public class SignServerDigitalSigningService : IDigitalSigningService
     /// <summary>
     /// Send PDF to SignServer process endpoint using multipart/form-data.
     /// SignServer CE REST API: POST /signserver/process
+    /// Enhanced with Phase 3 audit logging: correlation IDs, duration tracking, caller metadata.
     /// </summary>
     private async Task<byte[]> SendToSignServerAsync(
         byte[] pdfBytes,
@@ -206,6 +207,8 @@ public class SignServerDigitalSigningService : IDigitalSigningService
         CancellationToken cancellationToken)
     {
         var processUrl = $"{_options.SignServerUrl.TrimEnd('/')}/process";
+        var correlationId = Guid.NewGuid().ToString("N")[..12];
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
         using var content = new MultipartFormDataContent();
 
@@ -221,7 +224,23 @@ public class SignServerDigitalSigningService : IDigitalSigningService
         // directly on the SignServer worker properties (not as request metadata)
         // because SignServer CE does not allow overriding by default.
 
+        // Audit logging — Phase 3 enhanced with correlation ID and structured events
+        string? documentHash = null;
+        if (_options.EnableAuditLogging)
+        {
+            documentHash = Convert.ToHexString(
+                System.Security.Cryptography.SHA256.HashData(pdfBytes)).ToLowerInvariant();
+            _logger.LogInformation(
+                "AUDIT[{CorrelationId}]: Signing request — Worker={Worker}, Reason={Reason}, " +
+                "Signer={Signer}, DocumentHash={Hash}, Size={Size}, Timestamp={Timestamp}",
+                correlationId, workerName,
+                metadata?.Reason ?? _options.DefaultReason,
+                metadata?.SignerName ?? "unknown",
+                documentHash, pdfBytes.Length, DateTime.UtcNow.ToString("O"));
+        }
+
         var response = await _httpClient.PostAsync(processUrl, content, cancellationToken);
+        stopwatch.Stop();
 
         if (!response.IsSuccessStatusCode)
         {
@@ -229,6 +248,15 @@ public class SignServerDigitalSigningService : IDigitalSigningService
             _logger.LogError(
                 "SignServer returned {StatusCode}: {Error}",
                 response.StatusCode, errorBody);
+
+            if (_options.EnableAuditLogging)
+            {
+                _logger.LogWarning(
+                    "AUDIT[{CorrelationId}]: Signing FAILED — Worker={Worker}, DocumentHash={Hash}, " +
+                    "Status={Status}, DurationMs={Duration}, Error={Error}",
+                    correlationId, workerName, documentHash,
+                    response.StatusCode, stopwatch.ElapsedMilliseconds, errorBody);
+            }
 
             throw new InvalidOperationException(
                 $"SignServer signing failed ({response.StatusCode}): {errorBody}");
@@ -244,6 +272,18 @@ public class SignServerDigitalSigningService : IDigitalSigningService
             signedPdf[3] != 0x46)   // F
         {
             _logger.LogWarning("SignServer response does not appear to be a valid PDF");
+        }
+
+        if (_options.EnableAuditLogging)
+        {
+            var signedHash = Convert.ToHexString(
+                System.Security.Cryptography.SHA256.HashData(signedPdf)).ToLowerInvariant();
+            _logger.LogInformation(
+                "AUDIT[{CorrelationId}]: Signing SUCCESS — Worker={Worker}, Signer={Signer}, " +
+                "InputHash={InputHash}, OutputHash={OutputHash}, OutputSize={Size}, DurationMs={Duration}",
+                correlationId, workerName,
+                metadata?.SignerName ?? "unknown",
+                documentHash, signedHash, signedPdf.Length, stopwatch.ElapsedMilliseconds);
         }
 
         return signedPdf;

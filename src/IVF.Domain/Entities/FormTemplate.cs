@@ -1,4 +1,7 @@
 using IVF.Domain.Common;
+using System.Globalization;
+using System.Text;
+using System.Text.RegularExpressions;
 
 namespace IVF.Domain.Entities;
 
@@ -9,6 +12,14 @@ public class FormTemplate : BaseEntity
 {
     public Guid CategoryId { get; private set; }
     public string Name { get; private set; } = string.Empty;
+
+    /// <summary>
+    /// Mã code ngắn gọn dùng trong MinIO path, URL. Ví dụ: "spermanalysis", "initialconsultation".
+    /// Tự sinh từ tên nếu không truyền vào: xóa dấu tiếng Việt, giữ a-z0-9, viết liền thường.
+    /// Không thay đổi khi đổi tên form → đảm bảo MinIO path ổn định.
+    /// </summary>
+    public string Code { get; private set; } = string.Empty;
+
     public string? Description { get; private set; }
     public string Version { get; private set; } = "1.0";
     public bool IsPublished { get; private set; }
@@ -27,13 +38,15 @@ public class FormTemplate : BaseEntity
         Guid categoryId,
         string name,
         Guid? createdByUserId,
-        string? description = null)
+        string? description = null,
+        string? code = null)
     {
         return new FormTemplate
         {
             Id = Guid.NewGuid(),
             CategoryId = categoryId,
             Name = name,
+            Code = string.IsNullOrWhiteSpace(code) ? GenerateCode(name) : NormalizeCode(code),
             Description = description,
             Version = "1.0",
             IsPublished = false,
@@ -42,10 +55,13 @@ public class FormTemplate : BaseEntity
         };
     }
 
-    public void Update(string name, string? description)
+    public void Update(string name, string? description, string? code = null)
     {
         Name = name;
         Description = description;
+        // Code only updated if explicitly provided; keeps MinIO paths stable when name changes
+        if (!string.IsNullOrWhiteSpace(code))
+            Code = NormalizeCode(code);
         SetUpdated();
     }
 
@@ -79,6 +95,51 @@ public class FormTemplate : BaseEntity
             Version = "1.1";
         }
         SetUpdated();
+    }
+
+    /// <summary>
+    /// Tự sinh code từ tên form tiếng Việt:
+    ///   1. Đổi ký tự đặc biệt tiếng Việt không tự decompose (đ→d)
+    ///   2. Unicode FormD normalization → tách dấu ra khỏi chữ
+    ///   3. Bỏ NonSpacingMark (dấu thanh, dấu mũ...)
+    ///   4. Lowercase, chỉ giữ a-z0-9
+    /// Ví dụ: "Phiếu xét nghiệm tinh dịch đồ" → "phieuxetnghiemtinhdichdо"
+    ///        "Phiếu khám ban đầu - Vô sinh"   → "phieukhamvandauvosinh"
+    /// </summary>
+    public static string GenerateCode(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "form";
+
+        // Step 1: explicit replacements for chars that don't decompose via FormD
+        var s = name
+            .Replace('đ', 'd').Replace('Đ', 'D')
+            .Replace('–', '-').Replace('—', '-');
+
+        // Step 2: decompose to base + combining marks
+        s = s.Normalize(NormalizationForm.FormD);
+
+        // Step 3: strip combining (NonSpacingMark) characters
+        var sb = new StringBuilder(s.Length);
+        foreach (var c in s)
+        {
+            if (CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark)
+                sb.Append(c);
+        }
+
+        // Step 4: lowercase, keep only a-z0-9
+        s = sb.ToString().Normalize(NormalizationForm.FormC).ToLowerInvariant();
+        s = Regex.Replace(s, @"[^a-z0-9]", "");
+
+        // Trim to max 50 chars, ensure non-empty
+        s = s.Length > 50 ? s[..50] : s;
+        return string.IsNullOrEmpty(s) ? "form" : s;
+    }
+
+    /// <summary>Chuẩn hóa code do người dùng nhập: lowercase, chỉ a-z0-9, tối đa 50 ký tự</summary>
+    public static string NormalizeCode(string code)
+    {
+        var s = Regex.Replace(code.ToLowerInvariant(), @"[^a-z0-9]", "");
+        return s.Length > 50 ? s[..50] : (string.IsNullOrEmpty(s) ? "form" : s);
     }
 
     public FormField AddField(

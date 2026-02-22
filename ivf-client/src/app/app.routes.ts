@@ -47,6 +47,13 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'patients/:id/documents',
+        loadComponent: () =>
+          import('./features/patients/patient-documents/patient-documents.component').then(
+            (m) => m.PatientDocumentsComponent,
+          ),
+      },
+      {
         path: 'couples',
         loadComponent: () =>
           import('./features/couples/couple-list/couple-list.component').then(
@@ -191,6 +198,27 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/admin/services/service-catalog.component').then(
             (m) => m.ServiceCatalogComponent,
+          ),
+      },
+      {
+        path: 'admin/permissions',
+        loadComponent: () =>
+          import('./features/admin/permissions/permission-management.component').then(
+            (m) => m.PermissionManagementComponent,
+          ),
+      },
+      {
+        path: 'admin/menu',
+        loadComponent: () =>
+          import('./features/admin/menu-config/menu-config.component').then(
+            (m) => m.MenuConfigComponent,
+          ),
+      },
+      {
+        path: 'admin/permission-config',
+        loadComponent: () =>
+          import('./features/admin/permission-config/permission-config.component').then(
+            (m) => m.PermissionConfigComponent,
           ),
       },
       {

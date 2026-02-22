@@ -5,6 +5,7 @@ using IVF.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Minio;
 
 namespace IVF.Infrastructure;
 
@@ -53,15 +54,37 @@ public static class DependencyInjection
         services.AddScoped<IAuditLogRepository, AuditLogRepository>();
         services.AddScoped<IUserPermissionRepository, UserPermissionRepository>();
         services.AddScoped<IServiceCatalogRepository, ServiceCatalogRepository>();
+        services.AddScoped<IMenuItemRepository, MenuItemRepository>();
+        services.AddScoped<IPermissionDefinitionRepository, PermissionDefinitionRepository>();
         services.AddScoped<ICyclePhaseDataRepository, CyclePhaseDataRepository>();
         services.AddScoped<IFormRepository, FormRepository>();
         services.AddScoped<IConceptRepository, ConceptRepository>();
+        services.AddScoped<IPatientDocumentRepository, PatientDocumentRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 
         // Register Services
         services.AddScoped<INotificationService, Services.NotificationService>();
         services.AddScoped<IFlowSeeder, FlowSeeder>();
-        services.AddSingleton<IFileStorageService, LocalFileStorageService>();
+
+        // ─── MinIO Object Storage (S3-compatible) ───
+        var minioSection = configuration.GetSection(MinioOptions.SectionName);
+        services.Configure<MinioOptions>(minioSection);
+        var minioOpts = minioSection.Get<MinioOptions>() ?? new MinioOptions();
+
+        services.AddSingleton<IMinioClient>(_ =>
+        {
+            var client = new MinioClient()
+                .WithEndpoint(minioOpts.Endpoint)
+                .WithCredentials(minioOpts.AccessKey, minioOpts.SecretKey);
+
+            if (minioOpts.UseSSL)
+                client.WithSSL();
+
+            return client.Build();
+        });
+
+        services.AddSingleton<IObjectStorageService, MinioObjectStorageService>();
+        services.AddSingleton<IFileStorageService, MinioFileStorageService>();
 
         // Partition Maintenance (auto-creates future partitions)
         services.AddHostedService<PartitionMaintenanceService>();

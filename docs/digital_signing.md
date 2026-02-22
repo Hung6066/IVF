@@ -438,3 +438,77 @@ docker compose logs signserver --tail=100
 - [RFC 5652 - CMS (Cryptographic Message Syntax)](https://tools.ietf.org/html/rfc5652)
 - [Docker Compose - EJBCA](https://hub.docker.com/r/keyfactor/ejbca-ce)
 - [Docker Compose - SignServer](https://hub.docker.com/r/keyfactor/signserver-ce)
+
+
+
+## Multi-Signature Approach: 
+SignServer's PDFSigner creates PAdES signatures using incremental updates. Sending an already-signed PDF to SignServer for a second signature adds a new signature layer WITHOUT invalidating the first. This is by design in the PDF spec.
+
+### Flow:
+
+1. Each user clicks "Sign" → creates a DocumentSignature record (userId, role, signedAt)
+2. When downloading signed PDF: generates PDF with QuestPDF embedding all signers' images → calls SignServer N times sequentially (one per signer, each with their worker) → each creates an incremental crypto signature → all N signatures valid
+
+How Multiple Signatures Work
+The key insight: SignServer's PDFSigner creates PAdES signatures using incremental updates. Each subsequent signature is appended to the PDF without modifying previous content, so all signatures remain valid.
+
+## Architecture
+1. DocumentSignature entity (DocumentSignature.cs) — tracks each user's signing action with FormResponseId, UserId, SignatureRole, SignedAt
+
+2. Database — new document_signatures table with unique constraint on (FormResponseId, UserId, SignatureRole), created via EF Core migration
+
+3. New endpoints (DocumentSignatureEndpoints.cs):
+
+POST /api/forms/responses/{id}/sign — User signs for their role (records the approval)
+GET /api/forms/responses/{id}/signing-status — Who has signed, pending roles, fully-signed status
+DELETE /api/forms/responses/{id}/sign/{signatureId} — Revoke a signature
+
+4. Multi-sign PDF export (FormEndpoints.cs export-pdf):
+
+Loads all DocumentSignature records for the form response
+Loads each signer's UserSignature for their handwritten image + worker name
+Generates PDF with QuestPDF, embedding each signer's image at their specific signatureZone (per role)
+Calls SignServer N times sequentially — once per signer with their own worker/certificate
+Each call creates an incremental crypto signature → all N signatures valid simultaneously
+
+5. Per-role rendering (ReportPdfService.cs):
+
+GenerateReportPdf now accepts Dictionary<string, SignatureContext> roleSignatures
+Each signatureZone control looks up its signatureRole in the dictionary
+Only the signer assigned to that role has their image placed in that zone
+
+6. Frontend (form-response-detail.component.ts):
+
+Signing status panel shows all required roles with their status
+Per-role "Ký" buttons for signing
+Revoke capability for own signatures
+Badge showing "Đã ký đầy đủ" or "Đang chờ ký"
+
+### Workflow
+1. Technician completes form → clicks "Ký" for technician role
+2. Department head reviews → clicks "Ký" for department_head role
+3. Doctor reviews → clicks "Ký" for doctor role
+4. Download signed PDF → PDF has 3 visible signatures + 3 valid crypto signatures
+
+## MinIO Integration for Signed PDFs
+
+Ký phiếu (DocumentSignatureEndpoints)
+  └─> Tạo DocumentSignature record
+  └─> Invalidate PDF ký số cũ trong MinIO (nếu có)
+
+Export PDF ký số (FormEndpoints/export-pdf?sign=true)
+  └─> Generate PDF → Sign qua SignServer
+  └─> Upload lên MinIO: ivf-signed-pdfs/{patientCode}/SignedPdf/{year}/{id}.pdf
+  └─> Tạo PatientDocument record (type=SignedPdf, formResponseId=...)
+  └─> Trả PDF cho client (không chờ upload)
+
+Download PDF ký số đã lưu (DocumentSignatureEndpoints)
+  └─> GET /api/forms/responses/{id}/signed-pdf      → stream trực tiếp
+  └─> GET /api/forms/responses/{id}/signed-pdf-url   → presigned URL (1 giờ)
+  └─> GET /api/forms/responses/{id}/signing-status   → kèm thông tin storedSignedPdf
+
+Thu hồi chữ ký
+  └─> Revoke DocumentSignature
+  └─> Invalidate PDF cũ (đánh dấu Superseded)
+  └─> Lần export tiếp theo sẽ tạo PDF mới
+

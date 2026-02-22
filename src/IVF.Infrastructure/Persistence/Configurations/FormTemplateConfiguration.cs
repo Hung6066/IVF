@@ -16,6 +16,16 @@ public class FormTemplateConfiguration : IEntityTypeConfiguration<FormTemplate>
             .HasMaxLength(300)
             .IsRequired();
 
+        builder.Property(t => t.Code)
+            .HasMaxLength(50)
+            .IsRequired()
+            .HasDefaultValue("form");
+
+        builder.HasIndex(t => t.Code)
+            .IsUnique()
+            .HasDatabaseName("IX_form_templates_code")
+            .HasFilter("\"IsDeleted\" = false");
+
         builder.Property(t => t.Description)
             .HasMaxLength(2000);
 

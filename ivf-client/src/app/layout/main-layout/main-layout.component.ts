@@ -3,8 +3,61 @@ import { CommonModule } from '@angular/common';
 import { RouterModule, Router } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
 import { SignalRService } from '../../core/services/signalr.service';
+import { MenuService, MenuSectionDto } from '../../core/services/menu.service';
 import { NotificationBellComponent } from '../../shared/components/notification-bell/notification-bell.component';
 import { GlobalToastComponent } from '../../shared/components/global-toast/global-toast.component';
+
+// ── Menu interfaces (used by template) ──────────────
+export interface MenuItem {
+  icon: string;
+  label: string;
+  route: string;
+  permission?: string;
+  adminOnly?: boolean;
+}
+
+export interface MenuSection {
+  header?: string;
+  adminOnly?: boolean;
+  items: MenuItem[];
+}
+
+/** Fallback menu config — used when API is unavailable */
+const FALLBACK_MENU: MenuSection[] = [
+  {
+    items: [
+      { icon: '📊', label: 'Dashboard', route: '/dashboard' },
+      { icon: '🏥', label: 'Tiếp đón', route: '/reception', permission: 'ViewPatients' },
+      { icon: '👥', label: 'Bệnh nhân', route: '/patients', permission: 'ViewPatients' },
+      { icon: '💑', label: 'Cặp đôi', route: '/couples', permission: 'ViewCouples' },
+      { icon: '🎫', label: 'Hàng đợi', route: '/queue/all', permission: 'ViewQueue' },
+      { icon: '🗣️', label: 'Tư vấn', route: '/consultation', permission: 'ViewCycles' },
+      { icon: '🔬', label: 'Siêu âm', route: '/ultrasound', permission: 'ViewUltrasounds' },
+      { icon: '🧫', label: 'Phòng Lab', route: '/lab', permission: 'ViewLabResults' },
+      { icon: '🔬', label: 'Nam khoa', route: '/andrology', permission: 'ViewAndrology' },
+      { icon: '💉', label: 'Tiêm', route: '/injection', permission: 'ViewCycles' },
+      { icon: '🏦', label: 'NHTT', route: '/sperm-bank', permission: 'ViewSpermBank' },
+      { icon: '💊', label: 'Nhà thuốc', route: '/pharmacy', permission: 'ViewPrescriptions' },
+      { icon: '💰', label: 'Hoá đơn', route: '/billing', permission: 'ViewBilling' },
+      { icon: '📅', label: 'Lịch hẹn', route: '/appointments', permission: 'ViewSchedule' },
+      { icon: '📈', label: 'Báo cáo', route: '/reports', permission: 'ViewReports' },
+    ],
+  },
+  {
+    header: 'Quản trị',
+    adminOnly: true,
+    items: [
+      { icon: '👥', label: 'Người dùng', route: '/admin/users', permission: 'ManageUsers' },
+      { icon: '🔐', label: 'Phân quyền', route: '/admin/permissions', adminOnly: true },
+      { icon: '📋', label: 'Danh mục DV', route: '/admin/services', adminOnly: true },
+      { icon: '📝', label: 'Biểu mẫu', route: '/forms', adminOnly: true },
+      { icon: '📁', label: 'Danh mục BM', route: '/forms/categories', adminOnly: true },
+      { icon: '📝', label: 'Nhật ký', route: '/admin/audit-logs', permission: 'ViewAuditLog' },
+      { icon: '🔔', label: 'Thông báo', route: '/admin/notifications', adminOnly: true },
+      { icon: '🔏', label: 'Ký số', route: '/admin/digital-signing', adminOnly: true },
+    ],
+  },
+];
 
 @Component({
   selector: 'app-main-layout',
@@ -20,17 +73,46 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   toastType = '';
   private currentNotification: any = null;
 
+  /** Data-driven menu sections — loaded from API, fallback to static config */
+  menuSections: MenuSection[] = FALLBACK_MENU;
+
   constructor(
     public authService: AuthService,
     private signalRService: SignalRService,
+    private menuService: MenuService,
     private router: Router,
   ) {}
 
   async ngOnInit() {
+    // Load menu from database
+    this.loadMenuFromApi();
+
     const token = localStorage.getItem('token');
     if (token) {
       await this.initializeSignalR(token);
     }
+  }
+
+  /** Load menu configuration from the API */
+  private loadMenuFromApi() {
+    this.menuService.loadMenu().subscribe({
+      next: (sections) => {
+        if (sections && sections.length > 0) {
+          this.menuSections = sections.map((s) => ({
+            header: s.header ?? undefined,
+            adminOnly: s.adminOnly,
+            items: s.items.map((i) => ({
+              icon: i.icon,
+              label: i.label,
+              route: i.route,
+              permission: i.permission ?? undefined,
+              adminOnly: i.adminOnly,
+            })),
+          }));
+        }
+        // else: keep FALLBACK_MENU
+      },
+    });
   }
 
   async ngOnDestroy() {
@@ -93,30 +175,14 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
 
   getPageTitle(): string {
     const path = window.location.pathname;
-    const titles: Record<string, string> = {
-      '/dashboard': 'Dashboard',
-      '/reception': 'Tiếp đón',
-      '/patients': 'Bệnh nhân',
-      '/couples': 'Cặp đôi',
-      '/queue': 'Hàng đợi',
-      '/consultation': 'Tư vấn',
-      '/ultrasound': 'Siêu âm',
-      '/lab': 'Phòng Lab',
-      '/andrology': 'Nam khoa',
-      '/injection': 'Tiêm',
-      '/sperm-bank': 'Ngân hàng tinh trùng',
-      '/pharmacy': 'Nhà thuốc',
-      '/billing': 'Hoá đơn',
-      '/appointments': 'Lịch hẹn',
-      '/reports': 'Báo cáo',
-      '/admin/audit-logs': 'Nhật ký hoạt động',
-      '/admin/notifications': 'Quản lý thông báo',
-      '/admin/users': 'Quản lý người dùng',
-      '/admin/digital-signing': 'Quản lý ký số',
-    };
 
-    for (const [key, value] of Object.entries(titles)) {
-      if (path.startsWith(key)) return value;
+    // Derive titles from menu config — no separate map to maintain
+    for (const section of this.menuSections) {
+      for (const item of section.items) {
+        if (path.startsWith(item.route)) {
+          return item.label;
+        }
+      }
     }
     return 'IVF System';
   }
@@ -125,7 +191,20 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     this.authService.logout();
   }
 
-  // Permission-based menu visibility
+  // ── Menu visibility helpers ─────────────────────────
+  /** Whether a section header + its items should be shown at all */
+  isSectionVisible(section: MenuSection): boolean {
+    if (section.adminOnly && !this.isAdmin()) return false;
+    return section.items.some((item) => this.isMenuItemVisible(item));
+  }
+
+  /** Whether a single menu item should be visible */
+  isMenuItemVisible(item: MenuItem): boolean {
+    if (item.adminOnly) return this.isAdmin();
+    if (item.permission) return this.canView(item.permission);
+    return true; // no restriction
+  }
+
   canView(permission: string): boolean {
     return this.authService.hasPermission(permission);
   }
