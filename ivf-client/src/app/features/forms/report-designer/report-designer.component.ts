@@ -3203,7 +3203,7 @@ export class ReportDesignerComponent implements OnInit, OnDestroy {
     const dragCenterX = dragX + ctrl.width / 2;
     const dragCenterY = dragY + ctrl.height / 2;
 
-    const band = this.design.bands.find(b => b.id === bandId);
+    const band = this.design.bands.find((b) => b.id === bandId);
     if (!band) return;
 
     const guides: { orientation: 'h' | 'v'; pos: number; bandId: string }[] = [];
@@ -3222,32 +3222,41 @@ export class ReportDesignerComponent implements OnInit, OnDestroy {
 
       // Vertical guides (x-axis alignment)
       // Left ↔ Left
-      if (Math.abs(dragX - oLeft) <= threshold) guides.push({ orientation: 'v', pos: oLeft, bandId });
+      if (Math.abs(dragX - oLeft) <= threshold)
+        guides.push({ orientation: 'v', pos: oLeft, bandId });
       // Right ↔ Right
-      if (Math.abs(dragRight - oRight) <= threshold) guides.push({ orientation: 'v', pos: oRight, bandId });
+      if (Math.abs(dragRight - oRight) <= threshold)
+        guides.push({ orientation: 'v', pos: oRight, bandId });
       // Left ↔ Right
-      if (Math.abs(dragX - oRight) <= threshold) guides.push({ orientation: 'v', pos: oRight, bandId });
+      if (Math.abs(dragX - oRight) <= threshold)
+        guides.push({ orientation: 'v', pos: oRight, bandId });
       // Right ↔ Left
-      if (Math.abs(dragRight - oLeft) <= threshold) guides.push({ orientation: 'v', pos: oLeft, bandId });
+      if (Math.abs(dragRight - oLeft) <= threshold)
+        guides.push({ orientation: 'v', pos: oLeft, bandId });
       // Center ↔ Center
-      if (Math.abs(dragCenterX - oCenterX) <= threshold) guides.push({ orientation: 'v', pos: oCenterX, bandId });
+      if (Math.abs(dragCenterX - oCenterX) <= threshold)
+        guides.push({ orientation: 'v', pos: oCenterX, bandId });
 
       // Horizontal guides (y-axis alignment)
       // Top ↔ Top
       if (Math.abs(dragY - oTop) <= threshold) guides.push({ orientation: 'h', pos: oTop, bandId });
       // Bottom ↔ Bottom
-      if (Math.abs(dragBottom - oBottom) <= threshold) guides.push({ orientation: 'h', pos: oBottom, bandId });
+      if (Math.abs(dragBottom - oBottom) <= threshold)
+        guides.push({ orientation: 'h', pos: oBottom, bandId });
       // Top ↔ Bottom
-      if (Math.abs(dragY - oBottom) <= threshold) guides.push({ orientation: 'h', pos: oBottom, bandId });
+      if (Math.abs(dragY - oBottom) <= threshold)
+        guides.push({ orientation: 'h', pos: oBottom, bandId });
       // Bottom ↔ Top
-      if (Math.abs(dragBottom - oTop) <= threshold) guides.push({ orientation: 'h', pos: oTop, bandId });
+      if (Math.abs(dragBottom - oTop) <= threshold)
+        guides.push({ orientation: 'h', pos: oTop, bandId });
       // Center ↔ Center
-      if (Math.abs(dragCenterY - oCenterY) <= threshold) guides.push({ orientation: 'h', pos: oCenterY, bandId });
+      if (Math.abs(dragCenterY - oCenterY) <= threshold)
+        guides.push({ orientation: 'h', pos: oCenterY, bandId });
     }
 
     // Deduplicate
     const seen = new Set<string>();
-    this.guideLines = guides.filter(g => {
+    this.guideLines = guides.filter((g) => {
       const key = `${g.orientation}-${Math.round(g.pos)}`;
       if (seen.has(key)) return false;
       seen.add(key);
