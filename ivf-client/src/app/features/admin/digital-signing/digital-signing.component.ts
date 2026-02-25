@@ -12,6 +12,10 @@ import {
   UserSignatureListItem,
   CertProvisionResult,
   UserTestSignResult,
+  EjbcaCertificate,
+  EjbcaCertSearchRequest,
+  EJBCA_CERT_STATUSES,
+  EJBCA_REVOKE_REASONS,
 } from '../../../core/models/api.models';
 
 @Component({
@@ -32,6 +36,22 @@ export class DigitalSigningComponent implements OnInit, OnDestroy {
   workers = signal<any>(null);
   ejbcaCAs = signal<any>(null);
 
+  // EJBCA management
+  ejbcaCertificates = signal<EjbcaCertificate[]>([]);
+  ejbcaCertProfiles = signal<any>(null);
+  ejbcaEndEntityProfiles = signal<any>(null);
+  ejbcaSearching = signal(false);
+  ejbcaRevoking = signal(false);
+  ejbcaCertSearch: EjbcaCertSearchRequest = {};
+  ejbcaMoreResults = signal(false);
+  ejbcaRevokeConfirm = signal<{ serial: string; issuerDn: string } | null>(null);
+  ejbcaRevokeReason = 'UNSPECIFIED';
+  ejbcaRevokeResult = signal<{ success: boolean; message?: string; error?: string } | null>(null);
+  expandedCertSerial = signal<string | null>(null);
+  ejbcaTotalCount = signal<number>(0);
+  readonly certStatuses = EJBCA_CERT_STATUSES;
+  readonly revokeReasons = EJBCA_REVOKE_REASONS;
+
   // User signatures
   userSignatures = signal<UserSignatureListItem[]>([]);
   selectedUserId = signal<string | null>(null);
@@ -41,7 +61,10 @@ export class DigitalSigningComponent implements OnInit, OnDestroy {
   signaturePadUserId = signal<string | null>(null);
   uploadingSignature = signal(false);
   provisioningCert = signal(false);
+  renewingCert = signal(false);
   testingUserSign = signal(false);
+
+  signatureImageUrls = new Map<string, string>();
 
   loading = signal(false);
   testingSign = signal(false);
@@ -61,6 +84,9 @@ export class DigitalSigningComponent implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     this.stopAutoRefresh();
+    // Revoke all object URLs to prevent memory leaks
+    this.signatureImageUrls.forEach((url) => URL.revokeObjectURL(url));
+    this.signatureImageUrls.clear();
   }
 
   loadDashboard() {
@@ -126,13 +152,123 @@ export class DigitalSigningComponent implements OnInit, OnDestroy {
     });
   }
 
+  // ─── EJBCA Certificate Management ───────────────────────
+
+  searchEjbcaCertificates() {
+    this.ejbcaSearching.set(true);
+    this.ejbcaCertificates.set([]);
+    this.signingService.searchEjbcaCertificates(this.ejbcaCertSearch).subscribe({
+      next: (data) => {
+        this.ejbcaCertificates.set(data.certificates || []);
+        this.ejbcaMoreResults.set(data.more_results || false);
+        this.ejbcaTotalCount.set(data.total_count || 0);
+        this.expandedCertSerial.set(null);
+        this.ejbcaSearching.set(false);
+      },
+      error: (err) => {
+        console.error('EJBCA certificate search failed:', err);
+        this.ejbcaSearching.set(false);
+      },
+    });
+  }
+
+  loadEjbcaProfiles() {
+    this.signingService.getEjbcaCertificateProfiles().subscribe({
+      next: (data) => this.ejbcaCertProfiles.set(data),
+      error: () => {},
+    });
+    this.signingService.getEjbcaEndEntityProfiles().subscribe({
+      next: (data) => this.ejbcaEndEntityProfiles.set(data),
+      error: () => {},
+    });
+  }
+
+  openRevokeConfirm(serial: string, issuerDn: string) {
+    this.ejbcaRevokeConfirm.set({ serial, issuerDn });
+    this.ejbcaRevokeReason = 'UNSPECIFIED';
+    this.ejbcaRevokeResult.set(null);
+  }
+
+  cancelRevoke() {
+    this.ejbcaRevokeConfirm.set(null);
+    this.ejbcaRevokeResult.set(null);
+  }
+
+  confirmRevokeCertificate() {
+    const target = this.ejbcaRevokeConfirm();
+    if (!target) return;
+
+    this.ejbcaRevoking.set(true);
+    this.signingService
+      .revokeEjbcaCertificate(target.serial, target.issuerDn, this.ejbcaRevokeReason)
+      .subscribe({
+        next: (result) => {
+          this.ejbcaRevokeResult.set(result);
+          this.ejbcaRevoking.set(false);
+          if (result.success) {
+            this.searchEjbcaCertificates(); // Refresh list
+          }
+        },
+        error: (err) => {
+          this.ejbcaRevokeResult.set({ success: false, error: err.message });
+          this.ejbcaRevoking.set(false);
+        },
+      });
+  }
+
+  downloadCaCert(caName: string) {
+    this.signingService.downloadCaCertificate(caName).subscribe({
+      next: (blob) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${caName}_ca.pem`;
+        a.click();
+        URL.revokeObjectURL(url);
+      },
+      error: (err) => console.error('Failed to download CA cert:', err),
+    });
+  }
+
+  formatCertSubject(dn: string): string {
+    if (!dn) return '-';
+    const cn = dn.match(/CN=([^,]+)/i);
+    return cn ? cn[1] : dn;
+  }
+
+  toggleCertDetail(serialNumber: string) {
+    this.expandedCertSerial.set(this.expandedCertSerial() === serialNumber ? null : serialNumber);
+  }
+
   // ─── User Signatures ────────────────────────────────────
 
   loadUserSignatures() {
     this.signatureService.listSignatures().subscribe({
-      next: (data) => this.userSignatures.set(data.items),
+      next: (data) => {
+        this.userSignatures.set(data.items);
+        this.loadSignatureImages(data.items);
+      },
       error: (err) => console.error('Failed to load user signatures:', err),
     });
+  }
+
+  private loadSignatureImages(signatures: UserSignatureListItem[]) {
+    // Revoke old URLs
+    this.signatureImageUrls.forEach((url) => URL.revokeObjectURL(url));
+    this.signatureImageUrls.clear();
+
+    for (const sig of signatures) {
+      if (sig.hasSignatureImage) {
+        this.signatureService.getUserSignatureImageBlob(sig.userId).subscribe({
+          next: (blob) => {
+            this.signatureImageUrls.set(sig.userId, URL.createObjectURL(blob));
+          },
+          error: () => {
+            /* signature image not available */
+          },
+        });
+      }
+    }
   }
 
   openSignaturePad(userId: string) {
@@ -182,6 +318,26 @@ export class DigitalSigningComponent implements OnInit, OnDestroy {
           error: err.message,
         });
         this.provisioningCert.set(false);
+      },
+    });
+  }
+
+  renewCertificate(userId: string) {
+    this.renewingCert.set(true);
+    this.provisionResult.set(null);
+    this.signatureService.renewCertificate(userId).subscribe({
+      next: (result) => {
+        this.provisionResult.set(result);
+        this.renewingCert.set(false);
+        this.loadUserSignatures();
+      },
+      error: (err) => {
+        this.provisionResult.set({
+          success: false,
+          message: 'Lỗi kết nối khi gia hạn',
+          error: err.message,
+        });
+        this.renewingCert.set(false);
       },
     });
   }
@@ -260,6 +416,7 @@ export class DigitalSigningComponent implements OnInit, OnDestroy {
       case 'ejbca':
         this.refreshEjbcaHealth();
         this.loadEjbcaCAs();
+        this.loadEjbcaProfiles();
         break;
       case 'config':
         this.loadConfig();

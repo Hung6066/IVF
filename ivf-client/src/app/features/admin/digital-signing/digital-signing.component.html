@@ -494,6 +494,7 @@
                   <th>Subject DN</th>
                   <th>Trạng thái</th>
                   <th>Hết hạn</th>
+                  <th>Thao tác</th>
                 </tr>
               </thead>
               <tbody>
@@ -507,6 +508,15 @@
                       <span class="status-badge active">{{ ca.status || 'Active' }}</span>
                     </td>
                     <td>{{ ca.expiration_date ? formatDateTime(ca.expiration_date) : '-' }}</td>
+                    <td>
+                      <button
+                        class="btn-sm btn-outline"
+                        (click)="downloadCaCert(ca.name)"
+                        title="Tải chứng thư CA"
+                      >
+                        📥
+                      </button>
+                    </td>
                   </tr>
                 }
               </tbody>
@@ -525,6 +535,315 @@
         } @else {
           <p class="muted">Nhấn "Tải lại" để xem danh sách CA.</p>
         }
+      </div>
+
+      <!-- Certificate Search -->
+      <div class="card">
+        <div class="section-header">
+          <h2>🔍 Tìm kiếm chứng thư</h2>
+        </div>
+
+        <div class="search-form">
+          <div class="search-row">
+            <div class="search-field">
+              <label>Subject DN</label>
+              <input
+                type="text"
+                [(ngModel)]="ejbcaCertSearch.subject"
+                placeholder="CN=..."
+                class="form-input"
+              />
+            </div>
+            <div class="search-field">
+              <label>Issuer DN</label>
+              <input
+                type="text"
+                [(ngModel)]="ejbcaCertSearch.issuer"
+                placeholder="CN=IVF..."
+                class="form-input"
+              />
+            </div>
+            <div class="search-field">
+              <label>Serial Number</label>
+              <input
+                type="text"
+                [(ngModel)]="ejbcaCertSearch.serialNumber"
+                placeholder="ABC123..."
+                class="form-input"
+              />
+            </div>
+            <div class="search-field">
+              <label>Trạng thái</label>
+              <select [(ngModel)]="ejbcaCertSearch.status" class="form-input">
+                <option value="">Tất cả</option>
+                @for (s of certStatuses; track s.value) {
+                  <option [value]="s.value">{{ s.label }}</option>
+                }
+              </select>
+            </div>
+          </div>
+          <div class="search-actions">
+            <button
+              class="btn-primary"
+              (click)="searchEjbcaCertificates()"
+              [disabled]="ejbcaSearching()"
+            >
+              {{ ejbcaSearching() ? '⏳ Đang tìm...' : '🔍 Tìm kiếm' }}
+            </button>
+          </div>
+        </div>
+
+        @if (ejbcaCertificates().length > 0) {
+          <p class="muted" style="margin-bottom: 0.5rem">
+            Tìm thấy <strong>{{ ejbcaTotalCount() || ejbcaCertificates().length }}</strong> chứng
+            thư
+          </p>
+          <table class="data-table cert-table">
+            <thead>
+              <tr>
+                <th></th>
+                <th>Subject</th>
+                <th>Loại</th>
+                <th>Serial Number</th>
+                <th>Hiệu lực</th>
+                <th>Hết hạn</th>
+                <th>Trạng thái</th>
+                <th>Thao tác</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (cert of ejbcaCertificates(); track cert.serial_number) {
+                <tr [class.expanded]="expandedCertSerial() === cert.serial_number">
+                  <td>
+                    <button
+                      class="btn-icon expand-btn"
+                      (click)="toggleCertDetail(cert.serial_number)"
+                      [title]="
+                        expandedCertSerial() === cert.serial_number ? 'Thu gọn' : 'Xem chi tiết'
+                      "
+                    >
+                      {{ expandedCertSerial() === cert.serial_number ? '▼' : '▶' }}
+                    </button>
+                  </td>
+                  <td>
+                    <strong>{{ formatCertSubject(cert.subject_dn || '') }}</strong>
+                    @if (cert.username) {
+                      <small class="block-text text-muted">👤 {{ cert.username }}</small>
+                    }
+                  </td>
+                  <td>
+                    <span class="cert-type-badge" [attr.data-type]="cert.cert_type">{{
+                      cert.cert_type || '-'
+                    }}</span>
+                  </td>
+                  <td class="mono small">{{ cert.serial_number }}</td>
+                  <td>{{ cert.not_before ? formatDateTime(cert.not_before) : '-' }}</td>
+                  <td>{{ cert.not_after ? formatDateTime(cert.not_after) : '-' }}</td>
+                  <td>
+                    @if (cert.status === 'CERT_ACTIVE' || !cert.status) {
+                      <span class="status-badge active">Hoạt động</span>
+                    } @else if (cert.status === 'CERT_REVOKED') {
+                      <span class="status-badge revoked">Đã thu hồi</span>
+                    } @else if (cert.status === 'CERT_EXPIRED') {
+                      <span class="status-badge expired">Hết hạn</span>
+                    } @else if (cert.status === 'CERT_ARCHIVED') {
+                      <span class="status-badge archived">Đã lưu trữ</span>
+                    } @else if (cert.status === 'CERT_TEMP_REVOKED') {
+                      <span class="status-badge revoked">Tạm thu hồi</span>
+                    } @else {
+                      <span class="status-badge">{{ cert.status }}</span>
+                    }
+                  </td>
+                  <td>
+                    <div class="action-btns">
+                      @if (cert.status !== 'CERT_REVOKED') {
+                        <button
+                          class="btn-sm btn-outline btn-danger"
+                          (click)="openRevokeConfirm(cert.serial_number, cert.issuer_dn || '')"
+                          title="Thu hồi chứng thư"
+                        >
+                          🚫
+                        </button>
+                      }
+                    </div>
+                  </td>
+                </tr>
+                @if (expandedCertSerial() === cert.serial_number) {
+                  <tr class="cert-detail-row">
+                    <td colspan="8">
+                      <div class="cert-detail-grid">
+                        <div class="detail-item">
+                          <label>Subject DN</label>
+                          <span class="mono small">{{ cert.subject_dn || '-' }}</span>
+                        </div>
+                        <div class="detail-item">
+                          <label>Issuer DN</label>
+                          <span class="mono small">{{ cert.issuer_dn || '-' }}</span>
+                        </div>
+                        <div class="detail-item">
+                          <label>Fingerprint (SHA-1)</label>
+                          <span class="mono small">{{ cert.fingerprint || '-' }}</span>
+                        </div>
+                        <div class="detail-item">
+                          <label>Username</label>
+                          <span>{{ cert.username || '-' }}</span>
+                        </div>
+                        <div class="detail-item">
+                          <label>Certificate Profile</label>
+                          <span>{{ cert.certificate_profile || '-' }}</span>
+                        </div>
+                        <div class="detail-item">
+                          <label>End Entity Profile</label>
+                          <span>{{ cert.end_entity_profile || '-' }}</span>
+                        </div>
+                        @if (cert.subject_alt_name) {
+                          <div class="detail-item">
+                            <label>Subject Alt Name</label>
+                            <span class="mono small">{{ cert.subject_alt_name }}</span>
+                          </div>
+                        }
+                        @if (cert.subject_key_id) {
+                          <div class="detail-item">
+                            <label>Subject Key ID</label>
+                            <span class="mono small">{{ cert.subject_key_id }}</span>
+                          </div>
+                        }
+                        @if (cert.revocation_reason) {
+                          <div class="detail-item">
+                            <label>Lý do thu hồi</label>
+                            <span>{{ cert.revocation_reason }}</span>
+                          </div>
+                        }
+                        @if (cert.revocation_date) {
+                          <div class="detail-item">
+                            <label>Ngày thu hồi</label>
+                            <span>{{ formatDateTime(cert.revocation_date) }}</span>
+                          </div>
+                        }
+                      </div>
+                    </td>
+                  </tr>
+                }
+              }
+            </tbody>
+          </table>
+          @if (ejbcaMoreResults()) {
+            <p class="muted" style="margin-top: 0.75rem">
+              ⚠️ Có thêm kết quả. Thu hẹp điều kiện tìm kiếm để xem đầy đủ.
+            </p>
+          }
+        } @else if (ejbcaSearching()) {
+          <div class="loading-state small-loading">
+            <div class="spinner"></div>
+            <p>Đang tìm kiếm...</p>
+          </div>
+        }
+      </div>
+
+      <!-- Revoke Confirmation Modal -->
+      @if (ejbcaRevokeConfirm()) {
+        <div class="modal-overlay" (click)="cancelRevoke()">
+          <div class="modal-content revoke-modal" (click)="$event.stopPropagation()">
+            <div class="modal-header">
+              <h2>🚫 Thu hồi chứng thư</h2>
+              <button class="btn-icon" (click)="cancelRevoke()">✕</button>
+            </div>
+            <div class="modal-body">
+              <div class="revoke-info">
+                <div class="info-row">
+                  <label>Serial Number</label>
+                  <span class="mono">{{ ejbcaRevokeConfirm()!.serial }}</span>
+                </div>
+                <div class="info-row">
+                  <label>Issuer DN</label>
+                  <span class="mono small">{{ ejbcaRevokeConfirm()!.issuerDn }}</span>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label>Lý do thu hồi</label>
+                <select [(ngModel)]="ejbcaRevokeReason" class="form-input">
+                  @for (r of revokeReasons; track r.value) {
+                    <option [value]="r.value">{{ r.label }}</option>
+                  }
+                </select>
+              </div>
+
+              <div class="warning-box">
+                ⚠️ <strong>Cảnh báo:</strong> Thu hồi chứng thư là thao tác không thể hoàn tác.
+                Chứng thư sẽ không thể dùng để ký số sau khi bị thu hồi.
+              </div>
+
+              @if (ejbcaRevokeResult()) {
+                <div
+                  class="result-box"
+                  [class.success]="ejbcaRevokeResult()!.success"
+                  [class.failure]="!ejbcaRevokeResult()!.success"
+                >
+                  {{
+                    ejbcaRevokeResult()!.success
+                      ? '✅ ' + ejbcaRevokeResult()!.message
+                      : '❌ ' + ejbcaRevokeResult()!.error
+                  }}
+                </div>
+              }
+            </div>
+            <div class="modal-footer">
+              <button class="btn-secondary" (click)="cancelRevoke()">Hủy</button>
+              <button
+                class="btn-danger"
+                (click)="confirmRevokeCertificate()"
+                [disabled]="ejbcaRevoking()"
+              >
+                {{ ejbcaRevoking() ? '⏳ Đang thu hồi...' : '🚫 Xác nhận thu hồi' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- Profiles -->
+      <div class="card">
+        <div class="section-header">
+          <h2>📋 Profiles</h2>
+          <button class="btn-secondary" (click)="loadEjbcaProfiles()">🔄 Tải lại</button>
+        </div>
+        <div class="profiles-grid">
+          <div class="profile-section">
+            <h4>Certificate Profiles</h4>
+            @if (ejbcaCertProfiles()?.certificate_profiles?.length > 0) {
+              <ul class="profile-list">
+                @for (p of ejbcaCertProfiles().certificate_profiles; track p.name || $index) {
+                  <li>{{ p.name || p }}</li>
+                }
+              </ul>
+            } @else {
+              <p class="muted small">
+                {{
+                  ejbcaCertProfiles()?.error ||
+                    'EJBCA CE không hỗ trợ REST API profiles. Xem trong Admin Web UI.'
+                }}
+              </p>
+            }
+          </div>
+          <div class="profile-section">
+            <h4>End Entity Profiles</h4>
+            @if (ejbcaEndEntityProfiles()?.end_entity_profiles?.length > 0) {
+              <ul class="profile-list">
+                @for (p of ejbcaEndEntityProfiles().end_entity_profiles; track p.name || $index) {
+                  <li>{{ p.name || p }}</li>
+                }
+              </ul>
+            } @else {
+              <p class="muted small">
+                {{
+                  ejbcaEndEntityProfiles()?.error ||
+                    'EJBCA CE không hỗ trợ REST API profiles. Xem trong Admin Web UI.'
+                }}
+              </p>
+            }
+          </div>
+        </div>
       </div>
 
       <!-- External Links -->
@@ -750,13 +1069,17 @@
                   <td>{{ sig.userRole || '-' }}</td>
                   <td>{{ sig.userDepartment || '-' }}</td>
                   <td>
-                    @if (sig.hasSignatureImage) {
+                    @if (sig.hasSignatureImage && signatureImageUrls.get(sig.userId)) {
                       <div class="sig-preview-cell">
                         <img
-                          [src]="signatureService.getUserSignatureImageUrl(sig.userId)"
+                          [src]="signatureImageUrls.get(sig.userId)"
                           alt="Chữ ký"
                           class="sig-preview-thumb"
                         />
+                      </div>
+                    } @else if (sig.hasSignatureImage) {
+                      <div class="sig-preview-cell">
+                        <span class="muted">Đang tải...</span>
                       </div>
                     } @else {
                       <span class="muted">Chưa có</span>
@@ -796,6 +1119,16 @@
                           title="Kiểm tra ký số"
                         >
                           🧪
+                        </button>
+                      }
+                      @if (sig.certStatus === 'Expired' || sig.certStatus === 'Error') {
+                        <button
+                          class="btn-sm btn-outline btn-renew"
+                          (click)="renewCertificate(sig.userId)"
+                          [disabled]="renewingCert()"
+                          title="Gia hạn chứng thư số"
+                        >
+                          🔄
                         </button>
                       }
                     </div>
@@ -922,7 +1255,15 @@
             </p>
           </div>
           <div class="troubleshoot-item">
-            <h4>3. 🧪 Kiểm tra ký số</h4>
+            <h4>3. 🔄 Gia hạn chứng thư số</h4>
+            <p>
+              Khi chứng thư <span class="cert-badge cert-expired">Hết hạn</span> hoặc
+              <span class="cert-badge cert-error">Lỗi</span>, nhấn 🔄 để tạo lại keystore và worker
+              mới với thời hạn 3 năm.
+            </p>
+          </div>
+          <div class="troubleshoot-item">
+            <h4>4. 🧪 Kiểm tra ký số</h4>
             <p>
               Khi chứng thư <span class="cert-badge cert-active">Hoạt động</span>, nhấn 🧪 để kiểm
               tra ký PDF với worker riêng của user.

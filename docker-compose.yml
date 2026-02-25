@@ -106,6 +106,8 @@ services:
       - "8442:8080" # HTTP (public enrollment)
     volumes:
       - ejbca_persistent:/opt/keyfactor/persistent
+      - ./certs/ca/ca.pem:/tmp/ivf-root-ca.pem:ro
+      - ./scripts/init-ejbca-rest.sh:/scripts/init-ejbca-rest.sh:ro
     depends_on:
       ejbca-db:
         condition: service_healthy

@@ -222,6 +222,75 @@ public static class UserSignatureEndpoints
         .RequireAuthorization("AdminOnly")
         .RequireRateLimiting("signing-provision");
 
+        // ─── Renew expired worker certificate (admin) ───────────
+        group.MapPost("/users/{userId:guid}/renew-certificate", async (
+            Guid userId,
+            IvfDbContext db,
+            IOptions<DigitalSigningOptions> options,
+            ILogger<Program> logger) =>
+        {
+            var opts = options.Value;
+            if (!opts.Enabled)
+                return Results.BadRequest(new { error = "Ký số chưa được bật" });
+
+            var user = await db.Users.FindAsync(userId);
+            if (user == null)
+                return Results.NotFound(new { error = "Người dùng không tồn tại" });
+
+            var sig = await db.UserSignatures
+                .Where(s => s.UserId == userId && !s.IsDeleted && s.IsActive)
+                .FirstOrDefaultAsync();
+
+            if (sig == null)
+                return Results.BadRequest(new { error = "Người dùng chưa có chữ ký tay." });
+
+            if (string.IsNullOrEmpty(sig.WorkerName))
+                return Results.BadRequest(new { error = "Người dùng chưa được cấp chứng thư. Hãy cấp trước khi gia hạn." });
+
+            try
+            {
+                sig.SetCertificateStatus(CertificateStatus.Pending);
+                await db.SaveChangesAsync();
+
+                // Re-provision: generates a new key pair, replacing the existing worker
+                var result = await ProvisionUserCertificateAsync(user, opts, logger);
+
+                sig.SetCertificateInfo(
+                    subject: result.CertSubject,
+                    serialNumber: result.SerialNumber,
+                    expiry: result.Expiry,
+                    workerName: result.WorkerName,
+                    keystorePath: result.KeystorePath);
+
+                await db.SaveChangesAsync();
+
+                return Results.Ok(new
+                {
+                    success = true,
+                    certificateSubject = result.CertSubject,
+                    workerName = result.WorkerName,
+                    expiry = result.Expiry,
+                    message = $"Đã gia hạn chứng thư số cho {user.FullName}"
+                });
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to renew certificate for user {UserId}", userId);
+                sig.SetCertificateStatus(CertificateStatus.Error);
+                await db.SaveChangesAsync();
+
+                return Results.Ok(new
+                {
+                    success = false,
+                    error = ex.Message,
+                    message = "Lỗi khi gia hạn chứng thư số"
+                });
+            }
+        })
+        .WithName("RenewUserCertificate")
+        .RequireAuthorization("AdminOnly")
+        .RequireRateLimiting("signing-provision");
+
         // ─── Upload signature for a specific user (admin) ───────
         group.MapPost("/users/{userId:guid}", async (
             Guid userId,

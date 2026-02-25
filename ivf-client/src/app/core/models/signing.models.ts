@@ -138,3 +138,74 @@ export interface UserTestSignResult {
 }
 
 export type CertificateStatus = 'None' | 'Pending' | 'Active' | 'Expired' | 'Revoked' | 'Error';
+
+// ─── EJBCA Management Models ────────────────────────────────
+
+export interface EjbcaCertSearchRequest {
+  subject?: string;
+  issuer?: string;
+  serialNumber?: string;
+  status?: string;
+  maxResults?: number;
+}
+
+export interface EjbcaCertificate {
+  serial_number: string;
+  subject_dn?: string;
+  issuer_dn?: string;
+  not_before?: string;
+  not_after?: string;
+  status?: string;
+  fingerprint?: string;
+  username?: string;
+  subject_alt_name?: string;
+  subject_key_id?: string;
+  certificate_profile?: string;
+  end_entity_profile?: string;
+  cert_type?: string;
+  revocation_reason?: string;
+  revocation_date?: string;
+  certificate?: string;
+  response_format?: string;
+  certificate_chain?: string[];
+}
+
+export interface EjbcaCertSearchResponse {
+  certificates: EjbcaCertificate[];
+  more_results: boolean;
+  total_count?: number;
+  error?: string;
+}
+
+export interface EjbcaRevokeResult {
+  success: boolean;
+  message?: string;
+  error?: string;
+  data?: string;
+}
+
+export interface EjbcaProfile {
+  name: string;
+  id?: number;
+  description?: string;
+}
+
+export const EJBCA_CERT_STATUSES = [
+  { value: 'CERT_ACTIVE', label: 'Hoạt động' },
+  { value: 'CERT_REVOKED', label: 'Đã thu hồi' },
+  { value: 'CERT_EXPIRED', label: 'Hết hạn' },
+  { value: 'CERT_ARCHIVED', label: 'Đã lưu trữ' },
+  { value: 'CERT_TEMP_REVOKED', label: 'Tạm thu hồi' },
+  { value: 'CERT_NOTIFIEDABOUTEXPIRATION', label: 'Sắp hết hạn' },
+] as const;
+
+export const EJBCA_REVOKE_REASONS = [
+  { value: 'UNSPECIFIED', label: 'Không xác định' },
+  { value: 'KEY_COMPROMISE', label: 'Khóa bị xâm phạm' },
+  { value: 'CA_COMPROMISE', label: 'CA bị xâm phạm' },
+  { value: 'AFFILIATION_CHANGED', label: 'Thay đổi liên kết' },
+  { value: 'SUPERSEDED', label: 'Đã thay thế' },
+  { value: 'CESSATION_OF_OPERATION', label: 'Ngừng hoạt động' },
+  { value: 'CERTIFICATE_HOLD', label: 'Tạm giữ' },
+  { value: 'PRIVILEGES_WITHDRAWN', label: 'Thu hồi quyền' },
+] as const;

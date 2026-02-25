@@ -7,6 +7,9 @@ import {
   SigningConfig,
   ServiceHealthDetail,
   TestSignResult,
+  EjbcaCertSearchRequest,
+  EjbcaCertSearchResponse,
+  EjbcaRevokeResult,
 } from '../models/signing.models';
 
 @Injectable({ providedIn: 'root' })
@@ -50,10 +53,47 @@ export class SigningAdminService {
   }
 
   /** Search EJBCA certificates */
-  getEjbcaCertificates(subject?: string): Observable<any> {
+  searchEjbcaCertificates(request: EjbcaCertSearchRequest): Observable<EjbcaCertSearchResponse> {
+    return this.http.post<EjbcaCertSearchResponse>(
+      this.baseUrl + '/ejbca/certificates/search',
+      request,
+    );
+  }
+
+  /** Get EJBCA certificate detail */
+  getEjbcaCertificateDetail(serialNumber: string, issuerDn?: string): Observable<any> {
     const params: any = {};
-    if (subject) params.subject = subject;
-    return this.http.get(this.baseUrl + '/ejbca/certificates', { params });
+    if (issuerDn) params.issuerDn = issuerDn;
+    return this.http.get(this.baseUrl + `/ejbca/certificates/${serialNumber}`, { params });
+  }
+
+  /** Revoke EJBCA certificate */
+  revokeEjbcaCertificate(
+    serialNumber: string,
+    issuerDn: string,
+    reason?: string,
+  ): Observable<EjbcaRevokeResult> {
+    return this.http.put<EjbcaRevokeResult>(
+      this.baseUrl + `/ejbca/certificates/${serialNumber}/revoke`,
+      { issuerDn, reason: reason || 'UNSPECIFIED' },
+    );
+  }
+
+  /** Get EJBCA certificate profiles */
+  getEjbcaCertificateProfiles(): Observable<any> {
+    return this.http.get(this.baseUrl + '/ejbca/certificate-profiles');
+  }
+
+  /** Get EJBCA end entity profiles */
+  getEjbcaEndEntityProfiles(): Observable<any> {
+    return this.http.get(this.baseUrl + '/ejbca/endentity-profiles');
+  }
+
+  /** Download CA certificate */
+  downloadCaCertificate(caName: string): Observable<Blob> {
+    return this.http.get(this.baseUrl + `/ejbca/ca/${encodeURIComponent(caName)}/certificate`, {
+      responseType: 'blob',
+    });
   }
 
   /** Run a test signing */

@@ -54,6 +54,13 @@ export class UserSignatureService {
     );
   }
 
+  renewCertificate(userId: string): Observable<CertProvisionResult> {
+    return this.http.post<CertProvisionResult>(
+      `${this.baseUrl}/users/${userId}/renew-certificate`,
+      {},
+    );
+  }
+
   testUserSigning(userId: string): Observable<UserTestSignResult> {
     return this.http.post<UserTestSignResult>(`${this.baseUrl}/users/${userId}/test-sign`, {});
   }
@@ -66,5 +73,9 @@ export class UserSignatureService {
 
   getUserSignatureImageUrl(userId: string): string {
     return `${this.baseUrl}/users/${userId}/image`;
+  }
+
+  getUserSignatureImageBlob(userId: string): Observable<Blob> {
+    return this.http.get(`${this.baseUrl}/users/${userId}/image`, { responseType: 'blob' });
   }
 }
