@@ -2192,6 +2192,8 @@ export class ReportDesignerComponent implements OnInit, OnDestroy {
   snapToGrid = true;
   gridSize = 5;
   showGrid = true;
+  showRulers = true;
+  zoomLevel = 100;
 
   // Smart guides (alignment snap lines)
   guideLines: { orientation: 'h' | 'v'; pos: number; bandId: string }[] = [];
@@ -2999,6 +3001,56 @@ export class ReportDesignerComponent implements OnInit, OnDestroy {
 
   toggleShowGrid() {
     this.showGrid = !this.showGrid;
+  }
+
+  toggleRulers() {
+    this.showRulers = !this.showRulers;
+  }
+
+  get pageWidthPx(): number {
+    return this.design.pageSettings.orientation === 'landscape' ? 1100 : 800;
+  }
+
+  get totalCanvasHeight(): number {
+    return this.design.bands.reduce((sum, b) => sum + b.height + 30, 0); // 30 ~ band label height
+  }
+
+  getRulerTicks(length: number): { pos: number; label: string; major: boolean }[] {
+    const ticks: { pos: number; label: string; major: boolean }[] = [];
+    // Every 50px = major tick with label, every 10px = minor tick
+    for (let i = 0; i <= length; i += 10) {
+      if (i % 50 === 0) {
+        ticks.push({ pos: i, label: String(i), major: true });
+      } else {
+        ticks.push({ pos: i, label: '', major: false });
+      }
+    }
+    return ticks;
+  }
+
+  zoomIn() {
+    this.zoomLevel = Math.min(200, this.zoomLevel + 10);
+  }
+
+  zoomOut() {
+    this.zoomLevel = Math.max(50, this.zoomLevel - 10);
+  }
+
+  resetZoom() {
+    this.zoomLevel = 100;
+  }
+
+  getBandShortLabel(type: string): string {
+    const map: Record<string, string> = {
+      reportHeader: 'Report H.',
+      pageHeader: 'Page H.',
+      groupHeader: 'Group H.',
+      detail: 'Detail',
+      groupFooter: 'Group F.',
+      pageFooter: 'Page F.',
+      reportFooter: 'Report F.',
+    };
+    return map[type] || type;
   }
 
   // ===== Context menu =====

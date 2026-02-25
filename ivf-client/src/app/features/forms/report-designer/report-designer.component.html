@@ -3,7 +3,7 @@
     <!-- ===== Top Toolbar ===== -->
     <header class="designer-toolbar">
       <div class="toolbar-left">
-        <button class="btn btn-ghost" (click)="goBack()">← Quay lại</button>
+        <button class="btn btn-ghost btn-sm" (click)="goBack()">← Quay lại</button>
         <div class="toolbar-title">
           <h1>🎨 Report Designer</h1>
           <span class="report-name">{{ report.name }}</span>
@@ -13,7 +13,7 @@
       <div class="toolbar-center">
         <div class="toolbar-history">
           <button
-            class="btn-icon-toolbar"
+            class="btn btn-ghost btn-sm"
             (click)="undo()"
             [disabled]="!canUndo"
             title="Hoàn tác (Ctrl+Z)"
@@ -21,7 +21,7 @@
             ↩
           </button>
           <button
-            class="btn-icon-toolbar"
+            class="btn btn-ghost btn-sm"
             (click)="redo()"
             [disabled]="!canRedo"
             title="Làm lại (Ctrl+Y)"
@@ -33,7 +33,7 @@
         <!-- Snap-to-grid & grid toggles -->
         <div class="toolbar-snap">
           <button
-            class="btn-icon-toolbar"
+            class="btn btn-ghost btn-sm"
             [class.active]="snapToGrid"
             (click)="toggleSnapToGrid()"
             title="Bắt lưới (Snap to Grid)"
@@ -41,32 +41,55 @@
             ⊞
           </button>
           <button
-            class="btn-icon-toolbar"
+            class="btn btn-ghost btn-sm"
             [class.active]="showGrid"
             (click)="toggleShowGrid()"
             title="Hiện lưới"
           >
             ⊟
           </button>
+          <button
+            class="btn btn-ghost btn-sm"
+            [class.active]="showRulers"
+            (click)="toggleRulers()"
+            title="Thước kẻ (Rulers)"
+          >
+            📏
+          </button>
         </div>
 
-        <button class="btn mode-btn" [class.active]="mode === 'design'" (click)="mode = 'design'">
+        <!-- Zoom controls -->
+        <div class="toolbar-zoom">
+          <button class="btn btn-ghost btn-sm" (click)="zoomOut()" title="Thu nhỏ">−</button>
+          <span class="zoom-label" (click)="resetZoom()" title="Reset zoom">{{ zoomLevel }}%</span>
+          <button class="btn btn-ghost btn-sm" (click)="zoomIn()" title="Phóng to">+</button>
+        </div>
+
+        <button
+          class="btn btn-ghost btn-sm mode-btn"
+          [class.active]="mode === 'design'"
+          (click)="mode = 'design'"
+        >
           🖊️ DESIGN
         </button>
-        <button class="btn mode-btn" [class.active]="mode === 'preview'" (click)="toggleMode()">
+        <button
+          class="btn btn-ghost btn-sm mode-btn"
+          [class.active]="mode === 'preview'"
+          (click)="toggleMode()"
+        >
           👁️ PREVIEW
         </button>
       </div>
 
       <div class="toolbar-right">
         @if (isDirty) {
-          <span class="unsaved-badge">● Chưa lưu</span>
+          <span class="tag tag-red">● Chưa lưu</span>
         }
-        <button class="btn btn-secondary" (click)="exportPdf()">📄 PDF</button>
-        <button class="btn btn-secondary" (click)="save()" [disabled]="isSaving || !isDirty">
+        <button class="btn btn-secondary btn-sm" (click)="exportPdf()">📄 PDF</button>
+        <button class="btn btn-secondary btn-sm" (click)="save()" [disabled]="isSaving || !isDirty">
           💾 Lưu
         </button>
-        <button class="btn btn-primary" (click)="saveAndPreview()" [disabled]="isSaving">
+        <button class="btn btn-primary btn-sm" (click)="saveAndPreview()" [disabled]="isSaving">
           ▶️ Lưu & Xem
         </button>
       </div>
@@ -75,12 +98,16 @@
     <!-- ===== Multi-tab bar (Phase 3) ===== -->
     @if (design.tabs?.length) {
       <div class="tab-bar">
-        <button class="tab-item" [class.active]="!activeTabId" (click)="selectTab(null)">
+        <button
+          class="btn btn-ghost btn-sm tab-item"
+          [class.active]="!activeTabId"
+          (click)="selectTab(null)"
+        >
           📋 Chính
         </button>
         @for (tab of design.tabs; track tab.id; let i = $index) {
           <button
-            class="tab-item"
+            class="btn btn-ghost btn-sm tab-item"
             [class.active]="activeTabId === tab.id"
             (click)="selectTab(tab.id)"
           >
@@ -88,7 +115,7 @@
             <span class="tab-close" (click)="removeTab(i); $event.stopPropagation()">✕</span>
           </button>
         }
-        <button class="tab-add" (click)="addTab()">+ Tab</button>
+        <button class="btn btn-ghost btn-sm" (click)="addTab()">+ Tab</button>
       </div>
     }
 
@@ -112,6 +139,14 @@
             title="Thuộc tính"
           >
             ⚙️
+          </button>
+          <button
+            class="side-tab"
+            [class.active]="sidePanel === 'explorer'"
+            (click)="sidePanel = 'explorer'"
+            title="Report Explorer"
+          >
+            🗂️
           </button>
           <button
             class="side-tab"
@@ -153,14 +188,6 @@
           >
             📐
           </button>
-          <button
-            class="side-tab"
-            [class.active]="sidePanel === 'explorer'"
-            (click)="sidePanel = 'explorer'"
-            title="Report Explorer"
-          >
-            🗂️
-          </button>
         </div>
 
         <div class="side-content">
@@ -189,7 +216,7 @@
               <h4>Thêm band</h4>
               <div class="band-add-btns">
                 @for (bt of getAvailableBandTypes(); track bt) {
-                  <button class="btn-sm btn-outline" (click)="addBand(bt)">
+                  <button class="btn btn-tertiary btn-sm" (click)="addBand(bt)">
                     + {{ getBandLabel(bt) }}
                   </button>
                 }
@@ -643,12 +670,12 @@
                 <!-- ── Actions ── -->
                 <div class="pgrid-actions">
                   <button
-                    class="btn-sm btn-secondary"
+                    class="btn btn-secondary btn-sm"
                     (click)="duplicateControl(selectedControl.id)"
                   >
                     📋 Nhân bản
                   </button>
-                  <button class="btn-sm btn-danger" (click)="removeControl(selectedControl.id)">
+                  <button class="btn btn-danger btn-sm" (click)="removeControl(selectedControl.id)">
                     🗑️ Xóa
                   </button>
                 </div>
@@ -1148,10 +1175,10 @@
                   }
                 </div>
                 <div class="pgrid-actions">
-                  <button class="btn-sm btn-secondary" (click)="addSubReport(selectedBand.id)">
+                  <button class="btn btn-secondary btn-sm" (click)="addSubReport(selectedBand.id)">
                     📎 Sub-report
                   </button>
-                  <button class="btn-sm btn-danger" (click)="removeBand(selectedBand.id)">
+                  <button class="btn btn-danger btn-sm" (click)="removeBand(selectedBand.id)">
                     🗑️ Xóa band
                   </button>
                 </div>
@@ -1291,7 +1318,9 @@
                       (ngModelChange)="markDirty()"
                       class="prop-input"
                     />
-                    <button class="btn-icon-sm btn-danger" (click)="removeSubReport(i)">✕</button>
+                    <button class="btn btn-danger-ghost btn-sm" (click)="removeSubReport(i)">
+                      ✕
+                    </button>
                   </div>
                 }
               }
@@ -1302,7 +1331,9 @@
           @if (sidePanel === 'parameters') {
             <div class="panel-section">
               <h3>🔧 Tham số báo cáo</h3>
-              <button class="btn-sm btn-primary" (click)="addParameter()">+ Thêm tham số</button>
+              <button class="btn btn-primary btn-sm" (click)="addParameter()">
+                + Thêm tham số
+              </button>
 
               @if (!design.parameters.length) {
                 <p class="hint-text">Tham số cho phép người dùng nhập giá trị khi xem báo cáo.</p>
@@ -1318,7 +1349,9 @@
                       class="prop-input"
                       placeholder="Tên..."
                     />
-                    <button class="btn-icon-sm btn-danger" (click)="removeParameter(i)">✕</button>
+                    <button class="btn btn-danger-ghost btn-sm" (click)="removeParameter(i)">
+                      ✕
+                    </button>
                   </div>
                   <div class="prop-group">
                     <label>Nhãn hiển thị</label>
@@ -1394,7 +1427,7 @@
           @if (sidePanel === 'tabs') {
             <div class="panel-section">
               <h3>📑 Đa trang (Tabs)</h3>
-              <button class="btn-sm btn-primary" (click)="addTab()">+ Thêm tab</button>
+              <button class="btn btn-primary btn-sm" (click)="addTab()">+ Thêm tab</button>
               <p class="hint-text">Mỗi tab là một trang báo cáo riêng.</p>
               @if (design.tabs?.length) {
                 @for (tab of design.tabs; track tab.id; let i = $index) {
@@ -1410,7 +1443,7 @@
                       class="prop-input"
                     />
                     <button
-                      class="btn-icon-sm btn-danger"
+                      class="btn btn-danger-ghost btn-sm"
                       (click)="removeTab(i); $event.stopPropagation()"
                     >
                       ✕
@@ -1426,7 +1459,9 @@
             <div class="panel-section">
               <h3>📐 Cross-Tab / Pivot</h3>
               @if (!design.crossTab) {
-                <button class="btn-sm btn-primary" (click)="initCrossTab()">+ Tạo Cross-Tab</button>
+                <button class="btn btn-primary btn-sm" (click)="initCrossTab()">
+                  + Tạo Cross-Tab
+                </button>
                 <p class="hint-text">Bảng chéo để phân tích dữ liệu theo 2 chiều.</p>
               } @else {
                 <div class="prop-group">
@@ -1512,7 +1547,7 @@
                     Tổng cộng
                   </label>
                 </div>
-                <button class="btn-sm btn-danger" (click)="removeCrossTab()">
+                <button class="btn btn-danger btn-sm" (click)="removeCrossTab()">
                   🗑️ Xóa Cross-Tab
                 </button>
               }
@@ -1744,20 +1779,39 @@
         @if (mode === 'design') {
           <main class="design-canvas-area">
             <div class="canvas-scroll">
-              <div
-                class="page-canvas"
-                [style.width]="design.pageSettings.orientation === 'landscape' ? '1100px' : '800px'"
-              >
-                @for (band of design.bands; track band.id) {
-                  <div
-                    class="band-wrapper"
-                    [class.selected]="selectedBandId === band.id"
-                    [class.hidden-band]="!band.visible"
-                    (click)="selectBand(band.id); $event.stopPropagation()"
-                  >
-                    <!-- Band label -->
+              <!-- Horizontal ruler -->
+              @if (showRulers) {
+                <div class="ruler-corner"></div>
+                <div class="ruler ruler-h" [style.width.px]="pageWidthPx">
+                  @for (tick of getRulerTicks(pageWidthPx); track tick.pos) {
+                    <div class="ruler-tick" [class.major]="tick.major" [style.left.px]="tick.pos">
+                      @if (tick.major) {
+                        <span class="ruler-label">{{ tick.label }}</span>
+                      }
+                    </div>
+                  }
+                </div>
+              }
+
+              <div class="canvas-body-row">
+                <!-- Vertical ruler -->
+                @if (showRulers) {
+                  <div class="ruler ruler-v" [style.height.px]="totalCanvasHeight">
+                    @for (tick of getRulerTicks(totalCanvasHeight); track tick.pos) {
+                      <div class="ruler-tick" [class.major]="tick.major" [style.top.px]="tick.pos">
+                        @if (tick.major) {
+                          <span class="ruler-label">{{ tick.label }}</span>
+                        }
+                      </div>
+                    }
+                  </div>
+                }
+
+                <!-- Band label strip (vertical, like DevExpress) -->
+                <div class="band-label-strip">
+                  @for (band of design.bands; track band.id) {
                     <div
-                      class="band-label"
+                      class="band-label-vertical"
                       [class.band-header]="
                         band.type === 'pageHeader' || band.type === 'reportHeader'
                       "
@@ -1767,207 +1821,254 @@
                       "
                       [class.band-group-h]="band.type === 'groupHeader'"
                       [class.band-group-f]="band.type === 'groupFooter'"
+                      [class.selected]="selectedBandId === band.id"
+                      [style.height.px]="band.height + 30"
+                      (click)="selectBand(band.id); $event.stopPropagation()"
+                      [title]="getBandLabel(band.type)"
                     >
-                      <span>{{ getBandLabel(band.type) }}</span>
-                      @if (band.groupField) {
-                        <span class="band-group-field"
-                          >: {{ getDataFieldLabel(band.groupField) }}</span
-                        >
-                      }
-                      <span class="band-size">{{ band.height }}px</span>
-                      <div class="band-actions">
-                        <button
-                          class="band-btn"
-                          (click)="toggleBandVisibility(band); $event.stopPropagation()"
-                          title="Ẩn/Hiện"
-                        >
-                          {{ band.visible ? '👁️' : '🚫' }}
-                        </button>
-                        <button
-                          class="band-btn"
-                          (click)="resizeBand(band, -10); $event.stopPropagation()"
-                          title="Thu nhỏ"
-                        >
-                          −
-                        </button>
-                        <button
-                          class="band-btn"
-                          (click)="resizeBand(band, 10); $event.stopPropagation()"
-                          title="Phóng to"
-                        >
-                          +
-                        </button>
-                        <button
-                          class="band-btn danger"
-                          (click)="removeBand(band.id); $event.stopPropagation()"
-                          title="Xóa"
-                        >
-                          ✕
-                        </button>
-                      </div>
+                      <span class="band-label-text">{{ getBandShortLabel(band.type) }}</span>
                     </div>
+                  }
+                </div>
 
-                    <!-- Band canvas (drop zone) -->
+                <!-- Page canvas -->
+                <div
+                  class="page-canvas"
+                  [style.width.px]="pageWidthPx"
+                  [style.transform]="'scale(' + zoomLevel / 100 + ')'"
+                  [style.transform-origin]="'top left'"
+                >
+                  @for (band of design.bands; track band.id) {
                     <div
-                      class="band-canvas"
-                      [class.show-grid]="showGrid"
-                      [style.height.px]="band.height"
-                      [style.background-color]="band.backgroundColor || 'transparent'"
-                      [style.--grid-size]="gridSize + 'px'"
-                      (dragover)="onBandDragOver($event)"
-                      (drop)="onBandDrop($event, band.id)"
-                      (mousedown)="onBandCanvasMouseDown($event, band.id)"
-                      (mousemove)="onBandCanvasMouseMove($event, band.id)"
-                      (contextmenu)="onBandContextMenu($event, band.id)"
+                      class="band-wrapper"
+                      [class.selected]="selectedBandId === band.id"
+                      [class.hidden-band]="!band.visible"
+                      (click)="selectBand(band.id); $event.stopPropagation()"
                     >
-                      @for (ctrl of band.controls; track ctrl.id) {
-                        <div
-                          class="control-wrapper"
-                          [class.selected]="isControlSelected(ctrl.id)"
-                          [class.multi-selected]="isControlSelected(ctrl.id) && hasMultipleSelected"
-                          [ngStyle]="getControlStyle(ctrl)"
-                          (click)="
-                            selectControl(ctrl.id, band.id, $event); $event.stopPropagation()
-                          "
-                          (contextmenu)="onContextMenu($event, ctrl.id, band.id)"
-                          cdkDrag
-                          [cdkDragFreeDragPosition]="{ x: 0, y: 0 }"
-                          (cdkDragStarted)="onControlDragStart(ctrl)"
-                          (cdkDragMoved)="onControlDragMove(ctrl, $event, band.id)"
-                          (cdkDragEnded)="onControlDragEnd(ctrl, $event)"
-                        >
-                          <!-- Control content preview -->
-                          @switch (ctrl.type) {
-                            @case ('label') {
-                              <span class="ctrl-label">{{ ctrl.text }}</span>
-                            }
-                            @case ('field') {
-                              <span class="ctrl-field"
-                                >[{{ getDataFieldLabel(ctrl.dataField ?? '') }}]</span
-                              >
-                            }
-                            @case ('expression') {
-                              <span class="ctrl-expr">fx: {{ ctrl.expression }}</span>
-                            }
-                            @case ('image') {
-                              <span class="ctrl-image">🖼️ Image</span>
-                            }
-                            @case ('shape') {
-                              <div class="ctrl-shape" [class]="'shape-' + ctrl.shapeType"></div>
-                            }
-                            @case ('line') {
-                              <hr
-                                class="ctrl-line"
-                                [style.border-color]="ctrl.style?.borderColor ?? '#94a3b8'"
-                              />
-                            }
-                            @case ('barcode') {
-                              <span class="ctrl-barcode"
-                                >{{ ctrl.barcodeType === 'qr' ? '⊞' : '|||' }}
-                                {{ ctrl.barcodeType?.toUpperCase() }}</span
-                              >
-                            }
-                            @case ('chart') {
-                              <span class="ctrl-chart">📈 Chart</span>
-                            }
-                            @case ('table') {
-                              <span class="ctrl-table">▦ Table</span>
-                            }
-                            @case ('checkbox') {
-                              <span class="ctrl-checkbox">☑ Checkbox</span>
-                            }
-                            @case ('pageNumber') {
-                              <span class="ctrl-system">Trang #</span>
-                            }
-                            @case ('totalPages') {
-                              <span class="ctrl-system">##</span>
-                            }
-                            @case ('currentDate') {
-                              <span class="ctrl-system">📅 {{ ctrl.format || 'dd/MM/yyyy' }}</span>
-                            }
-                            @case ('richText') {
-                              <span class="ctrl-richtext">{{ ctrl.text || 'Rich Text...' }}</span>
-                            }
-                            @case ('signatureZone') {
-                              <div class="ctrl-signature-zone">
-                                <span class="sig-icon">✍️</span>
-                                <span class="sig-label">{{ ctrl.text || 'Chữ ký' }}</span>
-                                <span class="sig-hint">(Ký và ghi rõ họ tên)</span>
-                              </div>
-                            }
-                            @default {
-                              <span>{{ ctrl.type }}</span>
-                            }
-                          }
-
-                          <!-- Resize handles on selected (all 8 directions) -->
-                          @if (isControlSelected(ctrl.id) && !hasMultipleSelected) {
-                            <div
-                              class="resize-handle resize-n"
-                              (mousedown)="onResizeStart($event, 'n', ctrl)"
-                            ></div>
-                            <div
-                              class="resize-handle resize-s"
-                              (mousedown)="onResizeStart($event, 's', ctrl)"
-                            ></div>
-                            <div
-                              class="resize-handle resize-e"
-                              (mousedown)="onResizeStart($event, 'e', ctrl)"
-                            ></div>
-                            <div
-                              class="resize-handle resize-w"
-                              (mousedown)="onResizeStart($event, 'w', ctrl)"
-                            ></div>
-                            <div
-                              class="resize-handle resize-ne"
-                              (mousedown)="onResizeStart($event, 'ne', ctrl)"
-                            ></div>
-                            <div
-                              class="resize-handle resize-nw"
-                              (mousedown)="onResizeStart($event, 'nw', ctrl)"
-                            ></div>
-                            <div
-                              class="resize-handle resize-se"
-                              (mousedown)="onResizeStart($event, 'se', ctrl)"
-                            ></div>
-                            <div
-                              class="resize-handle resize-sw"
-                              (mousedown)="onResizeStart($event, 'sw', ctrl)"
-                            ></div>
-                          }
+                      <!-- Band separator bar (compact, actions on hover) -->
+                      <div
+                        class="band-label band-separator"
+                        [class.band-header]="
+                          band.type === 'pageHeader' || band.type === 'reportHeader'
+                        "
+                        [class.band-detail]="band.type === 'detail'"
+                        [class.band-footer]="
+                          band.type === 'pageFooter' || band.type === 'reportFooter'
+                        "
+                        [class.band-group-h]="band.type === 'groupHeader'"
+                        [class.band-group-f]="band.type === 'groupFooter'"
+                      >
+                        <span class="band-sep-name">{{ getBandLabel(band.type) }}</span>
+                        @if (band.groupField) {
+                          <span class="band-group-field"
+                            >: {{ getDataFieldLabel(band.groupField) }}</span
+                          >
+                        }
+                        <span class="band-size">{{ band.height }}px</span>
+                        <div class="band-actions">
+                          <button
+                            class="band-btn"
+                            (click)="toggleBandVisibility(band); $event.stopPropagation()"
+                            title="Ẩn/Hiện"
+                          >
+                            {{ band.visible ? '👁️' : '🚫' }}
+                          </button>
+                          <button
+                            class="band-btn"
+                            (click)="resizeBand(band, -10); $event.stopPropagation()"
+                            title="Thu nhỏ"
+                          >
+                            −
+                          </button>
+                          <button
+                            class="band-btn"
+                            (click)="resizeBand(band, 10); $event.stopPropagation()"
+                            title="Phóng to"
+                          >
+                            +
+                          </button>
+                          <button
+                            class="band-btn danger"
+                            (click)="removeBand(band.id); $event.stopPropagation()"
+                            title="Xóa"
+                          >
+                            ✕
+                          </button>
                         </div>
-                      }
+                      </div>
 
-                      @if (!band.controls.length) {
-                        <div class="band-empty-hint">Kéo thả control vào đây</div>
-                      }
+                      <!-- Band canvas (drop zone) -->
+                      <div
+                        class="band-canvas"
+                        [class.show-grid]="showGrid"
+                        [style.height.px]="band.height"
+                        [style.background-color]="band.backgroundColor || 'transparent'"
+                        [style.--grid-size]="gridSize + 'px'"
+                        (dragover)="onBandDragOver($event)"
+                        (drop)="onBandDrop($event, band.id)"
+                        (mousedown)="onBandCanvasMouseDown($event, band.id)"
+                        (mousemove)="onBandCanvasMouseMove($event, band.id)"
+                        (contextmenu)="onBandContextMenu($event, band.id)"
+                      >
+                        @for (ctrl of band.controls; track ctrl.id) {
+                          <div
+                            class="control-wrapper"
+                            [class.selected]="isControlSelected(ctrl.id)"
+                            [class.multi-selected]="
+                              isControlSelected(ctrl.id) && hasMultipleSelected
+                            "
+                            [ngStyle]="getControlStyle(ctrl)"
+                            (click)="
+                              selectControl(ctrl.id, band.id, $event); $event.stopPropagation()
+                            "
+                            (contextmenu)="onContextMenu($event, ctrl.id, band.id)"
+                            cdkDrag
+                            [cdkDragFreeDragPosition]="{ x: 0, y: 0 }"
+                            (cdkDragStarted)="onControlDragStart(ctrl)"
+                            (cdkDragMoved)="onControlDragMove(ctrl, $event, band.id)"
+                            (cdkDragEnded)="onControlDragEnd(ctrl, $event)"
+                          >
+                            <!-- Control content preview -->
+                            @switch (ctrl.type) {
+                              @case ('label') {
+                                <span class="ctrl-label">{{ ctrl.text }}</span>
+                              }
+                              @case ('field') {
+                                <span class="ctrl-field"
+                                  >[{{ getDataFieldLabel(ctrl.dataField ?? '') }}]</span
+                                >
+                              }
+                              @case ('expression') {
+                                <span class="ctrl-expr">fx: {{ ctrl.expression }}</span>
+                              }
+                              @case ('image') {
+                                <span class="ctrl-image">🖼️ Image</span>
+                              }
+                              @case ('shape') {
+                                <div class="ctrl-shape" [class]="'shape-' + ctrl.shapeType"></div>
+                              }
+                              @case ('line') {
+                                <hr
+                                  class="ctrl-line"
+                                  [style.border-color]="ctrl.style?.borderColor ?? '#94a3b8'"
+                                />
+                              }
+                              @case ('barcode') {
+                                <span class="ctrl-barcode"
+                                  >{{ ctrl.barcodeType === 'qr' ? '⊞' : '|||' }}
+                                  {{ ctrl.barcodeType?.toUpperCase() }}</span
+                                >
+                              }
+                              @case ('chart') {
+                                <span class="ctrl-chart">📈 Chart</span>
+                              }
+                              @case ('table') {
+                                <span class="ctrl-table">▦ Table</span>
+                              }
+                              @case ('checkbox') {
+                                <span class="ctrl-checkbox">☑ Checkbox</span>
+                              }
+                              @case ('pageNumber') {
+                                <span class="ctrl-system">Trang #</span>
+                              }
+                              @case ('totalPages') {
+                                <span class="ctrl-system">##</span>
+                              }
+                              @case ('currentDate') {
+                                <span class="ctrl-system"
+                                  >📅 {{ ctrl.format || 'dd/MM/yyyy' }}</span
+                                >
+                              }
+                              @case ('richText') {
+                                <span class="ctrl-richtext">{{ ctrl.text || 'Rich Text...' }}</span>
+                              }
+                              @case ('signatureZone') {
+                                <div class="ctrl-signature-zone">
+                                  <span class="sig-icon">✍️</span>
+                                  <span class="sig-label">{{ ctrl.text || 'Chữ ký' }}</span>
+                                  <span class="sig-hint">(Ký và ghi rõ họ tên)</span>
+                                </div>
+                              }
+                              @default {
+                                <span>{{ ctrl.type }}</span>
+                              }
+                            }
 
-                      <!-- Alignment snap guide lines -->
-                      @for (guide of guideLines; track $index) {
-                        @if (guide.bandId === band.id) {
-                          @if (guide.orientation === 'v') {
-                            <div class="snap-guide snap-guide-v" [style.left.px]="guide.pos"></div>
-                          } @else {
-                            <div class="snap-guide snap-guide-h" [style.top.px]="guide.pos"></div>
+                            <!-- Resize handles on selected (all 8 directions) -->
+                            @if (isControlSelected(ctrl.id) && !hasMultipleSelected) {
+                              <div
+                                class="resize-handle resize-n"
+                                (mousedown)="onResizeStart($event, 'n', ctrl)"
+                              ></div>
+                              <div
+                                class="resize-handle resize-s"
+                                (mousedown)="onResizeStart($event, 's', ctrl)"
+                              ></div>
+                              <div
+                                class="resize-handle resize-e"
+                                (mousedown)="onResizeStart($event, 'e', ctrl)"
+                              ></div>
+                              <div
+                                class="resize-handle resize-w"
+                                (mousedown)="onResizeStart($event, 'w', ctrl)"
+                              ></div>
+                              <div
+                                class="resize-handle resize-ne"
+                                (mousedown)="onResizeStart($event, 'ne', ctrl)"
+                              ></div>
+                              <div
+                                class="resize-handle resize-nw"
+                                (mousedown)="onResizeStart($event, 'nw', ctrl)"
+                              ></div>
+                              <div
+                                class="resize-handle resize-se"
+                                (mousedown)="onResizeStart($event, 'se', ctrl)"
+                              ></div>
+                              <div
+                                class="resize-handle resize-sw"
+                                (mousedown)="onResizeStart($event, 'sw', ctrl)"
+                              ></div>
+                            }
+                          </div>
+                        }
+
+                        @if (!band.controls.length) {
+                          <div class="band-empty-hint">Kéo thả control vào đây</div>
+                        }
+
+                        <!-- Alignment snap guide lines -->
+                        @for (guide of guideLines; track $index) {
+                          @if (guide.bandId === band.id) {
+                            @if (guide.orientation === 'v') {
+                              <div
+                                class="snap-guide snap-guide-v"
+                                [style.left.px]="guide.pos"
+                              ></div>
+                            } @else {
+                              <div class="snap-guide snap-guide-h" [style.top.px]="guide.pos"></div>
+                            }
                           }
                         }
-                      }
 
-                      <!-- Rubber-band selection rectangle -->
-                      @if (isRubberBanding && rubberBandBandId === band.id) {
-                        <div
-                          class="rubber-band"
-                          [style.left.px]="rubberBandRect.x"
-                          [style.top.px]="rubberBandRect.y"
-                          [style.width.px]="rubberBandRect.w"
-                          [style.height.px]="rubberBandRect.h"
-                        ></div>
-                      }
+                        <!-- Rubber-band selection rectangle -->
+                        @if (isRubberBanding && rubberBandBandId === band.id) {
+                          <div
+                            class="rubber-band"
+                            [style.left.px]="rubberBandRect.x"
+                            [style.top.px]="rubberBandRect.y"
+                            [style.width.px]="rubberBandRect.w"
+                            [style.height.px]="rubberBandRect.h"
+                          ></div>
+                        }
+                      </div>
                     </div>
-                  </div>
-                }
+                  }
+                </div>
+                <!-- /page-canvas -->
               </div>
+              <!-- /canvas-body-row -->
             </div>
+            <!-- /canvas-scroll -->
           </main>
         }
 
@@ -2021,7 +2122,7 @@
                       </div>
                     }
                     <div class="params-actions">
-                      <button class="btn btn-primary" (click)="showParametersDialog = false">
+                      <button class="btn btn-primary btn-sm" (click)="showParametersDialog = false">
                         Áp dụng
                       </button>
                     </div>
@@ -2126,7 +2227,9 @@
             } @else {
               <div class="preview-empty">
                 <p>Không có dữ liệu để xem trước.</p>
-                <button class="btn btn-primary" (click)="loadPreviewData()">🔄 Tải lại</button>
+                <button class="btn btn-primary btn-sm" (click)="loadPreviewData()">
+                  🔄 Tải lại
+                </button>
               </div>
             }
           </main>
@@ -2211,15 +2314,15 @@
     <!-- ===== Multi-selection status bar ===== -->
     @if (mode === 'design' && selectedControlIds.size > 1) {
       <div class="multi-select-bar">
-        <span class="ms-badge">{{ selectedControlIds.size }} controls đã chọn</span>
-        <button class="btn-sm btn-secondary" (click)="alignLeft()" title="Căn trái">
+        <span class="tag tag-blue">{{ selectedControlIds.size }} controls đã chọn</span>
+        <button class="btn btn-ghost btn-sm" (click)="alignLeft()" title="Căn trái">
           ⫷ Căn trái
         </button>
-        <button class="btn-sm btn-secondary" (click)="alignTop()" title="Căn trên">
+        <button class="btn btn-ghost btn-sm" (click)="alignTop()" title="Căn trên">
           ⫠ Căn trên
         </button>
         <button
-          class="btn-sm btn-secondary"
+          class="btn btn-ghost btn-sm"
           (click)="distributeHorizontal()"
           [disabled]="selectedControlIds.size < 3"
           title="Phân bố đều ngang"
@@ -2227,17 +2330,21 @@
           ↔ Phân bố H
         </button>
         <button
-          class="btn-sm btn-secondary"
+          class="btn btn-ghost btn-sm"
           (click)="distributeVertical()"
           [disabled]="selectedControlIds.size < 3"
           title="Phân bố đều dọc"
         >
           ↕ Phân bố V
         </button>
-        <button class="btn-sm btn-secondary" (click)="makeSameSize()" title="Cùng kích thước">
+        <button class="btn btn-ghost btn-sm" (click)="makeSameSize()" title="Cùng kích thước">
           ⊞ Cùng size
         </button>
-        <button class="btn-sm btn-danger" (click)="deleteSelected()" title="Xóa tất cả đã chọn">
+        <button
+          class="btn btn-danger-ghost btn-sm"
+          (click)="deleteSelected()"
+          title="Xóa tất cả đã chọn"
+        >
           🗑️ Xóa
         </button>
       </div>
@@ -2259,62 +2366,98 @@
             <h4>Trường dữ liệu</h4>
             <div class="snippet-grid">
               @for (f of dataFieldOptions; track f.key) {
-                <button
-                  class="snippet-btn"
+                <span
+                  class="tag tag-blue snippet-tag"
                   (click)="insertExpressionSnippet('[Data.' + f.key + ']')"
                 >
                   {{ f.label }}
-                </button>
+                </span>
               }
             </div>
 
             <h4>Hàm</h4>
             <div class="snippet-grid">
-              <button class="snippet-btn" (click)="insertExpressionSnippet('Count()')">
+              <span class="tag tag-teal snippet-tag" (click)="insertExpressionSnippet('Count()')">
                 Count()
-              </button>
-              <button class="snippet-btn" (click)="insertExpressionSnippet('Sum(fieldKey)')">
+              </span>
+              <span
+                class="tag tag-teal snippet-tag"
+                (click)="insertExpressionSnippet('Sum(fieldKey)')"
+              >
                 Sum()
-              </button>
-              <button class="snippet-btn" (click)="insertExpressionSnippet('Avg(fieldKey)')">
+              </span>
+              <span
+                class="tag tag-teal snippet-tag"
+                (click)="insertExpressionSnippet('Avg(fieldKey)')"
+              >
                 Avg()
-              </button>
-              <button class="snippet-btn" (click)="insertExpressionSnippet('Min(fieldKey)')">
+              </span>
+              <span
+                class="tag tag-teal snippet-tag"
+                (click)="insertExpressionSnippet('Min(fieldKey)')"
+              >
                 Min()
-              </button>
-              <button class="snippet-btn" (click)="insertExpressionSnippet('Max(fieldKey)')">
+              </span>
+              <span
+                class="tag tag-teal snippet-tag"
+                (click)="insertExpressionSnippet('Max(fieldKey)')"
+              >
                 Max()
-              </button>
-              <button class="snippet-btn" (click)="insertExpressionSnippet('Upper(text)')">
+              </span>
+              <span
+                class="tag tag-teal snippet-tag"
+                (click)="insertExpressionSnippet('Upper(text)')"
+              >
                 Upper()
-              </button>
-              <button class="snippet-btn" (click)="insertExpressionSnippet('Lower(text)')">
+              </span>
+              <span
+                class="tag tag-teal snippet-tag"
+                (click)="insertExpressionSnippet('Lower(text)')"
+              >
                 Lower()
-              </button>
-              <button
-                class="snippet-btn"
+              </span>
+              <span
+                class="tag tag-teal snippet-tag"
                 (click)="insertExpressionSnippet('Iif(condition,trueVal,falseVal)')"
               >
                 Iif()
-              </button>
+              </span>
             </div>
 
             <h4>Toán tử</h4>
             <div class="snippet-grid">
-              <button class="snippet-btn" (click)="insertExpressionSnippet(' + ')">+</button>
-              <button class="snippet-btn" (click)="insertExpressionSnippet(' - ')">−</button>
-              <button class="snippet-btn" (click)="insertExpressionSnippet(' * ')">×</button>
-              <button class="snippet-btn" (click)="insertExpressionSnippet(' / ')">/</button>
-              <button class="snippet-btn" (click)="insertExpressionSnippet(' &gt; ')">&gt;</button>
-              <button class="snippet-btn" (click)="insertExpressionSnippet(' &lt; ')">&lt;</button>
-              <button class="snippet-btn" (click)="insertExpressionSnippet(' == ')">=</button>
-              <button class="snippet-btn" (click)="insertExpressionSnippet(' != ')">≠</button>
+              <span class="tag tag-gray snippet-tag" (click)="insertExpressionSnippet(' + ')"
+                >+</span
+              >
+              <span class="tag tag-gray snippet-tag" (click)="insertExpressionSnippet(' - ')"
+                >−</span
+              >
+              <span class="tag tag-gray snippet-tag" (click)="insertExpressionSnippet(' * ')"
+                >×</span
+              >
+              <span class="tag tag-gray snippet-tag" (click)="insertExpressionSnippet(' / ')"
+                >/</span
+              >
+              <span class="tag tag-gray snippet-tag" (click)="insertExpressionSnippet(' &gt; ')"
+                >&gt;</span
+              >
+              <span class="tag tag-gray snippet-tag" (click)="insertExpressionSnippet(' &lt; ')"
+                >&lt;</span
+              >
+              <span class="tag tag-gray snippet-tag" (click)="insertExpressionSnippet(' == ')"
+                >=</span
+              >
+              <span class="tag tag-gray snippet-tag" (click)="insertExpressionSnippet(' != ')"
+                >≠</span
+              >
             </div>
           </div>
 
           <div class="expr-actions">
-            <button class="btn btn-secondary" (click)="showExpressionEditor = false">Hủy</button>
-            <button class="btn btn-primary" (click)="applyExpression()">Áp dụng</button>
+            <button class="btn btn-secondary btn-sm" (click)="showExpressionEditor = false">
+              Hủy
+            </button>
+            <button class="btn btn-primary btn-sm" (click)="applyExpression()">Áp dụng</button>
           </div>
         </div>
       </div>

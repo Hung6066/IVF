@@ -31,13 +31,10 @@
     "@angular/forms": "^21.1.0",
     "@angular/platform-browser": "^21.1.0",
     "@angular/router": "^21.1.0",
-    "@carbon/icons": "^11.75.0",
-    "@carbon/styles": "^1.100.0",
     "@digitalpersona/core": "^0.2.6",
     "@digitalpersona/devices": "^0.2.6",
     "@digitalpersona/websdk": "^1.1.0",
     "@microsoft/signalr": "^10.0.0",
-    "carbon-components-angular": "^5.64.1",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0",
     "zone.js": "^0.16.0"
@@ -46,6 +43,9 @@
     "@angular/build": "^21.1.2",
     "@angular/cli": "^21.1.2",
     "@angular/compiler-cli": "^21.1.0",
+    "@tailwindcss/postcss": "^4.2.1",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.2.1",
     "typescript": "~5.9.2"
   }
 }
