@@ -16,6 +16,10 @@ using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// ─── Resolve Docker Secrets in configuration ───
+// Replace FILE:/path references with actual file contents (for connection strings, etc.)
+ResolveDockerSecrets(builder.Configuration);
+
 // Clean Architecture DI
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
@@ -396,3 +400,24 @@ if (app.Environment.IsDevelopment())
 QuestPDF.Settings.License = LicenseType.Community;
 
 app.Run();
+
+// ─── Helper: Resolve FILE:/path references in configuration ───
+static void ResolveDockerSecrets(IConfigurationRoot configuration)
+{
+    var filePattern = new System.Text.RegularExpressions.Regex(
+        @"FILE:(/[^\s;,]+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+    foreach (var kvp in configuration.AsEnumerable())
+    {
+        if (kvp.Value is null || !kvp.Value.Contains("FILE:", StringComparison.OrdinalIgnoreCase))
+            continue;
+
+        var resolved = filePattern.Replace(kvp.Value, match =>
+        {
+            var filePath = match.Groups[1].Value;
+            return File.Exists(filePath) ? File.ReadAllText(filePath).Trim() : match.Value;
+        });
+
+        configuration[kvp.Key] = resolved;
+    }
+}

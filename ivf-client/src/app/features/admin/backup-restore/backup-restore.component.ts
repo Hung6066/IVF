@@ -134,6 +134,15 @@ export class BackupRestoreComponent implements OnInit, OnDestroy {
   // WAL archives state
   walArchives = signal<WalArchiveListResponse | null>(null);
 
+  // PITR state
+  pitrRestoreRunning = false;
+  pitrDryRun = true;
+  pitrTargetTime = '';
+  pitrSelectedBackup = '';
+  pitrOperationId = '';
+  pitrLogs = signal<BackupLogLine[]>([]);
+  showPitrPanel = false;
+
   // Replication state
   replicationStatus = signal<ReplicationStatus | null>(null);
   replicationGuide = signal<ReplicationSetupGuide | null>(null);
@@ -875,6 +884,76 @@ export class BackupRestoreComponent implements OnInit, OnDestroy {
         alert('Base backup thất bại: ' + (err.error?.error || err.message));
       },
     });
+  }
+
+  // ─── PITR Restore ───────────────────────────────────
+
+  togglePitrPanel() {
+    this.showPitrPanel = !this.showPitrPanel;
+    if (this.showPitrPanel && this.baseBackups().length === 0) {
+      this.backupService.listBaseBackups().subscribe({
+        next: (data) => this.baseBackups.set(data),
+      });
+    }
+  }
+
+  startPitrRestore() {
+    if (!this.pitrSelectedBackup) {
+      alert('Vui lòng chọn base backup');
+      return;
+    }
+    const action = this.pitrDryRun ? 'DRY-RUN' : 'THỰC THI';
+    const timeMsg = this.pitrTargetTime
+      ? `tới thời điểm ${this.pitrTargetTime}`
+      : 'tới điểm mới nhất (latest)';
+    this.confirmMessage = `${action} PITR restore từ "${this.pitrSelectedBackup}" ${timeMsg}?`;
+    this.confirmAction = () => this.executePitrRestore();
+    this.showConfirmDialog = true;
+  }
+
+  private executePitrRestore() {
+    this.pitrRestoreRunning = true;
+    this.pitrLogs.set([]);
+    this.backupService
+      .startPitrRestore({
+        baseBackupFile: this.pitrSelectedBackup,
+        targetTime: this.pitrTargetTime || undefined,
+        dryRun: this.pitrDryRun,
+      })
+      .subscribe({
+        next: (res) => {
+          this.pitrOperationId = res.operationId;
+          // Connect to SignalR for live logs
+          this.backupService.connectHub(res.operationId);
+          const logSub = this.backupService.logLine$.subscribe((line) => {
+            if (line.operationId === res.operationId) {
+              this.pitrLogs.update((logs) => [
+                ...logs,
+                { timestamp: line.timestamp, level: line.level, message: line.message },
+              ]);
+              this.scrollToBottom();
+            }
+          });
+          const statusSub = this.backupService.statusChanged$.subscribe((op) => {
+            if (op.id === res.operationId && op.status !== 'Running') {
+              this.pitrRestoreRunning = false;
+              logSub.unsubscribe();
+              statusSub.unsubscribe();
+              this.backupService.disconnectHub();
+              if (op.status === 'Completed') {
+                alert('PITR restore hoàn tất thành công!');
+              } else {
+                alert('PITR restore thất bại: ' + (op.errorMessage || 'Unknown error'));
+              }
+            }
+          });
+          this.subscriptions.push(logSub, statusSub);
+        },
+        error: (err) => {
+          this.pitrRestoreRunning = false;
+          alert('Lỗi khởi chạy PITR: ' + (err.error?.error || err.message));
+        },
+      });
   }
 
   // ─── Replication ─────────────────────────────────────

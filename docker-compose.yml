@@ -54,6 +54,7 @@ services:
         condition: service_healthy
     networks:
       - ivf-data
+      - ivf-public
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
@@ -122,6 +123,7 @@ services:
       - "6379:6379"
     networks:
       - ivf-data
+      - ivf-public
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
@@ -232,10 +234,9 @@ services:
     read_only: true
     tmpfs:
       - /tmp:size=100M,mode=1777
-      - /opt/keyfactor/wildfly-35.0.1.Final/standalone/tmp:size=200M
-      - /opt/keyfactor/wildfly-35.0.1.Final/standalone/data:size=100M
-      - /opt/keyfactor/wildfly-35.0.1.Final/standalone/log:size=50M
-      - /opt/keyfactor/wildfly-35.0.1.Final/standalone/configuration:size=50M
+      - /opt/keyfactor/wildfly-35.0.1.Final/standalone/tmp:size=200M,mode=1777
+      - /opt/keyfactor/wildfly-35.0.1.Final/standalone/data:size=100M,mode=1777
+      - /opt/keyfactor/wildfly-35.0.1.Final/standalone/log:size=50M,mode=1777
     healthcheck:
       test:
         [
@@ -290,6 +291,7 @@ services:
     command: server /data --console-address ":9001"
     networks:
       - ivf-data
+      - ivf-public
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
@@ -393,10 +395,9 @@ services:
     read_only: true
     tmpfs:
       - /tmp:size=100M,mode=1777
-      - /opt/keyfactor/wildfly-35.0.1.Final/standalone/tmp:size=200M
-      - /opt/keyfactor/wildfly-35.0.1.Final/standalone/data:size=100M
-      - /opt/keyfactor/wildfly-35.0.1.Final/standalone/log:size=50M
-      - /opt/keyfactor/wildfly-35.0.1.Final/standalone/configuration:size=50M
+      - /opt/keyfactor/wildfly-35.0.1.Final/standalone/tmp:size=200M,mode=1777
+      - /opt/keyfactor/wildfly-35.0.1.Final/standalone/data:size=100M,mode=1777
+      - /opt/keyfactor/wildfly-35.0.1.Final/standalone/log:size=50M,mode=1777
     healthcheck:
       test:
         [

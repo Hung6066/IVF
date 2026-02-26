@@ -17,14 +17,13 @@ services:
   db:
     environment:
       - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=
       - POSTGRES_PASSWORD_FILE=/run/secrets/ivf_db_password
     secrets:
       - ivf_db_password
-    ports: [] # Remove host port exposure in production
+    ports: !override [] # Remove host port exposure in production
     networks:
       - ivf-data
-    security_opt:
-      - no-new-privileges:true
 
   # ─── IVF API ───
   api:
@@ -35,7 +34,7 @@ services:
       - ConnectionStrings__DefaultConnection=Host=db;Database=ivf_db;Username=postgres;Password=FILE:/run/secrets/ivf_db_password
       - ConnectionStrings__Redis=redis:6379,abortConnect=false
       # JWT — secret from file
-      - JwtSettings__SecretFile=/run/secrets/jwt_secret
+      - JwtSettings__Secret=FILE:/run/secrets/jwt_secret
       - JwtSettings__Issuer=IVF_System
       - JwtSettings__Audience=IVF_Users
       # SignServer — HTTPS with mTLS (Phase 2+3)
@@ -58,8 +57,8 @@ services:
       - DigitalSigning__Pkcs11PinFile=/run/secrets/softhsm_pin
       # MinIO — credentials from secrets
       - MinIO__Endpoint=minio:9000
-      - MinIO__AccessKeyFile=/run/secrets/minio_access_key
-      - MinIO__SecretKeyFile=/run/secrets/minio_secret_key
+      - MinIO__AccessKey=FILE:/run/secrets/minio_access_key
+      - MinIO__SecretKey=FILE:/run/secrets/minio_secret_key
       - MinIO__UseSSL=false
       - MinIO__DocumentsBucket=ivf-documents
       - MinIO__SignedPdfsBucket=ivf-signed-pdfs
@@ -80,8 +79,6 @@ services:
       - ivf-public
       - ivf-signing
       - ivf-data
-    security_opt:
-      - no-new-privileges:true
     deploy:
       resources:
         limits:
@@ -89,7 +86,7 @@ services:
 
   # ─── Redis ───
   redis:
-    ports: [] # Remove host port
+    ports: !override [] # Remove host port
     networks:
       - ivf-data
     command: >
@@ -97,8 +94,6 @@ services:
       --requirepass "${REDIS_PASSWORD:-}"
       --maxmemory 256mb
       --maxmemory-policy allkeys-lru
-    security_opt:
-      - no-new-privileges:true
 
   # ─── EJBCA (Certificate Authority) ───
   ejbca:
@@ -112,17 +107,16 @@ services:
       - INITIAL_ADMIN=;CertificateAuthenticationToken:WITH_ISSUER_SERIAL;CN=ManagementCA,O=IVF Clinic;${EJBCA_ADMIN_CERT_SERIAL:-0};
     secrets:
       - ejbca_db_password
-    ports:
+    ports: !override
       - "8443:8443" # HTTPS Admin only — restrict with firewall
       # REMOVED: 8442:8080 (HTTP enrollment) — not needed externally
     volumes:
       - ejbca_persistent:/opt/keyfactor/persistent
       - ./certs/ejbca/tls.p12:/opt/keyfactor/persistent/tls.p12:ro
     networks:
+      - ivf-public
       - ivf-signing
       - ivf-data
-    security_opt:
-      - no-new-privileges:true
     deploy:
       resources:
         limits:
@@ -132,15 +126,14 @@ services:
   ejbca-db:
     environment:
       - POSTGRES_USER=ejbca
+      - POSTGRES_PASSWORD=
       - POSTGRES_PASSWORD_FILE=/run/secrets/ejbca_db_password
       - POSTGRES_DB=ejbca
     secrets:
       - ejbca_db_password
-    ports: [] # No host port
+    ports: !override [] # No host port
     networks:
       - ivf-data
-    security_opt:
-      - no-new-privileges:true
 
   # ─── SignServer (Document Signing) — Phase 4: SoftHSM2 PKCS#11 ───
   signserver:
@@ -164,7 +157,7 @@ services:
       - keystore_password
       - softhsm_pin
       - softhsm_so_pin
-    ports:
+    ports: !override
       - "9443:8443" # HTTPS Admin only — restrict with firewall
       # Port 9080 completely REMOVED (Phase 3)
     volumes:
@@ -182,17 +175,12 @@ services:
       - ./scripts/init-softhsm.sh:/opt/keyfactor/persistent/init-softhsm.sh:ro
       - ./scripts/migrate-p12-to-pkcs11.sh:/opt/keyfactor/persistent/migrate-p12-to-pkcs11.sh:ro
     networks:
+      - ivf-public
       - ivf-signing
       - ivf-data
-    security_opt:
-      - no-new-privileges:true
-    read_only: true
+    read_only: false
     tmpfs:
       - /tmp:size=100M,mode=1777
-      - /opt/keyfactor/wildfly-35.0.1.Final/standalone/tmp:size=200M
-      - /opt/keyfactor/wildfly-35.0.1.Final/standalone/data:size=100M
-      - /opt/keyfactor/wildfly-35.0.1.Final/standalone/log:size=50M
-      - /opt/keyfactor/wildfly-35.0.1.Final/standalone/configuration:size=50M
     deploy:
       resources:
         limits:
@@ -202,32 +190,30 @@ services:
   signserver-db:
     environment:
       - POSTGRES_USER=signserver
+      - POSTGRES_PASSWORD=
       - POSTGRES_PASSWORD_FILE=/run/secrets/signserver_db_password
       - POSTGRES_DB=signserver
     secrets:
       - signserver_db_password
-    ports: [] # No host port
+    ports: !override [] # No host port
     networks:
       - ivf-data
-    security_opt:
-      - no-new-privileges:true
 
   # ─── MinIO (Object Storage) ───
   minio:
     environment:
+      - MINIO_ROOT_USER=
+      - MINIO_ROOT_PASSWORD=
       - MINIO_ROOT_USER_FILE=/run/secrets/minio_access_key
       - MINIO_ROOT_PASSWORD_FILE=/run/secrets/minio_secret_key
     secrets:
       - minio_access_key
       - minio_secret_key
-    ports:
-      # Only expose MinIO API — console behind reverse proxy
+    ports: !override # Only expose MinIO API — console behind reverse proxy
       - "127.0.0.1:9000:9000"
       - "127.0.0.1:9001:9001"
     networks:
       - ivf-data
-    security_opt:
-      - no-new-privileges:true
     deploy:
       resources:
         limits:

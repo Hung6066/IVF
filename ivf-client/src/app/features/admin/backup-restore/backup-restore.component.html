@@ -1671,6 +1671,141 @@
                 </div>
               </div>
             }
+
+            <!-- PITR Restore -->
+            <div class="card" style="margin-top: 16px">
+              <div class="card-header">
+                <h3>⏱️ PITR — Point-in-Time Recovery</h3>
+                <button class="btn btn-sm btn-outline" (click)="togglePitrPanel()">
+                  {{ showPitrPanel ? '▲ Ẩn' : '▼ Mở rộng' }}
+                </button>
+              </div>
+              @if (showPitrPanel) {
+                <div class="card-body">
+                  <p style="margin-bottom: 12px; color: #666; font-size: 0.85rem">
+                    Khôi phục database từ base backup + WAL tới một thời điểm cụ thể hoặc mới nhất.
+                  </p>
+
+                  <div
+                    style="
+                      display: grid;
+                      grid-template-columns: 1fr 1fr;
+                      gap: 16px;
+                      margin-bottom: 16px;
+                    "
+                  >
+                    <!-- Base Backup Selection -->
+                    <div>
+                      <label style="display: block; font-weight: 600; margin-bottom: 4px"
+                        >Base Backup</label
+                      >
+                      <select
+                        [(ngModel)]="pitrSelectedBackup"
+                        style="
+                          width: 100%;
+                          padding: 6px 8px;
+                          border: 1px solid #ddd;
+                          border-radius: 4px;
+                        "
+                      >
+                        <option value="">-- Chọn base backup --</option>
+                        @for (b of baseBackups(); track b.fileName) {
+                          <option [value]="b.fileName">
+                            {{ b.fileName }} ({{ formatSize(b.sizeBytes) }})
+                          </option>
+                        }
+                      </select>
+                    </div>
+
+                    <!-- Target Time -->
+                    <div>
+                      <label style="display: block; font-weight: 600; margin-bottom: 4px"
+                        >Thời điểm khôi phục
+                        <small style="color: #999">(để trống = latest)</small></label
+                      >
+                      <input
+                        type="datetime-local"
+                        [(ngModel)]="pitrTargetTime"
+                        style="
+                          width: 100%;
+                          padding: 6px 8px;
+                          border: 1px solid #ddd;
+                          border-radius: 4px;
+                        "
+                        placeholder="Để trống = restore tới mới nhất"
+                      />
+                    </div>
+                  </div>
+
+                  <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 16px">
+                    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer">
+                      <input type="checkbox" [(ngModel)]="pitrDryRun" />
+                      <span
+                        >Dry Run
+                        <small style="color: #999">(chỉ kiểm tra, không thực thi)</small></span
+                      >
+                    </label>
+                  </div>
+
+                  <div style="display: flex; gap: 8px">
+                    <button
+                      class="btn btn-primary"
+                      (click)="startPitrRestore()"
+                      [disabled]="pitrRestoreRunning || !pitrSelectedBackup"
+                    >
+                      {{
+                        pitrRestoreRunning
+                          ? '⏳ Đang chạy...'
+                          : pitrDryRun
+                            ? '🔍 Dry-Run PITR'
+                            : '🚀 Chạy PITR Restore'
+                      }}
+                    </button>
+                  </div>
+
+                  <!-- PITR Logs -->
+                  @if (pitrLogs().length > 0) {
+                    <div
+                      class="log-panel"
+                      style="
+                        margin-top: 16px;
+                        max-height: 400px;
+                        overflow-y: auto;
+                        background: #1e1e1e;
+                        border-radius: 6px;
+                        padding: 12px;
+                        font-family: monospace;
+                        font-size: 0.8rem;
+                      "
+                      #logContainer
+                    >
+                      @for (log of pitrLogs(); track $index) {
+                        <div
+                          style="padding: 1px 0; white-space: pre-wrap; word-break: break-all"
+                          [class]="getLogLevelClass(log.level)"
+                        >
+                          <span style="color: #888">{{ log.timestamp | date: 'HH:mm:ss' }}</span>
+                          <span
+                            style="margin: 0 4px"
+                            [style.color]="
+                              log.level === 'ERROR'
+                                ? '#ff6b6b'
+                                : log.level === 'WARN'
+                                  ? '#ffd93d'
+                                  : log.level === 'OK'
+                                    ? '#6bcb77'
+                                    : '#b0b0b0'
+                            "
+                            >[{{ log.level }}]</span
+                          >
+                          <span style="color: #e0e0e0">{{ log.message }}</span>
+                        </div>
+                      }
+                    </div>
+                  }
+                </div>
+              }
+            </div>
           } @else if (walLoading) {
             <div class="card-body empty"><span class="spinner"></span> Đang tải...</div>
           } @else {

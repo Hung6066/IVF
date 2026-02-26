@@ -115,6 +115,24 @@ public static class DataBackupEndpoints
         })
         .WithName("DeleteDataBackup");
 
+        // ─── Start PITR restore ────────────────────────────────
+        group.MapPost("/pitr-restore", async (DataBackupService service, HttpContext ctx, StartPitrRestoreRequest request) =>
+        {
+            if (string.IsNullOrWhiteSpace(request.BaseBackupFile))
+                return Results.BadRequest(new { error = "baseBackupFile is required" });
+
+            var username = ctx.User.FindFirstValue(ClaimTypes.Name) ?? "unknown";
+
+            var operationCode = await service.StartPitrRestoreAsync(
+                request.BaseBackupFile,
+                request.TargetTime,
+                request.DryRun,
+                username);
+
+            return Results.Ok(new { operationId = operationCode });
+        })
+        .WithName("StartPitrRestore");
+
         // ─── Validate backup file ──────────────────────────────
         group.MapPost("/validate", async (
             ValidateBackupRequest request,
@@ -180,3 +198,8 @@ public record StartDataRestoreRequest(
     string? MinioBackupFile = null);
 
 public record ValidateBackupRequest(string FileName);
+
+public record StartPitrRestoreRequest(
+    string BaseBackupFile,
+    string? TargetTime = null,
+    bool DryRun = false);

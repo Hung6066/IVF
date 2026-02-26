@@ -23,6 +23,7 @@ import {
   ReplicationStatus,
   StartDataBackupRequest,
   StartDataRestoreRequest,
+  StartPitrRestoreRequest,
   TestCloudConfigRequest,
   TestCloudResult,
   UpdateCloudConfigRequest,
@@ -263,6 +264,12 @@ export class BackupService {
 
   listWalArchives(): Observable<WalArchiveListResponse> {
     return this.http.get<WalArchiveListResponse>(`${this.dataUrl}/wal/archives`);
+  }
+
+  // ─── PITR Restore ─────────────────────────────────────
+
+  startPitrRestore(request: StartPitrRestoreRequest): Observable<{ operationId: string }> {
+    return this.http.post<{ operationId: string }>(`${this.dataUrl}/pitr-restore`, request);
   }
 
   // ─── SignalR ──────────────────────────────────────────

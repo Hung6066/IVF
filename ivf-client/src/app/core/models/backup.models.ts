@@ -360,3 +360,11 @@ export interface ReplicationActivationResult {
   steps: string[];
   nextAction: string;
 }
+
+// ─── PITR Restore models ─────────────────────────────────
+
+export interface StartPitrRestoreRequest {
+  baseBackupFile: string;
+  targetTime?: string;
+  dryRun?: boolean;
+}

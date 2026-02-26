@@ -240,6 +240,137 @@ public sealed class WalBackupService(
         return exit == 0 ? output.Trim() : null;
     }
 
+    /// <summary>
+    /// Restore the database from a base backup + WAL archive to a specific point in time.
+    /// Runs the restore-pitr.sh script in the background, streaming logs via onLog callback.
+    /// </summary>
+    public async Task RestoreFromPitrAsync(
+        string baseBackupPath,
+        string? targetTime,
+        bool dryRun,
+        Action<string, string>? onLog = null,
+        CancellationToken ct = default)
+    {
+        if (!File.Exists(baseBackupPath))
+            throw new FileNotFoundException($"Base backup not found: {baseBackupPath}");
+
+        onLog?.Invoke("INFO", $"Starting PITR restore from '{Path.GetFileName(baseBackupPath)}'...");
+
+        // Build script arguments
+        var args = new List<string> { $"\"{baseBackupPath}\"", "--yes" };
+
+        if (dryRun)
+            args.Add("--dry-run");
+
+        if (!string.IsNullOrWhiteSpace(targetTime))
+            args.AddRange(["--target-time", $"\"{targetTime}\""]);
+        else
+            args.Add("--target-latest");
+
+        // Check for local WAL backup directory
+        var backupsDir = Path.GetDirectoryName(baseBackupPath) ?? "";
+        var walDir = Path.Combine(backupsDir, "wal");
+        if (Directory.Exists(walDir) && Directory.GetFiles(walDir).Length > 0)
+        {
+            args.AddRange(["--wal-dir", $"\"{walDir}\""]);
+        }
+
+        var scriptPath = Path.Combine(
+            Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..")),
+            "scripts", "restore-pitr.sh");
+
+        // Fallback: try relative to content root
+        if (!File.Exists(scriptPath))
+        {
+            scriptPath = Path.Combine(Directory.GetCurrentDirectory(), "scripts", "restore-pitr.sh");
+        }
+
+        if (!File.Exists(scriptPath))
+            throw new FileNotFoundException("restore-pitr.sh script not found");
+
+        var argString = string.Join(" ", args);
+
+        // Use bash (Git for Windows on Windows, native on Linux)
+        string bashPath;
+        if (OperatingSystem.IsWindows())
+        {
+            bashPath = FindGitBash() ?? "bash";
+        }
+        else
+        {
+            bashPath = "/bin/bash";
+        }
+
+        var psi = new ProcessStartInfo
+        {
+            FileName = bashPath,
+            Arguments = $"\"{scriptPath}\" {argString}",
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+
+        onLog?.Invoke("INFO", $"Running: bash restore-pitr.sh {argString}");
+
+        using var process = Process.Start(psi)
+            ?? throw new InvalidOperationException("Failed to start restore-pitr.sh");
+
+        // Stream stdout/stderr lines in real-time
+        var readStdout = Task.Run(async () =>
+        {
+            while (await process.StandardOutput.ReadLineAsync(ct) is { } line)
+            {
+                var level = ParseLogLevel(line);
+                onLog?.Invoke(level, StripAnsiCodes(line));
+            }
+        }, ct);
+
+        var readStderr = Task.Run(async () =>
+        {
+            while (await process.StandardError.ReadLineAsync(ct) is { } line)
+            {
+                if (!string.IsNullOrWhiteSpace(line))
+                    onLog?.Invoke("WARN", StripAnsiCodes(line));
+            }
+        }, ct);
+
+        await Task.WhenAll(readStdout, readStderr);
+        await process.WaitForExitAsync(ct);
+
+        if (process.ExitCode != 0)
+        {
+            onLog?.Invoke("ERROR", $"restore-pitr.sh exited with code {process.ExitCode}");
+            throw new InvalidOperationException($"PITR restore failed with exit code {process.ExitCode}");
+        }
+
+        onLog?.Invoke("OK", "PITR restore completed successfully");
+    }
+
+    private static string ParseLogLevel(string line)
+    {
+        if (line.Contains("[OK]")) return "OK";
+        if (line.Contains("[ERROR]")) return "ERROR";
+        if (line.Contains("[WARN]")) return "WARN";
+        return "INFO";
+    }
+
+    private static string StripAnsiCodes(string text)
+    {
+        return System.Text.RegularExpressions.Regex.Replace(text, @"\x1b\[[0-9;]*m", "");
+    }
+
+    private static string? FindGitBash()
+    {
+        var candidates = new[]
+        {
+            @"C:\Program Files\Git\bin\bash.exe",
+            @"C:\Program Files (x86)\Git\bin\bash.exe",
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "Git", "bin", "bash.exe")
+        };
+        return candidates.FirstOrDefault(File.Exists);
+    }
+
     private static async Task<(int ExitCode, string Output)> RunCommandAsync(string command, CancellationToken ct)
     {
         var psi = new ProcessStartInfo

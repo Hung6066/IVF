@@ -20,7 +20,8 @@ public sealed class DataBackupService(
     DatabaseBackupService dbBackupService,
     MinioBackupService minioBackupService,
     CloudBackupProviderFactory cloudProviderFactory,
-    BackupCompressionService compressionService)
+    BackupCompressionService compressionService,
+    WalBackupService walBackupService)
 {
     private string ProjectDir => Path.GetFullPath(Path.Combine(env.ContentRootPath, "..", ".."));
     private string BackupsDir => Path.Combine(ProjectDir, "backups");
@@ -254,6 +255,80 @@ public sealed class DataBackupService(
             {
                 logger.LogError(ex, "Data restore operation {OpCode} failed", operationCode);
                 await SendLog(operationCode, logLines, "ERROR", $"Data restore failed: {ex.Message}");
+                await PersistFinalState(operationCode, entity.Id, logLines, BackupOperationStatus.Failed, errorMessage: ex.Message);
+                await NotifyStatus(operationCode, "Failed", errorMessage: ex.Message);
+            }
+            finally
+            {
+                _cancellations.TryRemove(operationCode, out _);
+                _liveLogs.TryRemove(operationCode, out _);
+                cts.Dispose();
+            }
+        });
+
+        return operationCode;
+    }
+
+    // ─── PITR restore ───────────────────────────────────────
+
+    /// <summary>
+    /// Start a point-in-time recovery from a base backup + WAL archive.
+    /// </summary>
+    public async Task<string> StartPitrRestoreAsync(
+        string baseBackupFile, string? targetTime, bool dryRun,
+        string? startedBy, CancellationToken ct = default)
+    {
+        var operationCode = $"pitr_restore_{DateTime.UtcNow:yyyyMMdd_HHmmss}_{Guid.NewGuid().ToString("N")[..8]}";
+        var logLines = new List<BackupLogLine>();
+
+        var entity = BackupOperation.Create(operationCode, BackupOperationType.Restore, startedBy);
+
+        using (var scope = scopeFactory.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<IvfDbContext>();
+            db.BackupOperations.Add(entity);
+            await db.SaveChangesAsync(ct);
+        }
+
+        var cts = new CancellationTokenSource();
+        _cancellations[operationCode] = cts;
+
+        _ = Task.Run(async () =>
+        {
+            var bgCt = cts.Token;
+            try
+            {
+                var targetDesc = string.IsNullOrWhiteSpace(targetTime) ? "latest" : targetTime;
+                await SendLog(operationCode, logLines, "INFO",
+                    $"═══ Starting PITR Restore (target: {targetDesc}) ═══");
+                await NotifyStatus(operationCode, "Running");
+
+                var backupPath = Path.Combine(BackupsDir, baseBackupFile);
+                if (!File.Exists(backupPath))
+                    throw new FileNotFoundException($"Base backup not found: {baseBackupFile}");
+
+                await walBackupService.RestoreFromPitrAsync(
+                    backupPath,
+                    targetTime,
+                    dryRun,
+                    async (level, msg) => await SendLog(operationCode, logLines, level, msg),
+                    bgCt);
+
+                var status = dryRun ? "Completed (dry-run)" : "Completed";
+                await SendLog(operationCode, logLines, "OK", $"═══ PITR Restore {status} ═══");
+                await PersistFinalState(operationCode, entity.Id, logLines, BackupOperationStatus.Completed);
+                await NotifyStatus(operationCode, "Completed");
+            }
+            catch (OperationCanceledException)
+            {
+                await SendLog(operationCode, logLines, "WARN", "PITR restore cancelled by user");
+                await PersistFinalState(operationCode, entity.Id, logLines, BackupOperationStatus.Cancelled);
+                await NotifyStatus(operationCode, "Cancelled");
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "PITR restore operation {OpCode} failed", operationCode);
+                await SendLog(operationCode, logLines, "ERROR", $"PITR restore failed: {ex.Message}");
                 await PersistFinalState(operationCode, entity.Id, logLines, BackupOperationStatus.Failed, errorMessage: ex.Message);
                 await NotifyStatus(operationCode, "Failed", errorMessage: ex.Message);
             }
