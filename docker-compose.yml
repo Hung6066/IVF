@@ -175,6 +175,7 @@ services:
       - signserver_persistent:/opt/keyfactor/persistent
       - ./certs/ca/ca.pem:/opt/keyfactor/persistent/keys/ivf-ca.pem:ro
       - ./scripts/init-mtls.sh:/opt/keyfactor/persistent/init-mtls.sh:ro
+      - ./scripts/init-tsa.sh:/opt/keyfactor/persistent/init-tsa.sh:ro
     depends_on:
       signserver-db:
         condition: service_healthy
@@ -192,6 +193,7 @@ services:
       - /opt/keyfactor/wildfly-35.0.1.Final/standalone/tmp:size=200M
       - /opt/keyfactor/wildfly-35.0.1.Final/standalone/data:size=100M
       - /opt/keyfactor/wildfly-35.0.1.Final/standalone/log:size=50M
+      - /opt/keyfactor/wildfly-35.0.1.Final/standalone/configuration:size=50M
     healthcheck:
       test:
         [
@@ -332,6 +334,7 @@ services:
       - signserver_persistent:/opt/keyfactor/persistent
       - ./certs/ca/ca.pem:/opt/keyfactor/persistent/keys/ivf-ca.pem:ro
       - ./scripts/init-mtls.sh:/opt/keyfactor/persistent/init-mtls.sh:ro
+      - ./scripts/init-tsa.sh:/opt/keyfactor/persistent/init-tsa.sh:ro
       - ./scripts/init-softhsm.sh:/opt/keyfactor/persistent/init-softhsm.sh:ro
       - ./scripts/migrate-p12-to-pkcs11.sh:/opt/keyfactor/persistent/migrate-p12-to-pkcs11.sh:ro
     depends_on:
@@ -351,6 +354,7 @@ services:
       - /opt/keyfactor/wildfly-35.0.1.Final/standalone/tmp:size=200M
       - /opt/keyfactor/wildfly-35.0.1.Final/standalone/data:size=100M
       - /opt/keyfactor/wildfly-35.0.1.Final/standalone/log:size=50M
+      - /opt/keyfactor/wildfly-35.0.1.Final/standalone/configuration:size=50M
     healthcheck:
       test:
         [

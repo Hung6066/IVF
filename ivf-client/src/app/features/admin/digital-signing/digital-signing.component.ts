@@ -36,6 +36,17 @@ export class DigitalSigningComponent implements OnInit, OnDestroy {
   workers = signal<any>(null);
   ejbcaCAs = signal<any>(null);
 
+  // SignServer management
+  selectedWorker = signal<any>(null);
+  workerLoading = signal(false);
+  workerActionResult = signal<{
+    success: boolean;
+    message?: string;
+    error?: string;
+    output?: string;
+  } | null>(null);
+  expandedWorkerId = signal<number | null>(null);
+
   // EJBCA management
   ejbcaCertificates = signal<EjbcaCertificate[]>([]);
   ejbcaCertProfiles = signal<any>(null);
@@ -143,6 +154,65 @@ export class DigitalSigningComponent implements OnInit, OnDestroy {
       next: (data) => this.workers.set(data),
       error: (err) => console.error('Failed to load workers:', err),
     });
+  }
+
+  loadWorkerDetail(workerId: number) {
+    this.workerLoading.set(true);
+    this.selectedWorker.set(null);
+    this.signingService.getSignServerWorker(workerId).subscribe({
+      next: (data) => {
+        this.selectedWorker.set(data);
+        this.workerLoading.set(false);
+      },
+      error: (err) => {
+        console.error('Failed to load worker detail:', err);
+        this.workerLoading.set(false);
+      },
+    });
+  }
+
+  toggleWorkerDetail(workerId: number) {
+    if (this.expandedWorkerId() === workerId) {
+      this.expandedWorkerId.set(null);
+      this.selectedWorker.set(null);
+    } else {
+      this.expandedWorkerId.set(workerId);
+      this.loadWorkerDetail(workerId);
+    }
+  }
+
+  reloadWorker(workerId: number) {
+    this.workerActionResult.set(null);
+    this.signingService.reloadSignServerWorker(workerId).subscribe({
+      next: (result) => {
+        this.workerActionResult.set(result);
+        this.loadWorkers(); // Refresh list
+      },
+      error: (err) => this.workerActionResult.set({ success: false, error: err.message }),
+    });
+  }
+
+  testWorkerKey(workerId: number) {
+    this.workerActionResult.set(null);
+    this.workerLoading.set(true);
+    this.signingService.testSignServerWorkerKey(workerId).subscribe({
+      next: (result) => {
+        this.workerActionResult.set(result);
+        this.workerLoading.set(false);
+      },
+      error: (err) => {
+        this.workerActionResult.set({ success: false, error: err.message });
+        this.workerLoading.set(false);
+      },
+    });
+  }
+
+  getWorkerProperties(worker: any): { key: string; value: string }[] {
+    if (!worker?.properties) return [];
+    return Object.entries(worker.properties)
+      .filter(([key]) => key !== 'KEYSTOREPASSWORD')
+      .map(([key, value]) => ({ key, value: value as string }))
+      .sort((a, b) => a.key.localeCompare(b.key));
   }
 
   loadEjbcaCAs() {

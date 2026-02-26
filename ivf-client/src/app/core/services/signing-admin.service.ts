@@ -42,6 +42,32 @@ export class SigningAdminService {
     return this.http.get(this.baseUrl + `/signserver/workers/${workerId}`);
   }
 
+  /** Reload a SignServer worker */
+  reloadSignServerWorker(workerId: number): Observable<any> {
+    return this.http.post(this.baseUrl + `/signserver/workers/${workerId}/reload`, {});
+  }
+
+  /** Test a SignServer worker's signing key */
+  testSignServerWorkerKey(workerId: number): Observable<any> {
+    return this.http.post(this.baseUrl + `/signserver/workers/${workerId}/testkey`, {});
+  }
+
+  /** Set a SignServer worker property */
+  setSignServerWorkerProperty(workerId: number, property: string, value: string): Observable<any> {
+    return this.http.put(this.baseUrl + `/signserver/workers/${workerId}/properties`, {
+      property,
+      value,
+    });
+  }
+
+  /** Remove a SignServer worker property */
+  removeSignServerWorkerProperty(workerId: number, propertyName: string): Observable<any> {
+    return this.http.delete(
+      this.baseUrl +
+        `/signserver/workers/${workerId}/properties/${encodeURIComponent(propertyName)}`,
+    );
+  }
+
   /** Check EJBCA health */
   getEjbcaHealth(): Observable<ServiceHealthDetail> {
     return this.http.get<ServiceHealthDetail>(this.baseUrl + '/ejbca/health');

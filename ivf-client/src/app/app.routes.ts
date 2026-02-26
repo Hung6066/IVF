@@ -229,6 +229,13 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'admin/backup-restore',
+        loadComponent: () =>
+          import('./features/admin/backup-restore/backup-restore.component').then(
+            (m) => m.BackupRestoreComponent,
+          ),
+      },
+      {
         path: 'forms',
         loadChildren: () => import('./features/forms/forms.routes').then((m) => m.FORMS_ROUTES),
       },

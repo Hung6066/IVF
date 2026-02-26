@@ -207,6 +207,17 @@ builder.Services.AddRateLimiter(options =>
 
 builder.Services.AddSignalR();
 builder.Services.AddSingleton<IVF.API.Hubs.IQueueNotifier, IVF.API.Hubs.QueueNotifier>();
+builder.Services.AddSingleton<IVF.API.Services.BackupCompressionService>();
+builder.Services.AddSingleton<IVF.API.Services.BackupRestoreService>();
+builder.Services.AddSingleton<IVF.API.Services.BackupSchedulerService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<IVF.API.Services.BackupSchedulerService>());
+
+// ─── Cloud Backup Provider Factory (dynamic, DB-backed) ───
+{
+    var cloudSection = builder.Configuration.GetSection(IVF.API.Services.CloudBackupSettings.SectionName);
+    builder.Services.Configure<IVF.API.Services.CloudBackupSettings>(cloudSection);
+}
+builder.Services.AddSingleton<IVF.API.Services.CloudBackupProviderFactory>();
 // Conditional Service Registration based on OS
 if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows))
 {
@@ -310,6 +321,7 @@ app.UseRateLimiter(); // Enable Rate Limiting
 app.MapHub<IVF.API.Hubs.QueueHub>("/hubs/queue");
 app.MapHub<IVF.API.Hubs.NotificationHub>("/hubs/notifications");
 app.MapHub<IVF.API.Hubs.FingerprintHub>("/hubs/fingerprint");
+app.MapHub<IVF.API.Hubs.BackupHub>("/hubs/backup");
 
 // Register Endpoints
 app.MapAuthEndpoints();
@@ -339,6 +351,7 @@ app.MapFormEndpoints();
 app.MapConceptEndpoints();
 app.MapDigitalSigningEndpoints();
 app.MapSigningAdminEndpoints();
+app.MapBackupRestoreEndpoints();
 app.MapUserSignatureEndpoints();
 app.MapPatientDocumentEndpoints();
 app.MapDocumentSignatureEndpoints();

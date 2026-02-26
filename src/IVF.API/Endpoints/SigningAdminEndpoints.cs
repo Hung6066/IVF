@@ -47,72 +47,125 @@ public static class SigningAdminEndpoints
         })
         .WithName("GetSigningDashboard");
 
-        // ─── SignServer Workers ─────────────────────────────────
+        // ─── SignServer Workers (CLI-based) ────────────────────
         group.MapGet("/signserver/workers", async (IOptions<DigitalSigningOptions> options) =>
         {
             var opts = options.Value;
             if (!opts.Enabled)
                 return Results.Ok(new { workers = Array.Empty<object>(), error = "Signing is disabled" });
 
-            try
-            {
-                using var handler = CreateHandler(opts);
-                using var client = new HttpClient(handler);
-                client.Timeout = TimeSpan.FromSeconds(opts.TimeoutSeconds);
+            var (output, error) = await RunSignServerCliAsync(opts, "getstatus brief all");
+            if (error != null)
+                return Results.Ok(new { workers = Array.Empty<object>(), error });
 
-                var url = $"{opts.SignServerUrl.TrimEnd('/')}/rest/v1/workers";
-                var response = await client.GetAsync(url);
-
-                if (response.IsSuccessStatusCode)
-                {
-                    var content = await response.Content.ReadAsStringAsync();
-                    return Results.Content(content, "application/json");
-                }
-
-                // Fallback: use the admin CLI data via process endpoint
-                return Results.Ok(new { workers = new[] { new { name = opts.WorkerName, id = opts.WorkerId ?? 1 } } });
-            }
-            catch (Exception ex)
-            {
-                return Results.Ok(new { workers = Array.Empty<object>(), error = ex.Message });
-            }
+            var workers = ParseGetStatusOutput(output!);
+            return Results.Ok(new { workers });
         })
         .WithName("GetSignServerWorkers");
 
-        // ─── SignServer Worker Detail ───────────────────────────
+        // ─── SignServer Worker Detail (CLI-based) ───────────────
         group.MapGet("/signserver/workers/{workerId:int}", async (int workerId, IOptions<DigitalSigningOptions> options) =>
         {
             var opts = options.Value;
             if (!opts.Enabled)
                 return Results.BadRequest(new { error = "Signing is disabled" });
 
-            try
+            // Get status
+            var (statusOut, statusErr) = await RunSignServerCliAsync(opts, $"getstatus brief all");
+            var allWorkers = statusOut != null ? ParseGetStatusOutput(statusOut) : [];
+            var workerStatus = allWorkers.FirstOrDefault(w => w.Id == workerId);
+
+            // Get config
+            var (configOut, configErr) = await RunSignServerCliAsync(opts, $"getconfig {workerId}");
+            var properties = configOut != null ? ParseGetConfigOutput(configOut) : new Dictionary<string, string>();
+
+            // Get authorized clients
+            var (authOut, _) = await RunSignServerCliAsync(opts, $"authorizedclients -worker {workerId} -list");
+            var authorizedClients = authOut != null ? ParseAuthorizedClients(authOut) : [];
+
+            return Results.Ok(new
             {
-                using var handler = CreateHandler(opts);
-                using var client = new HttpClient(handler);
-                client.Timeout = TimeSpan.FromSeconds(opts.TimeoutSeconds);
-
-                var url = $"{opts.SignServerUrl.TrimEnd('/')}/rest/v1/workers/{workerId}";
-                var response = await client.GetAsync(url);
-                var content = await response.Content.ReadAsStringAsync();
-
-                if (response.IsSuccessStatusCode)
-                    return Results.Content(content, "application/json");
-
-                return Results.Ok(new
-                {
-                    id = workerId,
-                    name = opts.WorkerName,
-                    status = "unknown",
-                    message = $"REST API returned {response.StatusCode}. Use SignServer Admin CLI for details."
-                });
-            }
-            catch (Exception ex)
-            {
-                return Results.Ok(new { id = workerId, error = ex.Message });
-            }
+                id = workerId,
+                name = workerStatus?.Name ?? properties.GetValueOrDefault("NAME", $"Worker-{workerId}"),
+                workerStatus = workerStatus?.WorkerStatus ?? "Unknown",
+                tokenStatus = workerStatus?.TokenStatus ?? "Unknown",
+                signings = workerStatus?.Signings ?? 0,
+                properties,
+                authorizedClients,
+                error = statusErr ?? configErr
+            });
         })
         .WithName("GetSignServerWorkerDetail");
+
+        // ─── SignServer Worker Reload ───────────────────────────
+        group.MapPost("/signserver/workers/{workerId:int}/reload", async (int workerId, IOptions<DigitalSigningOptions> options) =>
+        {
+            var opts = options.Value;
+            var (output, error) = await RunSignServerCliAsync(opts, $"reload {workerId}");
+            return error != null
+                ? Results.Ok(new { success = false, error })
+                : Results.Ok(new { success = true, message = output?.Trim() ?? "Worker reloaded" });
+        })
+        .WithName("ReloadSignServerWorker");
+
+        // ─── SignServer Worker Test Key ─────────────────────────
+        group.MapPost("/signserver/workers/{workerId:int}/testkey", async (int workerId, IOptions<DigitalSigningOptions> options) =>
+        {
+            var opts = options.Value;
+            var (output, error) = await RunSignServerCliAsync(opts, $"testkey {workerId}");
+            if (error != null)
+                return Results.Ok(new { success = false, error });
+
+            var success = output?.Contains("SUCCESS", StringComparison.OrdinalIgnoreCase) ?? false;
+            return Results.Ok(new { success, output = output?.Trim() });
+        })
+        .WithName("TestSignServerWorkerKey");
+
+        // ─── SignServer Worker Set Property ─────────────────────
+        group.MapPut("/signserver/workers/{workerId:int}/properties", async (
+            int workerId,
+            SignServerSetPropertyRequest request,
+            IOptions<DigitalSigningOptions> options) =>
+        {
+            var opts = options.Value;
+            // Validate property name (alphanumeric, underscore, dot only)
+            if (string.IsNullOrWhiteSpace(request.Property) ||
+                !System.Text.RegularExpressions.Regex.IsMatch(request.Property, @"^[A-Za-z0-9_.]+$"))
+                return Results.BadRequest(new { error = "Invalid property name" });
+
+            // Validate value doesn't contain shell-dangerous chars
+            if (request.Value != null && request.Value.Contains('\''))
+                return Results.BadRequest(new { error = "Property value cannot contain single quotes" });
+
+            var (output, error) = await RunSignServerCliAsync(opts,
+                $"setproperty {workerId} {request.Property} {request.Value ?? ""}");
+            if (error != null)
+                return Results.Ok(new { success = false, error });
+
+            // Auto-reload after setting property
+            await RunSignServerCliAsync(opts, $"reload {workerId}");
+            return Results.Ok(new { success = true, message = $"Property {request.Property} updated and worker reloaded" });
+        })
+        .WithName("SetSignServerWorkerProperty");
+
+        // ─── SignServer Worker Remove Property ──────────────────
+        group.MapDelete("/signserver/workers/{workerId:int}/properties/{propertyName}", async (
+            int workerId,
+            string propertyName,
+            IOptions<DigitalSigningOptions> options) =>
+        {
+            var opts = options.Value;
+            if (!System.Text.RegularExpressions.Regex.IsMatch(propertyName, @"^[A-Za-z0-9_.]+$"))
+                return Results.BadRequest(new { error = "Invalid property name" });
+
+            var (output, error) = await RunSignServerCliAsync(opts, $"removeproperty {workerId} {propertyName}");
+            if (error != null)
+                return Results.Ok(new { success = false, error });
+
+            await RunSignServerCliAsync(opts, $"reload {workerId}");
+            return Results.Ok(new { success = true, message = $"Property {propertyName} removed and worker reloaded" });
+        })
+        .WithName("RemoveSignServerWorkerProperty");
 
         // ─── SignServer Health ───────────────────────────────────
         group.MapGet("/signserver/health", async (IOptions<DigitalSigningOptions> options, ILogger<DigitalSigningOptions> logger) =>
@@ -963,6 +1016,167 @@ startxref
 
         return criteria;
     }
+
+    // ─── SignServer CLI Helpers ──────────────────────────────────
+
+    /// <summary>
+    /// Run a SignServer CLI command via docker exec.
+    /// Only accepts hardcoded commands with integer parameters to prevent injection.
+    /// </summary>
+    private static async Task<(string? Output, string? Error)> RunSignServerCliAsync(
+        DigitalSigningOptions opts, string cliArgs)
+    {
+        try
+        {
+            var containerName = opts.SignServerContainerName;
+            // Validate container name: alphanumeric, hyphens, underscores only
+            if (!System.Text.RegularExpressions.Regex.IsMatch(containerName, @"^[a-zA-Z0-9_-]+$"))
+                return (null, "Invalid container name");
+
+            var psi = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "docker",
+                Arguments = $"exec {containerName} /opt/signserver/bin/signserver {cliArgs}",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            using var process = System.Diagnostics.Process.Start(psi);
+            if (process == null)
+                return (null, "Failed to start docker process");
+
+            var stdout = await process.StandardOutput.ReadToEndAsync();
+            var stderr = await process.StandardError.ReadToEndAsync();
+            await process.WaitForExitAsync();
+
+            if (process.ExitCode != 0 && string.IsNullOrEmpty(stdout))
+                return (null, $"CLI error (exit {process.ExitCode}): {stderr.Trim()}");
+
+            return (stdout, null);
+        }
+        catch (Exception ex)
+        {
+            return (null, $"Docker exec failed: {ex.GetBaseException().Message}. Đảm bảo Docker đang chạy và container '{opts.SignServerContainerName}' đang hoạt động.");
+        }
+    }
+
+    private record SignServerWorkerInfo(int Id, string Name, string WorkerStatus, string TokenStatus, int Signings);
+
+    /// <summary>
+    /// Parse output of "getstatus brief all". Example:
+    /// Status of Signer with ID 1 (PDFSigner) is:
+    ///    Worker status : Active
+    ///    Token status  : Active
+    ///    Signings      : 38
+    /// </summary>
+    private static List<SignServerWorkerInfo> ParseGetStatusOutput(string output)
+    {
+        var workers = new List<SignServerWorkerInfo>();
+        var lines = output.Split('\n', StringSplitOptions.TrimEntries);
+
+        int currentId = 0;
+        string currentName = "";
+        string workerStatus = "";
+        string tokenStatus = "";
+        int signings = 0;
+
+        foreach (var line in lines)
+        {
+            // Match "Status of Signer with ID 1 (PDFSigner) is:"
+            var headerMatch = System.Text.RegularExpressions.Regex.Match(line,
+                @"Status of \w+ with ID (\d+) \(([^)]+)\)");
+            if (headerMatch.Success)
+            {
+                // Save previous worker if any
+                if (currentId > 0)
+                    workers.Add(new SignServerWorkerInfo(currentId, currentName, workerStatus, tokenStatus, signings));
+
+                currentId = int.Parse(headerMatch.Groups[1].Value);
+                currentName = headerMatch.Groups[2].Value;
+                workerStatus = "";
+                tokenStatus = "";
+                signings = 0;
+                continue;
+            }
+
+            if (line.StartsWith("Worker status", StringComparison.OrdinalIgnoreCase))
+                workerStatus = line.Split(':').LastOrDefault()?.Trim() ?? "";
+            else if (line.StartsWith("Token status", StringComparison.OrdinalIgnoreCase))
+                tokenStatus = line.Split(':').LastOrDefault()?.Trim() ?? "";
+            else if (line.StartsWith("Signings", StringComparison.OrdinalIgnoreCase))
+                int.TryParse(line.Split(':').LastOrDefault()?.Trim(), out signings);
+        }
+
+        // Don't forget last worker
+        if (currentId > 0)
+            workers.Add(new SignServerWorkerInfo(currentId, currentName, workerStatus, tokenStatus, signings));
+
+        return workers;
+    }
+
+    /// <summary>
+    /// Parse output of "getconfig {workerId}". Lines like: "  KEY=VALUE"
+    /// </summary>
+    private static Dictionary<string, string> ParseGetConfigOutput(string output)
+    {
+        var props = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var lines = output.Split('\n');
+
+        foreach (var line in lines)
+        {
+            var trimmed = line.Trim();
+            // Skip header/footer lines
+            if (string.IsNullOrEmpty(trimmed) || trimmed.StartsWith("OBSERVE") ||
+                trimmed.StartsWith("The current") || trimmed.StartsWith("Configurations") ||
+                trimmed.StartsWith("Either this") || trimmed.Contains("ERROR"))
+                continue;
+
+            var eqIdx = trimmed.IndexOf('=');
+            if (eqIdx > 0)
+            {
+                var key = trimmed[..eqIdx].Trim();
+                var val = trimmed[(eqIdx + 1)..].Trim();
+                if (!string.IsNullOrEmpty(key))
+                    props[key] = val;
+            }
+        }
+
+        return props;
+    }
+
+    /// <summary>
+    /// Parse output of "authorizedclients -worker {id} -list"
+    /// </summary>
+    private static List<object> ParseAuthorizedClients(string output)
+    {
+        var clients = new List<object>();
+        var lines = output.Split('\n', StringSplitOptions.TrimEntries);
+
+        foreach (var line in lines)
+        {
+            if (string.IsNullOrEmpty(line))
+                continue;
+
+            // SignServer format: "CERTIFICATE_SERIALNO: <serial> | ISSUER_DN_BCSTYLE: <issuer> | Description: <desc>"
+            var snMatch = System.Text.RegularExpressions.Regex.Match(line, @"CERTIFICATE_SERIALNO:\s*([^|]+)");
+            var dnMatch = System.Text.RegularExpressions.Regex.Match(line, @"ISSUER_DN_BCSTYLE:\s*([^|]+)");
+            var descMatch = System.Text.RegularExpressions.Regex.Match(line, @"Description:\s*(.+)");
+
+            if (snMatch.Success)
+            {
+                clients.Add(new
+                {
+                    serialNumber = snMatch.Groups[1].Value.Trim(),
+                    issuerDn = dnMatch.Success ? dnMatch.Groups[1].Value.Trim() : null,
+                    description = descMatch.Success ? descMatch.Groups[1].Value.Trim() : null
+                });
+            }
+        }
+
+        return clients;
+    }
 }
 
 /// <summary>
@@ -982,4 +1196,12 @@ public record EjbcaCertificateSearchRequest(
 public record EjbcaRevokeCertificateRequest(
     string IssuerDn,
     string? Reason = "UNSPECIFIED"
+);
+
+/// <summary>
+/// Request model for SignServer worker property update.
+/// </summary>
+public record SignServerSetPropertyRequest(
+    string Property,
+    string? Value
 );

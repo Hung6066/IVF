@@ -1,7 +1,7 @@
 # SignServer Security Hardening — Developer Implementation Guide
 
-> **Phiên bản:** 2.0  
-> **Ngày cập nhật:** 2026-02-22  
+> **Phiên bản:** 2.1  
+> **Ngày cập nhật:** 2026-02-23  
 > **Stack:** .NET 10 · SignServer CE 7.3.2 · WildFly 35.0.1 · Docker Compose · SoftHSM2  
 > **Mục tiêu:** Bảo mật toàn bộ kênh giao tiếp giữa IVF API và SignServer bằng mTLS + certificate authorization + PKCS#11 + compliance audit
 
@@ -20,6 +20,7 @@
 9. [Security Checklist](#9-security-checklist)
 10. [Phase 3 — Hardening & Monitoring](#10-phase-3--hardening--monitoring)
 11. [Phase 4 — Compliance & PKCS#11](#11-phase-4--compliance--pkcs11)
+12. [Phase 5 — TSA, OCSP & Certificate Lifecycle](#12-phase-5--tsa-ocsp--certificate-lifecycle)
 
 ---
 
@@ -291,26 +292,30 @@ $certPassword | Set-Content -NoNewline -Path secrets/api_cert_password.txt
 docker exec ivf-signserver keytool -import -trustcacerts \
     -alias ivf-internal-ca \
     -file /opt/keyfactor/persistent/keys/ivf-ca.pem \
-    -keystore /opt/keyfactor/persistent/keys/truststore.jks \
+    -keystore /opt/keyfactor/persistent/truststore.jks \
     -storepass changeit -noprompt
 ```
+
+> **Lưu ý:** Truststore ở `/opt/keyfactor/persistent/truststore.jks` (không phải `/keys/`). Thư mục `persistent` được mount là Docker volume nên truststore tồn tại qua container restart.
 
 #### 3.5.3. Cấu hình WildFly Elytron SSL
 
 ```bash
 docker exec ivf-signserver /opt/keyfactor/wildfly-35.0.1.Final/bin/jboss-cli.sh \
     --connect --commands="
-        /subsystem=elytron/key-store=httpsTrustStore:add(\
-            path=/opt/keyfactor/persistent/keys/truststore.jks,\
+        /subsystem=elytron/key-store=trustKS:add(\
+            path=/opt/keyfactor/persistent/truststore.jks,\
             type=JKS,\
             credential-reference={clear-text=changeit}),
         /subsystem=elytron/trust-manager=httpsTM:add(\
-            key-store=httpsTrustStore),
+            key-store=trustKS),
         /subsystem=elytron/server-ssl-context=httpsSSC:write-attribute(\
             name=trust-manager,value=httpsTM),
         /subsystem=elytron/server-ssl-context=httpsSSC:write-attribute(\
             name=want-client-auth,value=true)"
 ```
+
+> **Elytron resource names:** `trustKS` (key-store), `httpsTM` (trust-manager), `httpsSSC` (server-ssl-context). Nhất quán với `scripts/init-mtls.sh`.
 
 **`want-client-auth` vs `need-client-auth`:**
 
@@ -330,13 +335,19 @@ docker exec ivf-signserver /opt/keyfactor/wildfly-35.0.1.Final/bin/jboss-cli.sh 
 
 #### 3.5.5. Script tự động: `scripts/init-mtls.sh`
 
-Script idempotent để cấu hình mTLS sau mỗi lần container restart:
+Script idempotent cấu hình mọi bước mTLS (truststore + Elytron + reload). Hỗ trợ chạy từ **host** hoặc **trong container**:
 
 ```bash
+# Từ host (không cần docker exec):
+bash scripts/init-mtls.sh
+
+# Hoặc trong container:
 docker exec ivf-signserver bash /opt/keyfactor/persistent/init-mtls.sh
 ```
 
-Script kiểm tra nếu `httpsTrustStore` đã tồn tại thì skip; nếu chưa thì tạo tất cả. Chi tiết xem `scripts/init-mtls.sh`.
+Script kiểm tra từng resource (`trustKS`, `httpsTM`, `httpsSSC`) trước khi tạo — an toàn chạy lại nhiều lần. Chỉ reload WildFly khi có thay đổi.
+
+**Production** dùng `scripts/init-mtls-production.sh` với `need-client-auth=true` và thêm HTTP health listener trên port 8081 (để health check không cần client cert).
 
 Mount trong `docker-compose.yml`:
 
@@ -345,22 +356,24 @@ volumes:
   - ./scripts/init-mtls.sh:/opt/keyfactor/persistent/init-mtls.sh:ro
 ```
 
+> **Quan trọng:** WildFly configuration nằm trên tmpfs (`standalone/configuration`). Mỗi lần container được tạo mới (`docker compose up` sau `docker compose down`), cần chạy lại script.
+
 ### 3.6. Bước 4 — Cấu hình Workers với ClientCertAuthorizer
 
 #### Danh sách workers hiện tại
 
-| Worker ID | Worker Name       | Mô tả           |
-| --------- | ----------------- | --------------- |
-| 1         | PDFSigner         | Worker mặc định |
-| 272       | PDFSigner_drhoang | Per-user worker |
-| 444       | PDFSigner_nursele | Per-user worker |
-| 597       | PDFSigner_adminvu | Per-user worker |
-| 907       | PDFSigner_drpham  | Per-user worker |
+| Worker ID | Worker Name               | Mô tả           |
+| --------- | ------------------------- | --------------- |
+| 1         | PDFSigner                 | Worker mặc định |
+| 272       | PDFSigner_techinical      | Ký thuật viên   |
+| 444       | PDFSigner_head_department | Trưởng khoa     |
+| 597       | PDFSigner_doctor1         | Bác sĩ          |
+| 907       | PDFSigner_admin           | Quản trị viên   |
 
 #### Set AUTHTYPE trên tất cả workers
 
 ```bash
-CLI="bin/signserver"
+CLI="/opt/signserver/bin/signserver"
 SERIAL="2EB6EB968DE282D3D8E731F79081CA1405836E08"
 ISSUER="CN=IVF Internal Root CA,OU=IT Department,O=IVF Clinic,ST=Ho Chi Minh,C=VN"
 
@@ -378,15 +391,15 @@ done
 
 ```bash
 # Kiểm tra AUTHTYPE
-docker exec ivf-signserver bin/signserver getconfig 1 | grep AUTHTYPE
+docker exec ivf-signserver /opt/signserver/bin/signserver getconfig 1 | grep AUTHTYPE
 # Kết quả: AUTHTYPE=org.signserver.server.ClientCertAuthorizer
 
 # Kiểm tra authorized clients
-docker exec ivf-signserver bin/signserver listauthorizedclients 1
+docker exec ivf-signserver /opt/signserver/bin/signserver listauthorizedclients 1
 # Kết quả: SN: 2EB6EB968DE282D3D8E731F79081CA1405836E08, Issuer DN: CN=IVF...
 
 # Kiểm tra worker status
-docker exec ivf-signserver bin/signserver getstatus brief all
+docker exec ivf-signserver /opt/signserver/bin/signserver getstatus brief all
 # Tất cả 5 workers: Status: Active
 ```
 
@@ -410,6 +423,9 @@ public string? ClientCertificatePasswordFile { get; set; }
 public string? TrustedCaCertPath { get; set; }
 public bool RequireMtls { get; set; } = false;
 public bool EnableAuditLogging { get; set; } = false;
+
+// SignServer admin (CLI-based via docker exec)
+public string SignServerContainerName { get; set; } = "ivf-signserver";
 ```
 
 **Method `ResolveClientCertificatePassword()`:**
@@ -632,20 +648,23 @@ if (_options.EnableAuditLogging)
 
 ### 4.6. File: `docker-compose.yml`
 
-**SignServer service — thêm volumes:**
+**SignServer service — volumes và tmpfs:**
 
 ```yaml
 signserver:
   environment:
     - SIGNSERVER_NODEID=node1 # Ổn định worker ID
   ports:
-    - "9443:8443" # HTTPS Admin
-    - "127.0.0.1:9080:8080" # HTTP localhost only
+    - "9443:8443" # HTTPS Admin (không expose HTTP 8080)
+  tmpfs:
+    - standalone/configuration:size=50M # WildFly config (cho jboss-cli ghi trong read_only)
   volumes:
     - signserver_persistent:/opt/keyfactor/persistent
     - ./certs/ca/ca.pem:/opt/keyfactor/persistent/keys/ivf-ca.pem:ro
     - ./scripts/init-mtls.sh:/opt/keyfactor/persistent/init-mtls.sh:ro
 ```
+
+> **`standalone/configuration` tmpfs:** Cần thiết để `jboss-cli.sh` ghi được `standalone.xml` khi service dùng `read_only: true`. Mất khi container recreate nên cần `init-mtls.sh` sau mỗi `docker compose up`.
 
 **API service — mount certs:**
 
@@ -777,8 +796,8 @@ docker compose up -d
 # 4. Chờ SignServer healthy (~2 phút)
 docker compose logs -f signserver  # chờ "ALLOK"
 
-# 5. Cấu hình mTLS trên WildFly
-docker exec ivf-signserver bash /opt/keyfactor/persistent/init-mtls.sh
+# 5. Cấu hình mTLS trên WildFly (chạy từ host)
+bash scripts/init-mtls.sh
 
 # 6. Cấu hình workers (nếu chưa có worker nào)
 # Chạy signserver-init.sh hoặc tạo worker qua Admin UI
@@ -786,12 +805,12 @@ docker exec ivf-signserver bash /opt/keyfactor/persistent/init-mtls.sh
 
 # 7. Set AUTHTYPE cho tất cả workers
 SERIAL=$(cat certs/api/api-client-serial.txt)
-for WID in 1; do
-    docker exec ivf-signserver bin/signserver setproperty $WID AUTHTYPE \
+for WID in 1 272 444 597 907; do
+    docker exec ivf-signserver /opt/signserver/bin/signserver setproperty $WID AUTHTYPE \
         org.signserver.server.ClientCertAuthorizer
-    docker exec ivf-signserver bin/signserver addauthorizedclient $WID \
+    docker exec ivf-signserver /opt/signserver/bin/signserver addauthorizedclient $WID \
         $SERIAL "CN=IVF Internal Root CA,OU=IT Department,O=IVF Clinic,ST=Ho Chi Minh,C=VN"
-    docker exec ivf-signserver bin/signserver reload $WID
+    docker exec ivf-signserver /opt/signserver/bin/signserver reload $WID
 done
 
 # 8. Start API
@@ -808,8 +827,8 @@ dotnet run
 Sau khi `docker compose restart signserver`:
 
 ```bash
-# WildFly mất Elytron config khi restart → chạy lại init-mtls.sh
-docker exec ivf-signserver bash /opt/keyfactor/persistent/init-mtls.sh
+# WildFly mất Elytron config khi restart → chạy lại init-mtls.sh từ host
+bash scripts/init-mtls.sh
 
 # Worker config + authorized clients persist trong DB → không cần cấu hình lại
 ```
@@ -1945,4 +1964,142 @@ IVF/
 │   └── Program.cs                     # + Service registration, security headers
 ├── docker-compose.yml                 # + signserver-softhsm, trivy-scan profiles
 └── docker-compose.production.yml      # + PKCS#11 env, SoftHSM2 secrets
+```
+
+---
+
+## 12. Phase 5 — TSA, OCSP & Certificate Lifecycle
+
+### 12.1. Timestamp Authority (TSA)
+
+RFC 3161 timestamp cho PAdES-LTV (Long-Term Validation). PDF signatures include a trusted timestamp proving the document was signed at a specific time, even after the signer's certificate expires.
+
+**Setup:**
+
+```bash
+# Tạo TimeStampSigner worker (ID=100) + cấu hình PDFSigner TSA_WORKER
+bash scripts/init-tsa.sh
+```
+
+Script `init-tsa.sh`:
+
+1. Tạo TSA keystore (`tsa-signer.p12`) với EKU=timeStamping
+2. Tạo worker `TimeStampSigner` (ID=100) với `TimeStampSigner` implementation
+3. Set `TSA_WORKER=TimeStampSigner` trên tất cả 5 PDFSigner workers
+4. Copy ClientCertAuthorizer config từ PDFSigner (nếu mTLS đã bật)
+
+**Config (`appsettings.Production.json`):**
+
+```jsonc
+{
+  "DigitalSigning": {
+    "TsaWorkerName": "TimeStampSigner", // Tên worker TSA
+  },
+}
+```
+
+### 12.2. OCSP Responder
+
+EJBCA CE có built-in OCSP responder tại `/ejbca/publicweb/status/ocsp`.
+
+**Setup:**
+
+```bash
+# Cấu hình OCSP responder settings
+bash scripts/init-ocsp.sh
+```
+
+Script `init-ocsp.sh`:
+
+1. Verify EJBCA health
+2. Configure signature algorithm (SHA256WithRSA)
+3. Set default responder CA
+4. Test OCSP endpoint
+
+**Config (`appsettings.Production.json`):**
+
+```jsonc
+{
+  "DigitalSigning": {
+    "OcspResponderUrl": "https://ejbca:8443/ejbca/publicweb/status/ocsp",
+  },
+}
+```
+
+**Manual AIA extension** (EJBCA Admin UI):
+
+1. Certificate Profiles → Edit → X.509v3 extensions → Authority Information Access
+2. Add OCSP URI: `https://ejbca:8443/ejbca/publicweb/status/ocsp`
+
+### 12.3. EJBCA Certificate Enrollment
+
+Thay self-signed keystore bằng EJBCA-issued certificate cho PAdES chain-of-trust.
+
+```bash
+# Enroll tất cả workers + TSA
+bash scripts/enroll-ejbca-certs.sh
+
+# Chỉ 1 worker
+bash scripts/enroll-ejbca-certs.sh --worker 1
+
+# Chỉ TSA
+bash scripts/enroll-ejbca-certs.sh --tsa
+
+# Preview (không thay đổi)
+bash scripts/enroll-ejbca-certs.sh --dry-run
+```
+
+**Prerequisites:**
+
+- EJBCA Certificate Profile: `IVF-PDFSigner-Profile` (Key Usage: digitalSignature, nonRepudiation)
+- EJBCA End Entity Profile: `IVF-Signer-EEProfile`
+- CA: `ManagementCA` (hoặc custom CA name via `--ca`)
+
+### 12.4. CA Keys Backup
+
+```bash
+# Full backup (certs + EJBCA data + SignServer data + EJBCA DB)
+bash scripts/backup-ca-keys.sh
+
+# Certificate files only
+bash scripts/backup-ca-keys.sh --keys-only
+
+# Custom output directory
+bash scripts/backup-ca-keys.sh --output /mnt/backup/
+```
+
+Output: `backups/ivf-ca-backup_YYYYMMDD_HHMMSS.tar.gz`
+
+**Encrypt for offsite storage:**
+
+```bash
+openssl enc -aes-256-cbc -salt -pbkdf2 \
+  -in backups/ivf-ca-backup_*.tar.gz \
+  -out backups/ivf-ca-backup_*.tar.gz.enc
+```
+
+### 12.5. Phase 5 Security Checklist
+
+### Phase 5 ✅ COMPLETED
+
+- [x] **TSA worker**: `scripts/init-tsa.sh` (TimeStampSigner ID=100, RFC 3161)
+- [x] **PDFSigner TSA integration**: `TSA_WORKER=TimeStampSigner` on all 5 workers
+- [x] **OCSP responder**: `scripts/init-ocsp.sh` (EJBCA built-in, SHA256WithRSA)
+- [x] **EJBCA cert enrollment**: `scripts/enroll-ejbca-certs.sh` (replace self-signed, batch or per-worker)
+- [x] **CA keys backup**: `scripts/backup-ca-keys.sh` (full + keys-only modes, encrypted archive)
+- [x] **TSA config**: `TsaWorkerName` in `DigitalSigningOptions`
+- [x] **OCSP config**: `OcspResponderUrl` in `DigitalSigningOptions`
+- [x] **Production config**: `appsettings.Production.json` updated with TSA + OCSP settings
+- [x] **TLS validation**: `SkipTlsValidation: false` in production (already Phase 2)
+- [x] **Docker mount**: `init-tsa.sh` mounted read-only in both signserver services
+
+### 12.6. Post-Deploy Sequence (Phase 5)
+
+```bash
+# After docker compose up -d:
+bash scripts/init-mtls.sh          # 1. mTLS (WildFly Elytron)
+bash scripts/init-tsa.sh           # 2. TSA worker + PDFSigner integration
+bash scripts/init-ocsp.sh          # 3. OCSP responder config
+bash scripts/enroll-ejbca-certs.sh # 4. EJBCA-issued certs (optional, replaces self-signed)
+bash scripts/backup-ca-keys.sh     # 5. Backup before going live
 ```

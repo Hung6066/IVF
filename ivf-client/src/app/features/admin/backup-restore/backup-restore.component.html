@@ -1,0 +1,903 @@
+<div class="backup-restore-page">
+  <!-- Header -->
+  <div class="page-header">
+    <h2>🗄️ Sao lưu & Khôi phục</h2>
+    <p class="subtitle">Quản lý backup/restore EJBCA & SignServer</p>
+  </div>
+
+  <!-- Running operations banner -->
+  @if (runningOps.length > 0) {
+    <div class="running-banner">
+      <span class="spinner"></span>
+      <span>Đang chạy {{ runningOps.length }} thao tác...</span>
+      <button class="btn btn-sm btn-outline" (click)="viewOperationLogs(runningOps[0].id)">
+        Xem logs
+      </button>
+    </div>
+  }
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button [class.active]="activeTab === 'overview'" (click)="switchTab('overview')">
+      Tổng quan
+    </button>
+    <button [class.active]="activeTab === 'archives'" (click)="switchTab('archives')">
+      Bản sao lưu
+    </button>
+    <button [class.active]="activeTab === 'restore'" (click)="switchTab('restore')">
+      Khôi phục
+    </button>
+    <button [class.active]="activeTab === 'history'" (click)="switchTab('history')">Lịch sử</button>
+    <button [class.active]="activeTab === 'schedule'" (click)="switchTab('schedule')">
+      ⏰ Lịch tự động
+    </button>
+    <button [class.active]="activeTab === 'cloud'" (click)="switchTab('cloud')">☁️ Cloud</button>
+    @if (activeOperation()) {
+      <button [class.active]="activeTab === 'live'" (click)="switchTab('live')">
+        📋 Logs
+        @if (activeOperation()?.status === 'Running') {
+          <span class="spinner-sm"></span>
+        }
+      </button>
+    }
+  </div>
+
+  <!-- Tab content -->
+  <div class="tab-content">
+    <!-- ═══ Overview tab ═══ -->
+    @if (activeTab === 'overview') {
+      <div class="overview-grid">
+        <!-- Backup card -->
+        <div class="card">
+          <div class="card-header">
+            <h3>💾 Sao lưu mới</h3>
+          </div>
+          <div class="card-body">
+            <p>Tạo bản sao lưu đầy đủ bao gồm:</p>
+            <ul>
+              <li>Certificate files & secrets</li>
+              <li>EJBCA persistent data & DB</li>
+              <li>SignServer persistent data & DB</li>
+            </ul>
+            <div class="btn-group">
+              <button class="btn btn-primary" [disabled]="loading()" (click)="startBackup(false)">
+                @if (loading()) {
+                  <span class="spinner-sm"></span>
+                }
+                Sao lưu đầy đủ
+              </button>
+              <button class="btn btn-outline" [disabled]="loading()" (click)="startBackup(true)">
+                Chỉ Keys
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Stats card -->
+        <div class="card">
+          <div class="card-header">
+            <h3>📊 Thống kê</h3>
+          </div>
+          <div class="card-body">
+            <div class="stat-grid">
+              <div class="stat">
+                <span class="stat-value">{{ archives().length }}</span>
+                <span class="stat-label">Bản sao lưu</span>
+              </div>
+              <div class="stat">
+                <span class="stat-value">{{ operations().length }}</span>
+                <span class="stat-label">Thao tác</span>
+              </div>
+              <div class="stat">
+                <span class="stat-value">{{ runningOps.length }}</span>
+                <span class="stat-label">Đang chạy</span>
+              </div>
+              @if (archives().length > 0) {
+                <div class="stat">
+                  <span class="stat-value">{{ formatSize(archives()[0].sizeBytes) }}</span>
+                  <span class="stat-label">Mới nhất</span>
+                </div>
+              }
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick restore card -->
+        <div class="card">
+          <div class="card-header">
+            <h3>🔄 Khôi phục nhanh</h3>
+          </div>
+          <div class="card-body">
+            @if (archives().length > 0) {
+              <p>Bản sao lưu mới nhất:</p>
+              <div class="archive-quick">
+                <strong>{{ archives()[0].fileName }}</strong>
+                <span class="text-muted"
+                  >{{ formatSize(archives()[0].sizeBytes) }} ·
+                  {{ formatDate(archives()[0].createdAt) }}</span
+                >
+              </div>
+              <div class="btn-group">
+                <button
+                  class="btn btn-outline"
+                  (click)="selectArchiveForRestore(archives()[0].fileName)"
+                >
+                  Khôi phục
+                </button>
+              </div>
+            } @else {
+              <p class="text-muted">Chưa có bản sao lưu nào</p>
+            }
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- ═══ Archives tab ═══ -->
+    @if (activeTab === 'archives') {
+      <div class="card">
+        <div class="card-header">
+          <h3>Danh sách bản sao lưu</h3>
+          <button class="btn btn-sm btn-outline" (click)="loadArchives()">Làm mới</button>
+        </div>
+        @if (archives().length === 0) {
+          <div class="card-body empty">
+            <p>Chưa có bản sao lưu nào. Nhấn "Sao lưu đầy đủ" để tạo.</p>
+          </div>
+        } @else {
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Tên file</th>
+                <th>Kích thước</th>
+                <th>Ngày tạo</th>
+                <th>Thao tác</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (archive of archives(); track archive.fileName) {
+                <tr>
+                  <td>
+                    <code>{{ archive.fileName }}</code>
+                  </td>
+                  <td>{{ formatSize(archive.sizeBytes) }}</td>
+                  <td>{{ formatDate(archive.createdAt) }}</td>
+                  <td>
+                    <button
+                      class="btn btn-sm btn-outline"
+                      (click)="selectArchiveForRestore(archive.fileName)"
+                    >
+                      Khôi phục
+                    </button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        }
+      </div>
+    }
+
+    <!-- ═══ Restore tab ═══ -->
+    @if (activeTab === 'restore') {
+      <div class="card">
+        <div class="card-header">
+          <h3>🔄 Khôi phục từ backup</h3>
+        </div>
+        <div class="card-body">
+          <div class="form-group">
+            <label>Chọn bản sao lưu:</label>
+            <select [(ngModel)]="selectedArchive" class="form-control">
+              <option value="">-- Chọn --</option>
+              @for (archive of archives(); track archive.fileName) {
+                <option [value]="archive.fileName">
+                  {{ archive.fileName }} ({{ formatSize(archive.sizeBytes) }})
+                </option>
+              }
+            </select>
+          </div>
+
+          <div class="form-group checkbox-group">
+            <label>
+              <input type="checkbox" [(ngModel)]="restoreDryRun" />
+              Chạy thử (dry-run) — không thay đổi dữ liệu
+            </label>
+          </div>
+
+          <div class="form-group checkbox-group">
+            <label>
+              <input type="checkbox" [(ngModel)]="restoreKeysOnly" />
+              Chỉ khôi phục keys — bỏ qua dữ liệu container
+            </label>
+          </div>
+
+          @if (!restoreDryRun) {
+            <div class="warning-box">
+              ⚠️ <strong>Lưu ý:</strong> Khôi phục sẽ ghi đè database EJBCA & SignServer. Sau khôi
+              phục cần restart containers và re-apply mTLS/TSA.
+            </div>
+          }
+
+          <div class="btn-group">
+            <button
+              class="btn btn-primary"
+              [disabled]="!selectedArchive || loading()"
+              (click)="startRestore()"
+            >
+              @if (loading()) {
+                <span class="spinner-sm"></span>
+              }
+              {{ restoreDryRun ? 'Chạy thử' : 'Bắt đầu khôi phục' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- ═══ History tab ═══ -->
+    @if (activeTab === 'history') {
+      <div class="card">
+        <div class="card-header">
+          <h3>Lịch sử thao tác</h3>
+          <button class="btn btn-sm btn-outline" (click)="loadOperations()">Làm mới</button>
+        </div>
+        @if (recentOps.length === 0) {
+          <div class="card-body empty">
+            <p>Chưa có thao tác nào.</p>
+          </div>
+        } @else {
+          <table class="table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Loại</th>
+                <th>Trạng thái</th>
+                <th>Người thực hiện</th>
+                <th>Bắt đầu</th>
+                <th>Thời gian</th>
+                <th>Archive</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (op of recentOps; track op.id) {
+                <tr>
+                  <td>
+                    <code class="op-id">{{ op.id }}</code>
+                  </td>
+                  <td>
+                    <span
+                      class="type-badge"
+                      [class.backup]="op.type === 'Backup'"
+                      [class.restore]="op.type === 'Restore'"
+                    >
+                      {{ op.type === 'Backup' ? '💾 Backup' : '🔄 Restore' }}
+                    </span>
+                  </td>
+                  <td>
+                    <span class="badge" [ngClass]="getStatusBadgeClass(op.status)">
+                      @if (op.status === 'Running') {
+                        <span class="spinner-sm"></span>
+                      }
+                      {{ op.status }}
+                    </span>
+                  </td>
+                  <td>{{ op.startedBy }}</td>
+                  <td>{{ formatDate(op.startedAt) }}</td>
+                  <td>{{ formatDuration(op) }}</td>
+                  <td>
+                    @if (op.archivePath) {
+                      <code class="archive-name">{{ op.archivePath }}</code>
+                    }
+                  </td>
+                  <td>
+                    <button class="btn btn-sm btn-outline" (click)="viewOperationLogs(op.id)">
+                      Logs
+                    </button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        }
+      </div>
+    }
+
+    <!-- ═══ Schedule tab ═══ -->
+    @if (activeTab === 'schedule') {
+      <div class="schedule-grid">
+        <!-- Schedule config card -->
+        <div class="card">
+          <div class="card-header">
+            <h3>⏰ Cấu hình lịch tự động</h3>
+          </div>
+          <div class="card-body">
+            <div class="form-group checkbox-group">
+              <label>
+                <input type="checkbox" [(ngModel)]="scheduleEnabled" />
+                Bật sao lưu tự động
+              </label>
+            </div>
+
+            <div class="form-group">
+              <label>Biểu thức Cron (UTC)</label>
+              <input
+                type="text"
+                class="form-control"
+                [(ngModel)]="scheduleCron"
+                placeholder="0 2 * * *"
+              />
+              <div class="cron-hint">
+                {{ describeCron(scheduleCron) }}
+              </div>
+              <div class="cron-examples">
+                <span class="cron-example" (click)="scheduleCron = '0 2 * * *'">Hàng ngày 2h</span>
+                <span class="cron-example" (click)="scheduleCron = '0 3 * * 0'"
+                  >CN hàng tuần 3h</span
+                >
+                <span class="cron-example" (click)="scheduleCron = '0 1 1 * *'"
+                  >Ngày 1 hàng tháng</span
+                >
+                <span class="cron-example" (click)="scheduleCron = '0 */6 * * *'">Mỗi 6 giờ</span>
+              </div>
+            </div>
+
+            <div class="form-group checkbox-group">
+              <label>
+                <input type="checkbox" [(ngModel)]="scheduleKeysOnly" />
+                Chỉ sao lưu keys (bỏ qua DB)
+              </label>
+            </div>
+
+            <div class="form-group checkbox-group">
+              <label>
+                <input type="checkbox" [(ngModel)]="scheduleCloudSync" />
+                ☁️ Tự động đồng bộ cloud sau backup
+              </label>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label>Giữ lại (ngày)</label>
+                <input
+                  type="number"
+                  class="form-control"
+                  [(ngModel)]="scheduleRetentionDays"
+                  min="1"
+                  max="365"
+                />
+              </div>
+              <div class="form-group">
+                <label>Tối đa bản sao</label>
+                <input
+                  type="number"
+                  class="form-control"
+                  [(ngModel)]="scheduleMaxCount"
+                  min="1"
+                  max="500"
+                />
+              </div>
+            </div>
+
+            <div class="btn-group">
+              <button class="btn btn-primary" (click)="saveSchedule()" [disabled]="scheduleSaving">
+                @if (scheduleSaving) {
+                  <span class="spinner-sm"></span>
+                }
+                Lưu cấu hình
+              </button>
+              <button class="btn btn-outline" (click)="loadSchedule()">Đặt lại</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Schedule status card -->
+        <div class="card">
+          <div class="card-header">
+            <h3>📊 Trạng thái</h3>
+          </div>
+          <div class="card-body">
+            @if (schedule(); as s) {
+              <div class="status-list">
+                <div class="status-item">
+                  <span class="status-label">Trạng thái</span>
+                  <span class="badge" [ngClass]="s.enabled ? 'badge-success' : 'badge-secondary'">
+                    {{ s.enabled ? '✅ Đang bật' : '⏸️ Đã tắt' }}
+                  </span>
+                </div>
+                <div class="status-item">
+                  <span class="status-label">Lịch</span>
+                  <span>{{ describeCron(s.cronExpression) }}</span>
+                </div>
+                <div class="status-item">
+                  <span class="status-label">Cloud sync</span>
+                  <span
+                    class="badge"
+                    [ngClass]="s.cloudSyncEnabled ? 'badge-success' : 'badge-secondary'"
+                  >
+                    {{ s.cloudSyncEnabled ? '☁️ Bật' : '⏸️ Tắt' }}
+                  </span>
+                </div>
+                @if (s.nextScheduledRun) {
+                  <div class="status-item">
+                    <span class="status-label">Chạy tiếp theo</span>
+                    <span>{{ formatDate(s.nextScheduledRun) }}</span>
+                  </div>
+                }
+                @if (s.lastScheduledRun) {
+                  <div class="status-item">
+                    <span class="status-label">Chạy gần nhất</span>
+                    <span>{{ formatDate(s.lastScheduledRun) }}</span>
+                  </div>
+                }
+                @if (s.lastScheduledOperationId) {
+                  <div class="status-item">
+                    <span class="status-label">Operation ID</span>
+                    <button
+                      class="btn btn-sm btn-outline"
+                      (click)="viewOperationLogs(s.lastScheduledOperationId!)"
+                    >
+                      Xem logs
+                    </button>
+                  </div>
+                }
+                <div class="status-item">
+                  <span class="status-label">Chính sách xóa</span>
+                  <span>Giữ {{ s.retentionDays }} ngày, tối đa {{ s.maxBackupCount }} bản</span>
+                </div>
+              </div>
+            } @else {
+              <p class="text-muted">Đang tải...</p>
+            }
+
+            <div class="btn-group" style="margin-top: 16px">
+              <button class="btn btn-outline" (click)="runCleanup()" [disabled]="cleanupRunning">
+                @if (cleanupRunning) {
+                  <span class="spinner-sm"></span>
+                }
+                🧹 Dọn dẹp ngay
+              </button>
+              <button class="btn btn-outline" (click)="loadSchedule()">🔄 Làm mới</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- ═══ Cloud tab ═══ -->
+    @if (activeTab === 'cloud') {
+      <!-- Cloud Config Card -->
+      <div class="card" style="margin-bottom: 16px">
+        <div class="card-header">
+          <h3>⚙️ Cấu hình Cloud Provider</h3>
+        </div>
+        <div class="card-body">
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Provider</label>
+              <select [(ngModel)]="cloudConfigProvider" class="form-control">
+                <option value="MinIO">MinIO (S3-compatible)</option>
+                <option value="S3">AWS S3</option>
+                <option value="Azure">Azure Blob Storage</option>
+                <option value="GCS">Google Cloud Storage</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>
+                <input type="checkbox" [(ngModel)]="cloudConfigCompression" />
+                Nén Brotli trước khi upload
+              </label>
+            </div>
+          </div>
+
+          <!-- S3 / MinIO Settings -->
+          @if (cloudConfigProvider === 'MinIO' || cloudConfigProvider === 'S3') {
+            <h4 style="margin-top: 12px">
+              🪣 {{ cloudConfigProvider === 'MinIO' ? 'MinIO' : 'AWS S3' }} Settings
+            </h4>
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Region</label>
+                <input
+                  type="text"
+                  [(ngModel)]="cloudConfigS3Region"
+                  class="form-control"
+                  placeholder="us-east-1"
+                />
+              </div>
+              <div class="form-group">
+                <label>Bucket Name</label>
+                <input
+                  type="text"
+                  [(ngModel)]="cloudConfigS3Bucket"
+                  class="form-control"
+                  placeholder="ivf-backups"
+                />
+              </div>
+              <div class="form-group">
+                <label>Access Key</label>
+                <input
+                  type="text"
+                  [(ngModel)]="cloudConfigS3AccessKey"
+                  class="form-control"
+                  placeholder="Access Key"
+                />
+              </div>
+              <div class="form-group">
+                <label>Secret Key</label>
+                <input
+                  type="password"
+                  [(ngModel)]="cloudConfigS3SecretKey"
+                  class="form-control"
+                  placeholder="Secret Key"
+                />
+              </div>
+              @if (cloudConfigProvider === 'MinIO') {
+                <div class="form-group">
+                  <label>Service URL</label>
+                  <input
+                    type="text"
+                    [(ngModel)]="cloudConfigS3ServiceUrl"
+                    class="form-control"
+                    placeholder="http://localhost:9000"
+                  />
+                </div>
+                <div class="form-group">
+                  <label>
+                    <input type="checkbox" [(ngModel)]="cloudConfigS3ForcePathStyle" />
+                    Force Path Style
+                  </label>
+                </div>
+              }
+            </div>
+          }
+
+          <!-- Azure Settings -->
+          @if (cloudConfigProvider === 'Azure') {
+            <h4 style="margin-top: 12px">☁️ Azure Blob Storage Settings</h4>
+            <div class="form-grid">
+              <div class="form-group" style="grid-column: 1 / -1">
+                <label>Connection String</label>
+                <input
+                  type="password"
+                  [(ngModel)]="cloudConfigAzureConnStr"
+                  class="form-control"
+                  placeholder="DefaultEndpointsProtocol=https;..."
+                />
+              </div>
+              <div class="form-group">
+                <label>Container Name</label>
+                <input
+                  type="text"
+                  [(ngModel)]="cloudConfigAzureContainer"
+                  class="form-control"
+                  placeholder="ivf-backups"
+                />
+              </div>
+            </div>
+          }
+
+          <!-- GCS Settings -->
+          @if (cloudConfigProvider === 'GCS') {
+            <h4 style="margin-top: 12px">🌐 Google Cloud Storage Settings</h4>
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Project ID</label>
+                <input
+                  type="text"
+                  [(ngModel)]="cloudConfigGcsProjectId"
+                  class="form-control"
+                  placeholder="my-project-id"
+                />
+              </div>
+              <div class="form-group">
+                <label>Bucket Name</label>
+                <input
+                  type="text"
+                  [(ngModel)]="cloudConfigGcsBucket"
+                  class="form-control"
+                  placeholder="ivf-backups"
+                />
+              </div>
+              <div class="form-group" style="grid-column: 1 / -1">
+                <label>Credentials Path (JSON key file)</label>
+                <input
+                  type="text"
+                  [(ngModel)]="cloudConfigGcsCredentialsPath"
+                  class="form-control"
+                  placeholder="/path/to/service-account.json"
+                />
+              </div>
+            </div>
+          }
+
+          <!-- Test connection result -->
+          @if (cloudTestResult(); as tr) {
+            <div class="test-result" style="margin-top: 8px">
+              <span class="badge" [ngClass]="tr.connected ? 'badge-success' : 'badge-danger'">
+                {{ tr.connected ? '✅ Kết nối thành công' : '❌ Kết nối thất bại' }} —
+                {{ tr.provider }}
+              </span>
+            </div>
+          }
+
+          <div class="btn-group" style="margin-top: 12px">
+            <button
+              class="btn btn-outline"
+              [disabled]="cloudConfigTesting"
+              (click)="testCloudConnection()"
+            >
+              @if (cloudConfigTesting) {
+                <span class="spinner-sm"></span> Đang kiểm tra...
+              } @else {
+                🔌 Test kết nối
+              }
+            </button>
+            <button
+              class="btn btn-primary"
+              [disabled]="cloudConfigSaving"
+              (click)="saveCloudConfig()"
+            >
+              @if (cloudConfigSaving) {
+                <span class="spinner-sm"></span> Đang lưu...
+              } @else {
+                💾 Lưu cấu hình
+              }
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="schedule-grid">
+        <!-- Cloud status card -->
+        <div class="card">
+          <div class="card-header">
+            <h3>☁️ Trạng thái Cloud</h3>
+            <button class="btn btn-sm btn-outline" (click)="loadCloudData()">🔄 Làm mới</button>
+          </div>
+          <div class="card-body">
+            @if (cloudStatus(); as cs) {
+              <div class="status-list">
+                <div class="status-item">
+                  <span class="status-label">Provider</span>
+                  <span class="badge badge-info">{{ cs.providerName }}</span>
+                </div>
+                <div class="status-item">
+                  <span class="status-label">Kết nối</span>
+                  <span class="badge" [ngClass]="cs.connected ? 'badge-success' : 'badge-danger'">
+                    {{ cs.connected ? '✅ Đã kết nối' : '❌ Mất kết nối' }}
+                  </span>
+                </div>
+                <div class="status-item">
+                  <span class="status-label">Nén dữ liệu</span>
+                  <span
+                    class="badge"
+                    [ngClass]="cs.compressionEnabled ? 'badge-success' : 'badge-secondary'"
+                  >
+                    {{ cs.compressionEnabled ? '🗜️ Brotli (bật)' : '⏸️ Tắt' }}
+                  </span>
+                </div>
+                <div class="status-item">
+                  <span class="status-label">Số bản sao</span>
+                  <span>{{ cs.backupCount }}</span>
+                </div>
+                <div class="status-item">
+                  <span class="status-label">Tổng dung lượng</span>
+                  <span>{{ formatSize(cs.totalSizeBytes) }}</span>
+                </div>
+              </div>
+            } @else {
+              <p class="text-muted">Đang kiểm tra kết nối...</p>
+            }
+          </div>
+        </div>
+
+        <!-- Upload to cloud card -->
+        <div class="card">
+          <div class="card-header">
+            <h3>⬆️ Upload lên Cloud</h3>
+          </div>
+          <div class="card-body">
+            @if (archives().length === 0) {
+              <p class="text-muted">Chưa có bản sao lưu local nào</p>
+            } @else {
+              <p>Chọn bản sao lưu local để upload (có nén Brotli):</p>
+              <div class="archive-upload-list">
+                @for (archive of archives(); track archive.fileName) {
+                  <div class="archive-upload-item">
+                    <div class="archive-upload-info">
+                      <code>{{ archive.fileName }}</code>
+                      <span class="text-muted">{{ formatSize(archive.sizeBytes) }}</span>
+                    </div>
+                    <button
+                      class="btn btn-sm btn-primary"
+                      [disabled]="cloudUploading() !== null"
+                      (click)="uploadToCloud(archive.fileName)"
+                    >
+                      @if (cloudUploading() === archive.fileName) {
+                        <span class="spinner-sm"></span> Đang nén & upload...
+                      } @else {
+                        ⬆️ Upload
+                      }
+                    </button>
+                  </div>
+                }
+              </div>
+            }
+
+            <!-- Upload result -->
+            @if (lastUploadResult(); as ur) {
+              <div class="compression-stats">
+                <h4>📊 Kết quả upload & nén</h4>
+                <div class="stat-grid">
+                  <div class="stat">
+                    <span class="stat-value">{{ formatSize(ur.originalSizeBytes) }}</span>
+                    <span class="stat-label">Gốc</span>
+                  </div>
+                  @if (ur.compressedSizeBytes) {
+                    <div class="stat">
+                      <span class="stat-value">{{ formatSize(ur.compressedSizeBytes) }}</span>
+                      <span class="stat-label">Sau nén</span>
+                    </div>
+                    <div class="stat">
+                      <span class="stat-value">{{ ur.compressionRatioPercent?.toFixed(1) }}%</span>
+                      <span class="stat-label">Tỷ lệ nén</span>
+                    </div>
+                    <div class="stat">
+                      <span class="stat-value">{{ ur.compressionDurationMs }}ms</span>
+                      <span class="stat-label">Thời gian nén</span>
+                    </div>
+                  }
+                  <div class="stat">
+                    <span class="stat-value">{{ formatSize(ur.cloudSizeBytes) }}</span>
+                    <span class="stat-label">Trên Cloud</span>
+                  </div>
+                </div>
+                @if (ur.compressedSizeBytes && ur.originalSizeBytes > ur.compressedSizeBytes) {
+                  <div class="compression-savings">
+                    💰 Tiết kiệm:
+                    {{ formatSize(ur.originalSizeBytes - ur.compressedSizeBytes) }} ({{
+                      (100 - (ur.compressionRatioPercent ?? 100)).toFixed(1)
+                    }}%)
+                  </div>
+                }
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+
+      <!-- Cloud backups list -->
+      <div class="card" style="margin-top: 16px">
+        <div class="card-header">
+          <h3>📦 Bản sao lưu trên Cloud</h3>
+          <button class="btn btn-sm btn-outline" (click)="loadCloudData()">Làm mới</button>
+        </div>
+        @if (cloudBackups().length === 0) {
+          <div class="card-body empty">
+            <p>Chưa có bản sao lưu nào trên cloud.</p>
+          </div>
+        } @else {
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Object Key</th>
+                <th>Kích thước</th>
+                <th>Ngày sửa đổi</th>
+                <th>Thao tác</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (obj of cloudBackups(); track obj.objectKey) {
+                <tr>
+                  <td>
+                    <code>{{ obj.fileName }}</code>
+                    @if (obj.fileName.endsWith('.br')) {
+                      <span class="badge badge-info" style="margin-left: 6px">🗜️ Brotli</span>
+                    }
+                  </td>
+                  <td>{{ formatSize(obj.sizeBytes) }}</td>
+                  <td>{{ formatDate(obj.lastModified) }}</td>
+                  <td>
+                    <div class="btn-group">
+                      <button
+                        class="btn btn-sm btn-outline"
+                        [disabled]="cloudDownloading() !== null"
+                        (click)="downloadFromCloud(obj.objectKey)"
+                      >
+                        @if (cloudDownloading() === obj.objectKey) {
+                          <span class="spinner-sm"></span>
+                        }
+                        ⬇️ Tải về
+                      </button>
+                      <button
+                        class="btn btn-sm btn-danger"
+                        (click)="deleteFromCloud(obj.objectKey)"
+                      >
+                        🗑️ Xóa
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        }
+      </div>
+    }
+
+    <!-- ═══ Live logs tab ═══ -->
+    @if (activeTab === 'live') {
+      <div class="card log-card">
+        <div class="card-header">
+          <div class="log-header-left">
+            <h3>
+              @if (activeOperation(); as op) {
+                {{ op.type === 'Backup' ? '💾' : '🔄' }}
+                {{ op.id }}
+              }
+            </h3>
+            @if (activeOperation(); as op) {
+              <span class="badge" [ngClass]="getStatusBadgeClass(op.status)">
+                @if (op.status === 'Running') {
+                  <span class="spinner-sm"></span>
+                }
+                {{ op.status }}
+              </span>
+              <span class="text-muted">{{ formatDuration(op) }}</span>
+            }
+          </div>
+          <div class="log-header-right">
+            <label class="auto-scroll-toggle">
+              <input type="checkbox" [(ngModel)]="autoScroll" />
+              Auto-scroll
+            </label>
+            @if (activeOperation()?.status === 'Running') {
+              <button class="btn btn-sm btn-danger" (click)="cancelOperation()">Huỷ</button>
+            }
+          </div>
+        </div>
+        <div class="log-container" #logContainer>
+          @for (line of logLines(); track $index) {
+            <div class="log-line" [ngClass]="getLogLevelClass(line.level)">
+              <span class="log-time">{{ line.timestamp | date: 'HH:mm:ss' }}</span>
+              <span class="log-level">{{ line.level }}</span>
+              <span class="log-msg">{{ line.message }}</span>
+            </div>
+          }
+          @if (logLines().length === 0) {
+            <div class="log-empty">Đang chờ logs...</div>
+          }
+        </div>
+        @if (activeOperation(); as op) {
+          @if (op.errorMessage) {
+            <div class="error-footer">❌ {{ op.errorMessage }}</div>
+          }
+          @if (op.status === 'Completed' && op.archivePath) {
+            <div class="success-footer">
+              ✅ Hoàn thành · Archive: <code>{{ op.archivePath }}</code>
+            </div>
+          }
+        }
+      </div>
+    }
+  </div>
+
+  <!-- Confirm dialog -->
+  @if (showConfirmDialog) {
+    <div class="modal-overlay" (click)="confirmDialogNo()">
+      <div class="modal-dialog" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h3>⚠️ Xác nhận</h3>
+        </div>
+        <div class="modal-body">
+          <p>{{ confirmMessage }}</p>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline" (click)="confirmDialogNo()">Huỷ</button>
+          <button class="btn btn-danger" (click)="confirmDialogYes()">Xác nhận</button>
+        </div>
+      </div>
+    </div>
+  }
+</div>

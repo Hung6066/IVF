@@ -70,3 +70,5 @@ keys/
 # Production override env files
 .env.production
 
+/backups
+

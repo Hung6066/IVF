@@ -16,9 +16,9 @@ graph TB
         end
 
         subgraph Signer["SignServer - PDF Signer"]
-            SS_WORKER[PDFSigner Worker]
+            SS_WORKER[PDFSigner Workers x5]
             SS_CRYPTO[Keystore CryptoToken]
-            SS_REST[REST API :9080]
+            SS_REST[Process API :8443 mTLS]
         end
 
         subgraph DBs["Databases"]
@@ -79,21 +79,23 @@ graph TB
 
 ### 2. SignServer (Document Signing Service)
 
-| Thuộc tính    | Giá trị                                         |
-| ------------- | ----------------------------------------------- |
-| **Image**     | `keyfactor/signserver-ce:latest`                |
-| **Container** | `ivf-signserver`                                |
-| **Admin UI**  | https://localhost:9443/signserver/adminweb/     |
-| **REST API**  | http://localhost:9080/signserver/process        |
-| **Database**  | PostgreSQL (`ivf-signserver-db`, port internal) |
-| **Worker**    | `PDFSigner` (Worker ID: 1)                      |
+| Thuộc tính      | Giá trị                                              |
+| --------------- | ---------------------------------------------------- |
+| **Image**       | `keyfactor/signserver-ce:latest`                     |
+| **Container**   | `ivf-signserver`                                     |
+| **Admin UI**    | https://localhost:9443/signserver/adminweb/          |
+| **Process API** | `https://localhost:9443/signserver/process` (mTLS)   |
+| **Database**    | PostgreSQL (`ivf-signserver-db`, port internal)      |
+| **Workers**     | 5 PDFSigner workers (IDs: 1, 272, 444, 597, 907)     |
+| **Auth**        | `ClientCertAuthorizer` + mTLS (client cert required) |
 
 **Vai trò trong hệ thống:**
 
-- Nhận PDF chưa ký từ IVF API qua REST API
+- Nhận PDF chưa ký từ IVF API qua HTTPS với mTLS (client certificate)
 - Ký số PDF bằng chứng thư từ EJBCA (PAdES signature)
 - Trả về PDF đã ký với chữ ký số nhúng
 - Hỗ trợ visible/invisible signature
+- Mỗi bác sĩ/nhân viên có worker riêng cho multi-signature workflow
 
 ### 3. IVF API Integration
 
@@ -195,9 +197,24 @@ Khi chạy trong Docker:
 ```yaml
 # docker-compose.yml (đã cấu hình sẵn)
 environment:
-  - DigitalSigning__SignServerUrl=http://signserver:8080/signserver
+  - DigitalSigning__SignServerUrl=https://signserver:8443/signserver
   - DigitalSigning__Enabled=true
+  - DigitalSigning__SkipTlsValidation=true
+  - DigitalSigning__ClientCertificatePath=/app/certs/api-client.p12
+  - DigitalSigning__ClientCertificatePasswordFile=/run/secrets/api_cert_password
 ```
+
+**Sau `docker compose up -d`, cần chạy script mTLS:**
+
+```bash
+# Dev (want-client-auth — cho phép health check không cert)
+bash scripts/init-mtls.sh
+
+# Production (need-client-auth — bắt buộc cert cho mọi kết nối)
+bash scripts/init-mtls-production.sh
+```
+
+Script idempotent — an toàn chạy lại nhiều lần. Tạo truststore, cấu hình WildFly Elytron trust-manager, bật client auth trên SSL context.
 
 ---
 
@@ -346,14 +363,13 @@ keytool -genkeypair -alias signer -keyalg RSA -keysize 2048 \
 
 ### Docker Compose Ports
 
-| Service       | Container Port | Host Port | Protocol        |
-| ------------- | -------------- | --------- | --------------- |
-| EJBCA         | 8443           | 8443      | HTTPS (Admin)   |
-| EJBCA         | 8080           | 8442      | HTTP (Public)   |
-| SignServer    | 8443           | 9443      | HTTPS (Admin)   |
-| SignServer    | 8080           | 9080      | HTTP (REST API) |
-| EJBCA DB      | 5432           | -         | Internal only   |
-| SignServer DB | 5432           | -         | Internal only   |
+| Service       | Container Port | Host Port | Protocol             |
+| ------------- | -------------- | --------- | -------------------- |
+| EJBCA         | 8443           | 8443      | HTTPS (Admin)        |
+| EJBCA         | 8080           | 8442      | HTTP (Public)        |
+| SignServer    | 8443           | 9443      | HTTPS (Admin + mTLS) |
+| EJBCA DB      | 5432           | -         | Internal only        |
+| SignServer DB | 5432           | -         | Internal only        |
 
 ---
 
@@ -367,16 +383,16 @@ keytool -genkeypair -alias signer -keyalg RSA -keysize 2048 \
 
 ### Production Checklist
 
-- [ ] Sử dụng EJBCA-issued certificate thay vì self-signed
-- [ ] Enable TLS validation (`SkipTlsValidation: false`)
-- [ ] Cấu hình mutual TLS giữa IVF API và SignServer
-- [ ] Enable authentication cho SignServer worker
-- [ ] Cấu hình TSA (Timestamp Authority) cho long-term validation
-- [ ] Setup OCSP responder trong EJBCA
-- [ ] Rotate certificates trước khi hết hạn
-- [ ] Backup EJBCA CA keys
-- [ ] Giới hạn network access cho signing services
-- [ ] Enable audit logging trong EJBCA & SignServer
+- [x] Sử dụng EJBCA-issued certificate thay vì self-signed (`scripts/enroll-ejbca-certs.sh`)
+- [x] Enable TLS validation (`SkipTlsValidation: false` trong `appsettings.Production.json`)
+- [x] Cấu hình mutual TLS giữa IVF API và SignServer (`scripts/init-mtls.sh`)
+- [x] Enable authentication cho SignServer worker (`ClientCertAuthorizer`)
+- [x] Cấu hình TSA (Timestamp Authority) cho long-term validation (`scripts/init-tsa.sh`)
+- [x] Setup OCSP responder trong EJBCA (`scripts/init-ocsp.sh`)
+- [x] Rotate certificates script (`scripts/rotate-certs.sh`, `scripts/rotate-keys.sh`)
+- [x] Backup EJBCA CA keys (`scripts/backup-ca-keys.sh`)
+- [x] Giới hạn network access cho signing services (`ivf-signing` internal network)
+- [x] Enable audit logging trong IVF API (`EnableAuditLogging: true` — SHA256 hash tracking)
 
 ### Certificate Lifecycle
 
@@ -405,19 +421,38 @@ docker exec ivf-ejbca-db pg_isready -U ejbca
 
 ### SignServer worker không active
 
-```powershell
+```bash
 # Kiểm tra worker status
-docker exec ivf-signserver /opt/keyfactor/bin/signserver getstatus brief all
+docker exec ivf-signserver /opt/signserver/bin/signserver getstatus brief all
 # Reload worker
-docker exec ivf-signserver /opt/keyfactor/bin/signserver reload 1
+docker exec ivf-signserver /opt/signserver/bin/signserver reload 1
 # Check logs
 docker compose logs signserver --tail=100
 ```
 
+### Signing API trả về 400 "client authentication is required"
+
+mTLS chưa được cấu hình trên WildFly. Chạy script init:
+
+```bash
+bash scripts/init-mtls.sh
+```
+
+Script tạo truststore với CA cert, cấu hình WildFly Elytron (trust-manager + want-client-auth), và reload WildFly. Xác minh:
+
+```bash
+# Kiểm tra SSL context
+docker exec ivf-signserver /opt/keyfactor/wildfly-35.0.1.Final/bin/jboss-cli.sh \
+    --connect "--command=/subsystem=elytron/server-ssl-context=httpsSSC:read-attribute(name=want-client-auth)"
+# Kết quả: "result" => true
+```
+
+> **Lưu ý:** WildFly config nằm trong tmpfs nên mất khi container recreate. Cần chạy lại `init-mtls.sh` sau mỗi lần `docker compose up` tạo mới container.
+
 ### Signing API trả về 502
 
 - Kiểm tra SignServer container đang chạy: `docker ps | findstr signserver`
-- Kiểm tra health: `curl http://localhost:9080/signserver/healthcheck/signserverhealth`
+- Kiểm tra health: `curl -fk https://localhost:9443/signserver/healthcheck/signserverhealth`
 - Kiểm tra kết nối từ IVF API: `GET /api/signing/health`
 
 ### Certificate hết hạn
@@ -439,9 +474,8 @@ docker compose logs signserver --tail=100
 - [Docker Compose - EJBCA](https://hub.docker.com/r/keyfactor/ejbca-ce)
 - [Docker Compose - SignServer](https://hub.docker.com/r/keyfactor/signserver-ce)
 
+## Multi-Signature Approach:
 
-
-## Multi-Signature Approach: 
 SignServer's PDFSigner creates PAdES signatures using incremental updates. Sending an already-signed PDF to SignServer for a second signature adds a new signature layer WITHOUT invalidating the first. This is by design in the PDF spec.
 
 ### Flow:
@@ -453,6 +487,7 @@ How Multiple Signatures Work
 The key insight: SignServer's PDFSigner creates PAdES signatures using incremental updates. Each subsequent signature is appended to the PDF without modifying previous content, so all signatures remain valid.
 
 ## Architecture
+
 1. DocumentSignature entity (DocumentSignature.cs) — tracks each user's signing action with FormResponseId, UserId, SignatureRole, SignedAt
 
 2. Database — new document_signatures table with unique constraint on (FormResponseId, UserId, SignatureRole), created via EF Core migration
@@ -485,6 +520,7 @@ Revoke capability for own signatures
 Badge showing "Đã ký đầy đủ" or "Đang chờ ký"
 
 ### Workflow
+
 1. Technician completes form → clicks "Ký" for technician role
 2. Department head reviews → clicks "Ký" for department_head role
 3. Doctor reviews → clicks "Ký" for doctor role
@@ -493,22 +529,21 @@ Badge showing "Đã ký đầy đủ" or "Đang chờ ký"
 ## MinIO Integration for Signed PDFs
 
 Ký phiếu (DocumentSignatureEndpoints)
-  └─> Tạo DocumentSignature record
-  └─> Invalidate PDF ký số cũ trong MinIO (nếu có)
+└─> Tạo DocumentSignature record
+└─> Invalidate PDF ký số cũ trong MinIO (nếu có)
 
 Export PDF ký số (FormEndpoints/export-pdf?sign=true)
-  └─> Generate PDF → Sign qua SignServer
-  └─> Upload lên MinIO: ivf-signed-pdfs/{patientCode}/SignedPdf/{year}/{id}.pdf
-  └─> Tạo PatientDocument record (type=SignedPdf, formResponseId=...)
-  └─> Trả PDF cho client (không chờ upload)
+└─> Generate PDF → Sign qua SignServer
+└─> Upload lên MinIO: ivf-signed-pdfs/{patientCode}/SignedPdf/{year}/{id}.pdf
+└─> Tạo PatientDocument record (type=SignedPdf, formResponseId=...)
+└─> Trả PDF cho client (không chờ upload)
 
 Download PDF ký số đã lưu (DocumentSignatureEndpoints)
-  └─> GET /api/forms/responses/{id}/signed-pdf      → stream trực tiếp
-  └─> GET /api/forms/responses/{id}/signed-pdf-url   → presigned URL (1 giờ)
-  └─> GET /api/forms/responses/{id}/signing-status   → kèm thông tin storedSignedPdf
+└─> GET /api/forms/responses/{id}/signed-pdf → stream trực tiếp
+└─> GET /api/forms/responses/{id}/signed-pdf-url → presigned URL (1 giờ)
+└─> GET /api/forms/responses/{id}/signing-status → kèm thông tin storedSignedPdf
 
 Thu hồi chữ ký
-  └─> Revoke DocumentSignature
-  └─> Invalidate PDF cũ (đánh dấu Superseded)
-  └─> Lần export tiếp theo sẽ tạo PDF mới
-
+└─> Revoke DocumentSignature
+└─> Invalidate PDF cũ (đánh dấu Superseded)
+└─> Lần export tiếp theo sẽ tạo PDF mới

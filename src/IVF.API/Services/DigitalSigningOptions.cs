@@ -40,6 +40,12 @@ public class DigitalSigningOptions
     public string SignServerUrl { get; set; } = "http://localhost:9080/signserver";
 
     /// <summary>
+    /// Docker container name for SignServer CLI access.
+    /// Used by admin endpoints to query worker status/config via docker exec.
+    /// </summary>
+    public string SignServerContainerName { get; set; } = "ivf-signserver";
+
+    /// <summary>
     /// Name of the SignServer PDF signing worker (e.g., "PDFSigner").
     /// </summary>
     public string WorkerName { get; set; } = "PDFSigner";
@@ -145,6 +151,23 @@ public class DigitalSigningOptions
     /// Default: 30 per minute.
     /// </summary>
     public int SigningRateLimitPerMinute { get; set; } = 30;
+
+    // ─── TSA (Timestamp Authority) for PAdES-LTV ───
+
+    /// <summary>
+    /// Name of the SignServer TimeStampSigner worker.
+    /// When set, PDFSigner workers use TSA_WORKER property for RFC 3161 timestamps.
+    /// </summary>
+    public string? TsaWorkerName { get; set; }
+
+    // ─── OCSP Configuration ───
+
+    /// <summary>
+    /// OCSP responder URL for certificate revocation checking.
+    /// Typically the EJBCA built-in OCSP endpoint.
+    /// Example: https://ejbca:8443/ejbca/publicweb/status/ocsp
+    /// </summary>
+    public string? OcspResponderUrl { get; set; }
 
     // ─── Phase 4: PKCS#11 / SoftHSM2 Configuration ───
 

@@ -192,6 +192,7 @@ services:
       - /opt/keyfactor/wildfly-35.0.1.Final/standalone/tmp:size=200M
       - /opt/keyfactor/wildfly-35.0.1.Final/standalone/data:size=100M
       - /opt/keyfactor/wildfly-35.0.1.Final/standalone/log:size=50M
+      - /opt/keyfactor/wildfly-35.0.1.Final/standalone/configuration:size=50M
     deploy:
       resources:
         limits:

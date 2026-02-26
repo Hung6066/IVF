@@ -79,6 +79,11 @@ public class IvfDbContext : DbContext
     // Permission Definitions (dynamic RBAC metadata)
     public DbSet<PermissionDefinition> PermissionDefinitions => Set<PermissionDefinition>();
 
+    // Backup & Restore
+    public DbSet<BackupOperation> BackupOperations => Set<BackupOperation>();
+    public DbSet<BackupScheduleConfig> BackupScheduleConfigs => Set<BackupScheduleConfig>();
+    public DbSet<CloudBackupConfig> CloudBackupConfigs => Set<CloudBackupConfig>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

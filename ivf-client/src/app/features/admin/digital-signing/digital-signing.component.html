@@ -317,6 +317,25 @@
         }
       </div>
 
+      <!-- Worker Action Result -->
+      @if (workerActionResult()) {
+        <div
+          class="action-result"
+          [class.success]="workerActionResult()!.success"
+          [class.error]="!workerActionResult()!.success"
+        >
+          @if (workerActionResult()!.success) {
+            <span>✅ {{ workerActionResult()!.message || 'Thao tác thành công' }}</span>
+          } @else {
+            <span>❌ {{ workerActionResult()!.error || 'Thao tác thất bại' }}</span>
+          }
+          @if (workerActionResult()!.output) {
+            <pre class="action-output">{{ workerActionResult()!.output }}</pre>
+          }
+          <button class="btn-close-result" (click)="workerActionResult.set(null)">✕</button>
+        </div>
+      }
+
       <!-- Workers -->
       <div class="card">
         <div class="section-header">
@@ -326,49 +345,134 @@
 
         @if (workers()) {
           @if (workers().workers?.length > 0) {
-            <table class="data-table">
+            <table class="data-table workers-table">
               <thead>
                 <tr>
+                  <th style="width: 40px"></th>
                   <th>ID</th>
                   <th>Tên</th>
-                  <th>Loại</th>
-                  <th>Trạng thái</th>
+                  <th>Worker Status</th>
+                  <th>Token Status</th>
                   <th>Số lần ký</th>
+                  <th>Thao tác</th>
                 </tr>
               </thead>
               <tbody>
                 @for (worker of workers().workers; track worker.id || $index) {
-                  <tr>
-                    <td>{{ worker.id }}</td>
+                  <tr class="worker-row" [class.expanded]="expandedWorkerId() === worker.id">
+                    <td>
+                      <button
+                        class="btn-expand"
+                        (click)="toggleWorkerDetail(worker.id)"
+                        [title]="expandedWorkerId() === worker.id ? 'Thu gọn' : 'Mở rộng'"
+                      >
+                        {{ expandedWorkerId() === worker.id ? '▼' : '▶' }}
+                      </button>
+                    </td>
+                    <td>
+                      <strong>{{ worker.id }}</strong>
+                    </td>
                     <td>
                       <strong>{{ worker.name }}</strong>
                     </td>
-                    <td>{{ worker.type || 'PDFSigner' }}</td>
                     <td>
                       <span
                         class="status-badge"
-                        [class.active]="worker.status === 'Active'"
-                        [class.offline]="worker.status !== 'Active'"
+                        [class.active]="worker.workerStatus === 'Active'"
+                        [class.offline]="worker.workerStatus !== 'Active'"
                       >
-                        {{ worker.status || 'N/A' }}
+                        {{ worker.workerStatus || 'N/A' }}
                       </span>
                     </td>
-                    <td>{{ worker.signings ?? '-' }}</td>
+                    <td>
+                      <span
+                        class="status-badge"
+                        [class.active]="worker.tokenStatus === 'Active'"
+                        [class.offline]="worker.tokenStatus !== 'Active'"
+                      >
+                        {{ worker.tokenStatus || 'N/A' }}
+                      </span>
+                    </td>
+                    <td>{{ worker.signings ?? 0 }}</td>
+                    <td class="action-buttons">
+                      <button
+                        class="btn-icon"
+                        title="Reload worker"
+                        (click)="reloadWorker(worker.id)"
+                      >
+                        🔄
+                      </button>
+                      <button class="btn-icon" title="Test key" (click)="testWorkerKey(worker.id)">
+                        🔑
+                      </button>
+                    </td>
                   </tr>
+                  <!-- Expanded Detail Row -->
+                  @if (expandedWorkerId() === worker.id) {
+                    <tr class="worker-detail-row">
+                      <td colspan="7">
+                        @if (workerLoading()) {
+                          <div class="worker-detail-loading">⏳ Đang tải cấu hình worker...</div>
+                        } @else if (selectedWorker()) {
+                          <div class="worker-detail-content">
+                            <!-- Properties -->
+                            <div class="worker-detail-section">
+                              <h4>📋 Cấu hình (Properties)</h4>
+                              <div class="worker-props-grid">
+                                @for (
+                                  prop of getWorkerProperties(selectedWorker());
+                                  track prop.key
+                                ) {
+                                  <div class="worker-prop-item">
+                                    <span class="prop-key">{{ prop.key }}</span>
+                                    <span
+                                      class="prop-value"
+                                      [class.mono]="
+                                        prop.key.includes('PATH') ||
+                                        prop.key.includes('CLASS') ||
+                                        prop.key.includes('KEY')
+                                      "
+                                      >{{ prop.value }}</span
+                                    >
+                                  </div>
+                                }
+                              </div>
+                            </div>
+
+                            <!-- Authorized Clients -->
+                            @if (selectedWorker()?.authorizedClients?.length > 0) {
+                              <div class="worker-detail-section">
+                                <h4>🔐 Authorized Clients</h4>
+                                <div class="authorized-clients-list">
+                                  @for (
+                                    client of selectedWorker().authorizedClients;
+                                    track $index
+                                  ) {
+                                    <div class="client-item">
+                                      <span class="client-sn">SN: {{ client.serialNumber }}</span>
+                                      <span class="client-issuer"
+                                        >Issuer: {{ client.issuerDn }}</span
+                                      >
+                                      @if (client.description) {
+                                        <span class="client-issuer">{{ client.description }}</span>
+                                      }
+                                    </div>
+                                  }
+                                </div>
+                              </div>
+                            }
+                          </div>
+                        } @else {
+                          <div class="worker-detail-loading">Không thể tải cấu hình worker.</div>
+                        }
+                      </td>
+                    </tr>
+                  }
                 }
               </tbody>
             </table>
           } @else {
-            <div class="info-message">
-              <p>
-                📋 Worker mặc định:
-                <strong>{{ dashboard()?.signing?.workerName || 'PDFSigner' }}</strong> (ID:
-                {{ dashboard()?.signing?.workerId || 1 }})
-              </p>
-              @if (workers().error) {
-                <p class="muted">ℹ️ REST API workers list không khả dụng: {{ workers().error }}</p>
-              }
-            </div>
+            <p class="muted">Không tìm thấy worker nào.</p>
           }
         } @else {
           <p class="muted">Nhấn "Tải lại" để xem danh sách workers.</p>

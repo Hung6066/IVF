@@ -1302,3 +1302,190 @@
 .text-muted {
   color: var(--text-secondary, #64748b);
 }
+
+/* ══════════════════════════════════════════════════ */
+/*  SignServer Worker Management                      */
+/* ══════════════════════════════════════════════════ */
+
+.action-result {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  font-size: 0.875rem;
+
+  &.success {
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    color: #166534;
+  }
+
+  &.error {
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #991b1b;
+  }
+
+  .action-output {
+    margin: 0.5rem 0 0;
+    padding: 0.5rem;
+    background: rgba(0, 0, 0, 0.04);
+    border-radius: 4px;
+    font-size: 0.8rem;
+    max-height: 120px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+
+  .btn-close-result {
+    margin-left: auto;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1rem;
+    opacity: 0.5;
+    &:hover {
+      opacity: 1;
+    }
+  }
+}
+
+.workers-table {
+  .btn-expand {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 0.75rem;
+    padding: 0.25rem;
+    border-radius: 4px;
+    color: var(--text-secondary, #64748b);
+    &:hover {
+      background: var(--bg-secondary, #f1f5f9);
+    }
+  }
+
+  .worker-row.expanded {
+    background: var(--bg-secondary, #f8fafc);
+    td {
+      border-bottom: none;
+    }
+  }
+
+  .action-buttons {
+    display: flex;
+    gap: 0.25rem;
+  }
+
+  .btn-icon {
+    background: none;
+    border: 1px solid transparent;
+    cursor: pointer;
+    padding: 0.25rem 0.4rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    transition: all 0.15s;
+    &:hover {
+      background: var(--bg-secondary, #f1f5f9);
+      border-color: var(--border-color, #e2e8f0);
+    }
+  }
+}
+
+.worker-detail-row td {
+  background: var(--bg-secondary, #f8fafc);
+  padding: 0 !important;
+}
+
+.worker-detail-loading {
+  padding: 1.25rem;
+  text-align: center;
+  color: var(--text-secondary, #64748b);
+  font-size: 0.875rem;
+}
+
+.worker-detail-content {
+  padding: 1rem 1.25rem;
+  border-top: 1px dashed var(--border-color, #e2e8f0);
+}
+
+.worker-detail-section {
+  margin-bottom: 1rem;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+
+  h4 {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--text-primary, #1e293b);
+    margin: 0 0 0.75rem;
+  }
+}
+
+.worker-props-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 0.5rem;
+}
+
+.worker-prop-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.4rem 0.6rem;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid var(--border-color, #e2e8f0);
+
+  .prop-key {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-secondary, #64748b);
+  }
+
+  .prop-value {
+    font-size: 0.825rem;
+    color: var(--text-primary, #1e293b);
+    word-break: break-all;
+
+    &.mono {
+      font-family: 'Fira Code', 'Cascadia Code', monospace;
+      font-size: 0.78rem;
+    }
+  }
+}
+
+.authorized-clients-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.client-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.5rem 0.75rem;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid var(--border-color, #e2e8f0);
+  font-size: 0.8rem;
+
+  .client-sn {
+    font-weight: 600;
+    font-family: 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 0.75rem;
+    color: var(--text-primary, #1e293b);
+  }
+
+  .client-issuer {
+    color: var(--text-secondary, #64748b);
+    font-size: 0.75rem;
+  }
+}

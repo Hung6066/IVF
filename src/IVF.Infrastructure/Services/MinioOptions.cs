@@ -14,5 +14,6 @@ public class MinioOptions
     public string DocumentsBucket { get; set; } = "ivf-documents";
     public string SignedPdfsBucket { get; set; } = "ivf-signed-pdfs";
     public string MedicalImagesBucket { get; set; } = "ivf-medical-images";
+    public string BackupsBucket { get; set; } = "ivf-backups";
     public string BaseUrl { get; set; } = "http://localhost:9000";
 }
