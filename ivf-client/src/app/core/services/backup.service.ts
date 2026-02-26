@@ -8,20 +8,35 @@ import {
   BackupLogLine,
   BackupOperation,
   BackupSchedule,
+  BackupValidationResult,
   CloudBackupObject,
   CloudConfig,
   CloudStatusResult,
   CloudUploadResult,
+  ComplianceReport,
+  CreateDataBackupStrategyRequest,
+  DataBackupFile,
+  DataBackupStatus,
+  DataBackupStrategy,
+  ReplicationActivationResult,
+  ReplicationSetupGuide,
+  ReplicationStatus,
+  StartDataBackupRequest,
+  StartDataRestoreRequest,
   TestCloudConfigRequest,
   TestCloudResult,
   UpdateCloudConfigRequest,
+  UpdateDataBackupStrategyRequest,
   UpdateScheduleRequest,
+  WalArchiveListResponse,
+  WalStatusResponse,
 } from '../models/backup.models';
 
 @Injectable({ providedIn: 'root' })
 export class BackupService {
   private http = inject(HttpClient);
   private readonly baseUrl = `${environment.apiUrl}/admin/backup`;
+  private readonly dataUrl = `${environment.apiUrl}/admin/data-backup`;
   private readonly hubUrl = environment.apiUrl.replace('/api', '/hubs/backup');
 
   private hubConnection?: signalR.HubConnection;
@@ -131,6 +146,123 @@ export class BackupService {
 
   testCloudConfig(request: TestCloudConfigRequest): Observable<TestCloudResult> {
     return this.http.post<TestCloudResult>(`${this.baseUrl}/cloud/config/test`, request);
+  }
+
+  // ─── Data Backup API ─────────────────────────────────
+
+  getDataBackupStatus(): Observable<DataBackupStatus> {
+    return this.http.get<DataBackupStatus>(`${this.dataUrl}/status`);
+  }
+
+  startDataBackup(request: StartDataBackupRequest): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.dataUrl}/start`, request);
+  }
+
+  startDataRestore(request: StartDataRestoreRequest): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.dataUrl}/restore`, request);
+  }
+
+  deleteDataBackup(fileName: string): Observable<{ message: string }> {
+    return this.http.delete<{ message: string }>(`${this.dataUrl}/${encodeURIComponent(fileName)}`);
+  }
+
+  validateBackup(fileName: string): Observable<BackupValidationResult> {
+    return this.http.post<BackupValidationResult>(`${this.dataUrl}/validate`, { fileName });
+  }
+
+  // ─── Data Backup Strategy API ──────────────────────────
+
+  listStrategies(): Observable<DataBackupStrategy[]> {
+    return this.http.get<DataBackupStrategy[]>(`${this.dataUrl}/strategies`);
+  }
+
+  getStrategy(id: string): Observable<DataBackupStrategy> {
+    return this.http.get<DataBackupStrategy>(`${this.dataUrl}/strategies/${id}`);
+  }
+
+  createStrategy(
+    request: CreateDataBackupStrategyRequest,
+  ): Observable<{ id: string; message: string }> {
+    return this.http.post<{ id: string; message: string }>(`${this.dataUrl}/strategies`, request);
+  }
+
+  updateStrategy(
+    id: string,
+    request: UpdateDataBackupStrategyRequest,
+  ): Observable<{ message: string }> {
+    return this.http.put<{ message: string }>(`${this.dataUrl}/strategies/${id}`, request);
+  }
+
+  deleteStrategy(id: string): Observable<{ message: string }> {
+    return this.http.delete<{ message: string }>(`${this.dataUrl}/strategies/${id}`);
+  }
+
+  runStrategy(id: string): Observable<{ operationId: string; message: string }> {
+    return this.http.post<{ operationId: string; message: string }>(
+      `${this.dataUrl}/strategies/${id}/run`,
+      {},
+    );
+  }
+
+  // ─── 3-2-1 Compliance API ─────────────────────────────
+
+  getCompliance(): Observable<ComplianceReport> {
+    return this.http.get<ComplianceReport>(`${this.dataUrl}/compliance`);
+  }
+
+  // ─── WAL API ──────────────────────────────────────────
+
+  getWalStatus(): Observable<WalStatusResponse> {
+    return this.http.get<WalStatusResponse>(`${this.dataUrl}/wal/status`);
+  }
+
+  enableWalArchiving(): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.dataUrl}/wal/enable`, {});
+  }
+
+  switchWal(): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.dataUrl}/wal/switch`, {});
+  }
+
+  createBaseBackup(): Observable<{ fileName: string; sizeBytes: number; message: string }> {
+    return this.http.post<{ fileName: string; sizeBytes: number; message: string }>(
+      `${this.dataUrl}/wal/base-backup`,
+      {},
+    );
+  }
+
+  listBaseBackups(): Observable<DataBackupFile[]> {
+    return this.http.get<DataBackupFile[]>(`${this.dataUrl}/wal/base-backups`);
+  }
+
+  // ─── Replication API ──────────────────────────────────
+
+  getReplicationStatus(): Observable<ReplicationStatus> {
+    return this.http.get<ReplicationStatus>(`${this.dataUrl}/replication/status`);
+  }
+
+  getReplicationGuide(): Observable<ReplicationSetupGuide> {
+    return this.http.get<ReplicationSetupGuide>(`${this.dataUrl}/replication/guide`);
+  }
+
+  createReplicationSlot(slotName: string): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.dataUrl}/replication/slots`, { slotName });
+  }
+
+  dropReplicationSlot(slotName: string): Observable<{ message: string }> {
+    return this.http.delete<{ message: string }>(
+      `${this.dataUrl}/replication/slots/${encodeURIComponent(slotName)}`,
+    );
+  }
+
+  activateReplication(): Observable<ReplicationActivationResult> {
+    return this.http.post<ReplicationActivationResult>(`${this.dataUrl}/replication/activate`, {});
+  }
+
+  // ─── WAL Archive Listing ──────────────────────────────
+
+  listWalArchives(): Observable<WalArchiveListResponse> {
+    return this.http.get<WalArchiveListResponse>(`${this.dataUrl}/wal/archives`);
   }
 
   // ─── SignalR ──────────────────────────────────────────

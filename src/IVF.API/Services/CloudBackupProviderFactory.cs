@@ -75,7 +75,7 @@ public sealed class CloudBackupProviderFactory(
         using var scope = scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<IvfDbContext>();
 
-        var config = await db.CloudBackupConfigs.FirstOrDefaultAsync(ct);
+        var config = await db.CloudBackupConfigs.OrderBy(c => c.CreatedAt).FirstOrDefaultAsync(ct);
         if (config != null)
             return config;
 
@@ -109,7 +109,7 @@ public sealed class CloudBackupProviderFactory(
         using var scope = scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<IvfDbContext>();
 
-        var config = await db.CloudBackupConfigs.FirstOrDefaultAsync(ct);
+        var config = await db.CloudBackupConfigs.OrderBy(c => c.CreatedAt).FirstOrDefaultAsync(ct);
         if (config == null)
         {
             config = CloudBackupConfig.CreateDefault();
@@ -190,14 +190,29 @@ public sealed class CloudBackupProviderFactory(
         var settings = section.Get<CloudBackupSettings>();
         if (settings == null) return;
 
+        var s3AccessKey = settings.S3.AccessKey;
+        var s3SecretKey = settings.S3.SecretKey;
+        var s3ServiceUrl = settings.S3.ServiceUrl;
+
+        // For MinIO provider, fall back to MinIO section if S3 credentials are not configured
+        if (settings.Provider.Equals("MinIO", StringComparison.OrdinalIgnoreCase))
+        {
+            if (string.IsNullOrEmpty(s3AccessKey))
+                s3AccessKey = configuration["MinIO:AccessKey"];
+            if (string.IsNullOrEmpty(s3SecretKey))
+                s3SecretKey = configuration["MinIO:SecretKey"];
+            if (string.IsNullOrEmpty(s3ServiceUrl))
+                s3ServiceUrl = $"http://{configuration["MinIO:Endpoint"] ?? "localhost:9000"}";
+        }
+
         config.Update(
             provider: settings.Provider,
             compressionEnabled: settings.CompressionEnabled,
             s3Region: settings.S3.Region,
             s3BucketName: settings.S3.BucketName,
-            s3AccessKey: settings.S3.AccessKey,
-            s3SecretKey: settings.S3.SecretKey,
-            s3ServiceUrl: settings.S3.ServiceUrl,
+            s3AccessKey: s3AccessKey,
+            s3SecretKey: s3SecretKey,
+            s3ServiceUrl: s3ServiceUrl,
             s3ForcePathStyle: settings.S3.ForcePathStyle,
             azureConnectionString: settings.Azure.ConnectionString,
             azureContainerName: settings.Azure.ContainerName,

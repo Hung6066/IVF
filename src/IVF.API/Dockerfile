@@ -2,16 +2,14 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
-# Copy solution and project files
-COPY ["IVF.sln", "./"]
+# Copy project files for restore
 COPY ["src/IVF.API/IVF.API.csproj", "src/IVF.API/"]
 COPY ["src/IVF.Application/IVF.Application.csproj", "src/IVF.Application/"]
 COPY ["src/IVF.Domain/IVF.Domain.csproj", "src/IVF.Domain/"]
 COPY ["src/IVF.Infrastructure/IVF.Infrastructure.csproj", "src/IVF.Infrastructure/"]
-COPY ["tests/IVF.Tests/IVF.Tests.csproj", "tests/IVF.Tests/"]
 
-# Restore dependencies
-RUN dotnet restore
+# Restore dependencies (API project only — FingerprintClient is Windows-only)
+RUN dotnet restore "src/IVF.API/IVF.API.csproj"
 
 # Copy the rest of the source code
 COPY . .

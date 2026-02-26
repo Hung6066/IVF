@@ -212,6 +212,21 @@ builder.Services.AddSingleton<IVF.API.Services.BackupRestoreService>();
 builder.Services.AddSingleton<IVF.API.Services.BackupSchedulerService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<IVF.API.Services.BackupSchedulerService>());
 
+// ─── Data Backup Services (PostgreSQL + MinIO) ───
+builder.Services.AddSingleton<IVF.API.Services.BackupIntegrityService>();
+builder.Services.AddSingleton<IVF.API.Services.DatabaseBackupService>();
+builder.Services.AddSingleton<IVF.API.Services.MinioBackupService>();
+builder.Services.AddSingleton<IVF.API.Services.DataBackupService>();
+builder.Services.AddSingleton<IVF.API.Services.DataBackupSchedulerService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<IVF.API.Services.DataBackupSchedulerService>());
+
+// ─── 3-2-1 Backup Architecture (WAL, Replication, Compliance) ───
+builder.Services.AddSingleton<IVF.API.Services.WalBackupService>();
+builder.Services.AddSingleton<IVF.API.Services.ReplicationMonitorService>();
+builder.Services.AddSingleton<IVF.API.Services.BackupComplianceService>();
+builder.Services.AddSingleton<IVF.API.Services.WalBackupSchedulerService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<IVF.API.Services.WalBackupSchedulerService>());
+
 // ─── Cloud Backup Provider Factory (dynamic, DB-backed) ───
 {
     var cloudSection = builder.Configuration.GetSection(IVF.API.Services.CloudBackupSettings.SectionName);
@@ -352,6 +367,9 @@ app.MapConceptEndpoints();
 app.MapDigitalSigningEndpoints();
 app.MapSigningAdminEndpoints();
 app.MapBackupRestoreEndpoints();
+app.MapDataBackupEndpoints();
+app.MapDataBackupStrategyEndpoints();
+app.MapBackupComplianceEndpoints();
 app.MapUserSignatureEndpoints();
 app.MapPatientDocumentEndpoints();
 app.MapDocumentSignatureEndpoints();
@@ -366,6 +384,7 @@ if (app.Environment.IsDevelopment())
     await FormTemplateSeeder.SeedFormTemplatesAsync(app.Services);
     await FormTemplateCodeSeeder.RegenerateCodesAsync(app.Services); // Backfill codes sau migration
     await MenuSeeder.SeedAsync(db); // Seed default menu items
+    await BackupStrategySeeder.SeedAsync(db); // Seed default 3-2-1 backup strategies
 
     // Seed permission definitions
     var permDefRepo = scope.ServiceProvider.GetRequiredService<IPermissionDefinitionRepository>();

@@ -604,6 +604,114 @@
   font-size: 0.8rem;
   padding: 3px 10px;
   border: 1px solid #e0e0e0;
+
+  // ─── Strategy cards ─────────────────────────────────
+
+  .strategy-form {
+    background: #f8f9fa;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 16px;
+
+    h4 {
+      margin: 0 0 12px;
+      font-size: 1rem;
+    }
+  }
+
+  .form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 12px;
+  }
+
+  .strategy-card {
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 12px;
+    background: #fff;
+    transition: opacity 0.2s;
+
+    &.strategy-disabled {
+      opacity: 0.6;
+      background: #fafafa;
+    }
+  }
+
+  .strategy-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 8px;
+
+    h4 {
+      margin: 0;
+      font-size: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+  }
+
+  .strategy-actions {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+
+  .strategy-details {
+    font-size: 0.85rem;
+  }
+
+  .detail-chips {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 6px;
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 500;
+
+    &.chip-db {
+      background: #e3f2fd;
+      color: #1565c0;
+    }
+    &.chip-minio {
+      background: #fce4ec;
+      color: #c62828;
+    }
+    &.chip-cloud {
+      background: #e8f5e9;
+      color: #2e7d32;
+    }
+  }
+
+  .detail-row {
+    display: flex;
+    gap: 16px;
+    color: #666;
+    flex-wrap: wrap;
+
+    &.last-run {
+      margin-top: 4px;
+    }
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 32px;
+    color: #999;
+
+    p {
+      margin: 4px 0;
+    }
+  }
   border-radius: 12px;
   cursor: pointer;
   color: #666;
@@ -620,6 +728,192 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+// ─── 3-2-1 Compliance ──────────────────────────────
+.compliance-score-row {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.compliance-score-card {
+  text-align: center;
+  min-width: 140px;
+}
+
+.score-circle {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  border: 6px solid;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 8px;
+}
+
+.score-value {
+  font-size: 1.8rem;
+  font-weight: 700;
+}
+
+.score-label {
+  font-size: 0.85rem;
+  color: #666;
+  margin-bottom: 8px;
+}
+
+.score-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+
+  &.compliant {
+    background: #e8f5e9;
+    color: #2e7d32;
+  }
+  &.non-compliant {
+    background: #fff3e0;
+    color: #e65100;
+  }
+}
+
+.compliance-rule-cards {
+  display: flex;
+  gap: 16px;
+  flex: 1;
+}
+
+.rule-card {
+  flex: 1;
+  text-align: center;
+  padding: 20px;
+  border-radius: 12px;
+  border: 2px solid #e0e0e0;
+  background: #f8f9fa;
+
+  .rule-number {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #c62828;
+  }
+  .rule-label {
+    font-size: 0.85rem;
+    color: #666;
+    margin-top: 4px;
+  }
+
+  &.passed {
+    border-color: #a5d6a7;
+    background: #e8f5e9;
+
+    .rule-number {
+      color: #2e7d32;
+    }
+  }
+}
+
+.compliance-checks {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.compliance-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  border: 1px solid;
+
+  &.passed {
+    border-color: #c8e6c9;
+    background: #f1f8e9;
+  }
+  &.failed {
+    border-color: #ffcdd2;
+    background: #fff8f8;
+  }
+
+  .check-icon {
+    font-size: 1.2rem;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .check-content {
+    flex: 1;
+  }
+  .check-label {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: #333;
+  }
+  .check-detail {
+    font-size: 0.8rem;
+    color: #666;
+    margin-top: 2px;
+  }
+}
+
+.recommendations {
+  background: #fffde7;
+  border: 1px solid #fff9c4;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.recommendation-item {
+  padding: 6px 0;
+  font-size: 0.9rem;
+  color: #555;
+  border-bottom: 1px solid #fff9c4;
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+// ─── Replication Guide ──────────────────────────────
+.guide-step {
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #f0f0f0;
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  h4 {
+    margin: 0 0 6px;
+    font-size: 1rem;
+    color: #1976d2;
+  }
+
+  p {
+    margin: 0 0 8px;
+    color: #555;
+    font-size: 0.9rem;
+  }
+
+  pre {
+    background: #f5f5f5;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    padding: 12px;
+    overflow-x: auto;
+    font-size: 0.8rem;
+    margin: 0;
+
+    code {
+      background: none;
+      padding: 0;
+    }
+  }
 }
 
 .status-item {
@@ -692,4 +986,56 @@
   font-weight: 500;
   font-size: 0.9rem;
   text-align: center;
+}
+
+// ─── Integrity / checksum styles ────────────────────
+
+.checksum {
+  font-size: 0.75rem;
+  color: #666;
+  background: #f5f5f5;
+  padding: 2px 6px;
+  border-radius: 3px;
+  cursor: help;
+}
+
+.checksum-full {
+  font-size: 0.72rem;
+  word-break: break-all;
+  user-select: all;
+}
+
+.validation-result {
+  border-width: 2px;
+
+  &.validation-valid {
+    border-color: #4caf50;
+    background: #f1f8e9;
+
+    .card-header h3 {
+      color: #2e7d32;
+    }
+  }
+
+  &.validation-invalid {
+    border-color: #f44336;
+    background: #fef0ef;
+
+    .card-header h3 {
+      color: #c62828;
+    }
+  }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
+
+.text-danger {
+  color: #c62828;
+}
+.text-muted {
+  color: #999;
 }

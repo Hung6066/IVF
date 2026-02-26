@@ -23,6 +23,7 @@ public sealed class BackupInfo
     public string FullPath { get; init; } = "";
     public long SizeBytes { get; init; }
     public DateTime CreatedAt { get; init; }
+    public string? Checksum { get; init; }
 }
 
 // In-memory operation tracker for live streaming
@@ -88,6 +89,22 @@ public sealed class BackupRestoreService(
         var db = scope.ServiceProvider.GetRequiredService<IvfDbContext>();
         return await db.BackupOperations
             .FirstOrDefaultAsync(o => o.OperationCode == operationCode);
+    }
+
+    /// <summary>
+    /// Mark a stale "Running" operation as failed (e.g. orphaned after server restart).
+    /// </summary>
+    public async Task MarkStaleOperationFailedAsync(string operationCode, string reason)
+    {
+        using var scope = scopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<IvfDbContext>();
+        var op = await db.BackupOperations
+            .FirstOrDefaultAsync(o => o.OperationCode == operationCode);
+        if (op != null && op.Status == IVF.Domain.Entities.BackupOperationStatus.Running)
+        {
+            op.MarkFailed(reason);
+            await db.SaveChangesAsync();
+        }
     }
 
     /// <summary>

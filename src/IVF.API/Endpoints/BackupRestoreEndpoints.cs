@@ -53,13 +53,20 @@ public static class BackupRestoreEndpoints
         .WithName("StartRestore");
 
         // ─── Get operation status + logs ───────────────────────
-        group.MapGet("/operations/{operationId}", async (BackupRestoreService service, string operationId) =>
+        group.MapGet("/operations/{operationId}", async (BackupRestoreService service, DataBackupService dataService, string operationId) =>
         {
             var operation = await service.GetOperationByCodeAsync(operationId);
             if (operation == null)
                 return Results.NotFound(new { error = "Operation not found" });
 
+            // Try live logs from BackupRestoreService first, then DataBackupService, then DB
             var logLines = await service.GetLogsAsync(operationId);
+            if (logLines.Count == 0)
+            {
+                var dataLogs = dataService.GetLiveLogs(operationId);
+                if (dataLogs != null && dataLogs.Count > 0)
+                    logLines = dataLogs;
+            }
 
             return Results.Ok(new
             {
@@ -101,12 +108,21 @@ public static class BackupRestoreEndpoints
         .WithName("ListBackupOperations");
 
         // ─── Cancel running operation ──────────────────────────
-        group.MapPost("/operations/{operationId}/cancel", (BackupRestoreService service, string operationId) =>
+        group.MapPost("/operations/{operationId}/cancel", async (BackupRestoreService service, DataBackupService dataService, string operationId) =>
         {
-            var cancelled = service.CancelOperation(operationId);
-            return cancelled
-                ? Results.Ok(new { message = "Cancellation requested" })
-                : Results.NotFound(new { error = "Operation not found or already completed" });
+            // Try in-memory cancellation first
+            if (service.CancelOperation(operationId) || dataService.CancelOperation(operationId))
+                return Results.Ok(new { message = "Cancellation requested" });
+
+            // Fallback: mark stale DB operations (e.g. orphaned after server restart) as failed
+            var op = await service.GetOperationByCodeAsync(operationId);
+            if (op != null && op.Status == IVF.Domain.Entities.BackupOperationStatus.Running)
+            {
+                await service.MarkStaleOperationFailedAsync(operationId, "Cancelled — operation was orphaned after server restart");
+                return Results.Ok(new { message = "Stale operation marked as failed" });
+            }
+
+            return Results.NotFound(new { error = "Operation not found or already completed" });
         })
         .WithName("CancelBackupOperation");
 

@@ -32,6 +32,17 @@
       ⏰ Lịch tự động
     </button>
     <button [class.active]="activeTab === 'cloud'" (click)="switchTab('cloud')">☁️ Cloud</button>
+    <button [class.active]="activeTab === 'data'" (click)="switchTab('data')">💾 Dữ liệu</button>
+    <button [class.active]="activeTab === 'strategies'" (click)="switchTab('strategies')">
+      📋 Chiến lược
+    </button>
+    <button [class.active]="activeTab === 'compliance'" (click)="switchTab('compliance')">
+      🛡️ 3-2-1
+    </button>
+    <button [class.active]="activeTab === 'wal'" (click)="switchTab('wal')">📝 WAL</button>
+    <button [class.active]="activeTab === 'replication'" (click)="switchTab('replication')">
+      🔄 Replication
+    </button>
     @if (activeOperation()) {
       <button [class.active]="activeTab === 'live'" (click)="switchTab('live')">
         📋 Logs
@@ -823,6 +834,1065 @@
             </tbody>
           </table>
         }
+      </div>
+    }
+
+    <!-- ═══ Data backup tab ═══ -->
+    @if (activeTab === 'data') {
+      <div class="overview-grid">
+        <!-- Database status card -->
+        <div class="card">
+          <div class="card-header">
+            <h3>🐘 PostgreSQL</h3>
+            <button class="btn btn-sm btn-outline" (click)="loadDataStatus()">🔄 Làm mới</button>
+          </div>
+          <div class="card-body">
+            @if (dataStatus(); as ds) {
+              <div class="status-list">
+                <div class="status-item">
+                  <span class="status-label">Cơ sở dữ liệu</span>
+                  <span>{{ ds.database.databaseName }}</span>
+                </div>
+                <div class="status-item">
+                  <span class="status-label">Kích thước</span>
+                  <span class="badge badge-info">{{ formatSize(ds.database.sizeBytes) }}</span>
+                </div>
+                <div class="status-item">
+                  <span class="status-label">Số bảng</span>
+                  <span>{{ ds.database.tableCount }}</span>
+                </div>
+                <div class="status-item">
+                  <span class="status-label">Kết nối</span>
+                  <span
+                    class="badge"
+                    [ngClass]="ds.database.connected ? 'badge-success' : 'badge-danger'"
+                  >
+                    {{ ds.database.connected ? '✅ Đã kết nối' : '❌ Mất kết nối' }}
+                  </span>
+                </div>
+              </div>
+            } @else {
+              <p class="text-muted">Đang tải...</p>
+            }
+          </div>
+        </div>
+
+        <!-- MinIO status card -->
+        <div class="card">
+          <div class="card-header">
+            <h3>📦 MinIO</h3>
+          </div>
+          <div class="card-body">
+            @if (dataStatus(); as ds) {
+              <div class="status-list">
+                <div class="status-item">
+                  <span class="status-label">Tổng objects</span>
+                  <span>{{ ds.minio.totalObjects }}</span>
+                </div>
+                <div class="status-item">
+                  <span class="status-label">Tổng dung lượng</span>
+                  <span class="badge badge-info">{{ formatSize(ds.minio.totalSizeBytes) }}</span>
+                </div>
+                @for (bucket of ds.minio.buckets; track bucket.name) {
+                  <div class="status-item">
+                    <span class="status-label">{{ bucket.name }}</span>
+                    <span>{{ bucket.objectCount }} obj · {{ formatSize(bucket.sizeBytes) }}</span>
+                  </div>
+                }
+                <div class="status-item">
+                  <span class="status-label">Kết nối</span>
+                  <span
+                    class="badge"
+                    [ngClass]="ds.minio.connected ? 'badge-success' : 'badge-danger'"
+                  >
+                    {{ ds.minio.connected ? '✅ Đã kết nối' : '❌ Mất kết nối' }}
+                  </span>
+                </div>
+              </div>
+            } @else {
+              <p class="text-muted">Đang tải...</p>
+            }
+          </div>
+        </div>
+      </div>
+
+      <!-- Backup controls -->
+      <div class="card" style="margin-top: 16px">
+        <div class="card-header">
+          <h3>💾 Tạo bản sao lưu dữ liệu</h3>
+        </div>
+        <div class="card-body">
+          <div class="checkbox-group">
+            <label class="checkbox-label">
+              <input type="checkbox" [(ngModel)]="dataIncludeDatabase" />
+              🐘 Sao lưu PostgreSQL (pg_dump)
+            </label>
+            <label class="checkbox-label">
+              <input type="checkbox" [(ngModel)]="dataIncludeMinio" />
+              📦 Sao lưu MinIO (tệp lưu trữ)
+            </label>
+            <label class="checkbox-label">
+              <input type="checkbox" [(ngModel)]="dataUploadToCloud" />
+              ☁️ Upload lên Cloud sau khi sao lưu
+            </label>
+          </div>
+          <button
+            class="btn btn-primary"
+            style="margin-top: 12px"
+            [disabled]="dataBackupRunning || (!dataIncludeDatabase && !dataIncludeMinio)"
+            (click)="startDataBackup()"
+          >
+            @if (dataBackupRunning) {
+              <span class="spinner-sm"></span> Đang sao lưu...
+            } @else {
+              💾 Bắt đầu sao lưu
+            }
+          </button>
+        </div>
+      </div>
+
+      <!-- Database backup files -->
+      @if (dataStatus(); as ds) {
+        @if (ds.backups.databaseBackups.length > 0) {
+          <div class="card" style="margin-top: 16px">
+            <div class="card-header">
+              <h3>🐘 Bản sao lưu PostgreSQL</h3>
+            </div>
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Tên file</th>
+                  <th>Kích thước</th>
+                  <th>Checksum</th>
+                  <th>Ngày tạo</th>
+                  <th>Thao tác</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (file of ds.backups.databaseBackups; track file.fileName) {
+                  <tr>
+                    <td>
+                      <code>{{ file.fileName }}</code>
+                    </td>
+                    <td>{{ formatSize(file.sizeBytes) }}</td>
+                    <td>
+                      @if (file.checksum) {
+                        <code class="checksum" title="SHA-256: {{ file.checksum }}"
+                          >{{ file.checksum.substring(0, 16) }}…</code
+                        >
+                      } @else {
+                        <span class="text-muted">—</span>
+                      }
+                    </td>
+                    <td>{{ formatDate(file.createdAt) }}</td>
+                    <td>
+                      <div class="btn-group">
+                        <button
+                          class="btn btn-sm btn-outline"
+                          (click)="selectedDbBackup = file.fileName"
+                          [class.btn-primary]="selectedDbBackup === file.fileName"
+                        >
+                          {{
+                            selectedDbBackup === file.fileName ? '✅ Đã chọn' : '🔄 Chọn khôi phục'
+                          }}
+                        </button>
+                        <button
+                          class="btn btn-sm btn-outline"
+                          (click)="validateBackup(file.fileName)"
+                          [disabled]="validatingFile() === file.fileName"
+                        >
+                          {{
+                            validatingFile() === file.fileName
+                              ? '⏳ Đang kiểm tra...'
+                              : '🔍 Xác minh'
+                          }}
+                        </button>
+                        <button
+                          class="btn btn-sm btn-danger"
+                          (click)="deleteDataBackup(file.fileName)"
+                        >
+                          🗑️ Xóa
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+
+        @if (ds.backups.minioBackups.length > 0) {
+          <div class="card" style="margin-top: 16px">
+            <div class="card-header">
+              <h3>📦 Bản sao lưu MinIO</h3>
+            </div>
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Tên file</th>
+                  <th>Kích thước</th>
+                  <th>Checksum</th>
+                  <th>Ngày tạo</th>
+                  <th>Thao tác</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (file of ds.backups.minioBackups; track file.fileName) {
+                  <tr>
+                    <td>
+                      <code>{{ file.fileName }}</code>
+                    </td>
+                    <td>{{ formatSize(file.sizeBytes) }}</td>
+                    <td>
+                      @if (file.checksum) {
+                        <code class="checksum" title="SHA-256: {{ file.checksum }}"
+                          >{{ file.checksum.substring(0, 16) }}…</code
+                        >
+                      } @else {
+                        <span class="text-muted">—</span>
+                      }
+                    </td>
+                    <td>{{ formatDate(file.createdAt) }}</td>
+                    <td>
+                      <div class="btn-group">
+                        <button
+                          class="btn btn-sm btn-outline"
+                          (click)="selectedMinioBackup = file.fileName"
+                          [class.btn-primary]="selectedMinioBackup === file.fileName"
+                        >
+                          {{
+                            selectedMinioBackup === file.fileName
+                              ? '✅ Đã chọn'
+                              : '🔄 Chọn khôi phục'
+                          }}
+                        </button>
+                        <button
+                          class="btn btn-sm btn-outline"
+                          (click)="validateBackup(file.fileName)"
+                          [disabled]="validatingFile() === file.fileName"
+                        >
+                          {{
+                            validatingFile() === file.fileName
+                              ? '⏳ Đang kiểm tra...'
+                              : '🔍 Xác minh'
+                          }}
+                        </button>
+                        <button
+                          class="btn btn-sm btn-danger"
+                          (click)="deleteDataBackup(file.fileName)"
+                        >
+                          🗑️ Xóa
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+
+        <!-- Validation result panel -->
+        @if (validationResult(); as vr) {
+          <div
+            class="card validation-result"
+            style="margin-top: 16px"
+            [class.validation-valid]="vr.isValid"
+            [class.validation-invalid]="!vr.isValid"
+          >
+            <div class="card-header">
+              <h3>{{ vr.isValid ? '✅ Xác minh thành công' : '❌ Xác minh thất bại' }}</h3>
+              <button class="btn btn-sm btn-outline" (click)="dismissValidation()">✕ Đóng</button>
+            </div>
+            <div class="card-body">
+              @if (vr.checksum) {
+                <p>
+                  <strong>SHA-256:</strong> <code class="checksum-full">{{ vr.checksum }}</code>
+                </p>
+              }
+              @if (vr.error) {
+                <p class="text-danger"><strong>Lỗi:</strong> {{ vr.error }}</p>
+              }
+              @if (vr.type === 'database' && vr.isValid) {
+                <p>
+                  📊 <strong>{{ vr.tableCount }}</strong> bảng,
+                  <strong>{{ vr.rowCount?.toLocaleString() }}</strong> bản ghi
+                </p>
+              }
+              @if (vr.type === 'minio' && vr.isValid) {
+                <p>
+                  📦 <strong>{{ vr.bucketCount }}</strong> bucket,
+                  <strong>{{ vr.entryCount?.toLocaleString() }}</strong> mục
+                </p>
+              }
+            </div>
+          </div>
+        }
+
+        <!-- Restore button -->
+        @if (selectedDbBackup || selectedMinioBackup) {
+          <div class="card" style="margin-top: 16px">
+            <div class="card-header">
+              <h3>🔄 Khôi phục dữ liệu</h3>
+            </div>
+            <div class="card-body">
+              @if (selectedDbBackup) {
+                <p>
+                  🐘 Database: <code>{{ selectedDbBackup }}</code>
+                </p>
+              }
+              @if (selectedMinioBackup) {
+                <p>
+                  📦 MinIO: <code>{{ selectedMinioBackup }}</code>
+                </p>
+              }
+              <button
+                class="btn btn-danger"
+                style="margin-top: 8px"
+                [disabled]="dataRestoreRunning"
+                (click)="startDataRestore()"
+              >
+                @if (dataRestoreRunning) {
+                  <span class="spinner-sm"></span> Đang khôi phục...
+                } @else {
+                  🔄 Bắt đầu khôi phục
+                }
+              </button>
+            </div>
+          </div>
+        }
+      }
+    }
+
+    <!-- ═══ Strategies tab ═══ -->
+    @if (activeTab === 'strategies') {
+      <div class="card">
+        <div class="card-header d-flex justify-between align-center">
+          <h3>📋 Chiến lược sao lưu dữ liệu</h3>
+          <button class="btn btn-primary btn-sm" (click)="openNewStrategyForm()">+ Tạo mới</button>
+        </div>
+        <div class="card-body">
+          <!-- Strategy Form -->
+          @if (showStrategyForm) {
+            <div class="strategy-form mb-4">
+              <h4>{{ editingStrategyId ? '✏️ Chỉnh sửa chiến lược' : '➕ Tạo chiến lược mới' }}</h4>
+
+              <div class="form-grid">
+                <div class="form-group">
+                  <label>Tên chiến lược *</label>
+                  <input
+                    type="text"
+                    [(ngModel)]="strategyForm.name"
+                    placeholder="VD: Sao lưu hàng ngày"
+                    class="form-control"
+                  />
+                </div>
+
+                <div class="form-group">
+                  <label>Mô tả</label>
+                  <input
+                    type="text"
+                    [(ngModel)]="strategyForm.description"
+                    placeholder="Mô tả tùy chọn"
+                    class="form-control"
+                  />
+                </div>
+
+                <div class="form-group">
+                  <label>Cron Expression *</label>
+                  <input
+                    type="text"
+                    [(ngModel)]="strategyForm.cronExpression"
+                    placeholder="0 2 * * *"
+                    class="form-control"
+                  />
+                  <small class="text-muted">{{ describeCron(strategyForm.cronExpression) }}</small>
+                </div>
+
+                <div class="form-group">
+                  <label>Giữ lại (ngày)</label>
+                  <input
+                    type="number"
+                    [(ngModel)]="strategyForm.retentionDays"
+                    min="1"
+                    class="form-control"
+                  />
+                </div>
+
+                <div class="form-group">
+                  <label>Số bản sao lưu tối đa</label>
+                  <input
+                    type="number"
+                    [(ngModel)]="strategyForm.maxBackupCount"
+                    min="1"
+                    class="form-control"
+                  />
+                </div>
+              </div>
+
+              <div class="checkbox-group mt-2">
+                <label class="checkbox-label">
+                  <input type="checkbox" [(ngModel)]="strategyForm.includeDatabase" />
+                  🗄️ Database (PostgreSQL)
+                </label>
+                <label class="checkbox-label">
+                  <input type="checkbox" [(ngModel)]="strategyForm.includeMinio" />
+                  📦 MinIO Object Storage
+                </label>
+                <label class="checkbox-label">
+                  <input type="checkbox" [(ngModel)]="strategyForm.uploadToCloud" />
+                  ☁️ Upload lên Cloud
+                </label>
+              </div>
+
+              <div class="mt-3 d-flex gap-2">
+                <button
+                  class="btn btn-primary btn-sm"
+                  [disabled]="strategySaving || !strategyForm.name.trim()"
+                  (click)="saveStrategy()"
+                >
+                  @if (strategySaving) {
+                    <span class="spinner-sm"></span> Đang lưu...
+                  } @else {
+                    💾 Lưu
+                  }
+                </button>
+                <button class="btn btn-secondary btn-sm" (click)="cancelStrategyForm()">Hủy</button>
+              </div>
+            </div>
+          }
+
+          <!-- Strategy List -->
+          @if (strategies().length === 0 && !showStrategyForm) {
+            <div class="empty-state">
+              <p>Chưa có chiến lược sao lưu nào.</p>
+              <p class="text-muted">
+                Tạo chiến lược để tự động sao lưu database và MinIO theo lịch.
+              </p>
+            </div>
+          }
+
+          @for (s of strategies(); track s.id) {
+            <div class="strategy-card" [class.strategy-disabled]="!s.enabled">
+              <div class="strategy-header">
+                <div class="strategy-info">
+                  <h4>
+                    {{ s.name }}
+                    @if (!s.enabled) {
+                      <span class="badge badge-secondary">Tắt</span>
+                    }
+                  </h4>
+                  @if (s.description) {
+                    <p class="text-muted mb-0">{{ s.description }}</p>
+                  }
+                </div>
+                <div class="strategy-actions">
+                  <button
+                    class="btn btn-sm"
+                    [class.btn-success]="!s.enabled"
+                    [class.btn-warning]="s.enabled"
+                    (click)="toggleStrategy(s)"
+                    [title]="s.enabled ? 'Tắt' : 'Bật'"
+                  >
+                    {{ s.enabled ? '⏸️' : '▶️' }}
+                  </button>
+                  <button class="btn btn-primary btn-sm" (click)="runStrategy(s)" title="Chạy ngay">
+                    🚀
+                  </button>
+                  <button class="btn btn-secondary btn-sm" (click)="editStrategy(s)" title="Sửa">
+                    ✏️
+                  </button>
+                  <button class="btn btn-danger btn-sm" (click)="deleteStrategy(s)" title="Xóa">
+                    🗑️
+                  </button>
+                </div>
+              </div>
+
+              <div class="strategy-details">
+                <div class="detail-chips">
+                  @if (s.includeDatabase) {
+                    <span class="chip chip-db">🗄️ Database</span>
+                  }
+                  @if (s.includeMinio) {
+                    <span class="chip chip-minio">📦 MinIO</span>
+                  }
+                  @if (s.uploadToCloud) {
+                    <span class="chip chip-cloud">☁️ Cloud</span>
+                  }
+                </div>
+
+                <div class="detail-row">
+                  <span>⏰ Lịch: {{ describeCron(s.cronExpression) }}</span>
+                  <span
+                    >📅 Giữ: {{ s.retentionDays }} ngày / tối đa {{ s.maxBackupCount }} bản</span
+                  >
+                </div>
+
+                @if (s.lastRunAt) {
+                  <div class="detail-row last-run">
+                    <span>
+                      Lần chạy cuối: {{ formatDate(s.lastRunAt) }}
+                      <span class="badge" [ngClass]="getStatusBadgeClass(s.lastRunStatus || '')">
+                        {{ s.lastRunStatus }}
+                      </span>
+                    </span>
+                  </div>
+                }
+              </div>
+            </div>
+          }
+        </div>
+      </div>
+    }
+
+    <!-- ═══ 3-2-1 Compliance tab ═══ -->
+    @if (activeTab === 'compliance') {
+      <div class="card">
+        <div class="card-header">
+          <h3>🛡️ Quy tắc 3-2-1 Backup</h3>
+          <button
+            class="btn btn-sm btn-outline"
+            (click)="loadCompliance()"
+            [disabled]="complianceLoading"
+          >
+            {{ complianceLoading ? 'Đang tải...' : '🔄 Làm mới' }}
+          </button>
+        </div>
+        <div class="card-body">
+          @if (compliance(); as c) {
+            <!-- Score -->
+            <div class="compliance-score-row">
+              <div class="compliance-score-card">
+                <div
+                  class="score-circle"
+                  [style.border-color]="getComplianceColor(c.ruleScore, c.maxRuleScore)"
+                >
+                  <span
+                    class="score-value"
+                    [style.color]="getComplianceColor(c.ruleScore, c.maxRuleScore)"
+                  >
+                    {{ c.ruleScore }}/{{ c.maxRuleScore }}
+                  </span>
+                </div>
+                <div class="score-label">3-2-1 Score</div>
+                <div
+                  class="score-badge"
+                  [class.compliant]="c.isCompliant"
+                  [class.non-compliant]="!c.isCompliant"
+                >
+                  {{ c.isCompliant ? '✅ Tuân thủ' : '⚠️ Chưa đạt' }}
+                </div>
+              </div>
+              <div class="compliance-rule-cards">
+                <div class="rule-card" [class.passed]="c.copiesCount >= 3">
+                  <div class="rule-number">{{ c.copiesCount }}/3</div>
+                  <div class="rule-label">Bản sao dữ liệu</div>
+                </div>
+                <div class="rule-card" [class.passed]="c.storageTypesCount >= 2">
+                  <div class="rule-number">{{ c.storageTypesCount }}/2</div>
+                  <div class="rule-label">Loại lưu trữ</div>
+                </div>
+                <div class="rule-card" [class.passed]="c.offsiteCopiesCount >= 1">
+                  <div class="rule-number">{{ c.offsiteCopiesCount }}/1</div>
+                  <div class="rule-label">Offsite</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Checks -->
+            <h4 style="margin: 20px 0 12px">Kiểm tra chi tiết</h4>
+            <div class="compliance-checks">
+              @for (check of c.checks; track check.id) {
+                <div
+                  class="compliance-check"
+                  [class.passed]="check.passed"
+                  [class.failed]="!check.passed"
+                >
+                  <span class="check-icon">{{ check.passed ? '✅' : '❌' }}</span>
+                  <div class="check-content">
+                    <div class="check-label">{{ check.label }}</div>
+                    <div class="check-detail">{{ check.detail }}</div>
+                  </div>
+                </div>
+              }
+            </div>
+
+            <!-- Recommendations -->
+            @if (c.recommendations.length > 0) {
+              <h4 style="margin: 20px 0 12px">💡 Khuyến nghị</h4>
+              <div class="recommendations">
+                @for (rec of c.recommendations; track rec) {
+                  <div class="recommendation-item"><span>→</span> {{ rec }}</div>
+                }
+              </div>
+            }
+
+            <!-- Summary stats -->
+            <h4 style="margin: 20px 0 12px">Tổng kết</h4>
+            <div class="stat-grid" style="grid-template-columns: repeat(4, 1fr)">
+              <div class="stat">
+                <span class="stat-value">{{ c.summary.totalDbBackups }}</span>
+                <span class="stat-label">DB Backups</span>
+              </div>
+              <div class="stat">
+                <span class="stat-value">{{ c.summary.totalMinioBackups }}</span>
+                <span class="stat-label">MinIO Backups</span>
+              </div>
+              <div class="stat">
+                <span class="stat-value">{{ c.summary.totalBaseBackups }}</span>
+                <span class="stat-label">Base Backups</span>
+              </div>
+              <div class="stat">
+                <span class="stat-value">{{ c.summary.replicaCount }}</span>
+                <span class="stat-label">Replicas</span>
+              </div>
+            </div>
+          } @else if (complianceLoading) {
+            <div class="card-body empty"><span class="spinner"></span> Đang kiểm tra...</div>
+          } @else {
+            <div class="card-body empty">Nhấn "Làm mới" để kiểm tra tuân thủ 3-2-1</div>
+          }
+        </div>
+      </div>
+    }
+
+    <!-- ═══ WAL tab ═══ -->
+    @if (activeTab === 'wal') {
+      <div class="card">
+        <div class="card-header">
+          <h3>📝 WAL — Write-Ahead Log</h3>
+          <button class="btn btn-sm btn-outline" (click)="loadWalStatus()" [disabled]="walLoading">
+            {{ walLoading ? 'Đang tải...' : '🔄 Làm mới' }}
+          </button>
+        </div>
+        <div class="card-body">
+          @if (walStatus(); as ws) {
+            <div class="overview-grid">
+              <!-- WAL Configuration -->
+              <div class="card" style="margin-bottom: 0">
+                <div class="card-header"><h3>Cấu hình WAL</h3></div>
+                <div class="card-body">
+                  <table class="table">
+                    <tbody>
+                      <tr>
+                        <td>WAL Level</td>
+                        <td>
+                          <code>{{ ws.wal.walLevel }}</code>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Archive Mode</td>
+                        <td>
+                          <span
+                            class="badge"
+                            [class.badge-success]="ws.wal.isArchivingEnabled"
+                            [class.badge-warning]="!ws.wal.isArchivingEnabled"
+                          >
+                            {{ ws.wal.archiveMode }}
+                          </span>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Archive Command</td>
+                        <td>
+                          <code style="font-size: 0.75rem">{{
+                            ws.wal.archiveCommand || '(none)'
+                          }}</code>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Archive Timeout</td>
+                        <td>{{ ws.wal.archiveTimeout }}s</td>
+                      </tr>
+                      <tr>
+                        <td>Segment Size</td>
+                        <td>{{ ws.wal.walSegmentSize }}</td>
+                      </tr>
+                      <tr>
+                        <td>Current LSN</td>
+                        <td>
+                          <code>{{ ws.wal.currentLsn }}</code>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>WAL Written</td>
+                        <td>{{ formatSize(ws.wal.walBytesWritten) }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  @if (!ws.wal.isArchivingEnabled) {
+                    <button
+                      class="btn btn-primary"
+                      style="margin-top: 12px"
+                      (click)="enableWalArchiving()"
+                      [disabled]="walEnabling"
+                    >
+                      {{ walEnabling ? 'Đang bật...' : '⚡ Bật WAL Archiving' }}
+                    </button>
+                  }
+                </div>
+              </div>
+
+              <!-- Archive Stats -->
+              <div class="card" style="margin-bottom: 0">
+                <div class="card-header"><h3>Thống kê Archive</h3></div>
+                <div class="card-body">
+                  <div class="stat-grid">
+                    <div class="stat">
+                      <span class="stat-value">{{ ws.wal.archivedCount }}</span>
+                      <span class="stat-label">WAL Archived</span>
+                    </div>
+                    <div class="stat">
+                      <span class="stat-value">{{ ws.wal.failedCount }}</span>
+                      <span class="stat-label">Failed</span>
+                    </div>
+                    <div class="stat">
+                      <span class="stat-value">{{ ws.archive.fileCount }}</span>
+                      <span class="stat-label">Archive Files</span>
+                    </div>
+                    <div class="stat">
+                      <span class="stat-value">{{ formatSize(ws.archive.totalSizeBytes) }}</span>
+                      <span class="stat-label">Archive Size</span>
+                    </div>
+                  </div>
+                  @if (ws.wal.lastArchivedWal) {
+                    <p style="margin-top: 12px; color: #666; font-size: 0.85rem">
+                      WAL mới nhất: <code>{{ ws.wal.lastArchivedWal }}</code> ({{
+                        ws.wal.lastArchivedTime
+                      }})
+                    </p>
+                  }
+                  <div style="margin-top: 16px; display: flex; gap: 8px">
+                    <button
+                      class="btn btn-sm btn-outline"
+                      (click)="switchWal()"
+                      [disabled]="walSwitching"
+                    >
+                      {{ walSwitching ? '...' : '🔄 Switch WAL' }}
+                    </button>
+                    <button
+                      class="btn btn-sm btn-primary"
+                      (click)="createBaseBackup()"
+                      [disabled]="baseBackupRunning"
+                    >
+                      {{ baseBackupRunning ? 'Đang tạo...' : '💾 Tạo Base Backup' }}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Base Backups list -->
+            @if (baseBackups().length > 0) {
+              <div class="card" style="margin-top: 16px">
+                <div class="card-header"><h3>Base Backups (pg_basebackup)</h3></div>
+                <div class="card-body">
+                  <table class="table">
+                    <thead>
+                      <tr>
+                        <th>Tên file</th>
+                        <th>Kích thước</th>
+                        <th>Thời gian</th>
+                        <th>Checksum</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (b of baseBackups(); track b.fileName) {
+                        <tr>
+                          <td>{{ b.fileName }}</td>
+                          <td>{{ formatSize(b.sizeBytes) }}</td>
+                          <td>{{ formatDate(b.createdAt) }}</td>
+                          <td>
+                            <code style="font-size: 0.7rem">{{
+                              b.checksum ? b.checksum.substring(0, 16) + '...' : '—'
+                            }}</code>
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            }
+
+            <!-- WAL Archives (hourly backup) -->
+            @if (walArchives(); as wa) {
+              <div class="card" style="margin-top: 16px">
+                <div class="card-header">
+                  <h3>📦 WAL Archives (Hourly Log Backup)</h3>
+                  <span
+                    class="badge"
+                    style="
+                      margin-left: 8px;
+                      background: #1565c0;
+                      color: white;
+                      padding: 2px 8px;
+                      border-radius: 4px;
+                      font-size: 0.75rem;
+                    "
+                  >
+                    {{ wa.totalCount }} file · {{ formatSize(wa.totalSizeBytes) }}
+                  </span>
+                </div>
+                <div class="card-body">
+                  @if (wa.files.length > 0) {
+                    <table class="table">
+                      <thead>
+                        <tr>
+                          <th>Tên file</th>
+                          <th>Kích thước</th>
+                          <th>Thời gian</th>
+                          <th>Checksum</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        @for (f of wa.files; track f.fileName) {
+                          <tr>
+                            <td>
+                              <code style="font-size: 0.8rem">{{ f.fileName }}</code>
+                            </td>
+                            <td>{{ formatSize(f.sizeBytes) }}</td>
+                            <td>{{ formatDate(f.createdAt) }}</td>
+                            <td>
+                              <code style="font-size: 0.7rem">{{
+                                f.checksum ? f.checksum.substring(0, 16) + '...' : '—'
+                              }}</code>
+                            </td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  } @else {
+                    <p class="empty-text" style="color: #999; text-align: center; padding: 16px">
+                      Chưa có WAL archive. Scheduler chạy mỗi giờ khi WAL archiving đã bật.
+                    </p>
+                  }
+                </div>
+              </div>
+            }
+          } @else if (walLoading) {
+            <div class="card-body empty"><span class="spinner"></span> Đang tải...</div>
+          } @else {
+            <div class="card-body empty">Nhấn "Làm mới" để xem trạng thái WAL</div>
+          }
+        </div>
+      </div>
+    }
+
+    <!-- ═══ Replication tab ═══ -->
+    @if (activeTab === 'replication') {
+      <div class="card">
+        <div class="card-header">
+          <h3>🔄 Streaming Replication</h3>
+          <div style="display: flex; gap: 8px">
+            <button class="btn btn-sm btn-outline" (click)="loadReplicationGuide()">
+              📖 Hướng dẫn
+            </button>
+            <button
+              class="btn btn-sm btn-primary"
+              (click)="activateReplication()"
+              [disabled]="replicationActivating"
+            >
+              {{ replicationActivating ? 'Đang kích hoạt...' : '🚀 Kích hoạt Replication' }}
+            </button>
+            <button
+              class="btn btn-sm btn-outline"
+              (click)="loadReplicationStatus()"
+              [disabled]="replicationLoading"
+            >
+              {{ replicationLoading ? 'Đang tải...' : '🔄 Làm mới' }}
+            </button>
+          </div>
+        </div>
+        <div class="card-body">
+          @if (replicationStatus(); as rs) {
+            <div class="overview-grid">
+              <!-- Server Info -->
+              <div class="card" style="margin-bottom: 0">
+                <div class="card-header"><h3>Server Info</h3></div>
+                <div class="card-body">
+                  <table class="table">
+                    <tbody>
+                      <tr>
+                        <td>Server Role</td>
+                        <td>
+                          <span
+                            class="badge"
+                            [class.badge-info]="rs.serverRole === 'primary'"
+                            [class.badge-warning]="rs.serverRole === 'standby'"
+                          >
+                            {{ rs.serverRole }}
+                          </span>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Current LSN</td>
+                        <td>
+                          <code>{{ rs.currentLsn }}</code>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Max WAL Senders</td>
+                        <td>{{ rs.maxWalSenders }}</td>
+                      </tr>
+                      <tr>
+                        <td>Max Replication Slots</td>
+                        <td>{{ rs.maxReplicationSlots }}</td>
+                      </tr>
+                      <tr>
+                        <td>Synchronous Standby</td>
+                        <td>{{ rs.synchronousStandbyNames || '(none)' }}</td>
+                      </tr>
+                      <tr>
+                        <td>Replicating</td>
+                        <td>
+                          <span
+                            class="badge"
+                            [class.badge-success]="rs.isReplicating"
+                            [class.badge-secondary]="!rs.isReplicating"
+                          >
+                            {{ rs.isReplicating ? 'Có' : 'Không' }}
+                          </span>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- Replication Slots -->
+              <div class="card" style="margin-bottom: 0">
+                <div class="card-header"><h3>Replication Slots</h3></div>
+                <div class="card-body">
+                  @if (rs.replicationSlots.length > 0) {
+                    <table class="table">
+                      <thead>
+                        <tr>
+                          <th>Slot</th>
+                          <th>Type</th>
+                          <th>Active</th>
+                          <th>Retained</th>
+                          <th></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        @for (slot of rs.replicationSlots; track slot.slotName) {
+                          <tr>
+                            <td>
+                              <code>{{ slot.slotName }}</code>
+                            </td>
+                            <td>{{ slot.slotType }}</td>
+                            <td>
+                              <span
+                                class="badge"
+                                [class.badge-success]="slot.active"
+                                [class.badge-secondary]="!slot.active"
+                              >
+                                {{ slot.active ? 'Active' : 'Inactive' }}
+                              </span>
+                            </td>
+                            <td>{{ formatSize(slot.retainedBytes) }}</td>
+                            <td>
+                              <button
+                                class="btn btn-sm btn-danger"
+                                (click)="dropReplicationSlot(slot.slotName)"
+                              >
+                                Xóa
+                              </button>
+                            </td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  } @else {
+                    <p style="color: #888">Chưa có replication slot nào</p>
+                  }
+                  <div style="margin-top: 12px; display: flex; gap: 8px; align-items: center">
+                    <input
+                      type="text"
+                      [(ngModel)]="newSlotName"
+                      placeholder="Tên slot mới..."
+                      class="form-control"
+                      style="max-width: 200px"
+                    />
+                    <button
+                      class="btn btn-sm btn-primary"
+                      (click)="createReplicationSlot()"
+                      [disabled]="!newSlotName.trim()"
+                    >
+                      + Tạo Slot
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Connected Replicas -->
+            @if (rs.connectedReplicas.length > 0) {
+              <div class="card" style="margin-top: 16px">
+                <div class="card-header"><h3>Standby Servers đang kết nối</h3></div>
+                <div class="card-body">
+                  <table class="table">
+                    <thead>
+                      <tr>
+                        <th>App</th>
+                        <th>Client</th>
+                        <th>State</th>
+                        <th>Sync</th>
+                        <th>Lag</th>
+                        <th>Uptime</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (r of rs.connectedReplicas; track r.pid) {
+                        <tr>
+                          <td>{{ r.applicationName }}</td>
+                          <td>{{ r.clientAddress }}</td>
+                          <td>
+                            <span class="badge badge-info">{{ r.state }}</span>
+                          </td>
+                          <td>{{ r.syncState }}</td>
+                          <td>{{ formatSize(r.lagBytes) }}</td>
+                          <td>{{ formatUptime(r.uptimeSeconds) }}</td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            }
+          } @else if (replicationLoading) {
+            <div class="card-body empty"><span class="spinner"></span> Đang tải...</div>
+          } @else {
+            <div class="card-body empty">Nhấn "Làm mới" để xem trạng thái replication</div>
+          }
+
+          <!-- Setup Guide -->
+          @if (showReplicationGuide && replicationGuide(); as guide) {
+            <div class="card" style="margin-top: 16px">
+              <div class="card-header">
+                <h3>📖 Hướng dẫn thiết lập Streaming Replication</h3>
+                <button class="btn btn-sm btn-outline" (click)="showReplicationGuide = false">
+                  Đóng
+                </button>
+              </div>
+              <div class="card-body">
+                @for (step of guide.steps; track step.title) {
+                  <div class="guide-step">
+                    <h4>{{ step.title }}</h4>
+                    <p>{{ step.description }}</p>
+                    <pre><code>{{ step.command }}</code></pre>
+                  </div>
+                }
+                <div class="guide-step">
+                  <h4>Docker Compose (Standby)</h4>
+                  <pre><code>{{ guide.dockerComposeExample }}</code></pre>
+                </div>
+              </div>
+            </div>
+          }
+        </div>
       </div>
     }
 

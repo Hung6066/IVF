@@ -1,5 +1,5 @@
 services:
-  # PostgreSQL Database
+  # PostgreSQL Database (Primary — WAL archiving + replication enabled)
   db:
     image: postgres:16-alpine
     container_name: ivf-db
@@ -11,7 +11,10 @@ services:
       - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - postgres_archive:/var/lib/postgresql/archive
+      - ./docker/postgres/init-wal-replication.sh:/docker-entrypoint-initdb.d/20-init-wal-replication.sh:ro
     networks:
+      - default
       - ivf-data
     restart: unless-stopped
     security_opt:
@@ -21,6 +24,45 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+
+  # =============================================
+  # PostgreSQL Standby — Streaming Replication
+  # Read-only replica of the primary database.
+  # Activate with: docker compose --profile replication up -d
+  # After primary is initialized, this will clone via pg_basebackup.
+  # =============================================
+  db-standby:
+    image: postgres:16-alpine
+    container_name: ivf-db-standby
+    profiles:
+      - replication
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - PRIMARY_HOST=db
+      - PRIMARY_PORT=5432
+      - REPLICATOR_USER=replicator
+      - REPLICATOR_PASSWORD=replicator_pass
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres_standby:/var/lib/postgresql/data
+      - ./docker/postgres/standby-entrypoint.sh:/standby-entrypoint.sh:ro
+    entrypoint: ["/bin/bash", "/standby-entrypoint.sh"]
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - ivf-data
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
 
   # IVF API
   api:
@@ -262,28 +304,28 @@ services:
   # Custom MinIO Console for browsing objects
   # Console UI: http://localhost:9090
   # =============================================
-  object-browser:
-    build:
-      context: ./openmaxio-object-browser
-      dockerfile: Dockerfile
-    container_name: ivf-object-browser
-    environment:
-      - CONSOLE_MINIO_SERVER=http://minio:9000
-    ports:
-      - "9090:9090"
-    depends_on:
-      minio:
-        condition: service_healthy
-    networks:
-      - ivf-data
-    restart: unless-stopped
-    security_opt:
-      - no-new-privileges:true
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9090"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+  # object-browser:
+  #   build:
+  #     context: ./openmaxio-object-browser
+  #     dockerfile: Dockerfile
+  #   container_name: ivf-object-browser
+  #   environment:
+  #     - CONSOLE_MINIO_SERVER=http://minio:9000
+  #   ports:
+  #     - "9090:9090"
+  #   depends_on:
+  #     minio:
+  #       condition: service_healthy
+  #   networks:
+  #     - ivf-data
+  #   restart: unless-stopped
+  #   security_opt:
+  #     - no-new-privileges:true
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:9090"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
 
   # MinIO Client - Auto-create buckets on startup
   minio-init:
@@ -410,6 +452,8 @@ services:
 
 volumes:
   postgres_data:
+  postgres_archive:
+  postgres_standby:
   ejbca_persistent:
   ejbca_db_data:
   signserver_persistent:

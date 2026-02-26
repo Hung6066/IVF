@@ -83,6 +83,7 @@ public class IvfDbContext : DbContext
     public DbSet<BackupOperation> BackupOperations => Set<BackupOperation>();
     public DbSet<BackupScheduleConfig> BackupScheduleConfigs => Set<BackupScheduleConfig>();
     public DbSet<CloudBackupConfig> CloudBackupConfigs => Set<CloudBackupConfig>();
+    public DbSet<DataBackupStrategy> DataBackupStrategies => Set<DataBackupStrategy>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
