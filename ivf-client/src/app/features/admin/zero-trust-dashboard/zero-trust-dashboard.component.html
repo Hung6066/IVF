@@ -1,0 +1,305 @@
+<div class="zt-page">
+  <div class="page-header">
+    <h2>🛡️ Zero Trust Dashboard</h2>
+    <p class="subtitle">Quản lý chính sách truy cập Zero Trust — Never trust, always verify</p>
+  </div>
+
+  <!-- Summary Cards -->
+  <div class="stats-grid">
+    <div class="stat-card stat-blue">
+      <div class="stat-icon">📋</div>
+      <div class="stat-info">
+        <span class="stat-value">{{ policies().length }}</span>
+        <span class="stat-label">Tổng policies</span>
+      </div>
+    </div>
+    <div class="stat-card stat-green">
+      <div class="stat-icon">✅</div>
+      <div class="stat-info">
+        <span class="stat-value">{{ activePolicies() }}</span>
+        <span class="stat-label">Đang hoạt động</span>
+      </div>
+    </div>
+    <div class="stat-card stat-red">
+      <div class="stat-icon">🚫</div>
+      <div class="stat-info">
+        <span class="stat-value">{{ vpnBlockCount() }}</span>
+        <span class="stat-label">Chặn VPN/Tor</span>
+      </div>
+    </div>
+    <div class="stat-card stat-purple">
+      <div class="stat-icon">📱</div>
+      <div class="stat-info">
+        <span class="stat-value">{{ trustedDeviceCount() }}</span>
+        <span class="stat-label">Yêu cầu thiết bị tin cậy</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Policies Table -->
+  <div class="card">
+    <div class="card-header">
+      <h3>🔐 Chính sách Zero Trust</h3>
+      <div class="header-actions">
+        <button class="btn btn-sm btn-outline" (click)="loadPolicies()">🔄 Làm mới</button>
+      </div>
+    </div>
+    <div class="table-wrapper">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Action</th>
+            <th>Auth Level</th>
+            <th>Max Risk</th>
+            <th class="col-center">Thiết bị</th>
+            <th class="col-center">VPN/Tor</th>
+            <th class="col-center">GeoFence</th>
+            <th class="col-center">Anomaly</th>
+            <th class="col-center">Break Glass</th>
+            <th>Active</th>
+            <th>Thao tác</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (policy of policies(); track policy.id) {
+            <tr>
+              <td class="cell-bold">{{ policy.action }}</td>
+              <td>
+                <span class="badge" [ngClass]="getAuthLevelClass(policy.requiredAuthLevel)">
+                  {{ policy.requiredAuthLevel }}
+                </span>
+              </td>
+              <td>
+                <span class="badge" [ngClass]="getRiskClass(policy.maxAllowedRisk)">
+                  {{ policy.maxAllowedRisk }}
+                </span>
+              </td>
+              <td class="col-center">
+                <span
+                  class="indicator"
+                  [class.indicator-on]="policy.requireTrustedDevice"
+                  [class.indicator-off]="!policy.requireTrustedDevice"
+                >
+                  {{ policy.requireTrustedDevice ? '✓' : '✗' }}
+                </span>
+              </td>
+              <td class="col-center">
+                <span
+                  class="indicator"
+                  [class.indicator-block]="policy.blockVpnTor"
+                  [class.indicator-off]="!policy.blockVpnTor"
+                >
+                  {{ policy.blockVpnTor ? '🚫' : '—' }}
+                </span>
+              </td>
+              <td class="col-center">
+                <span
+                  class="indicator"
+                  [class.indicator-info]="policy.requireGeoFence"
+                  [class.indicator-off]="!policy.requireGeoFence"
+                >
+                  {{ policy.requireGeoFence ? '📍' : '—' }}
+                </span>
+              </td>
+              <td class="col-center">
+                <span
+                  class="indicator"
+                  [class.indicator-warn]="policy.blockAnomaly"
+                  [class.indicator-off]="!policy.blockAnomaly"
+                >
+                  {{ policy.blockAnomaly ? '⚠' : '—' }}
+                </span>
+              </td>
+              <td class="col-center">
+                <span
+                  class="indicator"
+                  [class.indicator-glass]="policy.allowBreakGlassOverride"
+                  [class.indicator-off]="!policy.allowBreakGlassOverride"
+                >
+                  {{ policy.allowBreakGlassOverride ? '🔓' : '—' }}
+                </span>
+              </td>
+              <td>
+                <span
+                  class="badge"
+                  [class.badge-success]="policy.isActive"
+                  [class.badge-secondary]="!policy.isActive"
+                >
+                  {{ policy.isActive ? 'Active' : 'Inactive' }}
+                </span>
+              </td>
+              <td>
+                <div class="action-cell">
+                  <button class="btn btn-xs btn-primary" (click)="editPolicy(policy)">
+                    ✏️ Sửa
+                  </button>
+                </div>
+              </td>
+            </tr>
+          }
+          @if (policies().length === 0) {
+            <tr>
+              <td colspan="10" class="empty-state">🔐 Chưa có chính sách nào</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Edit Policy Dialog -->
+  @if (editingPolicy()) {
+    <div class="modal-overlay" (click)="editingPolicy.set(false)">
+      <div class="modal-content modal-lg" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h3>✏️ Chỉnh sửa Policy: {{ editForm.action }}</h3>
+          <button class="btn-close" (click)="editingPolicy.set(false)">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Required Auth Level</label>
+              <select [(ngModel)]="editForm.requiredAuthLevel">
+                <option value="None">None</option>
+                <option value="Session">Session</option>
+                <option value="Password">Password</option>
+                <option value="MFA">MFA</option>
+                <option value="FreshSession">FreshSession</option>
+                <option value="Biometric">Biometric</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Max Allowed Risk</label>
+              <select [(ngModel)]="editForm.maxAllowedRisk">
+                <option value="Low">Low</option>
+                <option value="Medium">Medium</option>
+                <option value="High">High</option>
+                <option value="Critical">Critical</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="checkbox-grid">
+            <label class="checkbox-item">
+              <input type="checkbox" [(ngModel)]="editForm.requireTrustedDevice" />
+              <span>Require Trusted Device</span>
+            </label>
+            <label class="checkbox-item">
+              <input type="checkbox" [(ngModel)]="editForm.requireFreshSession" />
+              <span>Require Fresh Session</span>
+            </label>
+            <label class="checkbox-item">
+              <input type="checkbox" [(ngModel)]="editForm.blockAnomaly" />
+              <span>Block Anomaly</span>
+            </label>
+            <label class="checkbox-item">
+              <input type="checkbox" [(ngModel)]="editForm.requireGeoFence" />
+              <span>Require GeoFence</span>
+            </label>
+            <label class="checkbox-item">
+              <input type="checkbox" [(ngModel)]="editForm.blockVpnTor" />
+              <span>Block VPN/Tor</span>
+            </label>
+            <label class="checkbox-item">
+              <input type="checkbox" [(ngModel)]="editForm.allowBreakGlassOverride" />
+              <span>Allow Break Glass</span>
+            </label>
+          </div>
+
+          @if (editForm.requireGeoFence) {
+            <div class="form-group" style="margin-top: 1rem">
+              <label>Allowed Countries (comma-separated)</label>
+              <input type="text" [(ngModel)]="editForm.allowedCountries" placeholder="VN,US,JP" />
+            </div>
+          }
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline" (click)="editingPolicy.set(false)">Hủy</button>
+          <button class="btn btn-primary" (click)="savePolicy()" [disabled]="loading()">
+            💾 Lưu
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- Access Check Test -->
+  <div class="card">
+    <div class="card-header">
+      <h3>🧪 Kiểm tra truy cập (Test)</h3>
+    </div>
+    <div class="card-body">
+      <div class="access-check-form">
+        <div class="form-group">
+          <label>Action</label>
+          <input type="text" [(ngModel)]="accessCheckAction" placeholder="e.g. patient:read" />
+        </div>
+        <button class="btn btn-purple" (click)="testAccess()" [disabled]="loading()">
+          🔍 Kiểm tra
+        </button>
+      </div>
+
+      @if (accessDecision()) {
+        <div
+          class="decision-result"
+          [class.decision-allowed]="accessDecision()!.allowed"
+          [class.decision-denied]="!accessDecision()!.allowed"
+        >
+          <div class="decision-header">
+            <span class="decision-icon">{{ accessDecision()!.allowed ? '✅' : '❌' }}</span>
+            <span class="decision-title">
+              {{ accessDecision()!.allowed ? 'Cho phép' : 'Từ chối' }}
+            </span>
+          </div>
+          <div class="decision-details">
+            <div class="detail-row">
+              <span class="detail-label">Action:</span>
+              <span>{{ accessDecision()!.action }}</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">Lý do:</span>
+              <span>{{ accessDecision()!.reason }}</span>
+            </div>
+            @if (accessDecision()!.failedChecks.length > 0) {
+              <div class="detail-row">
+                <span class="detail-label">Kiểm tra thất bại:</span>
+                <ul class="failed-checks">
+                  @for (check of accessDecision()!.failedChecks; track check) {
+                    <li>{{ check }}</li>
+                  }
+                </ul>
+              </div>
+            }
+            @if (accessDecision()!.requiresStepUp) {
+              <div class="stepup-warning">
+                ⚠ Yêu cầu xác thực nâng cao ({{ accessDecision()!.requiredAuthLevel }})
+              </div>
+            }
+            @if (accessDecision()!.deviceRiskLevel) {
+              <div class="detail-row">
+                <span class="detail-label">Device Risk:</span>
+                <span
+                  >{{ accessDecision()!.deviceRiskLevel }} ({{
+                    accessDecision()!.deviceRiskScore
+                  }})</span
+                >
+              </div>
+            }
+            <div class="decision-time">{{ formatDate(accessDecision()!.decisionTime) }}</div>
+          </div>
+        </div>
+      }
+    </div>
+  </div>
+
+  <!-- Status Message -->
+  @if (statusMessage()) {
+    <div
+      class="toast"
+      [class.toast-success]="statusMessage()!.type === 'success'"
+      [class.toast-error]="statusMessage()!.type === 'error'"
+    >
+      {{ statusMessage()!.text }}
+    </div>
+  }
+</div>

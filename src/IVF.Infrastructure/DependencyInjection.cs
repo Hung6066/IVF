@@ -66,6 +66,10 @@ public static class DependencyInjection
         services.AddScoped<INotificationService, Services.NotificationService>();
         services.AddScoped<IFlowSeeder, FlowSeeder>();
 
+        // Key Vault & Zero Trust
+        services.AddScoped<IApiKeyManagementRepository, ApiKeyManagementRepository>();
+        services.AddScoped<IVaultRepository, VaultRepository>();
+
         // ─── MinIO Object Storage (S3-compatible) ───
         var minioSection = configuration.GetSection(MinioOptions.SectionName);
         services.Configure<MinioOptions>(minioSection);
@@ -80,11 +84,26 @@ public static class DependencyInjection
             if (minioOpts.UseSSL)
             {
                 client.WithSSL();
-                // Accept self-signed / internal CA certs for MinIO TLS
-                client.WithHttpClient(new HttpClient(new HttpClientHandler
+                var handler = new HttpClientHandler();
+                if (!string.IsNullOrWhiteSpace(minioOpts.TrustedCaCertPath) && File.Exists(minioOpts.TrustedCaCertPath))
                 {
-                    ServerCertificateCustomValidationCallback = (_, _, _, _) => true
-                }));
+                    // Validate MinIO TLS against our private CA certificate
+                    var caCert = System.Security.Cryptography.X509Certificates.X509CertificateLoader.LoadCertificateFromFile(minioOpts.TrustedCaCertPath);
+                    handler.ServerCertificateCustomValidationCallback = (_, cert, chain, errors) =>
+                    {
+                        if (errors == System.Net.Security.SslPolicyErrors.None) return true;
+                        if (cert == null || chain == null) return false;
+                        chain.ChainPolicy.TrustMode = System.Security.Cryptography.X509Certificates.X509ChainTrustMode.CustomRootTrust;
+                        chain.ChainPolicy.CustomTrustStore.Add(caCert);
+                        return chain.Build(System.Security.Cryptography.X509Certificates.X509CertificateLoader.LoadCertificate(cert.GetRawCertData()));
+                    };
+                }
+                else
+                {
+                    // Fallback: accept internal CA certs (development only)
+                    handler.ServerCertificateCustomValidationCallback = (_, _, _, _) => true;
+                }
+                client.WithHttpClient(new HttpClient(handler));
             }
 
             return client.Build();

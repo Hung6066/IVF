@@ -93,6 +93,24 @@ public class IvfDbContext : DbContext
     public DbSet<CertificateRevocationList> CertificateRevocationLists => Set<CertificateRevocationList>();
     public DbSet<CertificateAuditEvent> CertificateAuditEvents => Set<CertificateAuditEvent>();
 
+    // Key Vault & Zero Trust
+    public DbSet<ApiKeyManagement> ApiKeyManagements => Set<ApiKeyManagement>();
+    public DbSet<DeviceRisk> DeviceRisks => Set<DeviceRisk>();
+    public DbSet<ZTPolicy> ZTPolicies => Set<ZTPolicy>();
+
+    // Vault System (self-hosted, Azure KV only for auto-unseal wrap/unwrap)
+    public DbSet<VaultSecret> VaultSecrets => Set<VaultSecret>();
+    public DbSet<VaultPolicy> VaultPolicies => Set<VaultPolicy>();
+    public DbSet<VaultUserPolicy> VaultUserPolicies => Set<VaultUserPolicy>();
+    public DbSet<VaultLease> VaultLeases => Set<VaultLease>();
+    public DbSet<VaultDynamicCredential> VaultDynamicCredentials => Set<VaultDynamicCredential>();
+    public DbSet<VaultToken> VaultTokens => Set<VaultToken>();
+    public DbSet<VaultAutoUnseal> VaultAutoUnseals => Set<VaultAutoUnseal>();
+    public DbSet<VaultSetting> VaultSettings => Set<VaultSetting>();
+    public DbSet<VaultAuditLog> VaultAuditLogs => Set<VaultAuditLog>();
+    public DbSet<EncryptionConfig> EncryptionConfigs => Set<EncryptionConfig>();
+    public DbSet<FieldAccessPolicy> FieldAccessPolicies => Set<FieldAccessPolicy>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

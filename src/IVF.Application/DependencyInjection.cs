@@ -12,10 +12,11 @@ public static class DependencyInjection
     {
         services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(Assembly.GetExecutingAssembly()));
         services.AddValidatorsFromAssembly(Assembly.GetExecutingAssembly());
-        
+
         // Add pipeline behaviors
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
-        
+        services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ZeroTrustBehavior<,>));
+
         return services;
     }
 }

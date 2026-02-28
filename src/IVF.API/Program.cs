@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Threading.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -23,6 +24,17 @@ ResolveDockerSecrets(builder.Configuration);
 // Clean Architecture DI
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddMemoryCache();
+
+// ─── DataProtection: persistent key storage for private key encryption ───
+{
+    var dpKeysPath = builder.Configuration["DataProtection:KeysPath"]
+        ?? Path.Combine(builder.Environment.ContentRootPath, "keys", "dp");
+    Directory.CreateDirectory(dpKeysPath);
+    builder.Services.AddDataProtection()
+        .PersistKeysToFileSystem(new DirectoryInfo(dpKeysPath))
+        .SetApplicationName("IVF");
+}
 
 // ─── Digital Signing Service (SignServer + EJBCA) ───
 var signingSection = builder.Configuration.GetSection(DigitalSigningOptions.SectionName);
@@ -243,6 +255,11 @@ builder.Services.AddSingleton<IVF.API.Services.CloudReplicationService>();
 builder.Services.AddSingleton<IVF.API.Services.CloudReplicationSchedulerService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<IVF.API.Services.CloudReplicationSchedulerService>());
 
+// ─── Key Vault & Zero Trust ───
+builder.Services.AddSingleton<IVF.Application.Common.Interfaces.IKeyVaultService, IVF.Infrastructure.Services.AzureKeyVaultService>();
+builder.Services.AddScoped<IVF.Application.Common.Interfaces.IVaultSecretService, IVF.Infrastructure.Services.VaultSecretService>();
+builder.Services.AddScoped<IVF.Application.Common.Interfaces.IZeroTrustService, IVF.Infrastructure.Services.ZeroTrustService>();
+
 // ─── Certificate Authority & auto-renewal ───
 builder.Services.AddSingleton<IVF.API.Services.CertificateAuthorityService>();
 builder.Services.AddHostedService<IVF.API.Services.CertAutoRenewalService>();
@@ -388,6 +405,8 @@ app.MapCertificateAuthorityEndpoints();
 app.MapUserSignatureEndpoints();
 app.MapPatientDocumentEndpoints();
 app.MapDocumentSignatureEndpoints();
+app.MapKeyVaultEndpoints();
+app.MapZeroTrustEndpoints();
 
 // ── Config seeders: run in every environment (idempotent, no demo data) ──────
 {
@@ -396,6 +415,8 @@ app.MapDocumentSignatureEndpoints();
     await db.Database.MigrateAsync();
     await BackupStrategySeeder.SeedAsync(db);        // default 3-2-1 backup strategies
     await CloudReplicationSeeder.SeedAsync(db);      // default cloud replication config
+    await ZTPolicySeeder.SeedAsync(db);              // default Zero Trust policies
+    await EncryptionConfigSeeder.SeedAsync(db);      // default encryption configs
 
     // Permission definitions must always be present
     var permDefRepo = scope.ServiceProvider.GetRequiredService<IPermissionDefinitionRepository>();

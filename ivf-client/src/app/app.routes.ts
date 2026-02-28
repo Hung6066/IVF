@@ -243,6 +243,13 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'admin/vault',
+        loadComponent: () =>
+          import('./features/admin/vault-manager/vault-manager.component').then(
+            (m) => m.VaultManagerComponent,
+          ),
+      },
+      {
         path: 'forms',
         loadChildren: () => import('./features/forms/forms.routes').then((m) => m.FORMS_ROUTES),
       },

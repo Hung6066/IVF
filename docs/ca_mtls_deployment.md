@@ -361,7 +361,7 @@ public class CertificateAuditEvent : BaseEntity
 
 ## 4. Service Layer — CertificateAuthorityService
 
-**File:** `src/IVF.API/Services/CertificateAuthorityService.cs` (1464 LOC)
+**File:** `src/IVF.API/Services/CertificateAuthorityService.cs` (~1800 LOC)
 
 This singleton service contains **all** PKI logic — CA management, cert issuance, renewal, revocation, CRL generation, OCSP, deployment, and audit. It creates its own `IServiceScope` per operation.
 
@@ -377,10 +377,44 @@ builder.Services.AddHostedService<CertAutoRenewalService>();
 
 ```csharp
 public sealed class CertificateAuthorityService(
-    IServiceScopeFactory scopeFactory,       // For creating DbContext scopes
-    IHubContext<BackupHub> hubContext,        // SignalR for deploy progress
-    IConfiguration configuration,            // For CertificateAuthority:BaseUrl
-    ILogger<CertificateAuthorityService> logger)
+    IServiceScopeFactory scopeFactory,           // For creating DbContext scopes
+    IHubContext<BackupHub> hubContext,            // SignalR for deploy progress
+    IConfiguration configuration,                // For CertificateAuthority:BaseUrl
+    ILogger<CertificateAuthorityService> logger,
+    IDataProtectionProvider dataProtectionProvider) // For encrypting private keys
+```
+
+### 4.2.1 Key Protection Methods
+
+```csharp
+private const string KeyProtectionPurpose = "IVF.CertificateAuthority.PrivateKeys";
+
+/// Encrypt a private key PEM before storing in the database.
+private string ProtectKey(string keyPem)
+{
+    var protector = dataProtectionProvider.CreateProtector(KeyProtectionPurpose);
+    return protector.Protect(keyPem);
+}
+
+/// Decrypt a private key PEM retrieved from the database.
+/// Handles legacy unencrypted keys by checking for PEM header.
+private string UnprotectKey(string protectedKeyPem)
+{
+    if (protectedKeyPem.Contains("-----BEGIN", StringComparison.Ordinal))
+        return protectedKeyPem;  // Legacy unencrypted key
+    var protector = dataProtectionProvider.CreateProtector(KeyProtectionPurpose);
+    return protector.Unprotect(protectedKeyPem);
+}
+
+/// Generate a cryptographically random serial number (RFC 5280 §4.1.2.2).
+private static string GenerateRandomSerialHex()
+{
+    Span<byte> serialBytes = stackalloc byte[20]; // 160-bit random serial
+    RandomNumberGenerator.Fill(serialBytes);
+    serialBytes[0] &= 0x7F; // Ensure positive (clear high bit per X.690 DER)
+    if (serialBytes[0] == 0) serialBytes[0] = 0x01; // Avoid leading zero byte
+    return Convert.ToHexString(serialBytes);
+}
 ```
 
 ### 4.3 Public Method Reference
@@ -572,12 +606,17 @@ var pki = app.MapGroup("/api/pki")
 
 **Endpoint:** `POST /api/admin/certificates/ca`
 
-Creates a self-signed Root CA with RSA 4096-bit key:
+Creates a self-signed Root CA with RSA 4096-bit key (SHA-384 hash for long-lived trust anchors):
 
 ```csharp
 // From CertificateAuthorityService.CreateRootCaAsync()
-using var rsa = RSA.Create(keySize);  // 4096 default
-var certReq = new CertificateRequest(subject, rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+var keySize = req.KeySize > 0 ? req.KeySize : 4096;
+if (keySize < 4096)
+    throw new InvalidOperationException("CA key size must be at least 4096 bits");
+
+using var rsa = RSA.Create(keySize);  // 4096 minimum for CAs
+// SHA-384 for Root CA (stronger hash for long-lived trust anchors per NIST SP 800-57)
+var certReq = new CertificateRequest(subject, rsa, HashAlgorithmName.SHA384, RSASignaturePadding.Pkcs1);
 
 // CA extensions
 certReq.CertificateExtensions.Add(
@@ -588,6 +627,9 @@ certReq.CertificateExtensions.Add(
     new X509SubjectKeyIdentifierExtension(certReq.PublicKey, false));
 
 using var cert = certReq.CreateSelfSigned(notBefore, notAfter);
+
+// Private key encrypted before DB storage via IDataProtectionProvider
+privateKeyPem: ProtectKey(keyPem)
 ```
 
 **Request:**
@@ -607,15 +649,22 @@ using var cert = certReq.CreateSelfSigned(notBefore, notAfter);
 
 **Endpoint:** `POST /api/admin/certificates/ca/intermediate`
 
-Creates an Intermediate CA signed by an existing Root CA:
+Creates an Intermediate CA signed by an existing Root CA (SHA-384, with AKI):
 
 ```csharp
 // Key differences from Root:
 certReq.CertificateExtensions.Add(
     new X509BasicConstraintsExtension(true, true, 0, true));  // pathLenConstraint=0
 
-// Signed by parent CA (not self-signed)
-using var parentCert = X509Certificate2.CreateFromPem(parentCa.CertificatePem, parentCa.PrivateKeyPem);
+// Authority Key Identifier — links intermediate CA to parent CA
+certReq.CertificateExtensions.Add(
+    X509AuthorityKeyIdentifierExtension.CreateFromCertificate(
+        parentCert, includeKeyIdentifier: true, includeIssuerAndSerial: false));
+
+// Signed by parent CA (not self-signed), key decrypted from DB
+using var parentCert = X509Certificate2.CreateFromPem(
+    parentCa.CertificatePem, UnprotectKey(parentCa.PrivateKeyPem));
+var serialHex = GenerateRandomSerialHex();  // 160-bit random serial
 using var signedCert = certReq.Create(parentCert, notBefore, notAfter, serialBytes);
 
 // Chain = intermediate cert + parent chain
@@ -638,10 +687,14 @@ Root CA (self-signed, 10yr)
 
 **Endpoint:** `POST /api/admin/certificates/certs`
 
-Issues a server or client certificate signed by a CA:
+Issues a server or client certificate signed by a CA (with AKI extension for chain validation):
 
 ```csharp
 // From CertificateAuthorityService.IssueCertificateAsync()
+var keySize = req.KeySize > 0 ? req.KeySize : 4096;
+if (keySize < 2048)
+    throw new InvalidOperationException("Certificate key size must be at least 2048 bits");
+var serialHex = GenerateRandomSerialHex();  // 160-bit cryptographic random serial
 
 // Server certificates:
 certReq.CertificateExtensions.Add(new X509KeyUsageExtension(
@@ -672,9 +725,18 @@ if (!string.IsNullOrWhiteSpace(baseUrl))
     certReq.CertificateExtensions.Add(BuildCrlDistributionPointExtension(crlUrl));
 }
 
+// Authority Key Identifier — links cert to issuing CA for chain validation
+var caCert = X509Certificate2.CreateFromPem(ca.CertificatePem, UnprotectKey(ca.PrivateKeyPem));
+certReq.CertificateExtensions.Add(
+    X509AuthorityKeyIdentifierExtension.CreateFromCertificate(
+        caCert, includeKeyIdentifier: true, includeIssuerAndSerial: false));
+
 // Validity clamped to CA expiry
 if (notAfter > caCert.NotAfter)
     notAfter = caCert.NotAfter.AddMinutes(-1);
+
+// Private key encrypted before storage
+privateKeyPem: ProtectKey(keyPem)
 ```
 
 **Purpose Presets (UI helpers):**
@@ -1794,13 +1856,86 @@ openssl crl -inform DER -in /tmp/test.crl -text -noout
 | `ivf-client/src/app/core/services/backup.service.ts`        | ~510  | Angular HTTP service                      |
 | `ivf-client/src/app/features/admin/certificate-management/` | —     | 9-tab management UI                       |
 
-## Appendix: Security Considerations
+## Appendix: Security Hardening Summary
 
-1. **Private keys** are stored in the database (encrypted at rest via PostgreSQL). Production should use HSM integration.
-2. **SSH access** uses `StrictHostKeyChecking=no` for dev convenience. Production should use known_hosts verification.
-3. **CRL validity** is 7 days. Clients should refresh CRLs periodically.
-4. **OCSP endpoint** returns JSON (not ASN.1/DER per strict RFC 6960). Simplified for internal use.
-5. **Admin endpoints** require `AdminOnly` authorization policy (JWT). Public PKI endpoints are unauthenticated per RFC.
-6. **Self-signed CA trust**: MinIO SDK uses `ServerCertificateCustomValidationCallback` to trust the private CA.
-7. **File permissions**: PostgreSQL requires `postgres:postgres` ownership (UID 999 Debian, 70 Alpine). MinIO uses root.
-8. **Temp file cleanup**: All deploy operations write to temp files and cleanup in `finally` blocks.
+The PKI system implements the following security measures aligned with NIST SP 800-57, RFC 5280, and enterprise standards (Google GTS, Amazon ACM/PCA, Microsoft Azure PKI, Cloudflare).
+
+### Cryptographic Standards
+
+| Parameter        | Root CA                            | Intermediate CA        | End-Entity Certs                   |
+| ---------------- | ---------------------------------- | ---------------------- | ---------------------------------- |
+| Hash Algorithm   | SHA-384                            | SHA-384                | SHA-256                            |
+| Key Algorithms   | RSA 4096 / ECDSA P-384             | RSA 4096 / ECDSA P-384 | RSA 4096 / ECDSA P-256/P-384/P-521 |
+| Minimum Key Size | RSA 4096 (enforced)                | RSA 4096 (enforced)    | RSA 2048 (enforced)                |
+| ECDSA Curves     | P-256, P-384, P-521                | P-256, P-384, P-521    | P-256, P-384, P-521                |
+| Serial Numbers   | 160-bit random (RFC 5280 §4.1.2.2) | 160-bit random         | 160-bit random                     |
+
+**ECDSA Support (Google/Cloudflare Parity):** All certificate operations support ECDSA alongside RSA. Pass `KeyAlgorithm: "ECDSA"` in API requests. Key size maps to ECDSA curve: ≤256 → P-256, ≤384 → P-384, >384 → P-521. ECDSA server certs use `DigitalSignature` KeyUsage only (no `KeyEncipherment` — ECDSA uses key agreement, not key transport).
+
+### Private Key Protection
+
+- **Application-layer encryption**: All private keys are encrypted via `IDataProtectionProvider` before database storage, using a dedicated purpose string (`IVF.CertificateAuthority.PrivateKeys`).
+- **Persistent key storage**: DataProtection keys are persisted to file system (`DataProtection:KeysPath` config or `{ContentRoot}/keys/dp`), ensuring encrypted private keys remain recoverable across container restarts and redeployments.
+- **Legacy compatibility**: `UnprotectKey()` detects unencrypted legacy keys (PEM `-----BEGIN` header) and returns them as-is, enabling seamless migration.
+- **In-memory only**: Decrypted keys are held only in memory during signing operations; never written to disk unencrypted.
+- **Production recommendation**: Consider HSM (Hardware Security Module) integration for highest assurance environments. Mount `DataProtection:KeysPath` as a persistent Docker volume.
+
+### Certificate Extensions (RFC 5280 Compliance)
+
+- **Subject Key Identifier (SKI)**: All certificates include SKI for key identification.
+- **Authority Key Identifier (AKI)**: All issued certificates and intermediate CAs include AKI linking to the issuing CA's SKI, enabling proper chain validation.
+- **Basic Constraints**: CAs marked `CA:TRUE`; Root CA has `pathLenConstraint` unlimited, Intermediate has `pathLenConstraint=0`.
+- **Key Usage**: CAs: `keyCertSign | crlSign | digitalSignature`. RSA server certs: `digitalSignature | keyEncipherment`. ECDSA server certs: `digitalSignature` only. Client certs: `digitalSignature`.
+- **Extended Key Usage**: Server certs: `serverAuth`. Client certs: `clientAuth`.
+- **Certificate Policies (RFC 5280 §4.2.1.4)**: Root and Intermediate CAs include the `anyPolicy` OID (`2.5.29.32.0`). Matches enterprise CA practice (Google GTS, Amazon ACM).
+- **Name Constraints (RFC 5280 §4.2.1.10)**: Intermediate CAs optionally restrict issuance to permitted DNS domains via `permittedSubtrees`. Pass `PermittedDomains: ["example.com", "internal.org"]` when creating an intermediate CA. Marked critical.
+- **CRL Distribution Points**: End-entity certs include CDP extension when `CertificateAuthority:BaseUrl` is configured.
+- **Subject Alternative Names**: DNS names and IP addresses supported via SAN extension.
+
+### TLS Validation
+
+- **MinIO**: When `MinIO:TrustedCaCertPath` is configured, the MinIO client validates server TLS certificates against the private CA using `X509ChainTrustMode.CustomRootTrust`. Falls back to accepting all certs in development when no CA path is set.
+- **SignServer**: Supports custom CA validation via `DigitalSigning:TrustedCaCertPath` with `X509CertificateLoader`. Falls back to `SkipTlsValidation` for development.
+
+### SSH & Deployment Security
+
+- **SSH host key verification**: `StrictHostKeyChecking=accept-new` — trusts host keys on first connection and rejects changes thereafter (TOFU model). Prevents man-in-the-middle attacks on subsequent connections.
+- **Temp file cleanup**: All deploy operations write to temp files and cleanup in `finally` blocks.
+
+### CRL & Revocation
+
+- **CRL validity**: 14 days. Clients should refresh CRLs before expiry.
+- **OCSP endpoint**: Returns JSON (simplified for internal use, not ASN.1/DER per strict RFC 6960).
+
+### Access Control
+
+- **Admin endpoints** require `AdminOnly` authorization policy (JWT). Public PKI endpoints (CRL download, OCSP) are unauthenticated per RFC.
+- **Self-signed CA trust**: MinIO SDK validates against private CA cert when `TrustedCaCertPath` is configured.
+
+### Enterprise Gap Analysis (vs Google/Amazon/Microsoft/Cloudflare)
+
+| Feature                | Google GTS   | Amazon ACM/PCA | Microsoft | Cloudflare | IVF PKI   |
+| ---------------------- | ------------ | -------------- | --------- | ---------- | --------- |
+| ECDSA P-256/P-384      | ✅ Primary   | ✅             | ✅        | ✅ Primary | ✅        |
+| RSA 2048–4096          | ✅           | ✅             | ✅        | ✅         | ✅        |
+| SHA-384/SHA-256        | ✅           | ✅             | ✅        | ✅         | ✅        |
+| Certificate Policies   | ✅           | ✅             | ✅        | ✅         | ✅        |
+| Name Constraints       | ✅           | ✅             | ✅        | N/A        | ✅        |
+| AKI/SKI                | ✅           | ✅             | ✅        | ✅         | ✅        |
+| CRL Distribution       | ✅           | ✅             | ✅        | ✅         | ✅        |
+| OCSP                   | ✅ Signed    | ✅ Signed      | ✅        | ✅ Stapled | ⚠️ JSON   |
+| CT Logging             | ✅ Mandatory | ✅             | Optional  | ✅         | ❌ N/A    |
+| Key Encryption at Rest | ✅ HSM       | ✅ HSM         | ✅ HSM    | ✅ HSM     | ✅ DPAPI  |
+| Auto-Renewal           | ✅           | ✅             | ✅        | ✅         | ✅        |
+| Rate Limiting          | ✅           | ✅             | ✅        | ✅         | ✅ 30/min |
+
+**Not implemented (by design):**
+
+- **Certificate Transparency (CT)**: Requires external CT log infrastructure (Google Argon/Xenon, Cloudflare Nimbus). Not applicable for internal/private CAs.
+- **Signed OCSP responses**: RFC 6960 ASN.1/DER format. Current JSON OCSP is adequate for internal use.
+
+### Remaining Considerations
+
+- **File permissions**: PostgreSQL requires `postgres:postgres` ownership (UID 999 Debian, 70 Alpine). MinIO uses root.
+- **Production credentials**: Replace default credentials in `appsettings.Development.json` before production deployment.
+- **DataProtection volume**: Mount `DataProtection:KeysPath` as a persistent Docker volume to ensure private key recoverability.

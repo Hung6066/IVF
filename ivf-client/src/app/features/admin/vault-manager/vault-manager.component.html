@@ -1,0 +1,2555 @@
+<div class="vault-page">
+  <!-- ═══ Header ═══ -->
+  <div class="page-header">
+    <div class="header-left">
+      <h2>🔐 Quản lý Vault</h2>
+      <p class="subtitle">Secrets, API Keys, Policies, Encryption & Zero Trust</p>
+    </div>
+    <div class="header-right">
+      <span class="vault-badge" [class.vault-ok]="isHealthy()" [class.vault-err]="!isHealthy()">
+        {{ isInitialized() ? '🟢 Unlocked' : '🔴 Locked' }}
+      </span>
+      <span class="provider-badge">Azure Key Vault</span>
+      <button class="btn btn-sm btn-outline" (click)="refresh()">🔄 Refresh</button>
+    </div>
+  </div>
+
+  <!-- ═══ Stats Strip ═══ -->
+  <div class="stats-grid">
+    <div
+      class="stat-card"
+      [class.stat-success]="isInitialized()"
+      [class.stat-danger]="!isInitialized()"
+    >
+      <div class="stat-icon">🏦</div>
+      <div class="stat-info">
+        <span class="stat-value">{{ isInitialized() ? 'Hoạt động' : 'Chưa khởi tạo' }}</span>
+        <span class="stat-label">Trạng thái Vault</span>
+      </div>
+    </div>
+    <div class="stat-card stat-info-card">
+      <div class="stat-icon">🔑</div>
+      <div class="stat-info">
+        <span class="stat-value">{{ activeKeyCount() }}</span>
+        <span class="stat-label">Active Keys</span>
+      </div>
+    </div>
+    <div class="stat-card" [class.stat-success]="isHealthy()" [class.stat-danger]="!isHealthy()">
+      <div class="stat-icon">💓</div>
+      <div class="stat-info">
+        <span class="stat-value">{{ isHealthy() ? 'Healthy' : 'Unhealthy' }}</span>
+        <span class="stat-label">Health</span>
+      </div>
+    </div>
+    <div class="stat-card stat-info-card">
+      <div class="stat-icon">🛡️</div>
+      <div class="stat-info">
+        <span class="stat-value">{{ activeZTPolicies() }}</span>
+        <span class="stat-label">ZT Policies</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ Initialize Banner ═══ -->
+  @if (!isInitialized()) {
+    <div class="card card-warning">
+      <div class="card-header"><h3>⚡ Khởi tạo Vault</h3></div>
+      <div class="card-body">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Master Password</label>
+            <input
+              type="password"
+              [(ngModel)]="initForm.masterPassword"
+              placeholder="Nhập master password"
+            />
+          </div>
+          <div class="form-group">
+            <label>User ID</label>
+            <input type="text" [(ngModel)]="initForm.userId" placeholder="Nhập user ID" />
+          </div>
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-warning" (click)="initializeVault()" [disabled]="loading()">
+            🔓 Khởi tạo Vault
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ═══ Tabs Bar ═══ -->
+  <div class="tabs-bar">
+    @for (tab of tabs; track tab.key) {
+      <button
+        class="tab-btn"
+        [class.tab-active]="activeTab() === tab.key"
+        (click)="onTabChange(tab.key)"
+      >
+        <span class="tab-icon">{{ tab.icon }}</span>
+        <span class="tab-label">{{ tab.label }}</span>
+      </button>
+    }
+  </div>
+
+  <!-- ═══ TAB: Secrets ═══ -->
+  @if (activeTab() === 'secrets') {
+    <div class="tab-panel">
+      <!-- Breadcrumb -->
+      <div class="breadcrumb-bar">
+        <button
+          class="breadcrumb-item"
+          [class.active]="breadcrumb().length === 0"
+          (click)="navigateHome()"
+        >
+          🏠 vault
+        </button>
+        @for (seg of breadcrumb(); track seg; let i = $index) {
+          <span class="breadcrumb-sep">/</span>
+          <button
+            class="breadcrumb-item"
+            [class.active]="i === breadcrumb().length - 1"
+            (click)="navigateToBreadcrumb(i)"
+          >
+            {{ seg }}
+          </button>
+        }
+        <div class="breadcrumb-actions">
+          <button class="btn btn-sm btn-primary" (click)="showNewSecretDialog.set(true)">
+            ➕ New Secret
+          </button>
+        </div>
+      </div>
+
+      <!-- Secrets Table -->
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th style="width: 40px"></th>
+              <th>Tên</th>
+              <th>Loại</th>
+              <th>Thao tác</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (entry of secrets(); track entry.name) {
+              <tr>
+                <td class="cell-icon">
+                  @if (entry.type === 'folder') {
+                    <span class="folder-icon">📁</span>
+                  } @else {
+                    <span class="secret-icon">🔑</span>
+                  }
+                </td>
+                <td class="cell-bold">
+                  @if (entry.type === 'folder') {
+                    <button class="link-btn" (click)="navigateToFolder(entry.name)">
+                      {{ entry.name }}
+                    </button>
+                  } @else {
+                    <button class="link-btn" (click)="viewSecret(entry.name)">
+                      {{ entry.name }}
+                    </button>
+                  }
+                </td>
+                <td>
+                  <span
+                    class="badge"
+                    [class.badge-folder]="entry.type === 'folder'"
+                    [class.badge-secret]="entry.type === 'secret'"
+                  >
+                    {{ entry.type === 'folder' ? 'Folder' : 'Secret' }}
+                  </span>
+                </td>
+                <td>
+                  <div class="action-cell">
+                    @if (entry.type === 'secret') {
+                      <button class="btn btn-xs btn-outline" (click)="viewSecret(entry.name)">
+                        👁 Xem
+                      </button>
+                      <button class="btn btn-xs btn-danger" (click)="deleteSecretEntry(entry.name)">
+                        🗑 Xóa
+                      </button>
+                    } @else {
+                      <button class="btn btn-xs btn-outline" (click)="navigateToFolder(entry.name)">
+                        📂 Mở
+                      </button>
+                    }
+                  </div>
+                </td>
+              </tr>
+            }
+            @if (secrets().length === 0) {
+              <tr>
+                <td colspan="4" class="empty-state">📂 Thư mục trống</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  }
+
+  <!-- ═══ TAB: API Keys ═══ -->
+  @if (activeTab() === 'api-keys') {
+    <div class="tab-panel">
+      <!-- Expiring Alert -->
+      @if (expiringKeys().length > 0) {
+        <div class="alert alert-danger">
+          <div class="alert-title">⚠ {{ expiringKeys().length }} key sắp hết hạn (30 ngày)</div>
+          @for (key of expiringKeys(); track key.id) {
+            <div class="alert-item">
+              <span class="key-name">{{ key.serviceName }}/{{ key.keyName }}</span>
+              <span class="key-expiry">Hết hạn: {{ formatDate(key.expiresAt) }}</span>
+            </div>
+          }
+        </div>
+      }
+
+      <!-- Create Key Card -->
+      <div class="card">
+        <div class="card-header">
+          <h3>➕ Tạo Key mới</h3>
+          <div class="header-actions">
+            <button
+              class="btn btn-sm btn-outline"
+              (click)="showCreateKeyForm.set(!showCreateKeyForm())"
+            >
+              {{ showCreateKeyForm() ? 'Ẩn' : 'Hiện' }}
+            </button>
+          </div>
+        </div>
+        @if (showCreateKeyForm()) {
+          <div class="card-body">
+            <div class="form-grid form-grid-3">
+              <div class="form-group">
+                <label>Key Name</label>
+                <input
+                  type="text"
+                  [(ngModel)]="createForm.keyName"
+                  placeholder="e.g. api-key-main"
+                />
+              </div>
+              <div class="form-group">
+                <label>Service Name</label>
+                <input
+                  type="text"
+                  [(ngModel)]="createForm.serviceName"
+                  placeholder="e.g. backup-service"
+                />
+              </div>
+              <div class="form-group">
+                <label>Key Prefix</label>
+                <input type="text" [(ngModel)]="createForm.keyPrefix" placeholder="e.g. ivf_" />
+              </div>
+              <div class="form-group">
+                <label>Key Hash</label>
+                <input type="text" [(ngModel)]="createForm.keyHash" placeholder="Hash value" />
+              </div>
+              <div class="form-group">
+                <label>Environment</label>
+                <select [(ngModel)]="createForm.environment">
+                  <option value="Development">Development</option>
+                  <option value="Staging">Staging</option>
+                  <option value="Production">Production</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Chu kỳ xoay (ngày)</label>
+                <input
+                  type="number"
+                  [(ngModel)]="createForm.rotationIntervalDays"
+                  placeholder="90"
+                />
+              </div>
+            </div>
+            <div class="form-actions">
+              <button class="btn btn-primary" (click)="createKey()" [disabled]="loading()">
+                🔑 Tạo Key
+              </button>
+            </div>
+          </div>
+        }
+      </div>
+
+      <!-- Keys Table -->
+      <div class="card">
+        <div class="card-header">
+          <h3>📋 Danh sách API Keys</h3>
+        </div>
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Service</th>
+                <th>Key Name</th>
+                <th>Trạng thái</th>
+                <th>Version</th>
+                <th>Hết hạn</th>
+                <th>Xoay lần cuối</th>
+                <th>Thao tác</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (key of vaultStatus()?.keys ?? []; track key.keyName + key.serviceName) {
+                <tr>
+                  <td class="cell-bold">{{ key.serviceName }}</td>
+                  <td>{{ key.keyName }}</td>
+                  <td>
+                    <span
+                      class="badge"
+                      [class.badge-success]="key.isActive"
+                      [class.badge-danger]="!key.isActive"
+                    >
+                      {{ key.isActive ? 'Active' : 'Inactive' }}
+                    </span>
+                  </td>
+                  <td class="cell-mono">v{{ key.version }}</td>
+                  <td>{{ key.expiresAt ? formatDate(key.expiresAt) : '—' }}</td>
+                  <td>{{ key.lastRotatedAt ? formatDate(key.lastRotatedAt) : '—' }}</td>
+                  <td>
+                    <div class="action-cell">
+                      <button class="btn btn-xs btn-primary" (click)="openRotateDialog(key)">
+                        🔄 Xoay
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              }
+              @if ((vaultStatus()?.keys ?? []).length === 0) {
+                <tr>
+                  <td colspan="7" class="empty-state">🔑 Chưa có key nào</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ═══ TAB: Zero Trust ═══ -->
+  @if (activeTab() === 'zero-trust') {
+    <div class="tab-panel">
+      <!-- Security Dashboard -->
+      @if (securityDashboard(); as dashboard) {
+        <div class="card">
+          <div class="card-header"><h3>🛡️ Security Dashboard</h3></div>
+          <div class="card-body">
+            <div class="zt-stats">
+              <div class="zt-stat zt-stat-primary">
+                <span class="zt-stat-value">{{ dashboard.securityScore }}</span>
+                <span class="zt-stat-label">Security Score</span>
+              </div>
+              <div class="zt-stat">
+                <span class="zt-stat-value">{{ dashboard.vaultStatus }}</span>
+                <span class="zt-stat-label">Vault Status</span>
+              </div>
+              <div class="zt-stat">
+                <span class="zt-stat-value">{{ dashboard.trustedDevices }}</span>
+                <span class="zt-stat-label">Trusted Devices</span>
+              </div>
+              <div class="zt-stat">
+                <span class="zt-stat-value">{{ dashboard.recentAlerts }}</span>
+                <span class="zt-stat-label">Recent Alerts</span>
+              </div>
+              <div class="zt-stat">
+                <span class="zt-stat-value">{{ dashboard.blockedAttempts }}</span>
+                <span class="zt-stat-label">Blocked Attempts</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Recent Security Events -->
+        @if (dashboard.recentEvents.length > 0) {
+          <div class="card mt-16">
+            <div class="card-header"><h3>📋 Recent Security Events</h3></div>
+            <div class="table-wrapper">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Thời gian</th>
+                    <th>Hành động</th>
+                    <th>Resource</th>
+                    <th>IP</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (ev of dashboard.recentEvents; track ev.id) {
+                    <tr>
+                      <td>{{ formatDate(ev.createdAt) }}</td>
+                      <td>
+                        <span class="badge badge-outline">{{ ev.action }}</span>
+                      </td>
+                      <td>{{ ev.resourceType || '—' }}</td>
+                      <td>{{ ev.ipAddress || '—' }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+        }
+      }
+
+      <!-- ZT Stats -->
+      <div class="zt-stats mt-16">
+        <div class="zt-stat">
+          <span class="zt-stat-value">{{ activeZTPolicies() }}</span>
+          <span class="zt-stat-label">Active Policies</span>
+        </div>
+        <div class="zt-stat">
+          <span class="zt-stat-value">{{ vpnBlockCount() }}</span>
+          <span class="zt-stat-label">VPN/Tor Blocked</span>
+        </div>
+        <div class="zt-stat">
+          <span class="zt-stat-value">{{ trustedDeviceCount() }}</span>
+          <span class="zt-stat-label">Trusted Device Required</span>
+        </div>
+      </div>
+
+      <!-- Access Check -->
+      <div class="card">
+        <div class="card-header"><h3>🧪 Kiểm tra truy cập</h3></div>
+        <div class="card-body">
+          <div class="inline-form">
+            <input
+              type="text"
+              [(ngModel)]="accessCheckAction"
+              placeholder="Nhập action (vd: ViewPatient)"
+            />
+            <button class="btn btn-primary" (click)="testAccess()" [disabled]="loading()">
+              Kiểm tra
+            </button>
+          </div>
+          @if (accessDecision()) {
+            <div
+              class="access-result"
+              [class.access-granted]="accessDecision()!.allowed"
+              [class.access-denied]="!accessDecision()!.allowed"
+            >
+              <div class="access-header">
+                {{ accessDecision()!.allowed ? '✅ GRANTED' : '❌ DENIED' }}
+                — {{ accessDecision()!.action }}
+              </div>
+              <div class="access-detail">
+                <span>Auth Level: {{ accessDecision()!.requiredAuthLevel }}</span>
+                <span>Risk: {{ accessDecision()!.deviceRiskLevel ?? 'N/A' }}</span>
+              </div>
+              @if (accessDecision()!.failedChecks.length) {
+                <div class="access-failures">
+                  <strong>Failed checks:</strong>
+                  @for (c of accessDecision()!.failedChecks; track c) {
+                    <span class="badge badge-danger">{{ c }}</span>
+                  }
+                </div>
+              }
+            </div>
+          }
+        </div>
+      </div>
+
+      <!-- Policies Table -->
+      <div class="card">
+        <div class="card-header">
+          <h3>📋 Zero Trust Policies</h3>
+          <div class="header-actions">
+            <button class="btn btn-sm btn-outline" (click)="loadZTPolicies()">🔄 Làm mới</button>
+          </div>
+        </div>
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Action</th>
+                <th>Auth Level</th>
+                <th>Max Risk</th>
+                <th>Trusted Device</th>
+                <th>Fresh Session</th>
+                <th>Block VPN/Tor</th>
+                <th>Block Anomaly</th>
+                <th>Geo Fence</th>
+                <th>Active</th>
+                <th>Thao tác</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (p of ztPolicies(); track p.action) {
+                <tr>
+                  <td class="cell-bold">{{ p.action }}</td>
+                  <td>
+                    <span class="badge" [ngClass]="getAuthLevelClass(p.requiredAuthLevel)">
+                      {{ p.requiredAuthLevel }}
+                    </span>
+                  </td>
+                  <td>
+                    <span class="badge" [ngClass]="getRiskClass(p.maxAllowedRisk)">{{
+                      p.maxAllowedRisk
+                    }}</span>
+                  </td>
+                  <td class="cell-center">{{ p.requireTrustedDevice ? '✅' : '—' }}</td>
+                  <td class="cell-center">{{ p.requireFreshSession ? '✅' : '—' }}</td>
+                  <td class="cell-center">{{ p.blockVpnTor ? '✅' : '—' }}</td>
+                  <td class="cell-center">{{ p.blockAnomaly ? '✅' : '—' }}</td>
+                  <td class="cell-center">{{ p.requireGeoFence ? '✅' : '—' }}</td>
+                  <td class="cell-center">
+                    <span
+                      class="badge"
+                      [class.badge-success]="p.isActive"
+                      [class.badge-danger]="!p.isActive"
+                    >
+                      {{ p.isActive ? 'Active' : 'Off' }}
+                    </span>
+                  </td>
+                  <td>
+                    <div class="action-cell">
+                      <button class="btn btn-xs btn-primary" (click)="editPolicy(p)">✏️ Sửa</button>
+                    </div>
+                  </td>
+                </tr>
+              }
+              @if (ztPolicies().length === 0) {
+                <tr>
+                  <td colspan="10" class="empty-state">🛡️ Chưa có chính sách nào</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ═══ TAB: Rotation ═══ -->
+  @if (activeTab() === 'rotation') {
+    <div class="tab-panel">
+      <div class="card">
+        <div class="card-header"><h3>🔄 Key Rotation Schedule</h3></div>
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Service</th>
+                <th>Key</th>
+                <th>Trạng thái</th>
+                <th>Xoay lần cuối</th>
+                <th>Hết hạn</th>
+                <th>Thao tác</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (key of vaultStatus()?.keys ?? []; track key.keyName + key.serviceName) {
+                <tr>
+                  <td class="cell-bold">{{ key.serviceName }}</td>
+                  <td>{{ key.keyName }}</td>
+                  <td>
+                    <span
+                      class="badge"
+                      [class.badge-success]="key.isActive"
+                      [class.badge-danger]="!key.isActive"
+                    >
+                      {{ key.isActive ? 'Active' : 'Inactive' }}
+                    </span>
+                  </td>
+                  <td>{{ key.lastRotatedAt ? formatDate(key.lastRotatedAt) : '—' }}</td>
+                  <td>{{ key.expiresAt ? formatDate(key.expiresAt) : '—' }}</td>
+                  <td>
+                    <div class="action-cell">
+                      <button class="btn btn-xs btn-primary" (click)="openRotateDialog(key)">
+                        🔄 Xoay ngay
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              }
+              @if ((vaultStatus()?.keys ?? []).length === 0) {
+                <tr>
+                  <td colspan="6" class="empty-state">Chưa có key nào để xoay</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ═══ TAB: Database ═══ -->
+  @if (activeTab() === 'database') {
+    <div class="tab-panel">
+      <div class="section-header">
+        <div>
+          <h3>🗄️ Database Credentials</h3>
+          <p class="text-muted">Quản lý credentials cho database connections</p>
+        </div>
+        <button class="btn btn-sm btn-primary" (click)="showDbDialog.set(true)">
+          ➕ Thêm Database
+        </button>
+      </div>
+      <div class="card">
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Tên</th>
+                <th>Host</th>
+                <th>Database</th>
+                <th>Port</th>
+                <th>Thao tác</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (db of databaseSecrets(); track db.name) {
+                <tr>
+                  <td class="cell-bold"><span class="db-icon">🖥️</span> {{ db.name }}</td>
+                  <td>{{ db.host || '—' }}</td>
+                  <td>{{ db.database || '—' }}</td>
+                  <td>{{ db.port || '—' }}</td>
+                  <td>
+                    <div class="action-cell">
+                      <button
+                        class="btn btn-xs btn-outline"
+                        (click)="viewSecret('database/' + db.name)"
+                      >
+                        👁 Xem
+                      </button>
+                      <button class="btn btn-xs btn-danger" (click)="deleteDbSecret(db.name)">
+                        🗑 Xóa
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              }
+              @if (databaseSecrets().length === 0) {
+                <tr>
+                  <td colspan="5" class="empty-state">🗄️ Chưa có database credentials nào</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <p class="tip-text">💡 Database credentials được lưu tại path <code>database/[tên]</code></p>
+    </div>
+  }
+
+  <!-- ═══ TAB: Policies ═══ -->
+  @if (activeTab() === 'policies') {
+    <div class="tab-panel">
+      <div class="section-header">
+        <div>
+          <h3>📋 Vault Policies</h3>
+          <p class="text-muted">Quản lý chính sách truy cập vault</p>
+        </div>
+        <button class="btn btn-sm btn-primary" (click)="showPolicyDialog.set(true)">
+          ➕ Tạo Policy
+        </button>
+      </div>
+      <div class="card">
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Tên</th>
+                <th>Path Pattern</th>
+                <th>Capabilities</th>
+                <th>Mô tả</th>
+                <th>Thao tác</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (p of policies(); track p.id) {
+                <tr>
+                  <td class="cell-bold">{{ p.name }}</td>
+                  <td>
+                    <code>{{ p.pathPattern }}</code>
+                  </td>
+                  <td>
+                    @for (cap of p.capabilities; track cap) {
+                      <span class="badge badge-outline">{{ cap }}</span>
+                    }
+                  </td>
+                  <td>{{ p.description || '—' }}</td>
+                  <td>
+                    <div class="action-cell">
+                      <button class="btn btn-xs btn-danger" (click)="deletePolicy(p.id)">
+                        🗑 Xóa
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              }
+              @if (policies().length === 0) {
+                <tr>
+                  <td colspan="5" class="empty-state">📋 Chưa có policy nào</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ═══ TAB: User Policies ═══ -->
+  @if (activeTab() === 'user-policies') {
+    <div class="tab-panel">
+      <div class="section-header">
+        <div>
+          <h3>👤 User Policies</h3>
+          <p class="text-muted">Gán chính sách vault cho người dùng</p>
+        </div>
+        <button class="btn btn-sm btn-primary" (click)="showUserPolicyDialog.set(true)">
+          ➕ Gán Policy
+        </button>
+      </div>
+      <div class="card">
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>User</th>
+                <th>Policy</th>
+                <th>Gán lúc</th>
+                <th>Thao tác</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (up of userPolicies(); track up.id) {
+                <tr>
+                  <td class="cell-bold">{{ up.userName || up.userId }}</td>
+                  <td>
+                    <span class="badge badge-info">{{ up.policyName || up.policyId }}</span>
+                  </td>
+                  <td>{{ up.grantedAt ? formatDate(up.grantedAt) : '—' }}</td>
+                  <td>
+                    <div class="action-cell">
+                      <button class="btn btn-xs btn-danger" (click)="removeUserPolicy(up.id)">
+                        🗑 Gỡ
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              }
+              @if (userPolicies().length === 0) {
+                <tr>
+                  <td colspan="4" class="empty-state">👤 Chưa gán policy cho user nào</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ═══ TAB: Leases ═══ -->
+  @if (activeTab() === 'leases') {
+    <div class="tab-panel">
+      <div class="section-header">
+        <div>
+          <h3>⏱️ Secret Leases</h3>
+          <p class="text-muted">Quản lý lease (thời gian sử dụng) của secrets</p>
+        </div>
+        <button class="btn btn-primary" (click)="showLeaseDialog.set(true)">➕ Tạo Lease</button>
+      </div>
+      <div class="card">
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Secret</th>
+                <th>TTL</th>
+                <th>Renewable</th>
+                <th>Hết hạn</th>
+                <th>Trạng thái</th>
+                <th>Thao tác</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (lease of leases(); track lease.id) {
+                <tr>
+                  <td class="cell-bold">{{ lease.secretPath }}</td>
+                  <td>{{ lease.ttl }}s</td>
+                  <td class="cell-center">{{ lease.renewable ? '✅' : '—' }}</td>
+                  <td>{{ formatDate(lease.expiresAt) }}</td>
+                  <td>
+                    <span
+                      class="badge"
+                      [class.badge-success]="!lease.revoked"
+                      [class.badge-danger]="lease.revoked"
+                    >
+                      {{ lease.revoked ? 'Revoked' : 'Active' }}
+                    </span>
+                  </td>
+                  <td>
+                    <div class="action-cell">
+                      @if (!lease.revoked) {
+                        @if (lease.renewable) {
+                          <button
+                            class="btn btn-xs btn-outline"
+                            (click)="renewLease(lease.leaseId)"
+                          >
+                            🔄 Gia hạn
+                          </button>
+                        }
+                        <button class="btn btn-xs btn-danger" (click)="revokeLease(lease.leaseId)">
+                          🚫 Thu hồi
+                        </button>
+                      }
+                    </div>
+                  </td>
+                </tr>
+              }
+              @if (leases().length === 0) {
+                <tr>
+                  <td colspan="6" class="empty-state">⏱️ Không có lease nào đang active</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ─── Create Lease Dialog ─── -->
+      @if (showLeaseDialog()) {
+        <div class="dialog-overlay" (click)="showLeaseDialog.set(false)">
+          <div class="dialog" (click)="$event.stopPropagation()">
+            <div class="dialog-header">
+              <h3>➕ Tạo Lease mới</h3>
+              <button class="btn btn-xs btn-outline" (click)="showLeaseDialog.set(false)">✕</button>
+            </div>
+            <div class="dialog-body">
+              <div class="form-group">
+                <label>Secret Path</label>
+                <input
+                  type="text"
+                  [(ngModel)]="newLeaseForm.secretPath"
+                  placeholder="database/postgres"
+                />
+              </div>
+              <div class="form-group">
+                <label>TTL (giây)</label>
+                <input type="number" [(ngModel)]="newLeaseForm.ttlSeconds" min="60" />
+              </div>
+              <div class="form-group">
+                <label class="checkbox-label">
+                  <input type="checkbox" [(ngModel)]="newLeaseForm.renewable" />
+                  Cho phép gia hạn (Renewable)
+                </label>
+              </div>
+            </div>
+            <div class="dialog-footer">
+              <button class="btn btn-outline" (click)="showLeaseDialog.set(false)">Hủy</button>
+              <button
+                class="btn btn-primary"
+                (click)="createLease()"
+                [disabled]="loading() || !newLeaseForm.secretPath"
+              >
+                💾 Tạo
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+    </div>
+  }
+
+  <!-- ═══ TAB: Dynamic ═══ -->
+  @if (activeTab() === 'dynamic') {
+    <div class="tab-panel">
+      <div class="section-header">
+        <div>
+          <h3>⚡ Dynamic Credentials</h3>
+          <p class="text-muted">Tạo credentials tạm thời cho database và services</p>
+        </div>
+        <button class="btn btn-sm btn-primary" (click)="showDynamicDialog.set(true)">
+          ➕ Thêm Config
+        </button>
+      </div>
+      <div class="card">
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Lease ID</th>
+                <th>Backend</th>
+                <th>Username</th>
+                <th>Host</th>
+                <th>Database</th>
+                <th>Hết hạn</th>
+                <th>Thao tác</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (cred of dynamicCredentials(); track cred.id) {
+                <tr>
+                  <td class="cell-bold">
+                    <code>{{ cred.leaseId }}</code>
+                  </td>
+                  <td>
+                    <span class="badge badge-info">{{ cred.backend }}</span>
+                  </td>
+                  <td>{{ cred.username }}</td>
+                  <td>{{ cred.dbHost }}:{{ cred.dbPort }}</td>
+                  <td>{{ cred.dbName }}</td>
+                  <td>{{ formatDate(cred.expiresAt) }}</td>
+                  <td>
+                    <div class="action-cell">
+                      @if (!cred.revoked) {
+                        <button
+                          class="btn btn-xs btn-danger"
+                          (click)="deleteDynamicCredential(cred.id)"
+                        >
+                          🚫 Revoke
+                        </button>
+                      } @else {
+                        <span class="badge badge-danger">Revoked</span>
+                      }
+                    </div>
+                  </td>
+                </tr>
+              }
+              @if (dynamicCredentials().length === 0) {
+                <tr>
+                  <td colspan="7" class="empty-state">⚡ Chưa có dynamic credential nào</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ═══ TAB: Tokens ═══ -->
+  @if (activeTab() === 'tokens') {
+    <div class="tab-panel">
+      <div class="section-header">
+        <div>
+          <h3>🎟️ Vault Tokens</h3>
+          <p class="text-muted">Quản lý token truy cập vault</p>
+        </div>
+        <button class="btn btn-sm btn-primary" (click)="showTokenDialog.set(true)">
+          ➕ Tạo Token
+        </button>
+      </div>
+      <div class="card">
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Display Name</th>
+                <th>Accessor</th>
+                <th>Type</th>
+                <th>Policies</th>
+                <th>Uses</th>
+                <th>Hết hạn</th>
+                <th>Trạng thái</th>
+                <th>Thao tác</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (token of tokens(); track token.id) {
+                <tr>
+                  <td class="cell-bold">{{ token.displayName || '—' }}</td>
+                  <td>
+                    <code>{{ token.accessor }}</code>
+                  </td>
+                  <td>
+                    <span class="badge badge-outline">{{ token.tokenType }}</span>
+                  </td>
+                  <td>
+                    @for (p of token.policies; track p) {
+                      <span class="badge badge-outline">{{ p }}</span>
+                    }
+                  </td>
+                  <td>{{ token.usesCount }}{{ token.numUses ? '/' + token.numUses : '' }}</td>
+                  <td>{{ formatDate(token.expiresAt ?? null) }}</td>
+                  <td>
+                    <span
+                      class="badge"
+                      [class.badge-success]="token.isValid"
+                      [class.badge-danger]="!token.isValid"
+                    >
+                      {{ token.isValid ? 'Valid' : token.revoked ? 'Revoked' : 'Expired' }}
+                    </span>
+                  </td>
+                  <td>
+                    <div class="action-cell">
+                      @if (!token.revoked) {
+                        <button class="btn btn-xs btn-danger" (click)="revokeToken(token.id)">
+                          🚫 Thu hồi
+                        </button>
+                      }
+                    </div>
+                  </td>
+                </tr>
+              }
+              @if (tokens().length === 0) {
+                <tr>
+                  <td colspan="8" class="empty-state">🎟️ Chưa có token nào</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Created Token Alert -->
+      @if (createdToken()) {
+        <div class="alert alert-success mt-8">
+          <div class="alert-title">🎟️ Token đã tạo — sao chép ngay! (chỉ hiện một lần)</div>
+          <div class="result-row">
+            <span class="result-label">Token:</span>
+            <code class="result-mono">{{ createdToken()!.token }}</code>
+            <button class="btn btn-xs btn-outline" (click)="copyToClipboard(createdToken()!.token)">
+              📋 Copy
+            </button>
+          </div>
+          <div class="result-row">
+            <span class="result-label">Accessor:</span>
+            <code>{{ createdToken()!.accessor }}</code>
+          </div>
+          <button class="btn btn-xs btn-outline mt-8" (click)="createdToken.set(null)">✕ Ẩn</button>
+        </div>
+      }
+    </div>
+  }
+
+  <!-- ═══ TAB: Settings ═══ -->
+  @if (activeTab() === 'settings') {
+    <div class="tab-panel">
+      <!-- Azure Key Vault Config -->
+      <div class="card">
+        <div class="card-header">
+          <h3>🔷 Azure Key Vault Auto-Unseal</h3>
+          <p class="text-muted">Sử dụng Azure Key Vault để tự động mở khóa vault khi khởi động</p>
+        </div>
+        <div class="card-body">
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Vault URL</label>
+              <input
+                type="text"
+                [(ngModel)]="settingsForm.vaultUrl"
+                placeholder="https://myvault.vault.azure.net/"
+              />
+            </div>
+            <div class="form-group">
+              <label>Key Name</label>
+              <input
+                type="text"
+                [(ngModel)]="settingsForm.keyName"
+                placeholder="vault-unseal-key"
+              />
+            </div>
+          </div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Tenant ID</label>
+              <input
+                type="text"
+                [(ngModel)]="settingsForm.tenantId"
+                placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+              />
+            </div>
+            <div class="form-group">
+              <label>Client ID (App Registration)</label>
+              <input
+                type="text"
+                [(ngModel)]="settingsForm.clientId"
+                placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+              />
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Client Secret</label>
+            <input
+              type="password"
+              [(ngModel)]="settingsForm.clientSecret"
+              placeholder="Azure App Secret"
+            />
+          </div>
+          <div class="form-actions form-actions-between">
+            <button
+              class="btn btn-outline"
+              (click)="testConnection()"
+              [disabled]="testingConnection()"
+            >
+              {{ testingConnection() ? '⏳ Đang test...' : '🔌 Test Connection' }}
+            </button>
+            <button class="btn btn-danger" (click)="saveSettings()" [disabled]="loading()">
+              💾 Lưu cấu hình
+            </button>
+          </div>
+          @if (connectionResult()) {
+            <div
+              class="alert mt-8"
+              [class.alert-success]="connectionResult()!.connected"
+              [class.alert-danger]="!connectionResult()!.connected"
+            >
+              {{ connectionResult()!.connected ? '✅' : '❌' }} {{ connectionResult()!.message }}
+            </div>
+          }
+        </div>
+      </div>
+
+      <!-- Instructions -->
+      <div class="card">
+        <div class="card-header"><h3>📖 Hướng dẫn cấu hình Azure Key Vault</h3></div>
+        <div class="card-body instructions-list">
+          <p><strong>1.</strong> Tạo Azure Key Vault trong Azure Portal</p>
+          <p><strong>2.</strong> Tạo RSA key trong Key Vault (2048-bit hoặc 4096-bit)</p>
+          <p><strong>3.</strong> Tạo App Registration trong Azure AD</p>
+          <p><strong>4.</strong> Cấp quyền cho App: Key Vault → Access policies → Add:</p>
+          <p class="indent">• <code>Wrap Key</code> và <code>Unwrap Key</code> permissions</p>
+          <p><strong>5.</strong> Điền thông tin ở trên và lưu</p>
+        </div>
+      </div>
+
+      <!-- Enable Auto-Unseal -->
+      <div class="card">
+        <div class="card-header">
+          <h3>🔐 Kích Hoạt Auto-Unseal</h3>
+          <p class="text-muted">
+            Cho phép vault tự động mở khóa bằng Azure Key Vault (cho vault đã khởi tạo)
+          </p>
+        </div>
+        <div class="card-body">
+          <div class="alert alert-warning">
+            ⚠️ <strong>Lưu ý:</strong> Bạn cần nhập Master Password đã sử dụng để khởi tạo vault.
+            Password sẽ được mã hóa bằng Azure Key Vault và lưu vào database để auto-unseal.
+          </div>
+          <div class="form-group mt-8">
+            <label>Master Password</label>
+            <input
+              type="password"
+              [(ngModel)]="autoUnsealForm.masterPassword"
+              placeholder="Nhập Master Password đã khởi tạo vault..."
+            />
+          </div>
+          <button
+            class="btn btn-primary full-width"
+            (click)="configureAutoUnseal()"
+            [disabled]="loading() || autoUnsealForm.masterPassword.length < 8"
+          >
+            🔑 Kích Hoạt Auto-Unseal
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ═══ TAB: History ═══ -->
+  @if (activeTab() === 'history') {
+    <div class="tab-panel">
+      <div class="card">
+        <div class="card-header">
+          <h3>📜 Lịch sử hoạt động</h3>
+          <div class="header-actions">
+            <button class="btn btn-sm btn-outline" (click)="loadAuditLogs()">🔄 Làm mới</button>
+          </div>
+        </div>
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Thời gian</th>
+                <th>Action</th>
+                <th>Resource</th>
+                <th>User</th>
+                <th>IP</th>
+                <th>Chi tiết</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (log of auditLogs(); track log.id) {
+                <tr>
+                  <td>{{ formatDate(log.createdAt) }}</td>
+                  <td>
+                    <span class="badge badge-info">{{ log.action }}</span>
+                  </td>
+                  <td>{{ log.resourceType }}{{ log.resourceId ? '/' + log.resourceId : '' }}</td>
+                  <td>{{ log.userId || '—' }}</td>
+                  <td>
+                    <code>{{ log.ipAddress || '—' }}</code>
+                  </td>
+                  <td>{{ log.details || '—' }}</td>
+                </tr>
+              }
+              @if (auditLogs().length === 0) {
+                <tr>
+                  <td colspan="6" class="empty-state">📜 Chưa có hoạt động nào</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        @if (auditLogTotalCount() > 20) {
+          <div class="form-actions">
+            <button
+              class="btn btn-sm btn-outline"
+              [disabled]="auditLogPage() <= 1"
+              (click)="auditLogPage.set(auditLogPage() - 1); loadAuditLogs()"
+            >
+              ◀ Trước
+            </button>
+            <span>Trang {{ auditLogPage() }} / {{ Math.ceil(auditLogTotalCount() / 20) }}</span>
+            <button
+              class="btn btn-sm btn-outline"
+              (click)="auditLogPage.set(auditLogPage() + 1); loadAuditLogs()"
+            >
+              Sau ▶
+            </button>
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  <!-- ═══ TAB: Import ═══ -->
+  @if (activeTab() === 'import') {
+    <div class="tab-panel">
+      <div class="card">
+        <div class="card-header">
+          <h3>📥 Import Secrets</h3>
+          <p class="text-muted">Import secrets từ file JSON hoặc .env</p>
+        </div>
+        <div class="card-body">
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Format</label>
+              <select [ngModel]="importFormat()" (ngModelChange)="importFormat.set($event)">
+                <option value="json">JSON</option>
+                <option value="env">.env</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Prefix (tùy chọn)</label>
+              <input
+                type="text"
+                [ngModel]="importPrefix()"
+                (ngModelChange)="importPrefix.set($event)"
+                placeholder="e.g. production"
+              />
+            </div>
+          </div>
+          <div class="form-group">
+            <label>File</label>
+            <input type="file" (change)="handleImportFile($event)" accept=".json,.env,.txt" />
+          </div>
+          <div class="form-group">
+            <label>Hoặc paste dữ liệu</label>
+            <textarea
+              [ngModel]="importData()"
+              (ngModelChange)="importData.set($event)"
+              rows="10"
+              class="mono-textarea"
+              [placeholder]="
+                importFormat() === 'json'
+                  ? '{&quot;KEY&quot;: &quot;value&quot;, ...}'
+                  : 'KEY=value\nKEY2=value2'
+              "
+            ></textarea>
+          </div>
+          <div class="form-actions">
+            <button
+              class="btn btn-primary"
+              (click)="executeImport()"
+              [disabled]="loading() || !importData()"
+            >
+              📥 Import
+            </button>
+          </div>
+          @if (importResult()) {
+            <div
+              class="alert mt-8"
+              [class.alert-success]="importResult()!.failed === 0"
+              [class.alert-danger]="importResult()!.failed > 0"
+            >
+              ✅ {{ importResult()!.success }} thành công, ❌ {{ importResult()!.failed }} lỗi
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ═══ TAB: Field Access (Phân quyền) ═══ -->
+  @if (activeTab() === 'field-access') {
+    <div class="tab-panel">
+      <div class="card">
+        <div class="card-header">
+          <h3>🔐 Phân quyền truy cập dữ liệu</h3>
+          <div class="header-actions">
+            <button class="btn btn-sm btn-outline" (click)="loadFieldAccessPolicies()">
+              🔄 Làm mới
+            </button>
+            <button class="btn btn-sm btn-primary" (click)="openAddFAPolicy()">
+              ➕ Thêm policy
+            </button>
+          </div>
+        </div>
+        <div class="card-body">
+          <!-- Sub-tabs: Policies / Audit Log -->
+          <div class="sub-tabs">
+            <button
+              class="sub-tab"
+              [class.sub-tab-active]="faActiveSubTab() === 'policies'"
+              (click)="faActiveSubTab.set('policies')"
+            >
+              📋 Policies ({{ fieldAccessPolicies().length }})
+            </button>
+            <button
+              class="sub-tab"
+              [class.sub-tab-active]="faActiveSubTab() === 'audit'"
+              (click)="faActiveSubTab.set('audit'); loadFAAuditLogs()"
+            >
+              📜 Audit Log
+            </button>
+          </div>
+
+          @if (faActiveSubTab() === 'policies') {
+            <!-- Policies grouped by table -->
+            @for (table of faGroupKeys(); track table) {
+              <div class="fa-group">
+                <div class="fa-group-header" (click)="toggleFAGroup(table)">
+                  <span class="fa-group-toggle">{{ faExpandedGroups()[table] ? '▼' : '▶' }}</span>
+                  <span class="fa-group-name">{{ table }}</span>
+                  <span class="badge badge-info"
+                    >{{ faPoliciesGrouped()[table].length }} policies</span
+                  >
+                </div>
+                @if (faExpandedGroups()[table]) {
+                  <div class="fa-group-body">
+                    <table class="data-table">
+                      <thead>
+                        <tr>
+                          <th>Trường</th>
+                          <th>Vai trò</th>
+                          <th>Mức truy cập</th>
+                          <th>Mask Pattern</th>
+                          <th>Thao tác</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        @for (p of faPoliciesGrouped()[table]; track p.id) {
+                          <tr>
+                            <td class="cell-bold">{{ p.fieldName }}</td>
+                            <td>{{ p.role }}</td>
+                            <td>
+                              <span
+                                class="badge"
+                                [ngClass]="getAccessLevelBadgeClass(p.accessLevel)"
+                              >
+                                {{ getAccessLevelLabel(p.accessLevel) }}
+                              </span>
+                            </td>
+                            <td>
+                              <code>{{ p.accessLevel === 'masked' ? p.maskPattern : '—' }}</code>
+                            </td>
+                            <td>
+                              <div class="action-cell">
+                                <button
+                                  class="btn btn-xs btn-primary"
+                                  (click)="openEditFAPolicy(p)"
+                                >
+                                  ✏️
+                                </button>
+                                <button class="btn btn-xs btn-danger" (click)="deleteFAPolicy(p)">
+                                  🗑️
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  </div>
+                }
+              </div>
+            }
+            @if (faGroupKeys().length === 0) {
+              <div class="empty-state" style="padding: 2rem; text-align: center">
+                🔐 Chưa có policy nào. Nhấn "Thêm policy" để bắt đầu.
+              </div>
+            }
+
+            <!-- Important notes -->
+            <div class="info-box mt-16">
+              <h4>⚠️ Lưu ý quan trọng</h4>
+              <ul class="text-muted" style="margin: 0.5rem 0; padding-left: 1.5rem">
+                <li>
+                  Vai trò <strong>admin</strong> luôn có quyền truy cập đầy đủ vào tất cả dữ liệu
+                </li>
+                <li>Policies được áp dụng theo nguyên tắc "ít quyền nhất" (Least Privilege)</li>
+                <li>Thay đổi policies sẽ được ghi nhận trong Audit Log</li>
+              </ul>
+            </div>
+          }
+
+          @if (faActiveSubTab() === 'audit') {
+            <div class="table-wrapper">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Thời gian</th>
+                    <th>Hành động</th>
+                    <th>Resource</th>
+                    <th>IP</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (log of faAuditLogs(); track log.id) {
+                    <tr>
+                      <td>{{ formatDate(log.createdAt) }}</td>
+                      <td>
+                        <span class="badge badge-outline">{{ log.action }}</span>
+                      </td>
+                      <td>{{ log.resourceId || '—' }}</td>
+                      <td>{{ log.ipAddress || '—' }}</td>
+                    </tr>
+                  }
+                  @if (faAuditLogs().length === 0) {
+                    <tr>
+                      <td colspan="4" class="empty-state">📜 Chưa có audit log nào</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ═══ TAB: Encryption (Auto-Encryption Config) ═══ -->
+  @if (activeTab() === 'encryption') {
+    <div class="tab-panel">
+      <!-- Header -->
+      <div class="card">
+        <div class="card-header">
+          <h3>🔒 Cấu Hình Auto-Encryption</h3>
+          <div class="header-actions">
+            <button class="btn btn-sm btn-outline" (click)="loadEncryptionConfigs()">
+              🔄 Làm mới
+            </button>
+            <button class="btn btn-sm btn-primary" (click)="openAddEncConfig()">
+              ➕ Thêm bảng
+            </button>
+          </div>
+        </div>
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Bảng</th>
+                <th>Trường mã hóa</th>
+                <th>DEK Purpose</th>
+                <th>Trạng thái</th>
+                <th>Thao tác</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (c of encryptionConfigs(); track c.id) {
+                <tr>
+                  <td>
+                    <div class="cell-bold">{{ c.tableName }}</div>
+                    @if (c.isDefault) {
+                      <span class="badge badge-info" style="font-size: 0.7rem">Mặc định</span>
+                    }
+                  </td>
+                  <td>
+                    <div class="field-badges">
+                      @for (f of c.encryptedFields.slice(0, 3); track f) {
+                        <span class="badge badge-outline">{{ f }}</span>
+                      }
+                      @if (c.encryptedFields.length > 3) {
+                        <span class="badge badge-outline">+{{ c.encryptedFields.length - 3 }}</span>
+                      }
+                    </div>
+                  </td>
+                  <td>
+                    <span
+                      class="badge"
+                      [class.badge-primary]="c.dekPurpose === 'data'"
+                      [class.badge-warning]="c.dekPurpose === 'session'"
+                      [class.badge-info]="c.dekPurpose === 'api'"
+                      [class.badge-secondary]="c.dekPurpose === 'backup'"
+                    >
+                      {{ getDekPurposeLabel(c.dekPurpose) }}
+                    </span>
+                  </td>
+                  <td>
+                    <label class="toggle-switch">
+                      <input
+                        type="checkbox"
+                        [checked]="c.isEnabled"
+                        (change)="toggleEncConfig(c)"
+                      />
+                      <span class="toggle-slider"></span>
+                    </label>
+                  </td>
+                  <td>
+                    <div class="action-cell">
+                      <button class="btn btn-xs btn-primary" (click)="openEditEncConfig(c)">
+                        ✏️
+                      </button>
+                      @if (!c.isDefault) {
+                        <button class="btn btn-xs btn-danger" (click)="deleteEncConfig(c)">
+                          🗑️
+                        </button>
+                      }
+                    </div>
+                  </td>
+                </tr>
+              }
+              @if (encryptionConfigs().length === 0) {
+                <tr>
+                  <td colspan="5" class="empty-state">🔒 Chưa có cấu hình encryption nào</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Hybrid Auto-Encryption Info -->
+      <div class="card mt-16">
+        <div class="card-body">
+          <div class="info-box">
+            <h4>🔐 Hybrid Auto-Encryption</h4>
+            <p class="text-muted">
+              Hệ thống sử dụng mã hóa kết hợp (Hybrid Encryption) để bảo vệ dữ liệu PHI: Mỗi bảng dữ
+              liệu nhạy cảm sẽ được cấu hình với một Data Encryption Key (DEK) riêng, được bảo vệ
+              bởi Key Encryption Key (KEK) thông qua Azure Key Vault RSA-OAEP-256. Khi dữ liệu được
+              ghi vào database, các trường được chỉ định sẽ tự động được mã hóa bằng AES-256-GCM
+              trước khi lưu trữ.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Auto-Unseal Configuration (collapsed) -->
+      <div class="card mt-16">
+        <div class="card-header"><h3>🔓 Auto-Unseal (Azure Key Vault RSA-OAEP-256)</h3></div>
+        <div class="card-body">
+          @if (autoUnsealStatus(); as aus) {
+            <div class="auto-unseal-status">
+              <div
+                class="status-badge"
+                [class.status-configured]="aus.isConfigured"
+                [class.status-not-configured]="!aus.isConfigured"
+              >
+                {{ aus.isConfigured ? '✅ Đã cấu hình' : '⚠️ Chưa cấu hình' }}
+              </div>
+              @if (aus.isConfigured) {
+                <div class="status-details">
+                  <div class="result-row">
+                    <span class="result-label">Key Vault URL:</span>
+                    <code>{{ aus.keyVaultUrl || '—' }}</code>
+                  </div>
+                  <div class="result-row">
+                    <span class="result-label">Key Name:</span>
+                    <code>{{ aus.keyName || '—' }}</code>
+                  </div>
+                  <div class="result-row">
+                    <span class="result-label">Algorithm:</span>
+                    <code>{{ aus.algorithm || '—' }}</code>
+                  </div>
+                </div>
+                <button
+                  class="btn btn-primary mt-8"
+                  (click)="triggerAutoUnseal()"
+                  [disabled]="loading()"
+                >
+                  🔓 Auto-Unseal Now
+                </button>
+              }
+            </div>
+          }
+          <div class="auto-unseal-config mt-16">
+            <h4>⚙️ Cấu hình Auto-Unseal</h4>
+            <div class="form-group">
+              <label>Master Password</label>
+              <input
+                type="password"
+                [(ngModel)]="autoUnsealForm.masterPassword"
+                placeholder="Master password (tối thiểu 12 ký tự)"
+              />
+            </div>
+            <div class="form-group">
+              <label>Azure Key Name</label>
+              <input
+                type="text"
+                [(ngModel)]="autoUnsealForm.azureKeyName"
+                placeholder="ivf-master-key"
+              />
+            </div>
+            <button
+              class="btn btn-primary"
+              (click)="configureAutoUnseal()"
+              [disabled]="loading() || autoUnsealForm.masterPassword.length < 12"
+            >
+              💾 Cấu hình Auto-Unseal
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- DEK Status Cards -->
+      <div class="card">
+        <div class="card-header"><h3>🔒 Encryption Keys (DEKs)</h3></div>
+        <div class="card-body">
+          <div class="encryption-grid">
+            <div class="enc-card">
+              <div class="enc-icon">🔑</div>
+              <div class="enc-name">Data DEK</div>
+              <div class="enc-desc">Mã hóa dữ liệu bệnh nhân</div>
+            </div>
+            <div class="enc-card">
+              <div class="enc-icon">🔐</div>
+              <div class="enc-name">Session DEK</div>
+              <div class="enc-desc">Mã hóa phiên đăng nhập</div>
+            </div>
+            <div class="enc-card">
+              <div class="enc-icon">🗝️</div>
+              <div class="enc-name">API DEK</div>
+              <div class="enc-desc">Mã hóa API keys</div>
+            </div>
+            <div class="enc-card">
+              <div class="enc-icon">💾</div>
+              <div class="enc-name">Backup DEK</div>
+              <div class="enc-desc">Mã hóa bản sao lưu</div>
+            </div>
+            <div class="enc-card">
+              <div class="enc-icon">🧂</div>
+              <div class="enc-name">Master Salt</div>
+              <div class="enc-desc">Salt cho PBKDF2 key derivation</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Key Wrap / Unwrap -->
+      <div class="card mt-16">
+        <div class="card-header"><h3>📦 Key Wrap / Unwrap (Envelope Encryption)</h3></div>
+        <div class="card-body">
+          <div class="form-grid">
+            <!-- Wrap -->
+            <div class="crypto-panel">
+              <h4>🔒 Wrap Key</h4>
+              <p class="text-muted">
+                Mã hóa (wrap) một key bằng KEK qua AES-256-GCM hoặc Azure RSA-OAEP-256
+              </p>
+              <div class="form-group">
+                <label>Key Name</label>
+                <input type="text" [(ngModel)]="wrapForm.keyName" placeholder="ivf-master-key" />
+              </div>
+              <div class="form-group">
+                <label>Plaintext (dữ liệu cần wrap)</label>
+                <textarea
+                  [(ngModel)]="wrapForm.plaintext"
+                  placeholder="Nhập plaintext..."
+                  rows="3"
+                ></textarea>
+              </div>
+              <button
+                class="btn btn-primary"
+                (click)="wrapKey()"
+                [disabled]="loading() || !wrapForm.plaintext"
+              >
+                🔒 Wrap Key
+              </button>
+              @if (wrapResult()) {
+                <div class="result-box mt-8">
+                  <div class="result-row">
+                    <span class="result-label">Algorithm:</span>
+                    <code>{{ wrapResult()!.algorithm }}</code>
+                  </div>
+                  <div class="result-row">
+                    <span class="result-label">Wrapped Key:</span>
+                    <code class="result-mono">{{ wrapResult()!.wrappedKeyBase64 }}</code>
+                    <button
+                      class="btn btn-xs btn-outline"
+                      (click)="copyToClipboard(wrapResult()!.wrappedKeyBase64)"
+                    >
+                      📋
+                    </button>
+                  </div>
+                  <div class="result-row">
+                    <span class="result-label">IV:</span>
+                    <code class="result-mono">{{ wrapResult()!.ivBase64 || '—' }}</code>
+                  </div>
+                  <button class="btn btn-sm btn-outline mt-8" (click)="useWrapResultForUnwrap()">
+                    ➡️ Dùng cho Unwrap
+                  </button>
+                </div>
+              }
+            </div>
+
+            <!-- Unwrap -->
+            <div class="crypto-panel">
+              <h4>🔓 Unwrap Key</h4>
+              <p class="text-muted">Giải mã (unwrap) một wrapped key về plaintext</p>
+              <div class="form-group">
+                <label>Key Name</label>
+                <input type="text" [(ngModel)]="unwrapForm.keyName" placeholder="ivf-master-key" />
+              </div>
+              <div class="form-group">
+                <label>Wrapped Key (Base64)</label>
+                <textarea
+                  [(ngModel)]="unwrapForm.wrappedKeyBase64"
+                  placeholder="Wrapped key base64..."
+                  rows="3"
+                ></textarea>
+              </div>
+              <div class="form-group">
+                <label>IV (Base64)</label>
+                <input
+                  type="text"
+                  [(ngModel)]="unwrapForm.ivBase64"
+                  placeholder="IV base64 (nếu AES-GCM)"
+                />
+              </div>
+              <button
+                class="btn btn-primary"
+                (click)="unwrapKey()"
+                [disabled]="loading() || !unwrapForm.wrappedKeyBase64"
+              >
+                🔓 Unwrap Key
+              </button>
+              @if (unwrapResult() !== null) {
+                <div class="result-box mt-8">
+                  <div class="result-row">
+                    <span class="result-label">Plaintext:</span>
+                    <code class="result-mono">{{ unwrapResult() }}</code>
+                    <button
+                      class="btn btn-xs btn-outline"
+                      (click)="copyToClipboard(unwrapResult()!)"
+                    >
+                      📋
+                    </button>
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Encrypt / Decrypt Data -->
+      <div class="card mt-16">
+        <div class="card-header"><h3>🔐 Encrypt / Decrypt Data (AES-256-GCM)</h3></div>
+        <div class="card-body">
+          <div class="form-grid">
+            <!-- Encrypt -->
+            <div class="crypto-panel">
+              <h4>🔒 Encrypt</h4>
+              <p class="text-muted">Mã hóa dữ liệu bằng DEK theo mục đích sử dụng</p>
+              <div class="form-group">
+                <label>Key Purpose</label>
+                <select [(ngModel)]="encryptForm.purpose">
+                  @for (p of keyPurposes; track p) {
+                    <option [value]="p">{{ p }}</option>
+                  }
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Plaintext</label>
+                <textarea
+                  [(ngModel)]="encryptForm.plaintext"
+                  placeholder="Nhập dữ liệu cần mã hóa..."
+                  rows="3"
+                ></textarea>
+              </div>
+              <button
+                class="btn btn-primary"
+                (click)="encryptData()"
+                [disabled]="loading() || !encryptForm.plaintext"
+              >
+                🔒 Encrypt
+              </button>
+              @if (encryptResult()) {
+                <div class="result-box mt-8">
+                  <div class="result-row">
+                    <span class="result-label">Algorithm:</span>
+                    <code>{{ encryptResult()!.algorithm }}</code>
+                  </div>
+                  <div class="result-row">
+                    <span class="result-label">Purpose:</span>
+                    <code>{{ encryptResult()!.purpose }}</code>
+                  </div>
+                  <div class="result-row">
+                    <span class="result-label">Ciphertext:</span>
+                    <code class="result-mono">{{ encryptResult()!.ciphertextBase64 }}</code>
+                    <button
+                      class="btn btn-xs btn-outline"
+                      (click)="copyToClipboard(encryptResult()!.ciphertextBase64)"
+                    >
+                      📋
+                    </button>
+                  </div>
+                  <div class="result-row">
+                    <span class="result-label">IV:</span>
+                    <code class="result-mono">{{ encryptResult()!.ivBase64 }}</code>
+                  </div>
+                  <button
+                    class="btn btn-sm btn-outline mt-8"
+                    (click)="useEncryptResultForDecrypt()"
+                  >
+                    ➡️ Dùng cho Decrypt
+                  </button>
+                </div>
+              }
+            </div>
+
+            <!-- Decrypt -->
+            <div class="crypto-panel">
+              <h4>🔓 Decrypt</h4>
+              <p class="text-muted">Giải mã dữ liệu đã được mã hóa bằng DEK</p>
+              <div class="form-group">
+                <label>Key Purpose</label>
+                <select [(ngModel)]="decryptForm.purpose">
+                  @for (p of keyPurposes; track p) {
+                    <option [value]="p">{{ p }}</option>
+                  }
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Ciphertext (Base64)</label>
+                <textarea
+                  [(ngModel)]="decryptForm.ciphertextBase64"
+                  placeholder="Ciphertext base64..."
+                  rows="3"
+                ></textarea>
+              </div>
+              <div class="form-group">
+                <label>IV (Base64)</label>
+                <input type="text" [(ngModel)]="decryptForm.ivBase64" placeholder="IV base64" />
+              </div>
+              <button
+                class="btn btn-primary"
+                (click)="decryptData()"
+                [disabled]="loading() || !decryptForm.ciphertextBase64"
+              >
+                🔓 Decrypt
+              </button>
+              @if (decryptResult() !== null) {
+                <div class="result-box mt-8">
+                  <div class="result-row">
+                    <span class="result-label">Plaintext:</span>
+                    <code class="result-mono">{{ decryptResult() }}</code>
+                    <button
+                      class="btn btn-xs btn-outline"
+                      (click)="copyToClipboard(decryptResult()!)"
+                    >
+                      📋
+                    </button>
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Key Hierarchy Diagram -->
+      <div class="card mt-16">
+        <div class="card-header"><h3>🏗️ Key Hierarchy</h3></div>
+        <div class="card-body">
+          <div class="key-hierarchy">
+            <div class="hierarchy-level hierarchy-level-1">
+              <div class="hierarchy-node node-azure">
+                <span class="node-icon">☁️</span>
+                <span class="node-label">Azure RSA Key (RSA-OAEP-256)</span>
+              </div>
+            </div>
+            <div class="hierarchy-arrow">▼</div>
+            <div class="hierarchy-level hierarchy-level-2">
+              <div class="hierarchy-node node-kek">
+                <span class="node-icon">🔑</span>
+                <span class="node-label">Master Password → PBKDF2 → KEK (AES-256)</span>
+              </div>
+            </div>
+            <div class="hierarchy-arrow">▼</div>
+            <div class="hierarchy-level hierarchy-level-3">
+              <div class="hierarchy-node node-dek">
+                <span class="node-icon">🔐</span>
+                <span class="node-label">DEK Data</span>
+              </div>
+              <div class="hierarchy-node node-dek">
+                <span class="node-icon">🔐</span>
+                <span class="node-label">DEK Session</span>
+              </div>
+              <div class="hierarchy-node node-dek">
+                <span class="node-icon">🔐</span>
+                <span class="node-label">DEK API</span>
+              </div>
+              <div class="hierarchy-node node-dek">
+                <span class="node-icon">🔐</span>
+                <span class="node-label">DEK Backup</span>
+              </div>
+            </div>
+            <div class="hierarchy-arrow">▼</div>
+            <div class="hierarchy-level hierarchy-level-4">
+              <div class="hierarchy-node node-data">
+                <span class="node-icon">📄</span>
+                <span class="node-label">Encrypted Data (AES-256-GCM)</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ═══ DIALOG: New Secret ═══ -->
+  @if (showNewSecretDialog()) {
+    <div class="modal-overlay" (click)="showNewSecretDialog.set(false)">
+      <div class="modal-content modal-lg" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h3>➕ Tạo Secret mới</h3>
+          <button class="btn-close" (click)="showNewSecretDialog.set(false)">✕</button>
+        </div>
+        <div class="modal-body">
+          <!-- Templates -->
+          <div class="templates-section">
+            <h4>📋 Templates</h4>
+            <div class="template-grid">
+              @for (t of secretTemplates; track t.label) {
+                <button class="template-card" (click)="applyTemplate(t)">
+                  <span class="template-icon">{{ t.icon }}</span>
+                  <span class="template-label">{{ t.label }}</span>
+                </button>
+              }
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Secret Path</label>
+            <input
+              type="text"
+              [(ngModel)]="newSecretForm.path"
+              placeholder="e.g. database/connection-string"
+            />
+          </div>
+          <div class="form-group">
+            <label>Secret Data (JSON)</label>
+            <textarea [(ngModel)]="newSecretForm.data" rows="8" class="mono-textarea"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline" (click)="showNewSecretDialog.set(false)">Hủy</button>
+          <button class="btn btn-primary" (click)="createSecret()" [disabled]="loading()">
+            💾 Lưu Secret
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ═══ DIALOG: Secret Detail ═══ -->
+  @if (showSecretDetailDialog() && selectedSecret()) {
+    <div class="modal-overlay" (click)="showSecretDetailDialog.set(false)">
+      <div class="modal-content modal-lg" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h3>🔑 {{ selectedSecret()!.name }}</h3>
+          <button class="btn-close" (click)="showSecretDetailDialog.set(false)">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="secret-meta">
+            <span class="text-muted">Lấy lúc: {{ formatDate(selectedSecret()!.retrievedAt) }}</span>
+          </div>
+          <div class="secret-fields">
+            @for (field of getSecretFields(); track field.key) {
+              <div class="secret-field-row">
+                <span class="field-key">{{ field.key }}</span>
+                <div class="field-value-wrap">
+                  @if (showSecretData()[field.key]) {
+                    <code class="field-value">{{ field.value }}</code>
+                  } @else {
+                    <code class="field-value field-masked">••••••••••</code>
+                  }
+                  <button class="btn btn-xs btn-outline" (click)="toggleSecretField(field.key)">
+                    {{ showSecretData()[field.key] ? '🙈' : '👁' }}
+                  </button>
+                  <button class="btn btn-xs btn-outline" (click)="copyToClipboard(field.value)">
+                    📋
+                  </button>
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline" (click)="showSecretDetailDialog.set(false)">Đóng</button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ═══ DIALOG: Rotate Key ═══ -->
+  @if (rotatingKey()) {
+    <div class="modal-overlay" (click)="rotatingKey.set(null)">
+      <div class="modal-content" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h3>🔄 Xoay Key: {{ rotatingKey()!.keyName }}</h3>
+          <button class="btn-close" (click)="rotatingKey.set(null)">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>New Key Hash</label>
+            <input
+              type="text"
+              [(ngModel)]="rotateForm.newKeyHash"
+              placeholder="Nhập key hash mới"
+            />
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline" (click)="rotatingKey.set(null)">Hủy</button>
+          <button class="btn btn-primary" (click)="rotateKey()" [disabled]="loading()">
+            Xoay Key
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ═══ DIALOG: New Database ═══ -->
+  @if (showDbDialog()) {
+    <div class="modal-overlay" (click)="showDbDialog.set(false)">
+      <div class="modal-content" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h3>🗄️ Thêm Database Credentials</h3>
+          <button class="btn-close" (click)="showDbDialog.set(false)">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Tên (ID)</label>
+            <input type="text" [(ngModel)]="newDbForm.name" placeholder="postgres-main" />
+          </div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Host</label>
+              <input type="text" [(ngModel)]="newDbForm.host" placeholder="localhost" />
+            </div>
+            <div class="form-group">
+              <label>Port</label>
+              <input type="number" [(ngModel)]="newDbForm.port" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Database</label>
+            <input type="text" [(ngModel)]="newDbForm.database" placeholder="ivf_db" />
+          </div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Username</label>
+              <input type="text" [(ngModel)]="newDbForm.username" placeholder="admin" />
+            </div>
+            <div class="form-group">
+              <label>Password</label>
+              <input type="password" [(ngModel)]="newDbForm.password" placeholder="••••••••" />
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline" (click)="showDbDialog.set(false)">Hủy</button>
+          <button
+            class="btn btn-primary"
+            (click)="createDatabaseSecret()"
+            [disabled]="loading() || !newDbForm.name"
+          >
+            💾 Lưu Credentials
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ═══ DIALOG: New Policy ═══ -->
+  @if (showPolicyDialog()) {
+    <div class="modal-overlay" (click)="showPolicyDialog.set(false)">
+      <div class="modal-content" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h3>📋 Tạo Vault Policy</h3>
+          <button class="btn-close" (click)="showPolicyDialog.set(false)">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Tên Policy</label>
+            <input type="text" [(ngModel)]="newPolicyForm.name" placeholder="read-only-secrets" />
+          </div>
+          <div class="form-group">
+            <label>Mô tả</label>
+            <input
+              type="text"
+              [(ngModel)]="newPolicyForm.description"
+              placeholder="Mô tả policy..."
+            />
+          </div>
+          <div class="form-group">
+            <label>Path Pattern</label>
+            <input type="text" [(ngModel)]="newPolicyForm.pathPattern" placeholder="secret/*" />
+          </div>
+          <div class="form-group">
+            <label>Capabilities</label>
+            <div class="toggle-grid">
+              @for (cap of allCapabilities; track cap) {
+                <label class="toggle-item">
+                  <input
+                    type="checkbox"
+                    [checked]="newPolicyForm.capabilities.includes(cap)"
+                    (change)="toggleCapability(cap)"
+                  />
+                  <span>{{ cap }}</span>
+                </label>
+              }
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline" (click)="showPolicyDialog.set(false)">Hủy</button>
+          <button
+            class="btn btn-primary"
+            (click)="createPolicy()"
+            [disabled]="loading() || !newPolicyForm.name"
+          >
+            💾 Tạo Policy
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ═══ DIALOG: Assign User Policy ═══ -->
+  @if (showUserPolicyDialog()) {
+    <div class="modal-overlay" (click)="showUserPolicyDialog.set(false)">
+      <div class="modal-content" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h3>👤 Gán Policy cho User</h3>
+          <button class="btn-close" (click)="showUserPolicyDialog.set(false)">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>User ID</label>
+            <input type="text" [(ngModel)]="newUserPolicyForm.userId" placeholder="user-id..." />
+          </div>
+          <div class="form-group">
+            <label>Policy</label>
+            <select [(ngModel)]="newUserPolicyForm.policyId">
+              <option value="">-- Chọn Policy --</option>
+              @for (p of policies(); track p.id) {
+                <option [value]="p.id">{{ p.name }}</option>
+              }
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline" (click)="showUserPolicyDialog.set(false)">Hủy</button>
+          <button
+            class="btn btn-primary"
+            (click)="assignUserPolicy()"
+            [disabled]="loading() || !newUserPolicyForm.userId || !newUserPolicyForm.policyId"
+          >
+            💾 Gán Policy
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ═══ DIALOG: New Dynamic Credential ═══ -->
+  @if (showDynamicDialog()) {
+    <div class="modal-overlay" (click)="showDynamicDialog.set(false)">
+      <div class="modal-content" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h3>⚡ Tạo Dynamic Credential</h3>
+          <button class="btn-close" (click)="showDynamicDialog.set(false)">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Backend</label>
+              <select [(ngModel)]="newDynamicForm.backend">
+                <option value="postgres">PostgreSQL</option>
+                <option value="mysql">MySQL</option>
+                <option value="mssql">MS SQL</option>
+                <option value="redis">Redis</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>TTL (giây)</label>
+              <input type="number" [(ngModel)]="newDynamicForm.ttlSeconds" />
+            </div>
+          </div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>DB Host</label>
+              <input type="text" [(ngModel)]="newDynamicForm.dbHost" placeholder="localhost" />
+            </div>
+            <div class="form-group">
+              <label>DB Port</label>
+              <input type="number" [(ngModel)]="newDynamicForm.dbPort" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Database Name</label>
+            <input type="text" [(ngModel)]="newDynamicForm.dbName" placeholder="mydb" />
+          </div>
+          <div class="form-group">
+            <label>Username (sẽ tạo)</label>
+            <input
+              type="text"
+              [(ngModel)]="newDynamicForm.username"
+              placeholder="dynamic-user-001"
+            />
+          </div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Admin Username</label>
+              <input
+                type="text"
+                [(ngModel)]="newDynamicForm.adminUsername"
+                placeholder="postgres"
+              />
+            </div>
+            <div class="form-group">
+              <label>Admin Password</label>
+              <input
+                type="password"
+                [(ngModel)]="newDynamicForm.adminPassword"
+                placeholder="••••••••"
+              />
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline" (click)="showDynamicDialog.set(false)">Hủy</button>
+          <button
+            class="btn btn-primary"
+            (click)="createDynamicCredential()"
+            [disabled]="loading() || !newDynamicForm.username"
+          >
+            💾 Tạo Credential
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ═══ DIALOG: New Token ═══ -->
+  @if (showTokenDialog()) {
+    <div class="modal-overlay" (click)="showTokenDialog.set(false)">
+      <div class="modal-content" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h3>🎟️ Tạo Vault Token</h3>
+          <button class="btn-close" (click)="showTokenDialog.set(false)">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Display Name</label>
+            <input type="text" [(ngModel)]="newTokenForm.displayName" placeholder="ci-cd-token" />
+          </div>
+          <div class="form-group">
+            <label>Policies (phân cách bởi dấu phẩy)</label>
+            <input
+              type="text"
+              [(ngModel)]="newTokenForm.policies"
+              placeholder="read-only-secrets, deploy-policy"
+            />
+          </div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Token Type</label>
+              <select [(ngModel)]="newTokenForm.tokenType">
+                <option value="service">Service</option>
+                <option value="batch">Batch</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>TTL (giây)</label>
+              <input type="number" [(ngModel)]="newTokenForm.ttl" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Max Uses (0 = không giới hạn)</label>
+            <input type="number" [(ngModel)]="newTokenForm.numUses" />
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline" (click)="showTokenDialog.set(false)">Hủy</button>
+          <button class="btn btn-primary" (click)="createToken()" [disabled]="loading()">
+            💾 Tạo Token
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ═══ DIALOG: Encryption Config ═══ -->
+  @if (showEncConfigDialog()) {
+    <div class="modal-overlay" (click)="showEncConfigDialog.set(false)">
+      <div class="modal-content modal-lg" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h3>{{ editingEncConfig() ? '✏️ Sửa cấu hình' : '➕ Thêm bảng mã hóa' }}</h3>
+          <button class="btn-close" (click)="showEncConfigDialog.set(false)">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Tên bảng</label>
+            @if (editingEncConfig()) {
+              <input type="text" [value]="newEncConfigForm.tableName" disabled />
+            } @else {
+              <select [(ngModel)]="newEncConfigForm.tableName" (ngModelChange)="onEncTableChange()">
+                <option value="">-- Chọn bảng --</option>
+                @for (t of dbTableNames(); track t) {
+                  <option [value]="t">{{ t }}</option>
+                }
+              </select>
+            }
+          </div>
+          @if (availableFields.length > 0) {
+            <div class="form-group">
+              <label>Trường cần mã hóa</label>
+              <div class="checkbox-grid">
+                @for (f of availableFields; track f) {
+                  <label class="checkbox-item">
+                    <input
+                      type="checkbox"
+                      [checked]="newEncConfigForm.encryptedFields.includes(f)"
+                      (change)="toggleEncField(f)"
+                    />
+                    <span>{{ f }}</span>
+                  </label>
+                }
+              </div>
+            </div>
+          }
+          <div class="form-group">
+            <label>DEK Purpose</label>
+            <select [(ngModel)]="newEncConfigForm.dekPurpose">
+              @for (p of dekPurposeOptions; track p) {
+                <option [value]="p">{{ getDekPurposeLabel(p) }}</option>
+              }
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Mô tả</label>
+            <input
+              type="text"
+              [(ngModel)]="newEncConfigForm.description"
+              placeholder="Mô tả (tùy chọn)"
+            />
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline" (click)="showEncConfigDialog.set(false)">Hủy</button>
+          <button
+            class="btn btn-primary"
+            (click)="saveEncryptionConfig()"
+            [disabled]="
+              loading() ||
+              !newEncConfigForm.tableName ||
+              newEncConfigForm.encryptedFields.length === 0
+            "
+          >
+            💾 Lưu
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ═══ DIALOG: Field Access Policy ═══ -->
+  @if (showFAPolicyDialog()) {
+    <div class="modal-overlay" (click)="showFAPolicyDialog.set(false)">
+      <div class="modal-content modal-lg" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h3>{{ editingFAPolicy() ? '✏️ Sửa policy' : '➕ Thêm policy mới' }}</h3>
+          <button class="btn-close" (click)="showFAPolicyDialog.set(false)">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Tên bảng</label>
+              @if (editingFAPolicy()) {
+                <input type="text" [value]="newFAPolicyForm.tableName" disabled />
+              } @else {
+                <select [(ngModel)]="newFAPolicyForm.tableName" (ngModelChange)="onFATableChange()">
+                  <option value="">-- Chọn bảng --</option>
+                  @for (t of dbTableNames(); track t) {
+                    <option [value]="t">{{ t }}</option>
+                  }
+                </select>
+              }
+            </div>
+            <div class="form-group">
+              <label>Trường áp dụng</label>
+              @if (editingFAPolicy()) {
+                <input type="text" [value]="newFAPolicyForm.fieldNames.join(', ')" disabled />
+              } @else if (faAvailableFields.length > 0) {
+                <div class="checkbox-grid">
+                  @for (f of faAvailableFields; track f) {
+                    <label class="checkbox-item">
+                      <input
+                        type="checkbox"
+                        [checked]="newFAPolicyForm.fieldNames.includes(f)"
+                        (change)="toggleFAField(f)"
+                      />
+                      <span>{{ f }}</span>
+                    </label>
+                  }
+                </div>
+              } @else {
+                <p class="text-muted">Chọn bảng trước để hiển thị danh sách trường</p>
+              }
+            </div>
+            <div class="form-group">
+              <label>Vai trò</label>
+              @if (editingFAPolicy()) {
+                <input type="text" [value]="newFAPolicyForm.role" disabled />
+              } @else {
+                <select [(ngModel)]="newFAPolicyForm.role">
+                  <option value="">-- Chọn vai trò --</option>
+                  @for (r of faRoles(); track r) {
+                    <option [value]="r">{{ r }}</option>
+                  }
+                </select>
+              }
+            </div>
+            <div class="form-group">
+              <label>Mức truy cập</label>
+              <select [(ngModel)]="newFAPolicyForm.accessLevel">
+                @for (l of faAccessLevels; track l) {
+                  <option [value]="l">{{ getAccessLevelLabel(l) }}</option>
+                }
+              </select>
+            </div>
+          </div>
+          @if (newFAPolicyForm.accessLevel === 'masked') {
+            <div class="form-group">
+              <label>Mask Pattern</label>
+              <input type="text" [(ngModel)]="newFAPolicyForm.maskPattern" placeholder="********" />
+            </div>
+          }
+          @if (newFAPolicyForm.accessLevel === 'partial') {
+            <div class="form-group">
+              <label>Partial Length (ký tự hiển thị)</label>
+              <input type="number" [(ngModel)]="newFAPolicyForm.partialLength" min="1" max="50" />
+            </div>
+          }
+          <div class="form-group">
+            <label>Mô tả</label>
+            <input
+              type="text"
+              [(ngModel)]="newFAPolicyForm.description"
+              placeholder="Mô tả (tùy chọn)"
+            />
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline" (click)="showFAPolicyDialog.set(false)">Hủy</button>
+          <button
+            class="btn btn-primary"
+            (click)="saveFAPolicy()"
+            [disabled]="
+              loading() ||
+              (!editingFAPolicy() &&
+                (!newFAPolicyForm.tableName ||
+                  newFAPolicyForm.fieldNames.length === 0 ||
+                  !newFAPolicyForm.role))
+            "
+          >
+            💾 Lưu
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ═══ DIALOG: Edit ZT Policy ═══ -->
+  @if (editingZTPolicy()) {
+    <div class="modal-overlay" (click)="editingZTPolicy.set(false)">
+      <div class="modal-content modal-lg" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h3>✏️ Chỉnh sửa Policy: {{ editForm.action }}</h3>
+          <button class="btn-close" (click)="editingZTPolicy.set(false)">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Required Auth Level</label>
+              <select [(ngModel)]="editForm.requiredAuthLevel">
+                <option value="None">None</option>
+                <option value="Session">Session</option>
+                <option value="Password">Password</option>
+                <option value="MFA">MFA</option>
+                <option value="FreshSession">Fresh Session</option>
+                <option value="Biometric">Biometric</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Max Allowed Risk</label>
+              <select [(ngModel)]="editForm.maxAllowedRisk">
+                <option value="Low">Low</option>
+                <option value="Medium">Medium</option>
+                <option value="High">High</option>
+                <option value="Critical">Critical</option>
+              </select>
+            </div>
+          </div>
+          <div class="toggle-grid">
+            <label class="toggle-item">
+              <input type="checkbox" [(ngModel)]="editForm.requireTrustedDevice" />
+              <span>Require Trusted Device</span>
+            </label>
+            <label class="toggle-item">
+              <input type="checkbox" [(ngModel)]="editForm.requireFreshSession" />
+              <span>Require Fresh Session</span>
+            </label>
+            <label class="toggle-item">
+              <input type="checkbox" [(ngModel)]="editForm.blockAnomaly" />
+              <span>Block Anomaly</span>
+            </label>
+            <label class="toggle-item">
+              <input type="checkbox" [(ngModel)]="editForm.requireGeoFence" />
+              <span>Require Geo Fence</span>
+            </label>
+            <label class="toggle-item">
+              <input type="checkbox" [(ngModel)]="editForm.blockVpnTor" />
+              <span>Block VPN/Tor</span>
+            </label>
+            <label class="toggle-item">
+              <input type="checkbox" [(ngModel)]="editForm.allowBreakGlassOverride" />
+              <span>Allow Break Glass Override</span>
+            </label>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline" (click)="editingZTPolicy.set(false)">Hủy</button>
+          <button class="btn btn-primary" (click)="savePolicy()" [disabled]="loading()">
+            💾 Lưu
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ═══ Toast ═══ -->
+  @if (statusMessage()) {
+    <div
+      class="toast"
+      [class.toast-success]="statusMessage()!.type === 'success'"
+      [class.toast-error]="statusMessage()!.type === 'error'"
+    >
+      {{ statusMessage()!.text }}
+    </div>
+  }
+</div>

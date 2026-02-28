@@ -9,6 +9,7 @@ using IVF.Domain.Entities;
 using IVF.Infrastructure.Persistence;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.DataProtection;
 
 namespace IVF.API.Services;
 
@@ -21,8 +22,130 @@ public sealed class CertificateAuthorityService(
     IServiceScopeFactory scopeFactory,
     IHubContext<BackupHub> hubContext,
     IConfiguration configuration,
-    ILogger<CertificateAuthorityService> logger)
+    ILogger<CertificateAuthorityService> logger,
+    IDataProtectionProvider dataProtectionProvider)
 {
+    private const string KeyProtectionPurpose = "IVF.CertificateAuthority.PrivateKeys";
+
+    // OID: anyPolicy (RFC 5280 §4.2.1.4)
+    private const string OidAnyPolicy = "2.5.29.32.0";
+    // OID: Certificate Policies
+    private const string OidCertificatePolicies = "2.5.29.32";
+    // OID: Name Constraints
+    private const string OidNameConstraints = "2.5.29.30";
+
+    /// <summary>Encrypt a private key PEM before storing in the database.</summary>
+    private string ProtectKey(string keyPem)
+    {
+        var protector = dataProtectionProvider.CreateProtector(KeyProtectionPurpose);
+        return protector.Protect(keyPem);
+    }
+
+    /// <summary>Decrypt a private key PEM retrieved from the database.</summary>
+    private string UnprotectKey(string protectedKeyPem)
+    {
+        // Handle legacy unencrypted keys (before migration)
+        if (protectedKeyPem.Contains("-----BEGIN", StringComparison.Ordinal))
+            return protectedKeyPem;
+        var protector = dataProtectionProvider.CreateProtector(KeyProtectionPurpose);
+        return protector.Unprotect(protectedKeyPem);
+    }
+
+    /// <summary>Generate a cryptographically random serial number (RFC 5280 §4.1.2.2).</summary>
+    private static string GenerateRandomSerialHex()
+    {
+        Span<byte> serialBytes = stackalloc byte[20]; // 160-bit random serial
+        RandomNumberGenerator.Fill(serialBytes);
+        serialBytes[0] &= 0x7F; // Ensure positive (clear high bit per X.690 DER)
+        if (serialBytes[0] == 0) serialBytes[0] = 0x01; // Avoid leading zero byte
+        return Convert.ToHexString(serialBytes);
+    }
+
+    /// <summary>
+    /// Create an asymmetric key pair. Supports RSA and ECDSA (P-256, P-384, P-521).
+    /// Google/Cloudflare prefer ECDSA P-256/P-384 for performance; RSA 4096 for compatibility.
+    /// </summary>
+    private static (AsymmetricAlgorithm key, string algorithm, int keySize) CreateKeyPair(
+        string keyAlgorithm, int requestedKeySize)
+    {
+        if (keyAlgorithm.Equals("ECDSA", StringComparison.OrdinalIgnoreCase) ||
+            keyAlgorithm.Equals("EC", StringComparison.OrdinalIgnoreCase))
+        {
+            var curve = requestedKeySize switch
+            {
+                <= 256 => ECCurve.NamedCurves.nistP256,
+                <= 384 => ECCurve.NamedCurves.nistP384,
+                _ => ECCurve.NamedCurves.nistP521
+            };
+            var actualSize = requestedKeySize switch
+            {
+                <= 256 => 256,
+                <= 384 => 384,
+                _ => 521
+            };
+            return (ECDsa.Create(curve), "ECDSA", actualSize);
+        }
+
+        // Default: RSA
+        var rsaSize = requestedKeySize > 0 ? requestedKeySize : 4096;
+        return (RSA.Create(rsaSize), "RSA", rsaSize);
+    }
+
+    /// <summary>Export private key PEM for RSA or ECDSA.</summary>
+    private static string ExportKeyPem(AsymmetricAlgorithm key)
+    {
+        var keyBytes = key switch
+        {
+            RSA rsa => rsa.ExportPkcs8PrivateKey(),
+            ECDsa ecdsa => ecdsa.ExportPkcs8PrivateKey(),
+            _ => throw new InvalidOperationException($"Unsupported key type: {key.GetType().Name}")
+        };
+        var sb = new StringBuilder();
+        sb.AppendLine("-----BEGIN PRIVATE KEY-----");
+        sb.AppendLine(Convert.ToBase64String(keyBytes, Base64FormattingOptions.InsertLineBreaks));
+        sb.AppendLine("-----END PRIVATE KEY-----");
+        return sb.ToString();
+    }
+
+    /// <summary>Build Certificate Policies extension (RFC 5280 §4.2.1.4). Used by Google/Amazon/Microsoft.</summary>
+    private static X509Extension BuildCertificatePoliciesExtension(string policyOid)
+    {
+        var writer = new AsnWriter(AsnEncodingRules.DER);
+        using (writer.PushSequence()) // certificatePolicies SEQUENCE
+        {
+            using (writer.PushSequence()) // PolicyInformation SEQUENCE
+            {
+                writer.WriteObjectIdentifier(policyOid); // policyIdentifier
+            }
+        }
+        return new X509Extension(OidCertificatePolicies, writer.Encode(), critical: false);
+    }
+
+    /// <summary>Build Name Constraints extension (RFC 5280 §4.2.1.10). Restricts intermediate CA to permitted domains.</summary>
+    private static X509Extension BuildNameConstraintsExtension(string[] permittedDomains)
+    {
+        var writer = new AsnWriter(AsnEncodingRules.DER);
+        using (writer.PushSequence()) // NameConstraints SEQUENCE
+        {
+            // permittedSubtrees [0]
+            using (writer.PushSequence(new Asn1Tag(TagClass.ContextSpecific, 0, true)))
+            {
+                foreach (var domain in permittedDomains)
+                {
+                    using (writer.PushSequence()) // GeneralSubtree SEQUENCE
+                    {
+                        // dNSName [2] IA5String
+                        writer.WriteCharacterString(
+                            UniversalTagNumber.IA5String,
+                            domain,
+                            new Asn1Tag(TagClass.ContextSpecific, 2));
+                    }
+                }
+            }
+        }
+        return new X509Extension(OidNameConstraints, writer.Encode(), critical: true);
+    }
+
     // ═══════════════════════════════════════════════════════
     // CA Management
     // ═══════════════════════════════════════════════════════
@@ -65,14 +188,25 @@ public sealed class CertificateAuthorityService(
             throw new InvalidOperationException($"CA with name '{req.Name}' already exists");
 
         var keySize = req.KeySize > 0 ? req.KeySize : 4096;
+        var keyAlgorithm = req.KeyAlgorithm ?? "RSA";
+        if (keyAlgorithm.Equals("RSA", StringComparison.OrdinalIgnoreCase) && keySize < 4096)
+            throw new InvalidOperationException("RSA CA key size must be at least 4096 bits");
         var validityDays = req.ValidityDays > 0 ? req.ValidityDays : 3650; // 10 years
 
         // Build subject DN
         var subject = BuildSubjectName(req.CommonName, req.Organization, req.OrgUnit,
             req.Country, req.State, req.Locality);
 
-        using var rsa = RSA.Create(keySize);
-        var certReq = new CertificateRequest(subject, rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+        var (key, actualAlgorithm, actualKeySize) = CreateKeyPair(keyAlgorithm, keySize);
+        using var _ = key; // Ensure key is disposed
+
+        // Use SHA-384 for Root CA (stronger hash for long-lived trust anchors per NIST SP 800-57)
+        CertificateRequest certReq = key switch
+        {
+            RSA rsa => new CertificateRequest(subject, rsa, HashAlgorithmName.SHA384, RSASignaturePadding.Pkcs1),
+            ECDsa ecdsa => new CertificateRequest(subject, ecdsa, HashAlgorithmName.SHA384),
+            _ => throw new InvalidOperationException($"Unsupported key type: {key.GetType().Name}")
+        };
 
         // CA extensions
         certReq.CertificateExtensions.Add(new X509BasicConstraintsExtension(true, false, 0, true));
@@ -80,12 +214,15 @@ public sealed class CertificateAuthorityService(
             X509KeyUsageFlags.KeyCertSign | X509KeyUsageFlags.CrlSign | X509KeyUsageFlags.DigitalSignature, true));
         certReq.CertificateExtensions.Add(new X509SubjectKeyIdentifierExtension(certReq.PublicKey, false));
 
+        // Certificate Policies (RFC 5280 §4.2.1.4) — used by Google GTS, Amazon PCA, Microsoft
+        certReq.CertificateExtensions.Add(BuildCertificatePoliciesExtension(OidAnyPolicy));
+
         var notBefore = DateTimeOffset.UtcNow;
         var notAfter = notBefore.AddDays(validityDays);
 
         using var cert = certReq.CreateSelfSigned(notBefore, notAfter);
         var certPem = ExportCertPem(cert);
-        var keyPem = ExportKeyPem(rsa);
+        var keyPem = ExportKeyPem(key);
         var fingerprint = cert.GetCertHashString(HashAlgorithmName.SHA256);
 
         var ca = CertificateAuthority.Create(
@@ -97,10 +234,10 @@ public sealed class CertificateAuthorityService(
             state: req.State,
             locality: req.Locality,
             type: CaType.Root,
-            keyAlgorithm: "RSA",
-            keySize: keySize,
+            keyAlgorithm: actualAlgorithm,
+            keySize: actualKeySize,
             certificatePem: certPem,
-            privateKeyPem: keyPem,
+            privateKeyPem: ProtectKey(keyPem),
             fingerprint: fingerprint,
             notBefore: notBefore.UtcDateTime,
             notAfter: notAfter.UtcDateTime,
@@ -111,7 +248,7 @@ public sealed class CertificateAuthorityService(
         await AuditAsync(db, CertAuditEventType.CaCreated,
             $"Created Root CA '{req.Name}' (CN={req.CommonName})",
             caId: ca.Id,
-            metadata: JsonSerializer.Serialize(new { KeySize = keySize, ValidityDays = validityDays }));
+            metadata: JsonSerializer.Serialize(new { KeyAlgorithm = actualAlgorithm, KeySize = actualKeySize, ValidityDays = validityDays }));
         await db.SaveChangesAsync(ct);
 
         logger.LogInformation("Created Root CA: {Name} (CN={CN}, expires {Expiry})",
@@ -164,22 +301,33 @@ public sealed class CertificateAuthorityService(
             throw new InvalidOperationException("CA is not active");
 
         var validityDays = req.ValidityDays > 0 ? req.ValidityDays : 365;
-        var keySize = req.KeySize > 0 ? req.KeySize : 2048;
+        var keySize = req.KeySize > 0 ? req.KeySize : 4096;
+        var keyAlgorithm = req.KeyAlgorithm ?? "RSA";
+        if (keyAlgorithm.Equals("RSA", StringComparison.OrdinalIgnoreCase) && keySize < 2048)
+            throw new InvalidOperationException("RSA certificate key size must be at least 2048 bits");
 
-        var serial = ca.AllocateSerialNumber();
-        var serialHex = serial.ToString("X16");
+        // Use cryptographic random serial (RFC 5280 §4.1.2.2 recommends randomized serials)
+        var serialHex = GenerateRandomSerialHex();
 
-        // Generate key pair
-        using var rsa = RSA.Create(keySize);
+        // Generate key pair (RSA or ECDSA)
+        var (key, actualAlgorithm, actualKeySize) = CreateKeyPair(keyAlgorithm, keySize);
+        using var _k = key;
         var subject = new X500DistinguishedName($"CN={req.CommonName}");
 
-        var certReq = new CertificateRequest(subject, rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+        CertificateRequest certReq = key switch
+        {
+            RSA rsa => new CertificateRequest(subject, rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1),
+            ECDsa ecdsa => new CertificateRequest(subject, ecdsa, HashAlgorithmName.SHA256),
+            _ => throw new InvalidOperationException($"Unsupported key type: {key.GetType().Name}")
+        };
 
         // Extensions based on type
         if (req.Type == CertType.Server)
         {
-            certReq.CertificateExtensions.Add(new X509KeyUsageExtension(
-                X509KeyUsageFlags.DigitalSignature | X509KeyUsageFlags.KeyEncipherment, true));
+            var keyUsage = actualAlgorithm == "ECDSA"
+                ? X509KeyUsageFlags.DigitalSignature  // ECDSA doesn't use KeyEncipherment
+                : X509KeyUsageFlags.DigitalSignature | X509KeyUsageFlags.KeyEncipherment;
+            certReq.CertificateExtensions.Add(new X509KeyUsageExtension(keyUsage, true));
             certReq.CertificateExtensions.Add(new X509EnhancedKeyUsageExtension(
                 [new Oid("1.3.6.1.5.5.7.3.1")], false)); // serverAuth
         }
@@ -207,8 +355,14 @@ public sealed class CertificateAuthorityService(
             certReq.CertificateExtensions.Add(sanBuilder.Build());
         }
 
-        // Load CA cert + key for signing
-        var caCert = X509Certificate2.CreateFromPem(ca.CertificatePem, ca.PrivateKeyPem);
+        // Load CA cert + key for signing (decrypt key if encrypted)
+        var caCert = X509Certificate2.CreateFromPem(ca.CertificatePem, UnprotectKey(ca.PrivateKeyPem));
+
+        // Authority Key Identifier — links issued cert to issuing CA for chain validation
+        certReq.CertificateExtensions.Add(
+            X509AuthorityKeyIdentifierExtension.CreateFromCertificate(
+                caCert, includeKeyIdentifier: true, includeIssuerAndSerial: false));
+
         var notBefore = DateTimeOffset.UtcNow;
         var notAfter = notBefore.AddDays(validityDays);
 
@@ -216,11 +370,11 @@ public sealed class CertificateAuthorityService(
         if (notAfter > caCert.NotAfter)
             notAfter = caCert.NotAfter.AddMinutes(-1);
 
-        var serialBytes = Convert.FromHexString(serialHex.PadLeft(16, '0'));
+        var serialBytes = Convert.FromHexString(serialHex);
 
         using var signedCert = certReq.Create(caCert, notBefore, notAfter, serialBytes);
         var certPem = ExportCertPem(signedCert);
-        var keyPem = ExportKeyPem(rsa);
+        var keyPem = ExportKeyPem(key);
         var fingerprint = signedCert.GetCertHashString(HashAlgorithmName.SHA256);
 
         var managedCert = ManagedCertificate.Create(
@@ -229,13 +383,13 @@ public sealed class CertificateAuthorityService(
             type: req.Type,
             purpose: req.Purpose,
             certificatePem: certPem,
-            privateKeyPem: keyPem,
+            privateKeyPem: ProtectKey(keyPem),
             fingerprint: fingerprint,
             serialNumber: serialHex,
             notBefore: notBefore.UtcDateTime,
             notAfter: notAfter.UtcDateTime,
-            keyAlgorithm: "RSA",
-            keySize: keySize,
+            keyAlgorithm: actualAlgorithm,
+            keySize: actualKeySize,
             issuingCaId: ca.Id,
             renewBeforeDays: req.RenewBeforeDays > 0 ? req.RenewBeforeDays : 30
         );
@@ -246,7 +400,7 @@ public sealed class CertificateAuthorityService(
         await AuditAsync(db, CertAuditEventType.CertIssued,
             $"Issued {req.Type} cert CN={req.CommonName} serial={serialHex} purpose={req.Purpose}",
             certificateId: managedCert.Id, caId: ca.Id,
-            metadata: JsonSerializer.Serialize(new { req.CommonName, req.Purpose, SerialNumber = serialHex, KeySize = keySize }));
+            metadata: JsonSerializer.Serialize(new { req.CommonName, req.Purpose, SerialNumber = serialHex, KeyAlgorithm = actualAlgorithm, KeySize = actualKeySize }));
         await db.SaveChangesAsync(ct);
 
         logger.LogInformation("Issued {Type} cert: CN={CN}, purpose={Purpose}, expires={Expiry}, serial={Serial}",
@@ -274,7 +428,7 @@ public sealed class CertificateAuthorityService(
         if (oldCert.Status != ManagedCertStatus.Active)
             throw new InvalidOperationException($"Cannot renew a certificate with status {oldCert.Status}");
 
-        // Issue a replacement with same parameters
+        // Issue a replacement with same parameters (including key algorithm)
         var newCert = await IssueCertificateInternalAsync(db, new IssueCertRequest(
             CaId: oldCert.IssuingCaId,
             CommonName: oldCert.CommonName,
@@ -283,7 +437,8 @@ public sealed class CertificateAuthorityService(
             Purpose: oldCert.Purpose,
             ValidityDays: oldCert.ValidityDays,
             KeySize: oldCert.KeySize,
-            RenewBeforeDays: oldCert.RenewBeforeDays
+            RenewBeforeDays: oldCert.RenewBeforeDays,
+            KeyAlgorithm: oldCert.KeyAlgorithm
         ), ct);
 
         // Link rotation chain
@@ -366,7 +521,8 @@ public sealed class CertificateAuthorityService(
                     Purpose: cert.Purpose,
                     ValidityDays: cert.ValidityDays,
                     KeySize: cert.KeySize,
-                    RenewBeforeDays: cert.RenewBeforeDays
+                    RenewBeforeDays: cert.RenewBeforeDays,
+                    KeyAlgorithm: cert.KeyAlgorithm
                 ), ct);
 
                 newCert.SetReplacedCert(cert.Id);
@@ -448,9 +604,9 @@ public sealed class CertificateAuthorityService(
 
         var crlNumber = ca.AllocateCrlNumber();
         var thisUpdate = DateTime.UtcNow;
-        var nextUpdate = thisUpdate.AddDays(7); // CRL valid for 7 days
+        var nextUpdate = thisUpdate.AddDays(14); // CRL valid for 14 days
 
-        using var caCert = X509Certificate2.CreateFromPem(ca.CertificatePem, ca.PrivateKeyPem);
+        using var caCert = X509Certificate2.CreateFromPem(ca.CertificatePem, UnprotectKey(ca.PrivateKeyPem));
         using var caKey = caCert.GetRSAPrivateKey()
             ?? throw new InvalidOperationException("CA key is not RSA");
 
@@ -593,13 +749,24 @@ public sealed class CertificateAuthorityService(
             throw new InvalidOperationException($"CA with name '{req.Name}' already exists");
 
         var keySize = req.KeySize > 0 ? req.KeySize : 4096;
+        var keyAlgorithm = req.KeyAlgorithm ?? "RSA";
+        if (keyAlgorithm.Equals("RSA", StringComparison.OrdinalIgnoreCase) && keySize < 4096)
+            throw new InvalidOperationException("RSA CA key size must be at least 4096 bits");
         var validityDays = req.ValidityDays > 0 ? req.ValidityDays : 1825; // 5 years
 
         var subject = BuildSubjectName(req.CommonName, req.Organization, req.OrgUnit,
             req.Country, req.State, req.Locality);
 
-        using var rsa = RSA.Create(keySize);
-        var certReq = new CertificateRequest(subject, rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+        var (key, actualAlgorithm, actualKeySize) = CreateKeyPair(keyAlgorithm, keySize);
+        using var _k = key;
+
+        // Use SHA-384 for Intermediate CA (long-lived issuing CAs per NIST SP 800-57)
+        CertificateRequest certReq = key switch
+        {
+            RSA rsa => new CertificateRequest(subject, rsa, HashAlgorithmName.SHA384, RSASignaturePadding.Pkcs1),
+            ECDsa ecdsa => new CertificateRequest(subject, ecdsa, HashAlgorithmName.SHA384),
+            _ => throw new InvalidOperationException($"Unsupported key type: {key.GetType().Name}")
+        };
 
         // Intermediate CA extensions: pathLenConstraint=0 (can issue end-entity certs only)
         certReq.CertificateExtensions.Add(new X509BasicConstraintsExtension(true, true, 0, true));
@@ -607,11 +774,23 @@ public sealed class CertificateAuthorityService(
             X509KeyUsageFlags.KeyCertSign | X509KeyUsageFlags.CrlSign | X509KeyUsageFlags.DigitalSignature, true));
         certReq.CertificateExtensions.Add(new X509SubjectKeyIdentifierExtension(certReq.PublicKey, false));
 
-        // Load parent CA cert + key for signing
-        using var parentCert = X509Certificate2.CreateFromPem(parentCa.CertificatePem, parentCa.PrivateKeyPem);
+        // Certificate Policies (RFC 5280 §4.2.1.4)
+        certReq.CertificateExtensions.Add(BuildCertificatePoliciesExtension(OidAnyPolicy));
 
-        var serial = parentCa.AllocateSerialNumber();
-        var serialBytes = Convert.FromHexString(serial.ToString("X16").PadLeft(16, '0'));
+        // Name Constraints (RFC 5280 §4.2.1.10) — restrict intermediate CA to permitted domains
+        if (req.PermittedDomains is { Length: > 0 })
+            certReq.CertificateExtensions.Add(BuildNameConstraintsExtension(req.PermittedDomains));
+
+        // Load parent CA cert + key for signing (decrypt key if encrypted)
+        using var parentCert = X509Certificate2.CreateFromPem(parentCa.CertificatePem, UnprotectKey(parentCa.PrivateKeyPem));
+
+        // Authority Key Identifier — links intermediate CA to parent CA for chain validation
+        certReq.CertificateExtensions.Add(
+            X509AuthorityKeyIdentifierExtension.CreateFromCertificate(
+                parentCert, includeKeyIdentifier: true, includeIssuerAndSerial: false));
+
+        var serialHex = GenerateRandomSerialHex();
+        var serialBytes = Convert.FromHexString(serialHex);
 
         var notBefore = DateTimeOffset.UtcNow;
         var notAfter = notBefore.AddDays(validityDays);
@@ -622,7 +801,7 @@ public sealed class CertificateAuthorityService(
 
         using var signedCert = certReq.Create(parentCert, notBefore, notAfter, serialBytes);
         var certPem = ExportCertPem(signedCert);
-        var keyPem = ExportKeyPem(rsa);
+        var keyPem = ExportKeyPem(key);
         var fingerprint = signedCert.GetCertHashString(HashAlgorithmName.SHA256);
 
         // Chain = this cert + parent chain
@@ -637,10 +816,10 @@ public sealed class CertificateAuthorityService(
             state: req.State,
             locality: req.Locality,
             type: CaType.Intermediate,
-            keyAlgorithm: "RSA",
-            keySize: keySize,
+            keyAlgorithm: actualAlgorithm,
+            keySize: actualKeySize,
             certificatePem: certPem,
-            privateKeyPem: keyPem,
+            privateKeyPem: ProtectKey(keyPem),
             fingerprint: fingerprint,
             notBefore: notBefore.UtcDateTime,
             notAfter: notAfter.UtcDateTime,
@@ -652,7 +831,7 @@ public sealed class CertificateAuthorityService(
         await AuditAsync(db, CertAuditEventType.IntermediateCaCreated,
             $"Created Intermediate CA '{req.Name}' (CN={req.CommonName}) signed by '{parentCa.Name}'",
             caId: ca.Id,
-            metadata: JsonSerializer.Serialize(new { ParentCaId = parentCa.Id, ParentCaName = parentCa.Name, KeySize = keySize }));
+            metadata: JsonSerializer.Serialize(new { ParentCaId = parentCa.Id, ParentCaName = parentCa.Name, KeyAlgorithm = actualAlgorithm, KeySize = actualKeySize }));
         await db.SaveChangesAsync(ct);
 
         logger.LogInformation("Created Intermediate CA: {Name} (CN={CN}, parent={Parent}, expires {Expiry})",
@@ -794,8 +973,8 @@ public sealed class CertificateAuthorityService(
             steps.Add(step);
             await EmitLog(opId, log, "success", step);
 
-            // Write key PEM (set restrictive permissions)
-            await WriteToContainerAsync(container, keyPath, cert.PrivateKeyPem, deployToken);
+            // Write key PEM (decrypt before writing, set restrictive permissions)
+            await WriteToContainerAsync(container, keyPath, UnprotectKey(cert.PrivateKeyPem), deployToken);
             await RunCommandAsync($"docker exec {container} chmod 600 {keyPath}", deployToken);
             await RunCommandAsync($"docker exec {container} chown 999:999 {keyPath}", deployToken);
             step = $"✓ Private key → {container}:{keyPath} (chmod 600)";
@@ -966,7 +1145,7 @@ public sealed class CertificateAuthorityService(
             db.CertDeploymentLogs.Add(log);
 
         var steps = new List<string>();
-        var sshOpts = "-o StrictHostKeyChecking=no -o ConnectTimeout=30 -o ServerAliveInterval=10 -o ServerAliveCountMax=3";
+        var sshOpts = "-o StrictHostKeyChecking=accept-new -o ConnectTimeout=30 -o ServerAliveInterval=10 -o ServerAliveCountMax=3";
         var sshPrefix = $"ssh {sshOpts} root@{remoteHost}";
 
         await EmitStatus(opId, "Running");
@@ -980,8 +1159,8 @@ public sealed class CertificateAuthorityService(
             steps.Add(step);
             await EmitLog(opId, log, "success", step);
 
-            // Write key PEM
-            await WriteToRemoteContainerAsync(remoteHost, container, keyPath, cert.PrivateKeyPem, deployToken);
+            // Write key PEM (decrypt before writing)
+            await WriteToRemoteContainerAsync(remoteHost, container, keyPath, UnprotectKey(cert.PrivateKeyPem), deployToken);
             await RunCommandAsync($"{sshPrefix} docker exec {container} chmod 600 {keyPath}", deployToken);
             await RunCommandAsync($"{sshPrefix} docker exec {container} chown 999:999 {keyPath}", deployToken);
             step = $"✓ Private key → {remoteHost}:{container}:{keyPath} (chmod 600)";
@@ -1055,7 +1234,7 @@ public sealed class CertificateAuthorityService(
         {
             var config = await db.Set<CloudReplicationConfig>().FirstOrDefaultAsync(CancellationToken.None);
             var remoteHost = config?.RemoteDbHost ?? "unknown";
-            var sshPrefix = $"ssh -o StrictHostKeyChecking=no root@{remoteHost}";
+            var sshPrefix = $"ssh -o StrictHostKeyChecking=accept-new root@{remoteHost}";
 
             // Fix ownership to postgres user inside the container
             await RunCommandAsync(
@@ -1113,7 +1292,7 @@ public sealed class CertificateAuthorityService(
 
             await EmitLog(opId, log, "info", $"Restarting MinIO replica on {remoteHost}...");
             await RunCommandAsync(
-                $"ssh -o StrictHostKeyChecking=no root@{remoteHost} docker restart {container}", CancellationToken.None, timeoutSeconds: 60);
+                $"ssh -o StrictHostKeyChecking=accept-new root@{remoteHost} docker restart {container}", CancellationToken.None, timeoutSeconds: 60);
             var step = $"✓ MinIO replica restarted on {remoteHost} to load new TLS certificates";
             await EmitLog(opId, log, "success", step);
             result = result with { Steps = [.. result.Steps, step] };
@@ -1168,7 +1347,7 @@ public sealed class CertificateAuthorityService(
 
         return new CertBundle(
             cert.CertificatePem,
-            cert.PrivateKeyPem,
+            UnprotectKey(cert.PrivateKeyPem),
             cert.IssuingCa?.ChainPem ?? cert.IssuingCa?.CertificatePem ?? "",
             cert.CommonName,
             cert.Purpose
@@ -1237,18 +1416,31 @@ public sealed class CertificateAuthorityService(
             throw new InvalidOperationException("CA is not active");
 
         var validityDays = req.ValidityDays > 0 ? req.ValidityDays : 365;
-        var keySize = req.KeySize > 0 ? req.KeySize : 2048;
-        var serial = ca.AllocateSerialNumber();
-        var serialHex = serial.ToString("X16");
+        var keySize = req.KeySize > 0 ? req.KeySize : 4096;
+        var keyAlgorithm = req.KeyAlgorithm ?? "RSA";
+        if (keyAlgorithm.Equals("RSA", StringComparison.OrdinalIgnoreCase) && keySize < 2048)
+            throw new InvalidOperationException("RSA certificate key size must be at least 2048 bits");
 
-        using var rsa = RSA.Create(keySize);
+        // Use cryptographic random serial (RFC 5280 §4.1.2.2)
+        var serialHex = GenerateRandomSerialHex();
+
+        var (keyInternal, actualAlgorithmInternal, actualKeySizeInternal) = CreateKeyPair(keyAlgorithm, keySize);
+        using var _ki = keyInternal;
         var subject = new X500DistinguishedName($"CN={req.CommonName}");
-        var certReq = new CertificateRequest(subject, rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+
+        CertificateRequest certReq = keyInternal switch
+        {
+            RSA rsa => new CertificateRequest(subject, rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1),
+            ECDsa ecdsa => new CertificateRequest(subject, ecdsa, HashAlgorithmName.SHA256),
+            _ => throw new InvalidOperationException($"Unsupported key type: {keyInternal.GetType().Name}")
+        };
 
         if (req.Type == CertType.Server)
         {
-            certReq.CertificateExtensions.Add(new X509KeyUsageExtension(
-                X509KeyUsageFlags.DigitalSignature | X509KeyUsageFlags.KeyEncipherment, true));
+            var keyUsage = actualAlgorithmInternal == "ECDSA"
+                ? X509KeyUsageFlags.DigitalSignature
+                : X509KeyUsageFlags.DigitalSignature | X509KeyUsageFlags.KeyEncipherment;
+            certReq.CertificateExtensions.Add(new X509KeyUsageExtension(keyUsage, true));
             certReq.CertificateExtensions.Add(new X509EnhancedKeyUsageExtension(
                 [new Oid("1.3.6.1.5.5.7.3.1")], false));
         }
@@ -1283,7 +1475,14 @@ public sealed class CertificateAuthorityService(
             certReq.CertificateExtensions.Add(BuildCrlDistributionPointExtension(crlUrl));
         }
 
-        var caCert = X509Certificate2.CreateFromPem(ca.CertificatePem, ca.PrivateKeyPem);
+        // Load CA cert + key for signing (decrypt key if encrypted)
+        var caCert = X509Certificate2.CreateFromPem(ca.CertificatePem, UnprotectKey(ca.PrivateKeyPem));
+
+        // Authority Key Identifier — links issued cert to issuing CA for chain validation
+        certReq.CertificateExtensions.Add(
+            X509AuthorityKeyIdentifierExtension.CreateFromCertificate(
+                caCert, includeKeyIdentifier: true, includeIssuerAndSerial: false));
+
         var notBefore = DateTimeOffset.UtcNow;
         var notAfter = notBefore.AddDays(validityDays);
 
@@ -1291,11 +1490,11 @@ public sealed class CertificateAuthorityService(
         if (notAfter > caCert.NotAfter)
             notAfter = caCert.NotAfter.AddMinutes(-1);
 
-        var serialBytes = Convert.FromHexString(serialHex.PadLeft(16, '0'));
+        var serialBytes = Convert.FromHexString(serialHex);
 
         using var signedCert = certReq.Create(caCert, notBefore, notAfter, serialBytes);
         var certPem = ExportCertPem(signedCert);
-        var keyPem = ExportKeyPem(rsa);
+        var keyPem = ExportKeyPem(keyInternal);
         var fingerprint = signedCert.GetCertHashString(HashAlgorithmName.SHA256);
 
         var managedCert = ManagedCertificate.Create(
@@ -1304,13 +1503,13 @@ public sealed class CertificateAuthorityService(
             type: req.Type,
             purpose: req.Purpose,
             certificatePem: certPem,
-            privateKeyPem: keyPem,
+            privateKeyPem: ProtectKey(keyPem),
             fingerprint: fingerprint,
             serialNumber: serialHex,
             notBefore: notBefore.UtcDateTime,
             notAfter: notAfter.UtcDateTime,
-            keyAlgorithm: "RSA",
-            keySize: keySize,
+            keyAlgorithm: actualAlgorithmInternal,
+            keySize: actualKeySizeInternal,
             issuingCaId: ca.Id,
             renewBeforeDays: req.RenewBeforeDays > 0 ? req.RenewBeforeDays : 30
         );
@@ -1383,16 +1582,6 @@ public sealed class CertificateAuthorityService(
         return sb.ToString();
     }
 
-    private static string ExportKeyPem(RSA rsa)
-    {
-        var keyBytes = rsa.ExportPkcs8PrivateKey();
-        var sb = new StringBuilder();
-        sb.AppendLine("-----BEGIN PRIVATE KEY-----");
-        sb.AppendLine(Convert.ToBase64String(keyBytes, Base64FormattingOptions.InsertLineBreaks));
-        sb.AppendLine("-----END PRIVATE KEY-----");
-        return sb.ToString();
-    }
-
     private static string ExportCrlPem(byte[] crlDer)
     {
         var sb = new StringBuilder();
@@ -1454,7 +1643,7 @@ public sealed class CertificateAuthorityService(
         var tempName = $"cert_{Guid.NewGuid():N}.pem";
         var tempFile = Path.Combine(Path.GetTempPath(), tempName);
         var remoteTmp = $"/tmp/{tempName}";
-        var sshOpts = "-o StrictHostKeyChecking=no -o ConnectTimeout=30 -o BatchMode=yes -o ServerAliveInterval=10 -o ServerAliveCountMax=3";
+        var sshOpts = "-o StrictHostKeyChecking=accept-new -o ConnectTimeout=30 -o BatchMode=yes -o ServerAliveInterval=10 -o ServerAliveCountMax=3";
         const int maxRetries = 3;
 
         try
@@ -1606,6 +1795,7 @@ public record CreateCaRequest(
     string? Country,
     string? State,
     string? Locality,
+    string? KeyAlgorithm = "RSA",
     int KeySize = 4096,
     int ValidityDays = 3650
 );
@@ -1618,7 +1808,8 @@ public record IssueCertRequest(
     string Purpose,
     int ValidityDays = 365,
     int KeySize = 2048,
-    int RenewBeforeDays = 30
+    int RenewBeforeDays = 30,
+    string? KeyAlgorithm = "RSA"
 );
 
 public record CaListItem(
@@ -1673,8 +1864,10 @@ public record CreateIntermediateCaRequest(
     string? Country,
     string? State,
     string? Locality,
+    string? KeyAlgorithm = "RSA",
     int KeySize = 4096,
-    int ValidityDays = 1825
+    int ValidityDays = 1825,
+    string[]? PermittedDomains = null
 );
 
 // ═══ CRL DTOs ════════════════════════════════════════════

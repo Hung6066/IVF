@@ -16,4 +16,7 @@ public class MinioOptions
     public string MedicalImagesBucket { get; set; } = "ivf-medical-images";
     public string BackupsBucket { get; set; } = "ivf-backups";
     public string BaseUrl { get; set; } = "http://localhost:9000";
+
+    /// <summary>Path to trusted CA certificate PEM for validating MinIO TLS. If empty, uses system trust store.</summary>
+    public string? TrustedCaCertPath { get; set; }
 }
