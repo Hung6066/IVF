@@ -53,6 +53,12 @@ public sealed class WalBackupService(
                 IsReplicaLevel: V(0) is "replica" or "logical"
             );
         }
+        catch (OperationCanceledException)
+        {
+            return new WalStatus(
+                "unknown", "unknown", "", "0", "16MB", "", 0,
+                null, null, null, null, 0, 0, false, false);
+        }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Failed to get WAL status");
@@ -190,6 +196,11 @@ public sealed class WalBackupService(
                     string.IsNullOrEmpty(latestFile) ? null : latestFile);
             }
 
+            return new WalArchiveInfo(0, 0, null);
+        }
+        catch (OperationCanceledException)
+        {
+            // Normal when the HTTP request is cancelled or timed out — return empty gracefully
             return new WalArchiveInfo(0, 0, null);
         }
         catch (Exception ex)
@@ -390,16 +401,25 @@ public sealed class WalBackupService(
         timeoutCts.CancelAfter(TimeSpan.FromSeconds(30));
         var linked = timeoutCts.Token;
 
-        var stdoutTask = process.StandardOutput.ReadToEndAsync(linked);
-        var stderrTask = process.StandardError.ReadToEndAsync(linked);
+        try
+        {
+            var stdoutTask = process.StandardOutput.ReadToEndAsync(linked);
+            var stderrTask = process.StandardError.ReadToEndAsync(linked);
 
-        await Task.WhenAll(stdoutTask, stderrTask);
-        await process.WaitForExitAsync(linked);
+            await Task.WhenAll(stdoutTask, stderrTask);
+            await process.WaitForExitAsync(linked);
 
-        var stdout = stdoutTask.Result;
-        var stderr = stderrTask.Result;
-        var output = string.IsNullOrWhiteSpace(stdout) ? stderr : stdout;
-        return (process.ExitCode, output);
+            var stdout = stdoutTask.Result;
+            var stderr = stderrTask.Result;
+            var output = string.IsNullOrWhiteSpace(stdout) ? stderr : stdout;
+            return (process.ExitCode, output);
+        }
+        catch
+        {
+            // Kill the child process so it doesn't linger after cancellation / timeout
+            try { process.Kill(entireProcessTree: true); } catch { /* best effort */ }
+            throw;
+        }
     }
 
     private string GetDbUser()

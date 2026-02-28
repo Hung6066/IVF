@@ -9,6 +9,7 @@ public sealed class BackupComplianceService(
     MinioBackupService minioBackupService,
     WalBackupService walBackupService,
     ReplicationMonitorService replicationService,
+    BackupRestoreService pkiBackupService,
     CloudBackupProviderFactory cloudProviderFactory,
     IWebHostEnvironment env,
     ILogger<BackupComplianceService> logger)
@@ -150,6 +151,19 @@ public sealed class BackupComplianceService(
                 : "Chưa có base backup"
         ));
 
+        // PKI / CA key backups
+        var pkiBackups = pkiBackupService.ListBackups();
+        checks.Add(new BackupComplianceCheck(
+            "pki_backup",
+            "PKI / CA Keys — Sao lưu chứng chỉ số & khóa CA",
+            pkiBackups.Count > 0,
+            pkiBackups.Count > 0
+                ? $"{pkiBackups.Count} bản sao PKI ({FormatSize(pkiBackups.Sum(b => b.SizeBytes))})"
+                : "Chưa có bản sao lưu PKI/CA keys"
+        ));
+        if (pkiBackups.Count == 0)
+            recommendations.Add("Tạo bản sao lưu PKI/CA keys (để bảo vệ chứng chỉ số và khóa CA)");
+
         // Backup freshness
         var latestBackup = dbBackups.FirstOrDefault();
         DateTime? latestBackupTime = latestBackup?.CreatedAt;
@@ -171,18 +185,19 @@ public sealed class BackupComplianceService(
         int ruleScore = Math.Min(copiesCount, 3) + Math.Min(storageTypes, 2) + Math.Min(offsiteCopies, 1);
         bool isCompliant = copiesCount >= 3 && storageTypes >= 2 && offsiteCopies >= 1;
 
-        // Bonus score for additional features (WAL, replication, base backup, freshness)
+        // Bonus score for additional features (WAL, replication, base backup, freshness, PKI)
         int bonusScore = (walStatus.IsArchivingEnabled ? 1 : 0)
             + (hasReplication ? 1 : 0)
             + (baseBackups.Count > 0 ? 1 : 0)
-            + (isFresh ? 1 : 0);
+            + (isFresh ? 1 : 0)
+            + (pkiBackups.Count > 0 ? 1 : 0);
 
         return new BackupComplianceReport(
             IsCompliant: isCompliant,
             RuleScore: ruleScore,
             MaxRuleScore: 6,
             BonusScore: bonusScore,
-            MaxBonusScore: 4,
+            MaxBonusScore: 5,
             CopiesCount: copiesCount,
             StorageTypesCount: storageTypes,
             OffsiteCopiesCount: offsiteCopies,
@@ -192,6 +207,7 @@ public sealed class BackupComplianceService(
                 TotalDbBackups: dbBackups.Count,
                 TotalMinioBackups: minioBackups.Count,
                 TotalBaseBackups: baseBackups.Count,
+                TotalPkiBackups: pkiBackups.Count,
                 LatestBackupTime: latestBackupTime,
                 WalArchivingEnabled: walStatus.IsArchivingEnabled,
                 ReplicationActive: hasReplication,
@@ -230,6 +246,7 @@ public record BackupComplianceSummary(
     int TotalDbBackups,
     int TotalMinioBackups,
     int TotalBaseBackups,
+    int TotalPkiBackups,
     DateTime? LatestBackupTime,
     bool WalArchivingEnabled,
     bool ReplicationActive,

@@ -31,6 +31,12 @@ public sealed class S3CloudBackupProvider : ICloudBackupProvider, IDisposable
         if (!string.IsNullOrEmpty(settings.ServiceUrl))
             config.ServiceURL = settings.ServiceUrl;
 
+        // Accept self-signed certs for internal MinIO TLS
+        if (settings.ServiceUrl?.StartsWith("https://", StringComparison.OrdinalIgnoreCase) == true)
+        {
+            config.HttpClientFactory = new SelfSignedHttpClientFactory();
+        }
+
         _client = !string.IsNullOrEmpty(settings.AccessKey)
             ? new AmazonS3Client(settings.AccessKey, settings.SecretKey, config)
             : new AmazonS3Client(config);
@@ -151,4 +157,19 @@ public sealed class S3CloudBackupProvider : ICloudBackupProvider, IDisposable
     }
 
     public void Dispose() => _client.Dispose();
+}
+
+/// <summary>
+/// HttpClientFactory that accepts self-signed TLS certificates for internal MinIO.
+/// </summary>
+internal sealed class SelfSignedHttpClientFactory : Amazon.Runtime.HttpClientFactory
+{
+    public override HttpClient CreateHttpClient(Amazon.Runtime.IClientConfig clientConfig)
+    {
+        var handler = new HttpClientHandler
+        {
+            ServerCertificateCustomValidationCallback = (_, _, _, _) => true
+        };
+        return new HttpClient(handler);
+    }
 }

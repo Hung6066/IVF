@@ -174,7 +174,11 @@ public sealed class CloudBackupProviderFactory(
             if (string.IsNullOrEmpty(settings.SecretKey))
                 settings.SecretKey = configuration["MinIO:SecretKey"];
             if (string.IsNullOrEmpty(settings.ServiceUrl))
-                settings.ServiceUrl = $"http://{configuration["MinIO:Endpoint"] ?? "localhost:9000"}";
+            {
+                var useSsl = configuration.GetValue<bool>("MinIO:UseSSL");
+                var scheme = useSsl ? "https" : "http";
+                settings.ServiceUrl = $"{scheme}://{configuration["MinIO:Endpoint"] ?? "localhost:9000"}";
+            }
         }
 
         var providerName = isMinIO ? "MinIO (S3)" : "AWS S3";
@@ -202,7 +206,11 @@ public sealed class CloudBackupProviderFactory(
             if (string.IsNullOrEmpty(s3SecretKey))
                 s3SecretKey = configuration["MinIO:SecretKey"];
             if (string.IsNullOrEmpty(s3ServiceUrl))
-                s3ServiceUrl = $"http://{configuration["MinIO:Endpoint"] ?? "localhost:9000"}";
+            {
+                var useSsl = configuration.GetValue<bool>("MinIO:UseSSL");
+                var scheme = useSsl ? "https" : "http";
+                s3ServiceUrl = $"{scheme}://{configuration["MinIO:Endpoint"] ?? "localhost:9000"}";
+            }
         }
 
         config.Update(

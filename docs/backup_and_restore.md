@@ -19,6 +19,9 @@
 11. [Real-time Monitoring (SignalR)](#11-real-time-monitoring)
 12. [Frontend UI](#12-frontend-ui)
 13. [Vận hành & Troubleshooting](#13-vận-hành--troubleshooting)
+    - 13.1 Backup khuyến nghị hàng ngày
+    - 13.2 Chính sách lưu giữ (Retention Policy)
+    - 13.3 Kiểm tra sức khỏe
 
 ---
 
@@ -166,6 +169,7 @@ archive_timeout = 300   # 5 phút
 
 - Archive tự động mỗi khi WAL segment đầy (16 MB) hoặc mỗi 5 phút
 - Scheduler chạy mỗi giờ để copy WAL từ container ra `backups/wal/`
+- Giữ lại **14 ngày** WAL cục bộ (cửa sổ PITR 2 tuần)
 - Có thể force switch WAL bằng tay
 
 ### 2.5 Base Backup (Physical)
@@ -578,14 +582,14 @@ Xem chi tiết 7 bước tại [Mục 3.2](#32-pitr-restore).
 
 **Cấu hình** (lưu trong DB, seed từ `appsettings.json`):
 
-| Field              | Mặc định    | Mô tả                           |
-| ------------------ | ----------- | ------------------------------- |
-| `Enabled`          | `true`      | Bật/tắt scheduler               |
-| `CronExpression`   | `0 2 * * *` | Cron 5-field (mỗi ngày 2:00 AM) |
-| `KeysOnly`         | `false`     | Chỉ backup keys                 |
-| `RetentionDays`    | `30`        | Số ngày giữ backup              |
-| `MaxBackupCount`   | `50`        | Số backup tối đa                |
-| `CloudSyncEnabled` | `false`     | Tự động upload lên cloud        |
+| Field              | Mặc định    | Mô tả                                   |
+| ------------------ | ----------- | --------------------------------------- |
+| `Enabled`          | `true`      | Bật/tắt scheduler                       |
+| `CronExpression`   | `0 2 * * *` | Cron 5-field (mỗi ngày 2:00 AM)         |
+| `KeysOnly`         | `false`     | Chỉ backup keys                         |
+| `RetentionDays`    | `90`        | Số ngày giữ backup (PKI rất quan trọng) |
+| `MaxBackupCount`   | `30`        | Số backup tối đa                        |
+| `CloudSyncEnabled` | `false`     | Tự động upload lên cloud                |
 
 **Hoạt động:**
 
@@ -597,7 +601,19 @@ Xem chi tiết 7 bước tại [Mục 3.2](#32-pitr-restore).
 
 ### 7.2 Data Backup Strategies
 
-Hỗ trợ nhiều strategy tùy chỉnh cho DB + MinIO backup:
+Hỗ trợ nhiều strategy tùy chỉnh cho DB + MinIO backup.
+
+**3 strategy mặc định (seeded):**
+
+| Strategy                  | Lịch          | DB  | MinIO | Cloud | Giữ cục bộ       | Ghi chú                      |
+| ------------------------- | ------------- | --- | ----- | ----- | ---------------- | ---------------------------- |
+| Sao lưu đầy đủ hàng đêm   | `0 2 * * *`   | ✓   | ✓     | ✗     | 14 ngày / 14 bản | Full daily, cloud via weekly |
+| Sao lưu DB mỗi 6 giờ      | `0 */6 * * *` | ✓   | ✗     | ✗     | 7 ngày / 28 bản  | Dense short-term coverage    |
+| Sao lưu offsite hàng tuần | `0 3 * * 0`   | ✓   | ✓     | ✓     | 90 ngày / 12 bản | 3-2-1 offsite copy           |
+
+> **Lưu ý:** Seeder chỉ chạy khi chưa có strategy nào (`AnyAsync()` guard). Với hệ thống đã triển khai, cập nhật thủ công qua Admin UI hoặc endpoint `PUT /api/admin/data-backup/strategies/{id}`.
+
+**Ví dụ tạo strategy qua API:**
 
 ```json
 {
@@ -605,9 +621,9 @@ Hỗ trợ nhiều strategy tùy chỉnh cho DB + MinIO backup:
   "includeDatabase": true,
   "includeMinio": true,
   "cronExpression": "0 2 * * *",
-  "uploadToCloud": true,
-  "retentionDays": 30,
-  "maxBackupCount": 10
+  "uploadToCloud": false,
+  "retentionDays": 14,
+  "maxBackupCount": 14
 }
 ```
 
@@ -651,8 +667,11 @@ Hệ thống đánh giá tuân thủ **quy tắc 3-2-1 backup**:
 | `replication`      | +1   | Streaming replication đang hoạt động |
 | `base_backup`      | +1   | Có base backup                       |
 | `backup_freshness` | +1   | Backup gần nhất < 24 giờ             |
+| `pki_backup`       | +1   | Có bản sao lưu PKI / CA keys         |
 
-**Tổng điểm tối đa:** 10/10
+**Tổng điểm:** 6 (rule) + tối đa 5 (bonus) = **11 điểm**
+
+Field trong response: `ruleScore` (max 6), `bonusScore` (max 5), `summary.totalPkiBackups`.
 
 Response bao gồm `recommendations[]` với gợi ý khắc phục cho các check thất bại.
 
@@ -778,6 +797,84 @@ DELETE /api/admin/data-backup/replication/slots/my_standby_slot
 
 > Tên slot phải match pattern `^[a-zA-Z_][a-zA-Z0-9_]*$`
 
+### 10.5 Cloud / External Replication
+
+Replication qua internet tới cloud hoặc server bên ngoài, hỗ trợ cả PostgreSQL và MinIO.
+
+#### Kiến trúc
+
+```
+IVF Server (Docker)                    Cloud / Remote Site
+┌──────────────┐    SSL/TLS           ┌──────────────────┐
+│  ivf-db      │ ──Streaming WAL──→   │  Remote PG       │
+│  (Primary)   │    Replication       │  (Standby)       │
+└──────────────┘                      └──────────────────┘
+
+┌──────────────┐    TLS               ┌──────────────────┐
+│  ivf-minio   │ ──mc mirror──────→   │  Remote S3/MinIO │
+│  (3 buckets) │    Incremental Sync  │  (ivf-replica)   │
+└──────────────┘                      └──────────────────┘
+```
+
+#### Backend Services
+
+| Service                            | File                                                       | Loại          |
+| ---------------------------------- | ---------------------------------------------------------- | ------------- |
+| `CloudReplicationService`          | `src/IVF.API/Services/CloudReplicationService.cs`          | Singleton     |
+| `CloudReplicationSchedulerService` | `src/IVF.API/Services/CloudReplicationSchedulerService.cs` | HostedService |
+
+#### Cấu hình (Entity)
+
+`CloudReplicationConfig` — single-row table, được tạo tự động khi chưa có.
+
+| Nhóm              | Fields                                                                                                                                                       |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| DB Replication    | `DbReplicationEnabled`, `RemoteDbHost/Port/User/Password`, `RemoteDbSslMode`, `RemoteDbSlotName`, `RemoteDbAllowedIps`                                       |
+| MinIO Replication | `MinioReplicationEnabled`, `RemoteMinioEndpoint/AccessKey/SecretKey`, `RemoteMinioBucket`, `RemoteMinioUseSsl`, `RemoteMinioSyncMode`, `RemoteMinioSyncCron` |
+| Status            | `LastDbSyncAt/Status`, `LastMinioSyncAt/Status/Bytes/Files`                                                                                                  |
+
+#### API Endpoints
+
+Base: `/api/admin/data-backup/cloud-replication`
+
+| Method | Path            | Mô tả                                   |
+| ------ | --------------- | --------------------------------------- |
+| GET    | `/config`       | Lấy cấu hình (secrets masked)           |
+| PUT    | `/db/config`    | Cập nhật cấu hình DB replication        |
+| POST   | `/db/test`      | Test kết nối tới remote DB              |
+| POST   | `/db/setup`     | Thiết lập: tạo user, slot, pg_hba entry |
+| GET    | `/db/status`    | Trạng thái replicas (external vs local) |
+| PUT    | `/minio/config` | Cập nhật cấu hình MinIO replication     |
+| POST   | `/minio/test`   | Test kết nối tới remote S3/MinIO        |
+| POST   | `/minio/setup`  | Tạo mc alias + remote bucket            |
+| POST   | `/minio/sync`   | Sync ngay lập tức (mc mirror)           |
+| GET    | `/minio/status` | Trạng thái MinIO replication            |
+| GET    | `/guide`        | Hướng dẫn thiết lập step-by-step        |
+
+#### Bảo mật
+
+- **PostgreSQL:** SSL mode `require` / `verify-ca` / `verify-full`, IP whitelisting qua `pg_hba.conf`
+- **MinIO:** TLS (HTTPS) cho mọi kết nối, access/secret key qua biến môi trường
+- **Mạng:** Khuyến nghị dùng WireGuard VPN hoặc SSH tunnel cho kết nối internet
+- **Secrets:** Passwords/keys được mask (`****`) trong API responses
+
+#### MinIO Sync Modes
+
+| Mode          | Mô tả                                                            |
+| ------------- | ---------------------------------------------------------------- |
+| `incremental` | Chỉ sync files mới/thay đổi (`mc mirror --overwrite`) — nhanh    |
+| `full`        | Sync toàn bộ kể cả xóa remote files không còn local (`--remove`) |
+
+Scheduler tự động sync theo cron expression (mặc định: `0 */2 * * *` — mỗi 2 giờ).
+
+#### Frontend UI
+
+Tab "🌐 Cloud Repl" trong nhóm Database, gồm:
+
+- PostgreSQL external replication: status, config form, setup wizard
+- MinIO S3 external replication: status, sync now, config form, setup
+- Hướng dẫn chi tiết (setup guide) với security notes
+
 ---
 
 ## 11. Real-time Monitoring
@@ -837,21 +934,25 @@ backupService.statusChanged$.subscribe((op) => {
 
 **Component:** `BackupRestoreComponent`
 **Route:** `/admin/backup-restore`
-**Tabs:**
 
-| Tab         | Chức năng                                      |
-| ----------- | ---------------------------------------------- |
-| Overview    | Dashboard tổng quan                            |
-| Archives    | Danh sách CA backup archives                   |
-| Restore     | Restore CA keys                                |
-| History     | Lịch sử operations                             |
-| Schedule    | Cấu hình backup tự động                        |
-| Cloud       | Quản lý cloud backup                           |
-| Data        | DB + MinIO backup/restore                      |
-| Strategies  | Data backup strategies                         |
-| Compliance  | Báo cáo 3-2-1                                  |
-| WAL         | WAL archiving + Base backup + **PITR Restore** |
-| Replication | Streaming replication management               |
+Tabs được tổ chức theo nhóm:
+
+| Nhóm               | Tab           | Icon | Chức năng                                      |
+| ------------------ | ------------- | ---- | ---------------------------------------------- |
+| _(ungrouped)_      | Tổng quan     | 📊   | Dashboard tổng quan hệ thống                   |
+| **Database**       | PostgreSQL    | 🐘   | Tổng quan DB: size, tables, replication lag    |
+|                    | WAL           | 📝   | WAL archiving + Base backup + **PITR Restore** |
+|                    | Replication   | 🔄   | Streaming replication management               |
+|                    | Cloud Repl    | 🌐   | Cloud/External replication (DB + MinIO)        |
+| **Object Storage** | MinIO         | 📦   | Tổng quan MinIO: bucket sizes, object count    |
+| **Sao lưu**        | Dữ liệu       | 💾   | DB + MinIO backup/restore                      |
+|                    | Chiến lược    | 📋   | Data backup strategies (CRUD + run)            |
+|                    | Lịch tự động  | ⏰   | Cấu hình cron scheduler cho CA keys            |
+| **PKI**            | PKI / CA Keys | 🔐   | Archives + Restore CA keys (EJBCA/SignServer)  |
+| **Giám sát**       | Cloud         | ☁️   | Quản lý cloud backup (cấu hình + upload)       |
+|                    | 3-2-1         | 🛡️   | Báo cáo tuân thủ 3-2-1                         |
+|                    | Lịch sử       | 📜   | Lịch sử operations                             |
+| _(dynamic)_        | Logs          | 📋   | Live log viewer (hiện khi operation đang chạy) |
 
 ### 12.2 PITR Panel (trong tab WAL)
 
@@ -881,13 +982,25 @@ Panel PITR nằm cuối tab WAL, mở bằng nút "▼ Mở rộng":
 ┌─────────────────────────────────────────────────────────┐
 │  02:00 — Scheduled CA keys backup (auto)                │
 │  02:30 — Data backup strategy: DB + MinIO (auto)        │
-│  03:00 — Base backup (nên tạo daily)                    │
+│  03:00 — Sao lưu offsite hàng tuần: upload lên cloud    │
 │  Liên tục — WAL archiving (tự động mỗi 5 phút/16MB)    │
+│  Liên tục — WAL copy sang host (mỗi 1 giờ)             │
 │  Liên tục — Streaming replication (real-time)           │
 └─────────────────────────────────────────────────────────┘
 ```
 
-### 13.2 Kiểm tra sức khỏe
+### 13.2 Chính sách lưu giữ (Retention Policy)
+
+| Loại backup            | Lưu cục bộ       | Lưu cloud/offsite  | Ghi chú                             |
+| ---------------------- | ---------------- | ------------------ | ----------------------------------- |
+| **WAL archives**       | 14 ngày          | Upload từng giờ    | PITR window 2 tuần                  |
+| **DB full (hàng đêm)** | 14 ngày / 14 bản | Qua weekly offsite | Weekly strategy giữ cloud 90 ngày   |
+| **DB 6-hour**          | 7 ngày / 28 bản  | —                  | 4 bản/ngày × 7 ngày = coverage dày  |
+| **MinIO (hàng đêm)**   | 14 ngày / 14 bản | Qua weekly offsite | Gộp chung với DB daily strategy     |
+| **Weekly offsite**     | 90 ngày / 12 bản | 12 bản / 3 tháng   | Luật 3-2-1: bản sao offsite         |
+| **PKI / CA Keys**      | 90 ngày / 30 bản | Thủ công           | Khóa CA không thể tái tạo — giữ lâu |
+
+### 13.3 Kiểm tra sức khỏe
 
 ```bash
 # Kiểm tra WAL archiving hoạt động
@@ -900,7 +1013,7 @@ curl -H "Authorization: Bearer $TOKEN" http://localhost:5000/api/admin/data-back
 curl -H "Authorization: Bearer $TOKEN" http://localhost:5000/api/admin/data-backup/compliance
 ```
 
-### 13.3 Disaster Recovery Scenarios
+### 13.4 Disaster Recovery Scenarios
 
 #### Scenario 1: Dữ liệu bị xóa nhầm
 
@@ -944,7 +1057,7 @@ POST /api/admin/data-backup/restore
 docker exec ivf-db-standby pg_ctl promote -D /var/lib/postgresql/data
 ```
 
-### 13.4 Troubleshooting chung
+### 13.5 Troubleshooting chung
 
 | Vấn đề                             | Nguyên nhân                    | Giải pháp                                    |
 | ---------------------------------- | ------------------------------ | -------------------------------------------- |
@@ -956,7 +1069,7 @@ docker exec ivf-db-standby pg_ctl promote -D /var/lib/postgresql/data
 | Cloud upload thất bại              | Credentials hết hạn            | `POST /api/admin/backup/cloud/config/test`   |
 | Base backup chậm                   | DB lớn                         | Sử dụng `--checkpoint=fast` (mặc định)       |
 
-### 13.5 File layout
+### 13.6 File layout
 
 ```
 backups/
@@ -974,7 +1087,7 @@ backups/
     └── ...
 ```
 
-### 13.6 Bảo mật
+### 13.7 Bảo mật
 
 - Mọi endpoint yêu cầu JWT + role Admin
 - CA backup hỗ trợ mã hóa AES-256-CBC

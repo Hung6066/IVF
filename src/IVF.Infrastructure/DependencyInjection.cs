@@ -78,7 +78,14 @@ public static class DependencyInjection
                 .WithCredentials(minioOpts.AccessKey, minioOpts.SecretKey);
 
             if (minioOpts.UseSSL)
+            {
                 client.WithSSL();
+                // Accept self-signed / internal CA certs for MinIO TLS
+                client.WithHttpClient(new HttpClient(new HttpClientHandler
+                {
+                    ServerCertificateCustomValidationCallback = (_, _, _, _) => true
+                }));
+            }
 
             return client.Build();
         });

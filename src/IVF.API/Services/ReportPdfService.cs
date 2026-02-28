@@ -889,13 +889,21 @@ public static class ReportPdfService
         // For single-response reports, use the first row for header/footer field bindings
         var firstRow = data.Count > 0 ? data[0] : null;
 
+        // Calculate maximum band height that fits in a single page's content area
+        // A4 portrait = 842pt, landscape = 595pt height; margins = 30pt each side
+        var isLandscapeCalc = pageWidth > 800;
+        var pageHeightPt = isLandscapeCalc ? 595f : 842f;
+        var headerTotalHeight = pageHeaders.Sum(b => (float)Math.Max(b.Height, 20));
+        var footerTotalHeight = pageFooters.Sum(b => (float)Math.Max(b.Height, 20));
+        var maxBandHeight = pageHeightPt - 60f - headerTotalHeight - footerTotalHeight;
+
         var document = Document.Create(container =>
         {
             container.Page(page =>
             {
                 // Determine page orientation from design pageWidth
                 // Portrait A4 has ~595pt width; template pageWidth > 800 suggests landscape
-                var isLandscape = pageWidth > 800;
+                var isLandscape = isLandscapeCalc;
                 page.Size(isLandscape ? PageSizes.A4.Landscape() : PageSizes.A4);
                 page.Margin(30);
                 page.DefaultTextStyle(x => x.FontSize(9));
@@ -907,7 +915,7 @@ public static class ReportPdfService
                     {
                         foreach (var band in pageHeaders)
                         {
-                            RenderBandContainer(col, band, firstRow, data, summary, paramValues, pageWidth, signatureContext, roleSignatures);
+                            RenderBandContainer(col, band, firstRow, data, summary, paramValues, pageWidth, maxBandHeight, signatureContext, roleSignatures);
                         }
                     });
                 }
@@ -924,7 +932,7 @@ public static class ReportPdfService
                     // Report headers (once)
                     foreach (var band in reportHeaders)
                     {
-                        RenderBandContainer(col, band, firstRow, data, summary, paramValues, pageWidth, signatureContext, roleSignatures);
+                        RenderBandContainer(col, band, firstRow, data, summary, paramValues, pageWidth, maxBandHeight, signatureContext, roleSignatures);
                     }
 
                     // Determine grouping
@@ -947,7 +955,7 @@ public static class ReportPdfService
                                     ["_groupKey"] = grp.Key,
                                     ["_groupCount"] = grp.Count()
                                 };
-                                RenderBandContainer(col, band, groupRow, data, summary, paramValues, pageWidth, signatureContext, roleSignatures);
+                                RenderBandContainer(col, band, groupRow, data, summary, paramValues, pageWidth, maxBandHeight, signatureContext, roleSignatures);
                             }
 
                             // Detail rows
@@ -955,7 +963,7 @@ public static class ReportPdfService
                             {
                                 foreach (var band in detailBands)
                                 {
-                                    RenderBandContainer(col, band, row, data, summary, paramValues, pageWidth, signatureContext, roleSignatures);
+                                    RenderBandContainer(col, band, row, data, summary, paramValues, pageWidth, maxBandHeight, signatureContext, roleSignatures);
                                 }
                             }
 
@@ -969,7 +977,7 @@ public static class ReportPdfService
                                     ["_groupCount"] = grp.Count(),
                                     ["_groupData"] = groupData
                                 };
-                                RenderBandContainer(col, band, footerRow, data, summary, paramValues, pageWidth, signatureContext, roleSignatures);
+                                RenderBandContainer(col, band, footerRow, data, summary, paramValues, pageWidth, maxBandHeight, signatureContext, roleSignatures);
                             }
                         }
                     }
@@ -980,7 +988,7 @@ public static class ReportPdfService
                         {
                             foreach (var band in detailBands)
                             {
-                                RenderBandContainer(col, band, row, data, summary, paramValues, pageWidth, signatureContext, roleSignatures);
+                                RenderBandContainer(col, band, row, data, summary, paramValues, pageWidth, maxBandHeight, signatureContext, roleSignatures);
                             }
                         }
                     }
@@ -988,7 +996,7 @@ public static class ReportPdfService
                     // Report footers (once)
                     foreach (var band in reportFooters)
                     {
-                        RenderBandContainer(col, band, firstRow, data, summary, paramValues, pageWidth, signatureContext, roleSignatures);
+                        RenderBandContainer(col, band, firstRow, data, summary, paramValues, pageWidth, maxBandHeight, signatureContext, roleSignatures);
                     }
                 });
 
@@ -999,7 +1007,7 @@ public static class ReportPdfService
                     {
                         foreach (var band in pageFooters)
                         {
-                            RenderBandContainer(col, band, firstRow, data, summary, paramValues, pageWidth, signatureContext, roleSignatures);
+                            RenderBandContainer(col, band, firstRow, data, summary, paramValues, pageWidth, maxBandHeight, signatureContext, roleSignatures);
                         }
                     });
                 }
@@ -1043,10 +1051,20 @@ public static class ReportPdfService
         ReportSummaryDto? summary,
         Dictionary<string, object?> paramValues,
         int pageWidth,
+        float maxBandHeight,
         SignatureContext? signatureContext = null,
         Dictionary<string, SignatureContext>? roleSignatures = null)
     {
-        var bandHeight = Math.Max(band.Height, 20);
+        var bandHeight = (float)Math.Max(band.Height, 20);
+
+        // Scale band vertically if it exceeds the available page content area
+        var scaleY = 1.0f;
+        if (bandHeight > maxBandHeight && maxBandHeight > 0)
+        {
+            scaleY = maxBandHeight / bandHeight;
+            bandHeight = maxBandHeight;
+        }
+
         // Scale factor for HORIZONTAL axis only
         // A4 portrait content = ~535pt (595-60), A4 landscape content = ~782pt (842-60)
         var pdfContentWidth = pageWidth > 800 ? 782.0f : 535.0f;
@@ -1062,9 +1080,17 @@ public static class ReportPdfService
             foreach (var ctrl in band.Controls)
             {
                 var x = ctrl.X * scaleX;           // Scale X horizontally
-                var y = (float)ctrl.Y;              // Keep Y at original
+                var y = (float)ctrl.Y * scaleY;    // Scale Y vertically if needed
                 var w = Math.Max(ctrl.Width * scaleX, 10); // Scale Width horizontally
-                var h = Math.Max((float)ctrl.Height, 10);  // Keep Height at original
+                var h = Math.Max((float)ctrl.Height * scaleY, 10);  // Scale Height vertically if needed
+
+                // Skip controls positioned entirely outside the band boundaries
+                if (y >= bandHeight || x >= pdfContentWidth)
+                    continue;
+
+                // Clamp dimensions to stay within band boundaries
+                if (y + h > bandHeight) h = bandHeight - y;
+                if (x + w > pdfContentWidth) w = pdfContentWidth - x;
 
                 // Four-sided padding to create exact bounding box at (x, y, w, h)
                 // This eliminates any default alignment ambiguity within the layer

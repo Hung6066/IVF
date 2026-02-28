@@ -238,6 +238,7 @@ export interface ComplianceSummary {
   totalDbBackups: number;
   totalMinioBackups: number;
   totalBaseBackups: number;
+  totalPkiBackups: number;
   latestBackupTime?: string;
   walArchivingEnabled: boolean;
   replicationActive: boolean;
@@ -367,4 +368,357 @@ export interface StartPitrRestoreRequest {
   baseBackupFile: string;
   targetTime?: string;
   dryRun?: boolean;
+}
+
+// ─── Cloud Replication models ───────────────────────────
+
+export interface CloudReplicationConfig {
+  id: string;
+  dbReplicationEnabled: boolean;
+  remoteDbHost?: string;
+  remoteDbPort: number;
+  remoteDbUser?: string;
+  remoteDbPassword?: string;
+  remoteDbSslMode: string;
+  remoteDbSlotName?: string;
+  remoteDbAllowedIps?: string;
+  minioReplicationEnabled: boolean;
+  remoteMinioEndpoint?: string;
+  remoteMinioAccessKey?: string;
+  remoteMinioSecretKey?: string;
+  remoteMinioBucket: string;
+  remoteMinioUseSsl: boolean;
+  remoteMinioRegion: string;
+  remoteMinioSyncMode: string;
+  remoteMinioSyncCron?: string;
+  lastDbSyncAt?: string;
+  lastMinioSyncAt?: string;
+  lastDbSyncStatus?: string;
+  lastMinioSyncStatus?: string;
+  lastMinioSyncBytes: number;
+  lastMinioSyncFiles: number;
+}
+
+export interface UpdateDbReplicationRequest {
+  enabled?: boolean;
+  remoteHost?: string;
+  remotePort?: number;
+  remoteUser?: string;
+  remotePassword?: string;
+  sslMode?: string;
+  slotName?: string;
+  allowedIps?: string;
+}
+
+export interface UpdateMinioReplicationRequest {
+  enabled?: boolean;
+  endpoint?: string;
+  accessKey?: string;
+  secretKey?: string;
+  bucket?: string;
+  useSsl?: boolean;
+  region?: string;
+  syncMode?: string;
+  syncCron?: string;
+}
+
+export interface CloudReplicationSetupResult {
+  success: boolean;
+  steps: string[];
+  connectionInfo?: DbReplicationConnectionInfo;
+}
+
+export interface DbReplicationConnectionInfo {
+  host: string;
+  port: number;
+  user: string;
+  password: string;
+  slotName: string;
+  sslMode: string;
+  primaryConnInfo: string;
+  baseBackupCommand: string;
+  standbySignalContent: string;
+}
+
+export interface DbCloudReplicationStatus {
+  enabled: boolean;
+  sslEnabled: boolean;
+  currentLsn: string;
+  slotName?: string;
+  slotStatus?: string;
+  slotRetainedBytes: number;
+  externalReplicas: ExternalReplica[];
+  localReplicas: ExternalReplica[];
+  lastSyncAt?: string;
+  lastSyncStatus?: string;
+}
+
+export interface ExternalReplica {
+  pid: number;
+  username: string;
+  applicationName: string;
+  clientAddress: string;
+  state: string;
+  sentLsn: string;
+  replayLsn: string;
+  syncState: string;
+  uptimeSeconds: number;
+  lagBytes: number;
+  isExternal: boolean;
+}
+
+export interface MinioSyncResult {
+  success: boolean;
+  message: string;
+  totalFiles: number;
+  totalBytes: number;
+  bucketResults: MinioBucketSyncResult[];
+}
+
+export interface MinioBucketSyncResult {
+  bucket: string;
+  success: boolean;
+  filesSync: number;
+  message: string;
+}
+
+export interface MinioCloudReplicationStatus {
+  enabled: boolean;
+  remoteEndpoint?: string;
+  remoteBucket: string;
+  useSsl: boolean;
+  syncMode: string;
+  syncCron?: string;
+  localBuckets: MinioBucketInfo[];
+  lastSyncAt?: string;
+  lastSyncStatus?: string;
+  lastSyncBytes: number;
+  lastSyncFiles: number;
+}
+
+export interface MinioBucketInfo {
+  name: string;
+  sizeBytes: number;
+  objectCount: number;
+}
+
+export interface ExternalReplicationGuide {
+  steps: ReplicationSetupStep[];
+  minioSteps: ReplicationSetupStep[];
+  securityNotes: string[];
+}
+
+// ─── Certificate Authority & mTLS models ────────────────
+
+export interface CaDashboard {
+  totalCAs: number;
+  activeCAs: number;
+  totalCerts: number;
+  activeCerts: number;
+  expiringSoon: number;
+  revokedCerts: number;
+  expiringSoonList: CertListItem[];
+  recentRenewals: CertListItem[];
+}
+
+export interface CaListItem {
+  id: string;
+  name: string;
+  commonName: string;
+  type: string; // 'Root' | 'Intermediate'
+  status: string; // 'Active' | 'Revoked' | 'Expired'
+  keyAlgorithm: string;
+  keySize: number;
+  fingerprint: string;
+  notBefore: string;
+  notAfter: string;
+  parentCaId?: string;
+  activeCertCount: number;
+}
+
+export interface CaDetail {
+  id: string;
+  name: string;
+  commonName: string;
+  organization: string;
+  organizationalUnit?: string;
+  country: string;
+  state?: string;
+  locality?: string;
+  type: string;
+  status: string;
+  keyAlgorithm: string;
+  keySize: number;
+  fingerprint: string;
+  notBefore: string;
+  notAfter: string;
+  parentCaId?: string;
+  nextSerialNumber: number;
+  certificatePem: string;
+  chainPem?: string;
+  issuedCerts: number;
+}
+
+export interface CreateCaRequest {
+  name: string;
+  commonName: string;
+  organization?: string;
+  orgUnit?: string;
+  country?: string;
+  state?: string;
+  locality?: string;
+  keySize?: number;
+  validityDays?: number;
+}
+
+export interface CertListItem {
+  id: string;
+  commonName: string;
+  subjectAltNames?: string;
+  type: string; // 'Server' | 'Client'
+  purpose: string;
+  status: string; // 'Active' | 'Revoked' | 'Expired' | 'Superseded'
+  fingerprint: string;
+  serialNumber: string;
+  notBefore: string;
+  notAfter: string;
+  issuingCaId: string;
+  deployedTo?: string;
+  deployedAt?: string;
+  autoRenewEnabled: boolean;
+  renewBeforeDays: number;
+  replacedCertId?: string;
+  replacedByCertId?: string;
+  lastRenewalAttempt?: string;
+  lastRenewalResult?: string;
+  isExpiringSoon: boolean;
+}
+
+export interface IssueCertRequest {
+  caId: string;
+  commonName: string;
+  subjectAltNames?: string;
+  type: number;
+  purpose: string;
+  validityDays?: number;
+  keySize?: number;
+  renewBeforeDays?: number;
+}
+
+export interface CertBundle {
+  certificatePem: string;
+  privateKeyPem: string;
+  caChainPem: string;
+  commonName: string;
+  purpose: string;
+}
+
+export interface CertDeployResult {
+  success: boolean;
+  steps: string[];
+  operationId?: string;
+}
+
+export interface DeployLogLine {
+  timestamp: string;
+  level: string; // info, warn, error, success
+  message: string;
+}
+
+export interface DeployLogItem {
+  id: string;
+  operationId: string;
+  certificateId: string;
+  target: string;
+  container: string;
+  remoteHost?: string;
+  status: string; // Running, Completed, Failed
+  startedAt: string;
+  completedAt?: string;
+  errorMessage?: string;
+  logLines: DeployLogLine[];
+}
+
+export interface CertRenewalResult {
+  oldCertId: string;
+  newCertId?: string;
+  commonName: string;
+  purpose: string;
+  success: boolean;
+  message: string;
+}
+
+export interface CertRenewalBatchResult {
+  totalCandidates: number;
+  renewedCount: number;
+  results: CertRenewalResult[];
+}
+
+export interface DeployCertRequest {
+  container: string;
+  certPath: string;
+  keyPath: string;
+  caPath?: string;
+}
+
+// ─── Enterprise CA/mTLS Models ──────────────────────────
+
+export interface CreateIntermediateCaRequest {
+  parentCaId: string;
+  name: string;
+  commonName: string;
+  organization?: string;
+  orgUnit?: string;
+  country?: string;
+  state?: string;
+  locality?: string;
+  keySize?: number;
+  validityDays?: number;
+}
+
+export interface CrlListItem {
+  id: string;
+  crlNumber: number;
+  thisUpdate: string;
+  nextUpdate: string;
+  revokedCount: number;
+  fingerprint: string;
+}
+
+export interface OcspResponse {
+  status: string; // 'Good' | 'Revoked' | 'Unknown'
+  serialNumber: string;
+  revokedAt?: string;
+  revocationReason?: string;
+  producedAt: string;
+}
+
+export interface CertAuditItem {
+  id: string;
+  certificateId?: string;
+  caId?: string;
+  eventType: string;
+  description: string;
+  actor: string;
+  sourceIp?: string;
+  metadata?: string;
+  success: boolean;
+  errorMessage?: string;
+  createdAt: string;
+}
+
+export type RevocationReason =
+  | 'Unspecified'
+  | 'KeyCompromise'
+  | 'CaCompromise'
+  | 'AffiliationChanged'
+  | 'Superseded'
+  | 'CessationOfOperation'
+  | 'CertificateHold'
+  | 'RemoveFromCrl'
+  | 'PrivilegeWithdrawn'
+  | 'AaCompromise';
+
+export interface RevokeCertRequest {
+  reason: RevocationReason;
 }

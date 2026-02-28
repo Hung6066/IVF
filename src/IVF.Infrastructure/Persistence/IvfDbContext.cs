@@ -84,6 +84,14 @@ public class IvfDbContext : DbContext
     public DbSet<BackupScheduleConfig> BackupScheduleConfigs => Set<BackupScheduleConfig>();
     public DbSet<CloudBackupConfig> CloudBackupConfigs => Set<CloudBackupConfig>();
     public DbSet<DataBackupStrategy> DataBackupStrategies => Set<DataBackupStrategy>();
+    public DbSet<CloudReplicationConfig> CloudReplicationConfigs => Set<CloudReplicationConfig>();
+
+    // Certificate Authority & mTLS
+    public DbSet<CertificateAuthority> CertificateAuthorities => Set<CertificateAuthority>();
+    public DbSet<ManagedCertificate> ManagedCertificates => Set<ManagedCertificate>();
+    public DbSet<CertDeploymentLog> CertDeploymentLogs => Set<CertDeploymentLog>();
+    public DbSet<CertificateRevocationList> CertificateRevocationLists => Set<CertificateRevocationList>();
+    public DbSet<CertificateAuditEvent> CertificateAuditEvents => Set<CertificateAuditEvent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -97,7 +105,8 @@ public class IvfDbContext : DbContext
     {
         foreach (var entry in ChangeTracker.Entries())
         {
-            if (entry.State == EntityState.Modified)
+            if (entry.State == EntityState.Modified
+                && entry.Metadata.FindProperty("UpdatedAt") is not null)
             {
                 entry.Property("UpdatedAt").CurrentValue = DateTime.UtcNow;
             }

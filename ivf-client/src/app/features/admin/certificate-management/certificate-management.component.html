@@ -1,0 +1,1395 @@
+<div class="cert-mgmt-page">
+  <!-- Header -->
+  <div class="page-header">
+    <h2>🔐 Quản lý Certificate Authority & mTLS</h2>
+    <p class="subtitle">
+      Tạo CA, cấp phát cert cho PostgreSQL SSL, MinIO TLS, và mTLS giữa các dịch vụ. Tự động gia hạn
+      (auto-renew) khi gần hết hạn.
+    </p>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button [class.active]="activeTab() === 'dashboard'" (click)="switchTab('dashboard')">
+      📊 Tổng quan
+    </button>
+    <button [class.active]="activeTab() === 'cas'" (click)="switchTab('cas')">🏛️ CA</button>
+    <button [class.active]="activeTab() === 'certs'" (click)="switchTab('certs')">
+      📜 Certificates
+    </button>
+    <button [class.active]="activeTab() === 'expiring'" (click)="switchTab('expiring')">
+      ⏰ Sắp hết hạn
+      @if (dashboard()?.expiringSoon) {
+        <span class="badge badge-warning">{{ dashboard()!.expiringSoon }}</span>
+      }
+    </button>
+    <button [class.active]="activeTab() === 'deploy'" (click)="switchTab('deploy')">
+      🚀 Deploy
+    </button>
+    <button [class.active]="activeTab() === 'logs'" (click)="switchTab('logs')">📋 Logs</button>
+    <button [class.active]="activeTab() === 'crl'" (click)="switchTab('crl')">🔒 CRL</button>
+    <button [class.active]="activeTab() === 'ocsp'" (click)="switchTab('ocsp')">🔍 OCSP</button>
+    <button [class.active]="activeTab() === 'audit'" (click)="switchTab('audit')">📝 Audit</button>
+  </div>
+
+  <!-- ═══ Dashboard Tab ═══ -->
+  @if (activeTab() === 'dashboard') {
+    @if (dashboard(); as d) {
+      <div class="overview-grid">
+        <div class="card stat-card" (click)="switchTab('cas')">
+          <div class="stat-icon">🏛️</div>
+          <div class="stat-info">
+            <span class="stat-value">{{ d.activeCAs }}/{{ d.totalCAs }}</span>
+            <span class="stat-label">Certificate Authorities</span>
+          </div>
+        </div>
+        <div class="card stat-card" (click)="switchTab('certs')">
+          <div class="stat-icon">📜</div>
+          <div class="stat-info">
+            <span class="stat-value">{{ d.activeCerts }}/{{ d.totalCerts }}</span>
+            <span class="stat-label">Active Certificates</span>
+          </div>
+        </div>
+        <div class="card stat-card warning" (click)="switchTab('expiring')">
+          <div class="stat-icon">⏰</div>
+          <div class="stat-info">
+            <span class="stat-value">{{ d.expiringSoon }}</span>
+            <span class="stat-label">Sắp hết hạn</span>
+          </div>
+        </div>
+        <div class="card stat-card">
+          <div class="stat-icon">🚫</div>
+          <div class="stat-info">
+            <span class="stat-value">{{ d.revokedCerts }}</span>
+            <span class="stat-label">Đã thu hồi</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Expiring soon list -->
+      @if (d.expiringSoonList.length > 0) {
+        <div class="card">
+          <div class="card-header">
+            <h3>⚠️ Certificates sắp hết hạn</h3>
+            <button
+              class="btn btn-primary btn-sm"
+              (click)="triggerAutoRenew()"
+              [disabled]="loading()"
+            >
+              🔄 Auto-Renew All
+            </button>
+          </div>
+          <div class="card-body">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>CN</th>
+                  <th>Purpose</th>
+                  <th>Hết hạn</th>
+                  <th>Còn lại</th>
+                  <th>Auto-Renew</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (c of d.expiringSoonList; track c.id) {
+                  <tr>
+                    <td>
+                      <strong>{{ c.commonName }}</strong>
+                    </td>
+                    <td>
+                      <span class="badge badge-info">{{ c.purpose }}</span>
+                    </td>
+                    <td>{{ formatDate(c.notAfter) }}</td>
+                    <td>
+                      <span
+                        class="badge"
+                        [class.badge-danger]="daysUntilExpiry(c.notAfter) < 7"
+                        [class.badge-warning]="daysUntilExpiry(c.notAfter) >= 7"
+                      >
+                        {{ daysUntilExpiry(c.notAfter) }} ngày
+                      </span>
+                    </td>
+                    <td>
+                      <span
+                        class="badge"
+                        [class.badge-success]="c.autoRenewEnabled"
+                        [class.badge-secondary]="!c.autoRenewEnabled"
+                      >
+                        {{ c.autoRenewEnabled ? 'ON' : 'OFF' }}
+                      </span>
+                    </td>
+                    <td>
+                      <button
+                        class="btn btn-sm btn-primary"
+                        (click)="renewCert(c.id)"
+                        [disabled]="loading()"
+                      >
+                        Renew
+                      </button>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      }
+
+      <!-- Recent renewals -->
+      @if (d.recentRenewals.length > 0) {
+        <div class="card">
+          <div class="card-header"><h3>🔄 Gia hạn gần đây (7 ngày)</h3></div>
+          <div class="card-body">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>CN</th>
+                  <th>Purpose</th>
+                  <th>Trạng thái</th>
+                  <th>Thời gian</th>
+                  <th>Kết quả</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (c of d.recentRenewals; track c.id) {
+                  <tr>
+                    <td>{{ c.commonName }}</td>
+                    <td>
+                      <span class="badge badge-info">{{ c.purpose }}</span>
+                    </td>
+                    <td>
+                      <span class="badge" [ngClass]="certStatusClass(c.status)">{{
+                        certStatusLabel(c.status)
+                      }}</span>
+                    </td>
+                    <td>{{ formatDate(c.lastRenewalAttempt) }}</td>
+                    <td>{{ c.lastRenewalResult || '—' }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      }
+    } @else {
+      <div class="loading-spinner">Đang tải...</div>
+    }
+  }
+
+  <!-- ═══ CAs Tab ═══ -->
+  @if (activeTab() === 'cas') {
+    <div class="card">
+      <div class="card-header">
+        <h3>🏛️ Certificate Authorities</h3>
+        <div class="btn-group">
+          <button class="btn btn-primary" (click)="showCreateCa.set(true)">+ Tạo Root CA</button>
+          <button class="btn btn-outline" (click)="showCreateIntermediateCa.set(true)">
+            + Intermediate CA
+          </button>
+        </div>
+      </div>
+      <div class="card-body">
+        <!-- Create CA form -->
+        @if (showCreateCa()) {
+          <div class="form-panel">
+            <h4>Tạo Root CA mới</h4>
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Tên CA *</label>
+                <input type="text" [(ngModel)]="newCa.name" placeholder="IVF Internal CA" />
+              </div>
+              <div class="form-group">
+                <label>Common Name *</label>
+                <input type="text" [(ngModel)]="newCa.commonName" placeholder="IVF Root CA" />
+              </div>
+              <div class="form-group">
+                <label>Tổ chức</label>
+                <input type="text" [(ngModel)]="newCa.organization" />
+              </div>
+              <div class="form-group">
+                <label>Đơn vị</label>
+                <input type="text" [(ngModel)]="newCa.orgUnit" placeholder="IT Security" />
+              </div>
+              <div class="form-group">
+                <label>Quốc gia</label>
+                <input type="text" [(ngModel)]="newCa.country" maxlength="2" />
+              </div>
+              <div class="form-group">
+                <label>Tỉnh/Thành</label>
+                <input type="text" [(ngModel)]="newCa.state" />
+              </div>
+              <div class="form-group">
+                <label>Key Size</label>
+                <select [(ngModel)]="newCa.keySize">
+                  <option [ngValue]="2048">RSA-2048</option>
+                  <option [ngValue]="4096">RSA-4096</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Thời hạn (ngày)</label>
+                <input type="number" [(ngModel)]="newCa.validityDays" min="365" />
+              </div>
+            </div>
+            <div class="form-actions">
+              <button
+                class="btn btn-primary"
+                (click)="createCA()"
+                [disabled]="loading() || !newCa.name || !newCa.commonName"
+              >
+                {{ loading() ? 'Đang tạo...' : '✓ Tạo Root CA' }}
+              </button>
+              <button class="btn btn-secondary" (click)="showCreateCa.set(false)">Hủy</button>
+            </div>
+          </div>
+        }
+
+        <!-- Create Intermediate CA form -->
+        @if (showCreateIntermediateCa()) {
+          <div class="form-panel">
+            <h4>Tạo Intermediate CA</h4>
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Parent CA *</label>
+                <select [(ngModel)]="newIntermediateCa.parentCaId">
+                  <option value="">-- Chọn Parent CA --</option>
+                  @for (ca of cas(); track ca.id) {
+                    @if (ca.status === 'Active') {
+                      <option [value]="ca.id">{{ ca.name }} ({{ ca.commonName }})</option>
+                    }
+                  }
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Tên CA *</label>
+                <input
+                  type="text"
+                  [(ngModel)]="newIntermediateCa.name"
+                  placeholder="IVF Issuing CA"
+                />
+              </div>
+              <div class="form-group">
+                <label>Common Name *</label>
+                <input
+                  type="text"
+                  [(ngModel)]="newIntermediateCa.commonName"
+                  placeholder="IVF Issuing CA"
+                />
+              </div>
+              <div class="form-group">
+                <label>Tổ chức</label>
+                <input type="text" [(ngModel)]="newIntermediateCa.organization" />
+              </div>
+              <div class="form-group">
+                <label>Key Size</label>
+                <select [(ngModel)]="newIntermediateCa.keySize">
+                  <option [ngValue]="2048">RSA-2048</option>
+                  <option [ngValue]="4096">RSA-4096</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Thời hạn (ngày)</label>
+                <input type="number" [(ngModel)]="newIntermediateCa.validityDays" min="365" />
+              </div>
+            </div>
+            <div class="form-actions">
+              <button
+                class="btn btn-primary"
+                (click)="createIntermediateCA()"
+                [disabled]="
+                  loading() ||
+                  !newIntermediateCa.parentCaId ||
+                  !newIntermediateCa.name ||
+                  !newIntermediateCa.commonName
+                "
+              >
+                {{ loading() ? 'Đang tạo...' : '✓ Tạo Intermediate CA' }}
+              </button>
+              <button class="btn btn-secondary" (click)="showCreateIntermediateCa.set(false)">
+                Hủy
+              </button>
+            </div>
+          </div>
+        }
+
+        <!-- CA List -->
+        @if (cas().length === 0 && !loading()) {
+          <div class="empty-state">
+            <p>Chưa có CA nào. Tạo Root CA để bắt đầu cấp phát certificates.</p>
+          </div>
+        }
+
+        @for (ca of cas(); track ca.id) {
+          <div class="ca-card">
+            <div class="ca-card-header">
+              <div class="ca-info">
+                <h4>{{ ca.name }}</h4>
+                <span class="text-muted">CN={{ ca.commonName }}</span>
+              </div>
+              <div class="ca-badges">
+                <span
+                  class="badge"
+                  [class.badge-success]="ca.status === 'Active'"
+                  [class.badge-danger]="ca.status !== 'Active'"
+                >
+                  {{ caStatusLabel(ca.status) }}
+                </span>
+                <span class="badge badge-info">{{ caTypeLabel(ca.type) }}</span>
+                <span class="badge badge-secondary">{{ ca.keyAlgorithm }}-{{ ca.keySize }}</span>
+              </div>
+            </div>
+            <div class="ca-card-body">
+              <div class="ca-details">
+                <div>
+                  <strong>Fingerprint:</strong>
+                  <code>{{ truncateFingerprint(ca.fingerprint) }}</code>
+                </div>
+                <div>
+                  <strong>Hiệu lực:</strong> {{ formatDate(ca.notBefore) }} →
+                  {{ formatDate(ca.notAfter) }}
+                </div>
+                <div>
+                  <strong>Còn lại:</strong>
+                  <span
+                    class="badge"
+                    [class.badge-warning]="daysUntilExpiry(ca.notAfter) < 365"
+                    [class.badge-success]="daysUntilExpiry(ca.notAfter) >= 365"
+                  >
+                    {{ daysUntilExpiry(ca.notAfter) }} ngày
+                  </span>
+                </div>
+                <div><strong>Certs đã cấp (active):</strong> {{ ca.activeCertCount }}</div>
+              </div>
+              <div class="ca-actions">
+                <button class="btn btn-sm btn-outline" (click)="viewCaDetail(ca.id)">
+                  Chi tiết
+                </button>
+                <button class="btn btn-sm btn-outline" (click)="downloadChain(ca.id)">
+                  ⬇ CA Chain
+                </button>
+                <button
+                  class="btn btn-sm btn-primary"
+                  (click)="filterCaId = ca.id; switchTab('certs')"
+                >
+                  Xem Certs
+                </button>
+              </div>
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+
+    <!-- CA Detail Modal -->
+    @if (selectedCa(); as ca) {
+      <div class="modal-overlay" (click)="selectedCa.set(null)">
+        <div class="modal-content" (click)="$event.stopPropagation()">
+          <div class="modal-header">
+            <h3>{{ ca.name }} — Chi tiết CA</h3>
+            <button class="modal-close" (click)="selectedCa.set(null)">✕</button>
+          </div>
+          <div class="modal-body">
+            <div class="detail-grid">
+              <div><strong>Common Name:</strong> {{ ca.commonName }}</div>
+              <div><strong>Organization:</strong> {{ ca.organization }}</div>
+              <div><strong>OU:</strong> {{ ca.organizationalUnit || '—' }}</div>
+              <div><strong>Country:</strong> {{ ca.country }}</div>
+              <div><strong>State:</strong> {{ ca.state || '—' }}</div>
+              <div><strong>Locality:</strong> {{ ca.locality || '—' }}</div>
+              <div><strong>Algorithm:</strong> {{ ca.keyAlgorithm }}-{{ ca.keySize }}</div>
+              <div>
+                <strong>Fingerprint:</strong> <code class="code-sm">{{ ca.fingerprint }}</code>
+              </div>
+              <div><strong>Serial Counter:</strong> {{ ca.nextSerialNumber }}</div>
+              <div><strong>Issued Certs:</strong> {{ ca.issuedCerts }}</div>
+              <div>
+                <strong>Valid:</strong> {{ formatDate(ca.notBefore) }} →
+                {{ formatDate(ca.notAfter) }}
+              </div>
+            </div>
+            @if (ca.certificatePem) {
+              <div class="pem-section">
+                <h4>CA Certificate (PEM)</h4>
+                <pre class="pem-block">{{ ca.certificatePem }}</pre>
+                <button
+                  class="btn btn-sm btn-outline"
+                  (click)="downloadPem(ca.certificatePem, ca.name + '-cert.pem')"
+                >
+                  ⬇ Download
+                </button>
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+    }
+  }
+
+  <!-- ═══ Certificates Tab ═══ -->
+  @if (activeTab() === 'certs') {
+    <div class="card">
+      <div class="card-header">
+        <h3>📜 Certificates</h3>
+        <div class="header-actions">
+          <select
+            [(ngModel)]="filterCaId"
+            (ngModelChange)="loadCertificates()"
+            class="filter-select"
+          >
+            <option value="">Tất cả CA</option>
+            @for (ca of cas(); track ca.id) {
+              <option [value]="ca.id">{{ ca.name }}</option>
+            }
+          </select>
+          <button class="btn btn-primary" (click)="showIssueCert.set(true); loadCAs()">
+            + Cấp phát Certificate
+          </button>
+        </div>
+      </div>
+      <div class="card-body">
+        <!-- Issue cert form -->
+        @if (showIssueCert()) {
+          <div class="form-panel">
+            <h4>Cấp phát Certificate mới</h4>
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Chọn CA *</label>
+                <select [(ngModel)]="newCert.caId">
+                  <option value="">-- Chọn CA --</option>
+                  @for (ca of cas(); track ca.id) {
+                    <option [value]="ca.id">{{ ca.name }} ({{ caTypeLabel(ca.type) }})</option>
+                  }
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Common Name *</label>
+                <input type="text" [(ngModel)]="newCert.commonName" placeholder="ivf-db-primary" />
+              </div>
+              <div class="form-group">
+                <label>SANs (DNS/IP, phân cách bằng dấu phẩy)</label>
+                <input
+                  type="text"
+                  [(ngModel)]="newCert.subjectAltNames"
+                  placeholder="172.68.2.143,localhost,ivf-db"
+                />
+              </div>
+              <div class="form-group">
+                <label>Loại *</label>
+                <select [(ngModel)]="newCert.type">
+                  <option [ngValue]="0">Server</option>
+                  <option [ngValue]="1">Client</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Purpose *</label>
+                <select [(ngModel)]="newCert.purpose">
+                  @for (p of purposePresets; track p.value) {
+                    <option [value]="p.value">{{ p.label }}</option>
+                  }
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Thời hạn (ngày)</label>
+                <input type="number" [(ngModel)]="newCert.validityDays" min="30" />
+              </div>
+              <div class="form-group">
+                <label>Key Size</label>
+                <select [(ngModel)]="newCert.keySize">
+                  <option [ngValue]="2048">RSA-2048</option>
+                  <option [ngValue]="4096">RSA-4096</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Gia hạn trước (ngày)</label>
+                <input type="number" [(ngModel)]="newCert.renewBeforeDays" min="1" />
+              </div>
+            </div>
+            <div class="form-actions">
+              <button
+                class="btn btn-primary"
+                (click)="issueCert()"
+                [disabled]="loading() || !newCert.caId || !newCert.commonName || !newCert.purpose"
+              >
+                {{ loading() ? 'Đang cấp...' : '✓ Cấp phát Certificate' }}
+              </button>
+              <button class="btn btn-secondary" (click)="showIssueCert.set(false)">Hủy</button>
+            </div>
+          </div>
+        }
+
+        <!-- Cert List -->
+        @if (certs().length === 0 && !loading()) {
+          <div class="empty-state">
+            <p>Chưa có certificate nào. Cấp phát certificate mới từ một CA.</p>
+          </div>
+        }
+
+        @if (certs().length > 0) {
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>CN</th>
+                <th>Type</th>
+                <th>Purpose</th>
+                <th>Status</th>
+                <th>Hết hạn</th>
+                <th>Auto-Renew</th>
+                <th>Deployed</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (c of certs(); track c.id) {
+                <tr
+                  [class.row-warning]="c.isExpiringSoon"
+                  [class.row-muted]="c.status !== 'Active'"
+                >
+                  <td>
+                    <strong>{{ c.commonName }}</strong>
+                    @if (c.subjectAltNames) {
+                      <br /><span class="text-muted text-sm">SANs: {{ c.subjectAltNames }}</span>
+                    }
+                  </td>
+                  <td>{{ certTypeLabel(c.type) }}</td>
+                  <td>
+                    <span class="badge badge-info">{{ c.purpose }}</span>
+                  </td>
+                  <td>
+                    <span class="badge" [ngClass]="certStatusClass(c.status)">{{
+                      certStatusLabel(c.status)
+                    }}</span>
+                    @if (c.replacedByCertId) {
+                      <br /><span class="text-muted text-sm">→ replaced</span>
+                    }
+                  </td>
+                  <td>
+                    {{ formatDate(c.notAfter) }}
+                    @if (c.status === 'Active') {
+                      <br />
+                      <span
+                        class="badge"
+                        [class.badge-danger]="daysUntilExpiry(c.notAfter) < 7"
+                        [class.badge-warning]="
+                          daysUntilExpiry(c.notAfter) >= 7 && daysUntilExpiry(c.notAfter) < 30
+                        "
+                        [class.badge-success]="daysUntilExpiry(c.notAfter) >= 30"
+                      >
+                        {{ daysUntilExpiry(c.notAfter) }}d
+                      </span>
+                    }
+                  </td>
+                  <td>
+                    <button
+                      class="btn btn-xs"
+                      [class.btn-success]="c.autoRenewEnabled"
+                      [class.btn-secondary]="!c.autoRenewEnabled"
+                      (click)="toggleAutoRenew(c)"
+                      [disabled]="c.status !== 'Active'"
+                    >
+                      {{ c.autoRenewEnabled ? 'ON' : 'OFF' }}
+                    </button>
+                    @if (c.autoRenewEnabled) {
+                      <span class="text-muted text-sm">{{ c.renewBeforeDays }}d</span>
+                    }
+                  </td>
+                  <td>
+                    @if (c.deployedTo) {
+                      <span class="badge badge-success">{{ c.deployedTo }}</span>
+                      <br /><span class="text-muted text-sm">{{ formatDate(c.deployedAt) }}</span>
+                    } @else {
+                      <span class="text-muted">—</span>
+                    }
+                  </td>
+                  <td class="action-cell">
+                    @if (c.status === 'Active') {
+                      <button
+                        class="btn btn-xs btn-outline"
+                        (click)="viewBundle(c.id)"
+                        title="View/Download PEM"
+                      >
+                        📋
+                      </button>
+                      <button
+                        class="btn btn-xs btn-primary"
+                        (click)="renewCert(c.id)"
+                        title="Renew"
+                      >
+                        🔄
+                      </button>
+                      <button
+                        class="btn btn-xs btn-outline"
+                        (click)="startDeploy(c.id)"
+                        title="Custom Deploy"
+                      >
+                        🚀
+                      </button>
+                      @if (c.purpose === 'pg-primary') {
+                        <button
+                          class="btn btn-xs btn-success"
+                          (click)="deployPgSsl(c.id)"
+                          title="Deploy to PG Primary"
+                        >
+                          🐘 Pri
+                        </button>
+                      }
+                      @if (c.purpose === 'pg-replica') {
+                        <button
+                          class="btn btn-xs btn-success"
+                          (click)="deployReplicaPgSsl(c.id)"
+                          title="Deploy to PG Replica (SSH)"
+                        >
+                          🐘 Rep
+                        </button>
+                      }
+                      @if (c.purpose === 'minio-primary') {
+                        <button
+                          class="btn btn-xs btn-success"
+                          (click)="deployMinioSsl(c.id)"
+                          title="Deploy to MinIO Primary"
+                        >
+                          📦 Pri
+                        </button>
+                      }
+                      @if (c.purpose === 'minio-replica') {
+                        <button
+                          class="btn btn-xs btn-success"
+                          (click)="deployReplicaMinioSsl(c.id)"
+                          title="Deploy to MinIO Replica (SSH)"
+                        >
+                          📦 Rep
+                        </button>
+                      }
+                      <button
+                        class="btn btn-xs btn-danger"
+                        (click)="revokeCert(c.id, c.commonName)"
+                        title="Revoke"
+                      >
+                        ✕
+                      </button>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        }
+      </div>
+    </div>
+
+    <!-- Cert Bundle Modal -->
+    @if (viewingBundle(); as b) {
+      <div class="modal-overlay" (click)="closeBundle()">
+        <div class="modal-content modal-lg" (click)="$event.stopPropagation()">
+          <div class="modal-header">
+            <h3>📋 {{ b.commonName }} — Certificate Bundle</h3>
+            <button class="modal-close" (click)="closeBundle()">✕</button>
+          </div>
+          <div class="modal-body">
+            <div class="pem-section">
+              <div class="pem-label">
+                <h4>Certificate</h4>
+                <button
+                  class="btn btn-sm btn-outline"
+                  (click)="downloadPem(b.certificatePem, b.commonName + '.crt')"
+                >
+                  ⬇
+                </button>
+              </div>
+              <pre class="pem-block">{{ b.certificatePem }}</pre>
+            </div>
+            <div class="pem-section">
+              <div class="pem-label">
+                <h4>Private Key</h4>
+                <button
+                  class="btn btn-sm btn-outline"
+                  (click)="downloadPem(b.privateKeyPem, b.commonName + '.key')"
+                >
+                  ⬇
+                </button>
+              </div>
+              <pre class="pem-block">{{ b.privateKeyPem }}</pre>
+            </div>
+            <div class="pem-section">
+              <div class="pem-label">
+                <h4>CA Chain</h4>
+                <button
+                  class="btn btn-sm btn-outline"
+                  (click)="downloadPem(b.caChainPem, 'ca-chain.pem')"
+                >
+                  ⬇
+                </button>
+              </div>
+              <pre class="pem-block">{{ b.caChainPem }}</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    }
+  }
+
+  <!-- ═══ Expiring Tab ═══ -->
+  @if (activeTab() === 'expiring') {
+    <div class="card">
+      <div class="card-header">
+        <h3>⏰ Certificates sắp hết hạn</h3>
+        <button class="btn btn-primary" (click)="triggerAutoRenew()" [disabled]="loading()">
+          🔄 Auto-Renew All Now
+        </button>
+      </div>
+      <div class="card-body">
+        @if (expiringCerts().length === 0 && !loading()) {
+          <div class="empty-state success">
+            <p>✅ Không có certificate nào sắp hết hạn. Hệ thống an toàn.</p>
+          </div>
+        }
+
+        @if (expiringCerts().length > 0) {
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>CN</th>
+                <th>Purpose</th>
+                <th>Hết hạn</th>
+                <th>Còn lại</th>
+                <th>Auto-Renew</th>
+                <th>Lần gia hạn cuối</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (c of expiringCerts(); track c.id) {
+                <tr>
+                  <td>
+                    <strong>{{ c.commonName }}</strong>
+                  </td>
+                  <td>
+                    <span class="badge badge-info">{{ c.purpose }}</span>
+                  </td>
+                  <td>{{ formatDate(c.notAfter) }}</td>
+                  <td>
+                    <span
+                      class="badge"
+                      [class.badge-danger]="daysUntilExpiry(c.notAfter) < 7"
+                      [class.badge-warning]="daysUntilExpiry(c.notAfter) >= 7"
+                    >
+                      {{ daysUntilExpiry(c.notAfter) }} ngày
+                    </span>
+                  </td>
+                  <td>
+                    <button
+                      class="btn btn-xs"
+                      [class.btn-success]="c.autoRenewEnabled"
+                      [class.btn-secondary]="!c.autoRenewEnabled"
+                      (click)="toggleAutoRenew(c)"
+                    >
+                      {{ c.autoRenewEnabled ? 'ON' : 'OFF' }}
+                    </button>
+                  </td>
+                  <td>
+                    {{ formatDate(c.lastRenewalAttempt) }}
+                    @if (c.lastRenewalResult) {
+                      <br /><span class="text-muted text-sm">{{ c.lastRenewalResult }}</span>
+                    }
+                  </td>
+                  <td>
+                    <button
+                      class="btn btn-sm btn-primary"
+                      (click)="renewCert(c.id)"
+                      [disabled]="loading()"
+                    >
+                      Renew
+                    </button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        }
+
+        <!-- Batch result -->
+        @if (renewalResult(); as r) {
+          <div class="card mt-3">
+            <div class="card-header"><h3>Kết quả Auto-Renewal</h3></div>
+            <div class="card-body">
+              <p><strong>Tìm thấy:</strong> {{ r.totalCandidates }} certs cần gia hạn</p>
+              <p><strong>Đã gia hạn:</strong> {{ r.renewedCount }}</p>
+              @for (res of r.results; track res.oldCertId) {
+                <div
+                  class="renewal-result"
+                  [class.success]="res.success"
+                  [class.error]="!res.success"
+                >
+                  <span>{{ res.commonName }} ({{ res.purpose }})</span>
+                  <span>{{ res.success ? '✅ ' + res.message : '❌ ' + res.message }}</span>
+                </div>
+              }
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  <!-- ═══ Deploy Tab ═══ -->
+  @if (activeTab() === 'deploy') {
+    <!-- Quick Deploy Presets -->
+    <div class="card">
+      <div class="card-header">
+        <h3>⚡ Quick Deploy — Chọn cert và deploy nhanh</h3>
+      </div>
+      <div class="card-body">
+        <div class="deploy-presets">
+          <div class="preset-card">
+            <div class="preset-icon">🐘</div>
+            <div class="preset-info">
+              <h4>PostgreSQL Primary</h4>
+              <p>Container: <code>ivf-db</code></p>
+              <p>Path: <code>/var/lib/postgresql/data/server.crt</code></p>
+            </div>
+            <div class="preset-action">
+              <select [(ngModel)]="quickDeployPgPrimaryId" class="filter-select">
+                <option value="">-- Chọn cert --</option>
+                @for (c of certs(); track c.id) {
+                  @if (
+                    c.status === 'Active' && (c.purpose === 'pg-primary' || c.type === 'Server')
+                  ) {
+                    <option [value]="c.id">{{ c.commonName }} ({{ c.purpose }})</option>
+                  }
+                }
+              </select>
+              <button
+                class="btn btn-primary btn-sm"
+                (click)="deployPgSsl(quickDeployPgPrimaryId)"
+                [disabled]="!quickDeployPgPrimaryId || loading()"
+              >
+                Deploy
+              </button>
+            </div>
+          </div>
+
+          <div class="preset-card">
+            <div class="preset-icon">🐘</div>
+            <div class="preset-info">
+              <h4>PostgreSQL Replica (SSH)</h4>
+              <p>Container: <code>ivf-db-replica</code></p>
+              <p>Remote host from CloudReplicationConfig</p>
+            </div>
+            <div class="preset-action">
+              <select [(ngModel)]="quickDeployPgReplicaId" class="filter-select">
+                <option value="">-- Chọn cert --</option>
+                @for (c of certs(); track c.id) {
+                  @if (
+                    c.status === 'Active' && (c.purpose === 'pg-replica' || c.type === 'Server')
+                  ) {
+                    <option [value]="c.id">{{ c.commonName }} ({{ c.purpose }})</option>
+                  }
+                }
+              </select>
+              <button
+                class="btn btn-primary btn-sm"
+                (click)="deployReplicaPgSsl(quickDeployPgReplicaId)"
+                [disabled]="!quickDeployPgReplicaId || loading()"
+              >
+                Deploy via SSH
+              </button>
+            </div>
+          </div>
+
+          <div class="preset-card">
+            <div class="preset-icon">📦</div>
+            <div class="preset-info">
+              <h4>MinIO Primary</h4>
+              <p>Container: <code>ivf-minio</code></p>
+              <p>Path: <code>/root/.minio/certs/</code></p>
+            </div>
+            <div class="preset-action">
+              <select [(ngModel)]="quickDeployMinioPrimaryId" class="filter-select">
+                <option value="">-- Chọn cert --</option>
+                @for (c of certs(); track c.id) {
+                  @if (
+                    c.status === 'Active' && (c.purpose === 'minio-primary' || c.type === 'Server')
+                  ) {
+                    <option [value]="c.id">{{ c.commonName }} ({{ c.purpose }})</option>
+                  }
+                }
+              </select>
+              <button
+                class="btn btn-primary btn-sm"
+                (click)="deployMinioSsl(quickDeployMinioPrimaryId)"
+                [disabled]="!quickDeployMinioPrimaryId || loading()"
+              >
+                Deploy
+              </button>
+            </div>
+          </div>
+
+          <div class="preset-card">
+            <div class="preset-icon">📦</div>
+            <div class="preset-info">
+              <h4>MinIO Replica (SSH)</h4>
+              <p>Container: <code>ivf-minio-replica</code></p>
+              <p>Remote host from CloudReplicationConfig</p>
+            </div>
+            <div class="preset-action">
+              <select [(ngModel)]="quickDeployMinioReplicaId" class="filter-select">
+                <option value="">-- Chọn cert --</option>
+                @for (c of certs(); track c.id) {
+                  @if (
+                    c.status === 'Active' && (c.purpose === 'minio-replica' || c.type === 'Server')
+                  ) {
+                    <option [value]="c.id">{{ c.commonName }} ({{ c.purpose }})</option>
+                  }
+                }
+              </select>
+              <button
+                class="btn btn-primary btn-sm"
+                (click)="deployReplicaMinioSsl(quickDeployMinioReplicaId)"
+                [disabled]="!quickDeployMinioReplicaId || loading()"
+              >
+                Deploy via SSH
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Custom Deploy -->
+    <div class="card">
+      <div class="card-header">
+        <h3>🚀 Custom Deploy — Deploy thủ công</h3>
+      </div>
+      <div class="card-body">
+        @if (!deployingCertId()) {
+          <div class="empty-state">
+            <p>
+              Chọn certificate từ tab "Certificates" và nhấn nút 🚀 Deploy, hoặc dùng Quick Deploy ở
+              trên.
+            </p>
+          </div>
+        } @else {
+          <div class="form-panel">
+            <h4>Deploy Certificate: {{ deployingCertId() }}</h4>
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Container *</label>
+                <select [(ngModel)]="deployReq.container">
+                  <option value="ivf-db">ivf-db (PostgreSQL Primary)</option>
+                  <option value="ivf-db-standby">ivf-db-standby (PG Standby)</option>
+                  <option value="ivf-minio">ivf-minio (MinIO Primary)</option>
+                  <option value="ivf-db-replica">ivf-db-replica (PG Replica - remote)</option>
+                  <option value="ivf-minio-replica">
+                    ivf-minio-replica (MinIO Replica - remote)
+                  </option>
+                  <option value="ivf-api">ivf-api (API Server)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Cert Path *</label>
+                <input
+                  type="text"
+                  [(ngModel)]="deployReq.certPath"
+                  placeholder="/var/lib/postgresql/data/server.crt"
+                />
+              </div>
+              <div class="form-group">
+                <label>Key Path *</label>
+                <input
+                  type="text"
+                  [(ngModel)]="deployReq.keyPath"
+                  placeholder="/var/lib/postgresql/data/server.key"
+                />
+              </div>
+              <div class="form-group">
+                <label>CA Chain Path</label>
+                <input
+                  type="text"
+                  [(ngModel)]="deployReq.caPath"
+                  placeholder="/var/lib/postgresql/data/root.crt"
+                />
+              </div>
+            </div>
+            <div class="form-actions">
+              <button
+                class="btn btn-primary"
+                (click)="deployToContainer()"
+                [disabled]="loading() || !deployReq.certPath || !deployReq.keyPath"
+              >
+                {{ loading() ? 'Deploying...' : '🚀 Deploy' }}
+              </button>
+            </div>
+          </div>
+        }
+
+        <!-- Live Deploy Log -->
+        @if (liveLogLines().length > 0 || deployResult()) {
+          <div class="card deploy-log-card">
+            <div class="card-header">
+              <h3>
+                📋 Deploy Log
+                @if (activeOperationId()) {
+                  <span class="text-muted text-sm">({{ activeOperationId() }})</span>
+                }
+              </h3>
+            </div>
+            <div class="card-body">
+              @if (deployResult(); as r) {
+                <div
+                  class="deploy-status-banner"
+                  [class.success]="r.success"
+                  [class.error]="!r.success"
+                >
+                  {{ r.success ? '✅ Deploy thành công' : '❌ Deploy thất bại' }}
+                </div>
+              }
+              <div class="log-console">
+                @for (line of liveLogLines(); track $index) {
+                  <div class="log-line" [ngClass]="logLevelClass(line.level)">
+                    <span class="log-time">{{ line.timestamp | date: 'HH:mm:ss' }}</span>
+                    <span class="log-level-badge">{{ line.level }}</span>
+                    <span class="log-msg">{{ line.message }}</span>
+                  </div>
+                }
+                @if (loading()) {
+                  <div class="log-line log-info">
+                    <span class="log-msg">⏳ Deploying...</span>
+                  </div>
+                }
+              </div>
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  <!-- ═══ LOGS TAB ════════════════════════════════════════ -->
+  @if (activeTab() === 'logs') {
+    <div class="card">
+      <div class="card-header">
+        <h3>📋 Deploy History</h3>
+        <button class="btn btn-sm btn-outline" (click)="loadDeployLogs()" [disabled]="loading()">
+          🔄 Refresh
+        </button>
+      </div>
+      <div class="card-body">
+        @if (deployLogs().length === 0 && !loading()) {
+          <div class="empty-state">
+            <p>Chưa có log deploy nào.</p>
+          </div>
+        }
+
+        @if (loading()) {
+          <div class="loading-spinner">Loading...</div>
+        }
+
+        @if (deployLogs().length > 0) {
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Operation</th>
+                <th>Target</th>
+                <th>Container</th>
+                <th>Remote</th>
+                <th>Status</th>
+                <th>Started</th>
+                <th>Duration</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (log of deployLogs(); track log.id) {
+                <tr [class.row-muted]="log.status === 'Failed'">
+                  <td>
+                    <code>{{ log.operationId }}</code>
+                  </td>
+                  <td>
+                    <span class="badge badge-info">{{ log.target }}</span>
+                  </td>
+                  <td>
+                    <code>{{ log.container }}</code>
+                  </td>
+                  <td>
+                    @if (log.remoteHost) {
+                      <code>{{ log.remoteHost }}</code>
+                    } @else {
+                      <span class="text-muted">local</span>
+                    }
+                  </td>
+                  <td>
+                    <span class="badge" [ngClass]="deployStatusClass(log.status)">{{
+                      log.status
+                    }}</span>
+                  </td>
+                  <td>{{ formatDate(log.startedAt) }}</td>
+                  <td>
+                    @if (log.completedAt) {
+                      {{ getDuration(log.startedAt, log.completedAt) }}
+                    } @else {
+                      <span class="text-muted">—</span>
+                    }
+                  </td>
+                  <td>
+                    <button
+                      class="btn btn-xs btn-outline"
+                      (click)="viewDeployLog(log)"
+                      title="View logs"
+                    >
+                      📋
+                    </button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        }
+      </div>
+    </div>
+
+    <!-- Log Detail Modal -->
+    @if (viewingLog(); as vl) {
+      <div class="modal-overlay" (click)="closeLogViewer()">
+        <div class="modal-content modal-lg" (click)="$event.stopPropagation()">
+          <div class="modal-header">
+            <h3>📋 Deploy Log — {{ vl.operationId }}</h3>
+            <button class="modal-close" (click)="closeLogViewer()">✕</button>
+          </div>
+          <div class="modal-body">
+            <div class="log-meta">
+              <span><strong>Target:</strong> {{ vl.target }}</span>
+              <span><strong>Container:</strong> {{ vl.container }}</span>
+              @if (vl.remoteHost) {
+                <span><strong>Remote:</strong> {{ vl.remoteHost }}</span>
+              }
+              <span>
+                <strong>Status:</strong>
+                <span class="badge" [ngClass]="deployStatusClass(vl.status)">{{ vl.status }}</span>
+              </span>
+              @if (vl.errorMessage) {
+                <span class="text-danger"><strong>Error:</strong> {{ vl.errorMessage }}</span>
+              }
+            </div>
+            <div class="log-console">
+              @for (line of vl.logLines; track $index) {
+                <div class="log-line" [ngClass]="logLevelClass(line.level)">
+                  <span class="log-time">{{ line.timestamp | date: 'HH:mm:ss.SSS' }}</span>
+                  <span class="log-level-badge">{{ line.level }}</span>
+                  <span class="log-msg">{{ line.message }}</span>
+                </div>
+              }
+              @if (vl.logLines.length === 0) {
+                <div class="log-line log-info">
+                  <span class="log-msg">No log lines recorded.</span>
+                </div>
+              }
+            </div>
+          </div>
+        </div>
+      </div>
+    }
+  }
+
+  <!-- ═══ CRL Tab ═══ -->
+  @if (activeTab() === 'crl') {
+    <div class="card">
+      <div class="card-header">
+        <h3>🔒 Certificate Revocation Lists (CRL)</h3>
+      </div>
+      <div class="card-body">
+        <p class="text-muted">Chọn CA để xem danh sách CRL hoặc tạo CRL mới.</p>
+        <div class="form-group" style="max-width: 400px; margin-bottom: 1rem">
+          <label>Certificate Authority</label>
+          <select (change)="loadCrls($any($event.target).value)">
+            <option value="">-- Chọn CA --</option>
+            @for (ca of cas(); track ca.id) {
+              <option [value]="ca.id">{{ ca.name }} ({{ ca.commonName }})</option>
+            }
+          </select>
+        </div>
+
+        @if (selectedCrlCaId()) {
+          <div class="btn-group" style="margin-bottom: 1rem">
+            <button
+              class="btn btn-primary"
+              (click)="generateCrl(selectedCrlCaId())"
+              [disabled]="loading()"
+            >
+              🔄 Tạo CRL mới
+            </button>
+            <button class="btn btn-outline" (click)="downloadCrl(selectedCrlCaId())">
+              ⬇ Tải CRL (PEM)
+            </button>
+          </div>
+
+          @if (crls().length > 0) {
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>CRL #</th>
+                  <th>This Update</th>
+                  <th>Next Update</th>
+                  <th>Revoked Count</th>
+                  <th>Fingerprint</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (crl of crls(); track crl.id) {
+                  <tr>
+                    <td>
+                      <strong>{{ crl.crlNumber }}</strong>
+                    </td>
+                    <td>{{ formatDate(crl.thisUpdate) }}</td>
+                    <td>{{ formatDate(crl.nextUpdate) }}</td>
+                    <td>
+                      <span class="badge badge-warning">{{ crl.revokedCount }}</span>
+                    </td>
+                    <td>
+                      <code>{{ truncateFingerprint(crl.fingerprint) }}</code>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          } @else if (!loading()) {
+            <div class="empty-state">
+              <p>Chưa có CRL nào cho CA này. Nhấn "Tạo CRL mới" để tạo.</p>
+            </div>
+          }
+        }
+      </div>
+    </div>
+  }
+
+  <!-- ═══ OCSP Tab ═══ -->
+  @if (activeTab() === 'ocsp') {
+    <div class="card">
+      <div class="card-header">
+        <h3>🔍 OCSP — Kiểm tra trạng thái Certificate</h3>
+      </div>
+      <div class="card-body">
+        <p class="text-muted">
+          Kiểm tra trạng thái thu hồi (revocation) của một certificate theo serial number.
+        </p>
+        <div class="form-grid" style="max-width: 600px">
+          <div class="form-group">
+            <label>Certificate Authority</label>
+            <select [(ngModel)]="ocspCaId">
+              <option value="">-- Chọn CA --</option>
+              @for (ca of cas(); track ca.id) {
+                <option [value]="ca.id">{{ ca.name }}</option>
+              }
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Serial Number (hex)</label>
+            <input type="text" [(ngModel)]="ocspSerial" placeholder="0000000000000001" />
+          </div>
+        </div>
+        <div class="form-actions">
+          <button
+            class="btn btn-primary"
+            (click)="checkOcsp()"
+            [disabled]="loading() || !ocspCaId || !ocspSerial"
+          >
+            {{ loading() ? 'Đang kiểm tra...' : '🔍 Kiểm tra' }}
+          </button>
+        </div>
+
+        @if (ocspResult(); as r) {
+          <div class="card" style="margin-top: 1rem">
+            <div class="card-header">
+              <h4>Kết quả OCSP</h4>
+            </div>
+            <div class="card-body">
+              <div class="detail-grid">
+                <div>
+                  <strong>Status:</strong>
+                  <span class="badge" [ngClass]="ocspStatusClass(r.status)">{{ r.status }}</span>
+                </div>
+                <div>
+                  <strong>Serial Number:</strong> <code>{{ r.serialNumber }}</code>
+                </div>
+                <div><strong>Produced At:</strong> {{ formatDate(r.producedAt) }}</div>
+                @if (r.revokedAt) {
+                  <div><strong>Revoked At:</strong> {{ formatDate(r.revokedAt) }}</div>
+                }
+                @if (r.revocationReason) {
+                  <div><strong>Reason:</strong> {{ r.revocationReason }}</div>
+                }
+              </div>
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  <!-- ═══ Audit Tab ═══ -->
+  @if (activeTab() === 'audit') {
+    <div class="card">
+      <div class="card-header">
+        <h3>📝 Certificate Audit Trail</h3>
+        <button class="btn btn-outline btn-sm" (click)="loadAuditEvents()" [disabled]="loading()">
+          🔄 Refresh
+        </button>
+      </div>
+      <div class="card-body">
+        <div class="form-grid" style="max-width: 800px; margin-bottom: 1rem">
+          <div class="form-group">
+            <label>Lọc theo Event Type</label>
+            <select [(ngModel)]="auditFilterEventType" (change)="loadAuditEvents()">
+              <option value="">Tất cả</option>
+              <option value="CaCreated">CA Created</option>
+              <option value="CertIssued">Cert Issued</option>
+              <option value="CertRenewed">Cert Renewed</option>
+              <option value="CertRevoked">Cert Revoked</option>
+              <option value="CertDeployed">Cert Deployed</option>
+              <option value="CrlGenerated">CRL Generated</option>
+              <option value="OcspQuery">OCSP Query</option>
+              <option value="IntermediateCaCreated">Intermediate CA</option>
+            </select>
+          </div>
+        </div>
+
+        @if (auditEvents().length > 0) {
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Thời gian</th>
+                <th>Loại</th>
+                <th>Mô tả</th>
+                <th>Actor</th>
+                <th>Kết quả</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (event of auditEvents(); track event.id) {
+                <tr>
+                  <td>{{ formatDate(event.createdAt) }}</td>
+                  <td>
+                    <span class="badge badge-info">{{ auditEventTypeLabel(event.eventType) }}</span>
+                  </td>
+                  <td>{{ event.description }}</td>
+                  <td>{{ event.actor }}</td>
+                  <td>
+                    @if (event.success) {
+                      <span class="badge badge-success">OK</span>
+                    } @else {
+                      <span class="badge badge-danger" [title]="event.errorMessage || ''"
+                        >Failed</span
+                      >
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        } @else if (!loading()) {
+          <div class="empty-state">
+            <p>Chưa có event nào.</p>
+          </div>
+        }
+      </div>
+    </div>
+  }
+</div>

@@ -236,6 +236,13 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'admin/certificates',
+        loadComponent: () =>
+          import('./features/admin/certificate-management/certificate-management.component').then(
+            (m) => m.CertificateManagementComponent,
+          ),
+      },
+      {
         path: 'forms',
         loadChildren: () => import('./features/forms/forms.routes').then((m) => m.FORMS_ROUTES),
       },

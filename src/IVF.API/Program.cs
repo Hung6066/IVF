@@ -237,6 +237,15 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<IVF.API.Services.W
     builder.Services.Configure<IVF.API.Services.CloudBackupSettings>(cloudSection);
 }
 builder.Services.AddSingleton<IVF.API.Services.CloudBackupProviderFactory>();
+
+// ─── Cloud Replication (PostgreSQL + MinIO external sync) ───
+builder.Services.AddSingleton<IVF.API.Services.CloudReplicationService>();
+builder.Services.AddSingleton<IVF.API.Services.CloudReplicationSchedulerService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<IVF.API.Services.CloudReplicationSchedulerService>());
+
+// ─── Certificate Authority & auto-renewal ───
+builder.Services.AddSingleton<IVF.API.Services.CertificateAuthorityService>();
+builder.Services.AddHostedService<IVF.API.Services.CertAutoRenewalService>();
 // Conditional Service Registration based on OS
 if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows))
 {
@@ -374,26 +383,35 @@ app.MapBackupRestoreEndpoints();
 app.MapDataBackupEndpoints();
 app.MapDataBackupStrategyEndpoints();
 app.MapBackupComplianceEndpoints();
+app.MapCloudReplicationEndpoints();
+app.MapCertificateAuthorityEndpoints();
 app.MapUserSignatureEndpoints();
 app.MapPatientDocumentEndpoints();
 app.MapDocumentSignatureEndpoints();
 
-// Auto-migrate and seed in dev
-if (app.Environment.IsDevelopment())
+// ── Config seeders: run in every environment (idempotent, no demo data) ──────
 {
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<IvfDbContext>();
     await db.Database.MigrateAsync();
-    await DatabaseSeeder.SeedAsync(app.Services);
-    await FormTemplateSeeder.SeedFormTemplatesAsync(app.Services);
-    await FormTemplateCodeSeeder.RegenerateCodesAsync(app.Services); // Backfill codes sau migration
-    await MenuSeeder.SeedAsync(db); // Seed default menu items
-    await BackupStrategySeeder.SeedAsync(db); // Seed default 3-2-1 backup strategies
+    await BackupStrategySeeder.SeedAsync(db);        // default 3-2-1 backup strategies
+    await CloudReplicationSeeder.SeedAsync(db);      // default cloud replication config
 
-    // Seed permission definitions
+    // Permission definitions must always be present
     var permDefRepo = scope.ServiceProvider.GetRequiredService<IPermissionDefinitionRepository>();
     var permUow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
     await PermissionDefinitionSeeder.SeedAsync(permDefRepo, permUow);
+}
+
+// ── Demo/dev data: only in Development ───────────────────────────────────────
+if (app.Environment.IsDevelopment())
+{
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<IvfDbContext>();
+    await DatabaseSeeder.SeedAsync(app.Services);
+    await FormTemplateSeeder.SeedFormTemplatesAsync(app.Services);
+    await FormTemplateCodeSeeder.RegenerateCodesAsync(app.Services); // Backfill codes after migration
+    await MenuSeeder.SeedAsync(db);                  // default menu items
 }
 
 // QuestPDF community license

@@ -103,8 +103,8 @@ public sealed class WalBackupSchedulerService : BackgroundService
         // Upload to cloud if configured
         await UploadWalToCloudAsync(walBackupsDir, ct);
 
-        // Cleanup old WAL files (keep last 7 days)
-        CleanupOldWalFiles(walBackupsDir, retentionDays: 7);
+        // Cleanup old WAL files (keep last 14 days — 2-week PITR window)
+        CleanupOldWalFiles(walBackupsDir, retentionDays: 14);
     }
 
     private async Task<int> CopyNewWalFilesAsync(string localDir, CancellationToken ct)

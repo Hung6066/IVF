@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
 import { BackupService } from '../../../core/services/backup.service';
+import { GlobalNotificationService } from '../../../core/services/global-notification.service';
 import {
   BackupInfo,
   BackupLogLine,
@@ -12,12 +13,18 @@ import {
   CloudBackupObject,
   CloudConfig,
   CloudProvider,
+  CloudReplicationConfig,
+  CloudReplicationSetupResult,
   CloudStatusResult,
   CloudUploadResult,
   ComplianceReport,
   DataBackupFile,
   DataBackupStatus,
   DataBackupStrategy,
+  DbCloudReplicationStatus,
+  ExternalReplicationGuide,
+  MinioCloudReplicationStatus,
+  MinioSyncResult,
   ReplicationActivationResult,
   ReplicationSetupGuide,
   ReplicationStatus,
@@ -151,10 +158,49 @@ export class BackupRestoreComponent implements OnInit, OnDestroy {
   showReplicationGuide = false;
   newSlotName = '';
 
+  // Cloud replication state
+  cloudReplConfig = signal<CloudReplicationConfig | null>(null);
+  dbReplStatus = signal<DbCloudReplicationStatus | null>(null);
+  minioReplStatus = signal<MinioCloudReplicationStatus | null>(null);
+  cloudReplGuide = signal<ExternalReplicationGuide | null>(null);
+  cloudReplSetupResult = signal<CloudReplicationSetupResult | null>(null);
+  minioSyncResult = signal<MinioSyncResult | null>(null);
+  cloudReplLoading = false;
+  cloudReplDbTesting = false;
+  cloudReplDbSetting = false;
+  cloudReplMinioTesting = false;
+  cloudReplMinioSetting = false;
+  cloudReplMinioSyncing = false;
+  showCloudReplGuide = false;
+  cloudReplDbForm = {
+    enabled: false,
+    remoteHost: '',
+    remotePort: 5432,
+    remoteUser: 'replicator',
+    remotePassword: '',
+    sslMode: 'require',
+    slotName: 'cloud_standby_slot',
+    allowedIps: '',
+  };
+  cloudReplMinioForm = {
+    enabled: false,
+    endpoint: '',
+    accessKey: '',
+    secretKey: '',
+    bucket: 'ivf-replica',
+    useSsl: true,
+    region: 'us-east-1',
+    syncMode: 'incremental',
+    syncCron: '0 */2 * * *',
+  };
+
   private subscriptions: Subscription[] = [];
   private refreshInterval: any;
 
-  constructor(private backupService: BackupService) {}
+  constructor(
+    private backupService: BackupService,
+    private notify: GlobalNotificationService,
+  ) {}
 
   ngOnInit() {
     this.loadArchives();
@@ -174,15 +220,27 @@ export class BackupRestoreComponent implements OnInit, OnDestroy {
 
   switchTab(tab: string) {
     this.activeTab = tab;
+    if (tab === 'overview') {
+      this.loadDataStatus();
+      this.loadCompliance();
+    }
+    if (tab === 'pki') this.loadArchives();
     if (tab === 'archives') this.loadArchives();
     if (tab === 'history') this.loadOperations();
     if (tab === 'schedule') this.loadSchedule();
     if (tab === 'cloud') this.loadCloudData();
     if (tab === 'data') this.loadDataStatus();
+    if (tab === 'db-overview') {
+      this.loadDataStatus();
+      this.loadWalStatus();
+      this.loadReplicationStatus();
+    }
+    if (tab === 'minio-overview') this.loadDataStatus();
     if (tab === 'strategies') this.loadStrategies();
     if (tab === 'compliance') this.loadCompliance();
     if (tab === 'wal') this.loadWalStatus();
     if (tab === 'replication') this.loadReplicationStatus();
+    if (tab === 'cloud-replication') this.loadCloudReplication();
   }
 
   // ─── Data loading ─────────────────────────────────────
@@ -248,9 +306,9 @@ export class BackupRestoreComponent implements OnInit, OnDestroy {
         this.cleanupRunning = false;
         this.loadArchives();
         if (res.deletedCount > 0) {
-          alert(`Đã xóa ${res.deletedCount} bản sao lưu cũ`);
+          this.notify.success('Dọn dẹp', `Đã xóa ${res.deletedCount} bản sao lưu cũ`);
         } else {
-          alert('Không có bản sao lưu cũ cần xóa');
+          this.notify.info('Dọn dẹp', 'Không có bản sao lưu cũ cần xóa');
         }
       },
       error: (err) => {
@@ -492,7 +550,10 @@ export class BackupRestoreComponent implements OnInit, OnDestroy {
         error: (err) => {
           this.cloudConfigSaving = false;
           console.error('Failed to save cloud config', err);
-          alert('Lưu cấu hình thất bại: ' + (err.error?.error || err.message));
+          this.notify.error(
+            'Cấu hình',
+            'Lưu cấu hình thất bại: ' + (err.error?.error || err.message),
+          );
         },
       });
   }
@@ -540,7 +601,7 @@ export class BackupRestoreComponent implements OnInit, OnDestroy {
       error: (err) => {
         this.cloudUploading.set(null);
         console.error('Cloud upload failed', err);
-        alert('Upload thất bại: ' + (err.error?.error || err.message));
+        this.notify.error('Cloud', 'Upload thất bại: ' + (err.error?.error || err.message));
       },
     });
   }
@@ -551,12 +612,12 @@ export class BackupRestoreComponent implements OnInit, OnDestroy {
       next: (res) => {
         this.cloudDownloading.set(null);
         this.loadArchives();
-        alert(`Tải về thành công: ${res.fileName}`);
+        this.notify.success('Cloud', `Tải về thành công: ${res.fileName}`);
       },
       error: (err) => {
         this.cloudDownloading.set(null);
         console.error('Cloud download failed', err);
-        alert('Tải về thất bại: ' + (err.error?.error || err.message));
+        this.notify.error('Cloud', 'Tải về thất bại: ' + (err.error?.error || err.message));
       },
     });
   }
@@ -597,9 +658,30 @@ export class BackupRestoreComponent implements OnInit, OnDestroy {
         error: (err) => {
           this.dataBackupRunning = false;
           console.error('Data backup failed', err);
-          alert('Sao lưu dữ liệu thất bại: ' + (err.error?.error || err.message));
+          this.notify.error(
+            'Sao lưu',
+            'Sao lưu dữ liệu thất bại: ' + (err.error?.error || err.message),
+          );
         },
       });
+  }
+
+  quickFullBackup() {
+    this.dataIncludeDatabase = true;
+    this.dataIncludeMinio = true;
+    this.startDataBackup();
+  }
+
+  quickDbBackup() {
+    this.dataIncludeDatabase = true;
+    this.dataIncludeMinio = false;
+    this.startDataBackup();
+  }
+
+  quickMinioBackup() {
+    this.dataIncludeDatabase = false;
+    this.dataIncludeMinio = true;
+    this.startDataBackup();
   }
 
   startDataRestore() {
@@ -622,12 +704,15 @@ export class BackupRestoreComponent implements OnInit, OnDestroy {
         next: () => {
           this.dataRestoreRunning = false;
           this.loadDataStatus();
-          alert('Khôi phục dữ liệu thành công!');
+          this.notify.success('Khôi phục', 'Khôi phục dữ liệu thành công!');
         },
         error: (err) => {
           this.dataRestoreRunning = false;
           console.error('Data restore failed', err);
-          alert('Khôi phục dữ liệu thất bại: ' + (err.error?.error || err.message));
+          this.notify.error(
+            'Khôi phục',
+            'Khôi phục dữ liệu thất bại: ' + (err.error?.error || err.message),
+          );
         },
       });
   }
@@ -734,7 +819,7 @@ export class BackupRestoreComponent implements OnInit, OnDestroy {
           },
           error: (err) => {
             this.strategySaving = false;
-            alert('Lưu thất bại: ' + (err.error?.error || err.message));
+            this.notify.error('Chiến lược', 'Lưu thất bại: ' + (err.error?.error || err.message));
           },
         });
     } else {
@@ -757,7 +842,7 @@ export class BackupRestoreComponent implements OnInit, OnDestroy {
           },
           error: (err) => {
             this.strategySaving = false;
-            alert('Tạo thất bại: ' + (err.error?.error || err.message));
+            this.notify.error('Chiến lược', 'Tạo thất bại: ' + (err.error?.error || err.message));
           },
         });
     }
@@ -784,12 +869,13 @@ export class BackupRestoreComponent implements OnInit, OnDestroy {
   runStrategy(s: DataBackupStrategy) {
     this.backupService.runStrategy(s.id).subscribe({
       next: (res) => {
+        this.notify.success('Chiến lược', `Đã bắt đầu chạy "${s.name}"`);
         this.loadStrategies();
         this.watchOperation(res.operationId);
       },
       error: (err) => {
         console.error('Run strategy failed', err);
-        alert('Chạy thất bại: ' + (err.error?.error || err.message));
+        this.notify.error('Chiến lược', 'Chạy thất bại: ' + (err.error?.error || err.message));
       },
     });
   }
@@ -846,12 +932,12 @@ export class BackupRestoreComponent implements OnInit, OnDestroy {
     this.backupService.enableWalArchiving().subscribe({
       next: (res) => {
         this.walEnabling = false;
-        alert(res.message);
+        this.notify.success('WAL', res.message);
         this.loadWalStatus();
       },
       error: (err) => {
         this.walEnabling = false;
-        alert('Lỗi: ' + (err.error?.error || err.message));
+        this.notify.error('WAL', 'Lỗi: ' + (err.error?.error || err.message));
       },
     });
   }
@@ -861,12 +947,12 @@ export class BackupRestoreComponent implements OnInit, OnDestroy {
     this.backupService.switchWal().subscribe({
       next: (res) => {
         this.walSwitching = false;
-        alert(res.message);
+        this.notify.success('WAL', res.message);
         this.loadWalStatus();
       },
       error: (err) => {
         this.walSwitching = false;
-        alert('Lỗi: ' + (err.error?.error || err.message));
+        this.notify.error('WAL', 'Lỗi: ' + (err.error?.error || err.message));
       },
     });
   }
@@ -876,12 +962,15 @@ export class BackupRestoreComponent implements OnInit, OnDestroy {
     this.backupService.createBaseBackup().subscribe({
       next: (res) => {
         this.baseBackupRunning = false;
-        alert(`Base backup tạo thành công: ${res.fileName} (${this.formatSize(res.sizeBytes)})`);
+        this.notify.success(
+          'Base Backup',
+          `Tạo thành công: ${res.fileName} (${this.formatSize(res.sizeBytes)})`,
+        );
         this.loadWalStatus();
       },
       error: (err) => {
         this.baseBackupRunning = false;
-        alert('Base backup thất bại: ' + (err.error?.error || err.message));
+        this.notify.error('Base Backup', 'Thất bại: ' + (err.error?.error || err.message));
       },
     });
   }
@@ -899,7 +988,7 @@ export class BackupRestoreComponent implements OnInit, OnDestroy {
 
   startPitrRestore() {
     if (!this.pitrSelectedBackup) {
-      alert('Vui lòng chọn base backup');
+      this.notify.warning('PITR', 'Vui lòng chọn base backup');
       return;
     }
     const action = this.pitrDryRun ? 'DRY-RUN' : 'THỰC THI';
@@ -941,9 +1030,12 @@ export class BackupRestoreComponent implements OnInit, OnDestroy {
               statusSub.unsubscribe();
               this.backupService.disconnectHub();
               if (op.status === 'Completed') {
-                alert('PITR restore hoàn tất thành công!');
+                this.notify.success('PITR', 'PITR restore hoàn tất thành công!');
               } else {
-                alert('PITR restore thất bại: ' + (op.errorMessage || 'Unknown error'));
+                this.notify.error(
+                  'PITR',
+                  'PITR restore thất bại: ' + (op.errorMessage || 'Unknown error'),
+                );
               }
             }
           });
@@ -951,7 +1043,7 @@ export class BackupRestoreComponent implements OnInit, OnDestroy {
         },
         error: (err) => {
           this.pitrRestoreRunning = false;
-          alert('Lỗi khởi chạy PITR: ' + (err.error?.error || err.message));
+          this.notify.error('PITR', 'Lỗi khởi chạy PITR: ' + (err.error?.error || err.message));
         },
       });
   }
@@ -990,14 +1082,17 @@ export class BackupRestoreComponent implements OnInit, OnDestroy {
       this.backupService.activateReplication().subscribe({
         next: (res) => {
           this.replicationActivating = false;
-          const stepsMsg = res.steps.join('\n');
-          alert(`${stepsMsg}\n\n${res.nextAction}`);
+          const stepsMsg = res.steps.join(', ');
+          this.notify.success('Replication', `${stepsMsg}. ${res.nextAction}`);
           this.loadReplicationStatus();
           this.loadWalStatus();
         },
         error: (err) => {
           this.replicationActivating = false;
-          alert('Kích hoạt thất bại: ' + (err.error?.error || err.message));
+          this.notify.error(
+            'Replication',
+            'Kích hoạt thất bại: ' + (err.error?.error || err.message),
+          );
         },
       });
     };
@@ -1008,11 +1103,11 @@ export class BackupRestoreComponent implements OnInit, OnDestroy {
     if (!this.newSlotName.trim()) return;
     this.backupService.createReplicationSlot(this.newSlotName.trim()).subscribe({
       next: (res) => {
-        alert(res.message);
+        this.notify.success('Replication', res.message);
         this.newSlotName = '';
         this.loadReplicationStatus();
       },
-      error: (err) => alert('Lỗi: ' + (err.error?.error || err.message)),
+      error: (err) => this.notify.error('Replication', 'Lỗi: ' + (err.error?.error || err.message)),
     });
   }
 
@@ -1021,10 +1116,224 @@ export class BackupRestoreComponent implements OnInit, OnDestroy {
     this.confirmAction = () => {
       this.backupService.dropReplicationSlot(slotName).subscribe({
         next: () => this.loadReplicationStatus(),
-        error: (err) => alert('Lỗi: ' + (err.error?.error || err.message)),
+        error: (err) =>
+          this.notify.error('Replication', 'Lỗi: ' + (err.error?.error || err.message)),
       });
     };
     this.showConfirmDialog = true;
+  }
+
+  // ─── Cloud Replication ───────────────────────────────
+
+  loadCloudReplication() {
+    this.cloudReplLoading = true;
+    this.backupService.getCloudReplicationConfig().subscribe({
+      next: (config) => {
+        this.cloudReplConfig.set(config);
+        this.cloudReplDbForm = {
+          enabled: config.dbReplicationEnabled,
+          remoteHost: config.remoteDbHost || '',
+          remotePort: config.remoteDbPort,
+          remoteUser: config.remoteDbUser || 'replicator',
+          remotePassword: '',
+          sslMode: config.remoteDbSslMode || 'require',
+          slotName: config.remoteDbSlotName || 'cloud_standby_slot',
+          allowedIps: config.remoteDbAllowedIps || '',
+        };
+        this.cloudReplMinioForm = {
+          enabled: config.minioReplicationEnabled,
+          endpoint: config.remoteMinioEndpoint || '',
+          accessKey: config.remoteMinioAccessKey || '',
+          secretKey: '',
+          bucket: config.remoteMinioBucket || 'ivf-replica',
+          useSsl: config.remoteMinioUseSsl,
+          region: config.remoteMinioRegion || 'us-east-1',
+          syncMode: config.remoteMinioSyncMode || 'incremental',
+          syncCron: config.remoteMinioSyncCron || '0 */2 * * *',
+        };
+        this.cloudReplLoading = false;
+        this.loadDbReplStatus();
+        this.loadMinioReplStatus();
+      },
+      error: (err) => {
+        this.cloudReplLoading = false;
+        console.error('Failed to load cloud replication config', err);
+      },
+    });
+  }
+
+  loadDbReplStatus() {
+    this.backupService.getDbReplicationStatus().subscribe({
+      next: (status) => this.dbReplStatus.set(status),
+      error: (err) => console.error('Failed to load DB repl status', err),
+    });
+  }
+
+  loadMinioReplStatus() {
+    this.backupService.getMinioReplicationStatus().subscribe({
+      next: (status) => this.minioReplStatus.set(status),
+      error: (err) => console.error('Failed to load MinIO repl status', err),
+    });
+  }
+
+  saveDbReplConfig() {
+    this.cloudReplDbSetting = true;
+    this.backupService
+      .updateDbReplicationConfig({
+        enabled: this.cloudReplDbForm.enabled,
+        remoteHost: this.cloudReplDbForm.remoteHost || undefined,
+        remotePort: this.cloudReplDbForm.remotePort,
+        remoteUser: this.cloudReplDbForm.remoteUser || undefined,
+        remotePassword: this.cloudReplDbForm.remotePassword || undefined,
+        sslMode: this.cloudReplDbForm.sslMode,
+        slotName: this.cloudReplDbForm.slotName || undefined,
+        allowedIps: this.cloudReplDbForm.allowedIps || undefined,
+      })
+      .subscribe({
+        next: (config) => {
+          this.cloudReplConfig.set(config);
+          this.cloudReplDbSetting = false;
+          this.notify.success('Cloud Replication', 'Cấu hình DB replication đã lưu');
+        },
+        error: (err) => {
+          this.cloudReplDbSetting = false;
+          this.notify.error('Cloud Replication', 'Lỗi: ' + (err.error?.error || err.message));
+        },
+      });
+  }
+
+  testDbReplication() {
+    this.cloudReplDbTesting = true;
+    this.backupService.testDbReplicationConnection().subscribe({
+      next: (res) => {
+        this.cloudReplDbTesting = false;
+        if (res.success) this.notify.success('Cloud Repl', res.message);
+        else this.notify.warning('Cloud Repl', res.message);
+      },
+      error: (err) => {
+        this.cloudReplDbTesting = false;
+        this.notify.error('Cloud Repl', 'Lỗi: ' + (err.error?.error || err.message));
+      },
+    });
+  }
+
+  setupDbReplication() {
+    this.confirmMessage =
+      'Thiết lập PostgreSQL replication cho remote standby? Sẽ tạo user, slot và cấu hình pg_hba.conf.';
+    this.confirmAction = () => {
+      this.cloudReplDbSetting = true;
+      this.backupService.setupDbReplication().subscribe({
+        next: (result) => {
+          this.cloudReplDbSetting = false;
+          this.cloudReplSetupResult.set(result);
+          if (result.success) {
+            this.notify.success('Cloud Repl', 'Thiết lập DB replication thành công');
+            this.loadDbReplStatus();
+          } else {
+            this.notify.warning('Cloud Repl', result.steps.join(', '));
+          }
+        },
+        error: (err) => {
+          this.cloudReplDbSetting = false;
+          this.notify.error('Cloud Repl', 'Lỗi: ' + (err.error?.error || err.message));
+        },
+      });
+    };
+    this.showConfirmDialog = true;
+  }
+
+  saveMinioReplConfig() {
+    this.cloudReplMinioSetting = true;
+    this.backupService
+      .updateMinioReplicationConfig({
+        enabled: this.cloudReplMinioForm.enabled,
+        endpoint: this.cloudReplMinioForm.endpoint || undefined,
+        accessKey: this.cloudReplMinioForm.accessKey || undefined,
+        secretKey: this.cloudReplMinioForm.secretKey || undefined,
+        bucket: this.cloudReplMinioForm.bucket,
+        useSsl: this.cloudReplMinioForm.useSsl,
+        region: this.cloudReplMinioForm.region,
+        syncMode: this.cloudReplMinioForm.syncMode,
+        syncCron: this.cloudReplMinioForm.syncCron,
+      })
+      .subscribe({
+        next: (config) => {
+          this.cloudReplConfig.set(config);
+          this.cloudReplMinioSetting = false;
+          this.notify.success('Cloud Replication', 'Cấu hình MinIO replication đã lưu');
+        },
+        error: (err) => {
+          this.cloudReplMinioSetting = false;
+          this.notify.error('Cloud Replication', 'Lỗi: ' + (err.error?.error || err.message));
+        },
+      });
+  }
+
+  testMinioReplication() {
+    this.cloudReplMinioTesting = true;
+    this.backupService.testMinioReplicationConnection().subscribe({
+      next: (res) => {
+        this.cloudReplMinioTesting = false;
+        if (res.success) this.notify.success('Cloud Repl', res.message);
+        else this.notify.warning('Cloud Repl', res.message);
+      },
+      error: (err) => {
+        this.cloudReplMinioTesting = false;
+        this.notify.error('Cloud Repl', 'Lỗi: ' + (err.error?.error || err.message));
+      },
+    });
+  }
+
+  setupMinioReplication() {
+    this.cloudReplMinioSetting = true;
+    this.backupService.setupMinioReplication().subscribe({
+      next: (res) => {
+        this.cloudReplMinioSetting = false;
+        if (res.success) {
+          this.notify.success('Cloud Repl', res.message);
+          this.loadMinioReplStatus();
+        } else {
+          this.notify.warning('Cloud Repl', res.message);
+        }
+      },
+      error: (err) => {
+        this.cloudReplMinioSetting = false;
+        this.notify.error('Cloud Repl', 'Lỗi: ' + (err.error?.error || err.message));
+      },
+    });
+  }
+
+  syncMinioNow() {
+    this.cloudReplMinioSyncing = true;
+    this.backupService.syncMinioNow().subscribe({
+      next: (result) => {
+        this.cloudReplMinioSyncing = false;
+        this.minioSyncResult.set(result);
+        if (result.success) {
+          this.notify.success(
+            'Cloud Repl',
+            `Đồng bộ ${result.totalFiles} files (${this.formatSize(result.totalBytes)})`,
+          );
+          this.loadMinioReplStatus();
+        } else {
+          this.notify.warning('Cloud Repl', result.message);
+        }
+      },
+      error: (err) => {
+        this.cloudReplMinioSyncing = false;
+        this.notify.error('Cloud Repl', 'Lỗi: ' + (err.error?.error || err.message));
+      },
+    });
+  }
+
+  loadCloudReplGuide() {
+    this.showCloudReplGuide = true;
+    if (!this.cloudReplGuide()) {
+      this.backupService.getCloudReplicationGuide().subscribe({
+        next: (guide) => this.cloudReplGuide.set(guide),
+        error: (err) => console.error('Failed to load cloud repl guide', err),
+      });
+    }
   }
 
   formatUptime(seconds: number): string {
@@ -1089,7 +1398,7 @@ export class BackupRestoreComponent implements OnInit, OnDestroy {
 
   selectArchiveForRestore(fileName: string) {
     this.selectedArchive = fileName;
-    this.activeTab = 'restore';
+    this.activeTab = 'pki';
   }
 
   private scrollToBottom() {

@@ -3,6 +3,7 @@ using System;
 using IVF.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using NpgsqlTypes;
@@ -12,9 +13,11 @@ using NpgsqlTypes;
 namespace IVF.Infrastructure.Migrations
 {
     [DbContext(typeof(IvfDbContext))]
-    partial class IvfDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260227025853_AddCloudReplicationConfig")]
+    partial class AddCloudReplicationConfig
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -407,289 +410,6 @@ namespace IVF.Infrastructure.Migrations
                     b.HasIndex("BirthDataId");
 
                     b.ToTable("birth_outcomes", (string)null);
-                });
-
-            modelBuilder.Entity("IVF.Domain.Entities.CertDeploymentLog", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("CertificateId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("CompletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Container")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("ErrorMessage")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("OperationId")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
-
-                    b.Property<string>("RemoteHost")
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)");
-
-                    b.Property<DateTime>("StartedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Target")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CertificateId");
-
-                    b.HasIndex("OperationId")
-                        .IsUnique();
-
-                    b.HasIndex("StartedAt");
-
-                    b.HasIndex("Status");
-
-                    b.ToTable("CertDeploymentLogs", (string)null);
-                });
-
-            modelBuilder.Entity("IVF.Domain.Entities.CertificateAuditEvent", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Actor")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<Guid?>("CaId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("CertificateId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
-                    b.Property<string>("ErrorMessage")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
-                    b.Property<int>("EventType")
-                        .HasColumnType("integer");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("Metadata")
-                        .HasColumnType("text");
-
-                    b.Property<string>("SourceIp")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<bool>("Success")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CaId");
-
-                    b.HasIndex("CertificateId");
-
-                    b.HasIndex("CreatedAt");
-
-                    b.HasIndex("EventType");
-
-                    b.ToTable("CertificateAuditEvents", (string)null);
-                });
-
-            modelBuilder.Entity("IVF.Domain.Entities.CertificateAuthority", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("CertificatePem")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("ChainPem")
-                        .HasColumnType("text");
-
-                    b.Property<string>("CommonName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<string>("Country")
-                        .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Fingerprint")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("KeyAlgorithm")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<int>("KeySize")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Locality")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<long>("NextCrlNumber")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("NextSerialNumber")
-                        .HasColumnType("bigint");
-
-                    b.Property<DateTime>("NotAfter")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime>("NotBefore")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Organization")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<string>("OrganizationalUnit")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<Guid?>("ParentCaId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("PrivateKeyPem")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("State")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("Type")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Fingerprint")
-                        .IsUnique();
-
-                    b.HasIndex("Name")
-                        .IsUnique();
-
-                    b.HasIndex("ParentCaId");
-
-                    b.ToTable("CertificateAuthorities", (string)null);
-                });
-
-            modelBuilder.Entity("IVF.Domain.Entities.CertificateRevocationList", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("CaId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<byte[]>("CrlDer")
-                        .IsRequired()
-                        .HasColumnType("bytea");
-
-                    b.Property<long>("CrlNumber")
-                        .HasColumnType("bigint");
-
-                    b.Property<string>("CrlPem")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Fingerprint")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTime>("NextUpdate")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("RevokedCount")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("ThisUpdate")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("NextUpdate");
-
-                    b.HasIndex("CaId", "CrlNumber")
-                        .IsUnique();
-
-                    b.ToTable("CertificateRevocationLists", (string)null);
                 });
 
             modelBuilder.Entity("IVF.Domain.Entities.CloudBackupConfig", b =>
@@ -1946,125 +1666,6 @@ namespace IVF.Infrastructure.Migrations
                     b.HasIndex("LutealPhaseDataId");
 
                     b.ToTable("luteal_phase_drugs", (string)null);
-                });
-
-            modelBuilder.Entity("IVF.Domain.Entities.ManagedCertificate", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<bool>("AutoRenewEnabled")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("CertificatePem")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("CommonName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("DeployedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("DeployedTo")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<string>("Fingerprint")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<Guid>("IssuingCaId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("KeyAlgorithm")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<int>("KeySize")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime?>("LastRenewalAttempt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("LastRenewalResult")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<DateTime>("NotAfter")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime>("NotBefore")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("PrivateKeyPem")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Purpose")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<int>("RenewBeforeDays")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid?>("ReplacedByCertId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("ReplacedCertId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int?>("RevocationReason")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime?>("RevokedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("SerialNumber")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("SubjectAltNames")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
-                    b.Property<int>("Type")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("ValidityDays")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Fingerprint")
-                        .IsUnique();
-
-                    b.HasIndex("IssuingCaId");
-
-                    b.HasIndex("Purpose");
-
-                    b.HasIndex("Status");
-
-                    b.ToTable("ManagedCertificates", (string)null);
                 });
 
             modelBuilder.Entity("IVF.Domain.Entities.MenuItem", b =>
@@ -4001,65 +3602,6 @@ namespace IVF.Infrastructure.Migrations
                     b.Navigation("BirthData");
                 });
 
-            modelBuilder.Entity("IVF.Domain.Entities.CertDeploymentLog", b =>
-                {
-                    b.HasOne("IVF.Domain.Entities.ManagedCertificate", "Certificate")
-                        .WithMany()
-                        .HasForeignKey("CertificateId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.OwnsMany("IVF.Domain.Entities.DeployLogLine", "LogLines", b1 =>
-                        {
-                            b1.Property<Guid>("CertDeploymentLogId");
-
-                            b1.Property<int>("__synthesizedOrdinal")
-                                .ValueGeneratedOnAdd();
-
-                            b1.Property<string>("Level")
-                                .IsRequired();
-
-                            b1.Property<string>("Message")
-                                .IsRequired();
-
-                            b1.Property<DateTime>("Timestamp");
-
-                            b1.HasKey("CertDeploymentLogId", "__synthesizedOrdinal");
-
-                            b1.ToTable("CertDeploymentLogs");
-
-                            b1.ToJson("LogLines");
-
-                            b1.WithOwner()
-                                .HasForeignKey("CertDeploymentLogId");
-                        });
-
-                    b.Navigation("Certificate");
-
-                    b.Navigation("LogLines");
-                });
-
-            modelBuilder.Entity("IVF.Domain.Entities.CertificateAuthority", b =>
-                {
-                    b.HasOne("IVF.Domain.Entities.CertificateAuthority", "ParentCa")
-                        .WithMany()
-                        .HasForeignKey("ParentCaId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.Navigation("ParentCa");
-                });
-
-            modelBuilder.Entity("IVF.Domain.Entities.CertificateRevocationList", b =>
-                {
-                    b.HasOne("IVF.Domain.Entities.CertificateAuthority", "Ca")
-                        .WithMany()
-                        .HasForeignKey("CaId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Ca");
-                });
-
             modelBuilder.Entity("IVF.Domain.Entities.ConceptMapping", b =>
                 {
                     b.HasOne("IVF.Domain.Entities.Concept", "Concept")
@@ -4347,17 +3889,6 @@ namespace IVF.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("LutealPhaseData");
-                });
-
-            modelBuilder.Entity("IVF.Domain.Entities.ManagedCertificate", b =>
-                {
-                    b.HasOne("IVF.Domain.Entities.CertificateAuthority", "IssuingCa")
-                        .WithMany("IssuedCertificates")
-                        .HasForeignKey("IssuingCaId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("IssuingCa");
                 });
 
             modelBuilder.Entity("IVF.Domain.Entities.Notification", b =>
@@ -4742,11 +4273,6 @@ namespace IVF.Infrastructure.Migrations
             modelBuilder.Entity("IVF.Domain.Entities.BirthData", b =>
                 {
                     b.Navigation("Outcomes");
-                });
-
-            modelBuilder.Entity("IVF.Domain.Entities.CertificateAuthority", b =>
-                {
-                    b.Navigation("IssuedCertificates");
                 });
 
             modelBuilder.Entity("IVF.Domain.Entities.Concept", b =>

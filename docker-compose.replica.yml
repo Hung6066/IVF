@@ -1,0 +1,155 @@
+# ╔══════════════════════════════════════════════════════════════════════════╗
+# ║  IVF — Cloud Replica Stack                                              ║
+# ║                                                                          ║
+# ║  Deploy this file on the REMOTE / CLOUD server that acts as the          ║
+# ║  replication target for the primary IVF system.                          ║
+# ║                                                                          ║
+# ║  Services:                                                               ║
+# ║    • db-replica   — PostgreSQL 16 hot-standby (streaming over SSL)      ║
+# ║    • minio        — MinIO S3-compatible object storage (sync target)     ║
+# ║    • minio-init   — One-shot bucket provisioning                         ║
+# ║                                                                          ║
+# ║  Usage:                                                                  ║
+# ║    1. Copy this file + .env.replica.example → remote server              ║
+# ║    2. cp .env.replica.example .env                                       ║
+# ║    3. Edit .env — set PRIMARY_HOST, passwords, MinIO credentials         ║
+# ║    4. docker compose -f docker-compose.replica.yml up -d                 ║
+# ╚══════════════════════════════════════════════════════════════════════════╝
+
+services:
+  # ── PostgreSQL Streaming Standby ──────────────────────────────────────────
+  db-replica:
+    image: postgres:16-alpine
+    container_name: ivf-db-replica
+    restart: unless-stopped
+
+    environment:
+      # PostgreSQL superuser (must match the primary's postgres user)
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-ivf_db}
+
+      # Primary connection details
+      PRIMARY_HOST: ${PRIMARY_HOST:?Set PRIMARY_HOST (public IP or hostname) in .env}
+      PRIMARY_PORT: ${PRIMARY_PORT:-5433}
+
+      # Replication credentials (must exist on primary)
+      REPLICATOR_USER: ${REPLICATOR_USER:-replicator}
+      REPLICATOR_PASSWORD: ${REPLICATOR_PASSWORD:?Set REPLICATOR_PASSWORD in .env}
+
+      # Replication slot (must be created on primary first)
+      REPLICA_SLOT_NAME: ${REPLICA_SLOT_NAME:-cloud_standby_slot}
+      REPLICA_APPLICATION: ${REPLICA_APPLICATION:-ivf-cloud-replica}
+
+      # SSL mode for replication connection (require | verify-ca | verify-full)
+      PGSSLMODE: ${PGSSLMODE:-require}
+
+    entrypoint: ["/docker-entrypoint-initdb.d/cloud-replica-entrypoint.sh"]
+
+    volumes:
+      # Persistent standby data
+      - replica_postgres_data:/var/lib/postgresql/data
+      # Custom entrypoint script (mounted read-only)
+      - ./docker/postgres/cloud-replica-entrypoint.sh:/docker-entrypoint-initdb.d/cloud-replica-entrypoint.sh:ro
+
+    ports:
+      # Expose PostgreSQL for read queries and replication monitoring
+      - "${REPLICA_DB_PORT:-5432}:5432"
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s # Allow time for pg_basebackup on first run
+
+    networks:
+      - replica-internal
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  # ── MinIO Object Storage (sync target) ────────────────────────────────────
+  minio:
+    image: minio/minio:latest
+    container_name: ivf-minio-replica
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Set MINIO_ROOT_USER in .env}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Set MINIO_ROOT_PASSWORD in .env}
+
+      # Optional: set a site name visible in MinIO console
+      MINIO_SITE_NAME: ${MINIO_SITE_NAME:-ivf-replica}
+      MINIO_SITE_REGION: ${MINIO_REGION:-us-east-1}
+
+    volumes:
+      - replica_minio_data:/data
+
+    ports:
+      # S3 API — used by CloudReplicationService (mc mirror)
+      - "${MINIO_API_PORT:-9000}:9000"
+      # MinIO Web Console
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+    networks:
+      - replica-internal
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  # ── MinIO Bucket Provisioning (one-shot) ──────────────────────────────────
+  minio-init:
+    image: minio/mc:latest
+    container_name: ivf-minio-replica-init
+    restart: "no"
+
+    depends_on:
+      minio:
+        condition: service_healthy
+
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+
+    entrypoint: >
+      /bin/sh -c "
+        echo '── MinIO Replica: creating buckets ──';
+        mc alias set replica http://minio:9000 $$MINIO_ROOT_USER $$MINIO_ROOT_PASSWORD --api S3v4;
+        mc mb --ignore-existing replica/ivf-documents;
+        mc mb --ignore-existing replica/ivf-signed-pdfs;
+        mc mb --ignore-existing replica/ivf-medical-images;
+        mc mb --ignore-existing replica/ivf-replica;
+        echo '── Buckets ready ──';
+        mc ls replica;
+      "
+
+    networks:
+      - replica-internal
+
+# ── Volumes ──────────────────────────────────────────────────────────────────
+volumes:
+  replica_postgres_data:
+    driver: local
+  replica_minio_data:
+    driver: local
+
+# ── Networks ─────────────────────────────────────────────────────────────────
+networks:
+  # Internal bridge — services talk to each other; ports above expose externally
+  replica-internal:
+    driver: bridge

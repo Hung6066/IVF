@@ -10,8 +10,8 @@ public class BackupScheduleConfig : BaseEntity
     public bool Enabled { get; private set; } = true;
     public string CronExpression { get; private set; } = "0 2 * * *";
     public bool KeysOnly { get; private set; }
-    public int RetentionDays { get; private set; } = 30;
-    public int MaxBackupCount { get; private set; } = 50;
+    public int RetentionDays { get; private set; } = 90;
+    public int MaxBackupCount { get; private set; } = 30;
     public bool CloudSyncEnabled { get; private set; }
     public DateTime? LastScheduledRun { get; private set; }
     public string? LastScheduledOperationCode { get; private set; }

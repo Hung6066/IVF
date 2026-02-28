@@ -24,13 +24,13 @@ public static class BackupStrategySeeder
             // Daily: Full Backup at 2 AM
             DataBackupStrategy.Create(
                 name: "Sao lưu đầy đủ hàng đêm",
-                description: "Full backup cơ sở dữ liệu + MinIO mỗi đêm lúc 2:00 AM UTC. Giữ lại 30 ngày, tối đa 30 bản.",
+                description: "Full backup cơ sở dữ liệu + MinIO mỗi đêm lúc 2:00 AM UTC. Giữ lại 14 ngày, tối đa 14 bản. Bản lâu dài qua chiến lược offsite hàng tuần.",
                 includeDatabase: true,
                 includeMinio: true,
                 cronExpression: "0 2 * * *",
                 uploadToCloud: false,
-                retentionDays: 30,
-                maxBackupCount: 30),
+                retentionDays: 14,
+                maxBackupCount: 14),
 
             // Every 6 hours: Database-only backup
             DataBackupStrategy.Create(

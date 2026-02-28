@@ -21,7 +21,7 @@ services:
       - POSTGRES_PASSWORD_FILE=/run/secrets/ivf_db_password
     secrets:
       - ivf_db_password
-    ports: !override [] # Remove host port exposure in production
+    ports: [] # Remove host port exposure in production
     networks:
       - ivf-data
 
@@ -108,7 +108,7 @@ services:
     secrets:
       - ejbca_db_password
     ports: !override
-      - "8443:8443" # HTTPS Admin only — restrict with firewall
+      - "8443:8443" # HTTPS Admin only — restrict with firewall  [host 8443 blocked by Hyper-V]
       # REMOVED: 8442:8080 (HTTP enrollment) — not needed externally
     volumes:
       - ejbca_persistent:/opt/keyfactor/persistent
@@ -209,8 +209,8 @@ services:
     secrets:
       - minio_access_key
       - minio_secret_key
-    ports: !override # Only expose MinIO API — console behind reverse proxy
-      - "127.0.0.1:9000:9000"
+    ports: !override # MinIO API accessible from replica; console localhost-only
+      - "0.0.0.0:9000:9000"
       - "127.0.0.1:9001:9001"
     networks:
       - ivf-data

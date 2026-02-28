@@ -9,15 +9,32 @@ import {
   BackupOperation,
   BackupSchedule,
   BackupValidationResult,
+  CaDetail,
+  CaDashboard,
+  CaListItem,
+  CertBundle,
+  CertDeployResult,
+  CertListItem,
+  CertRenewalBatchResult,
   CloudBackupObject,
   CloudConfig,
+  CloudReplicationConfig,
+  CloudReplicationSetupResult,
   CloudStatusResult,
   CloudUploadResult,
   ComplianceReport,
+  CreateCaRequest,
   CreateDataBackupStrategyRequest,
   DataBackupFile,
   DataBackupStatus,
   DataBackupStrategy,
+  DbCloudReplicationStatus,
+  DeployCertRequest,
+  DeployLogItem,
+  ExternalReplicationGuide,
+  IssueCertRequest,
+  MinioCloudReplicationStatus,
+  MinioSyncResult,
   ReplicationActivationResult,
   ReplicationSetupGuide,
   ReplicationStatus,
@@ -28,6 +45,8 @@ import {
   TestCloudResult,
   UpdateCloudConfigRequest,
   UpdateDataBackupStrategyRequest,
+  UpdateDbReplicationRequest,
+  UpdateMinioReplicationRequest,
   UpdateScheduleRequest,
   WalArchiveListResponse,
   WalStatusResponse,
@@ -270,6 +289,279 @@ export class BackupService {
 
   startPitrRestore(request: StartPitrRestoreRequest): Observable<{ operationId: string }> {
     return this.http.post<{ operationId: string }>(`${this.dataUrl}/pitr-restore`, request);
+  }
+
+  // ─── Cloud Replication API ────────────────────────────
+
+  private readonly cloudReplUrl = `${this.dataUrl}/cloud-replication`;
+
+  getCloudReplicationConfig(): Observable<CloudReplicationConfig> {
+    return this.http.get<CloudReplicationConfig>(`${this.cloudReplUrl}/config`);
+  }
+
+  updateDbReplicationConfig(
+    request: UpdateDbReplicationRequest,
+  ): Observable<CloudReplicationConfig> {
+    return this.http.put<CloudReplicationConfig>(`${this.cloudReplUrl}/db/config`, request);
+  }
+
+  testDbReplicationConnection(): Observable<{ success: boolean; message: string }> {
+    return this.http.post<{ success: boolean; message: string }>(
+      `${this.cloudReplUrl}/db/test`,
+      {},
+    );
+  }
+
+  setupDbReplication(): Observable<CloudReplicationSetupResult> {
+    return this.http.post<CloudReplicationSetupResult>(`${this.cloudReplUrl}/db/setup`, {});
+  }
+
+  getDbReplicationStatus(): Observable<DbCloudReplicationStatus> {
+    return this.http.get<DbCloudReplicationStatus>(`${this.cloudReplUrl}/db/status`);
+  }
+
+  updateMinioReplicationConfig(
+    request: UpdateMinioReplicationRequest,
+  ): Observable<CloudReplicationConfig> {
+    return this.http.put<CloudReplicationConfig>(`${this.cloudReplUrl}/minio/config`, request);
+  }
+
+  testMinioReplicationConnection(): Observable<{ success: boolean; message: string }> {
+    return this.http.post<{ success: boolean; message: string }>(
+      `${this.cloudReplUrl}/minio/test`,
+      {},
+    );
+  }
+
+  setupMinioReplication(): Observable<{ success: boolean; message: string }> {
+    return this.http.post<{ success: boolean; message: string }>(
+      `${this.cloudReplUrl}/minio/setup`,
+      {},
+    );
+  }
+
+  syncMinioNow(): Observable<MinioSyncResult> {
+    return this.http.post<MinioSyncResult>(`${this.cloudReplUrl}/minio/sync`, {});
+  }
+
+  getMinioReplicationStatus(): Observable<MinioCloudReplicationStatus> {
+    return this.http.get<MinioCloudReplicationStatus>(`${this.cloudReplUrl}/minio/status`);
+  }
+
+  getCloudReplicationGuide(): Observable<ExternalReplicationGuide> {
+    return this.http.get<ExternalReplicationGuide>(`${this.cloudReplUrl}/guide`);
+  }
+
+  // ─── Certificate Authority API ────────────────────────
+
+  private readonly certUrl = `${environment.apiUrl}/admin/certificates`;
+
+  getCaDashboard(): Observable<CaDashboard> {
+    return this.http.get<CaDashboard>(`${this.certUrl}/dashboard`);
+  }
+
+  listCAs(): Observable<CaListItem[]> {
+    return this.http.get<CaListItem[]>(`${this.certUrl}/ca`);
+  }
+
+  getCA(id: string): Observable<CaDetail> {
+    return this.http.get<CaDetail>(`${this.certUrl}/ca/${id}`);
+  }
+
+  createRootCA(
+    req: CreateCaRequest,
+  ): Observable<{ id: string; name: string; fingerprint: string }> {
+    return this.http.post<{ id: string; name: string; fingerprint: string }>(
+      `${this.certUrl}/ca`,
+      req,
+    );
+  }
+
+  downloadCaChain(id: string): Observable<string> {
+    return this.http.get(`${this.certUrl}/ca/${id}/chain`, { responseType: 'text' });
+  }
+
+  listCertificates(caId?: string): Observable<CertListItem[]> {
+    const params = caId ? `?caId=${caId}` : '';
+    return this.http.get<CertListItem[]>(`${this.certUrl}/certs${params}`);
+  }
+
+  issueCertificate(req: IssueCertRequest): Observable<any> {
+    return this.http.post(`${this.certUrl}/certs`, req);
+  }
+
+  getCertBundle(id: string): Observable<CertBundle> {
+    return this.http.get<CertBundle>(`${this.certUrl}/certs/${id}/bundle`);
+  }
+
+  renewCertificate(id: string): Observable<any> {
+    return this.http.post(`${this.certUrl}/certs/${id}/renew`, {});
+  }
+
+  setAutoRenew(id: string, enabled: boolean, renewBeforeDays?: number): Observable<void> {
+    return this.http.put<void>(`${this.certUrl}/certs/${id}/auto-renew`, {
+      enabled,
+      renewBeforeDays,
+    });
+  }
+
+  getExpiringCertificates(): Observable<CertListItem[]> {
+    return this.http.get<CertListItem[]>(`${this.certUrl}/certs/expiring`);
+  }
+
+  triggerAutoRenewal(): Observable<CertRenewalBatchResult> {
+    return this.http.post<CertRenewalBatchResult>(`${this.certUrl}/certs/auto-renew-now`, {});
+  }
+
+  revokeCertificate(id: string, reason?: string): Observable<void> {
+    return this.http.post<void>(`${this.certUrl}/certs/${id}/revoke`, {
+      reason: reason || 'Unspecified',
+    });
+  }
+
+  // ─── Intermediate CA ───────────────────────────────────
+
+  createIntermediateCA(
+    req: any,
+  ): Observable<{
+    id: string;
+    name: string;
+    fingerprint: string;
+    parentCaId: string;
+    type: string;
+  }> {
+    return this.http.post<{
+      id: string;
+      name: string;
+      fingerprint: string;
+      parentCaId: string;
+      type: string;
+    }>(`${this.certUrl}/ca/intermediate`, req);
+  }
+
+  // ─── CRL (Certificate Revocation List) ────────────────
+
+  generateCrl(
+    caId: string,
+  ): Observable<{
+    id: string;
+    crlNumber: number;
+    thisUpdate: string;
+    nextUpdate: string;
+    revokedCount: number;
+  }> {
+    return this.http.post<any>(`${this.certUrl}/ca/${caId}/crl/generate`, {});
+  }
+
+  listCrls(caId: string): Observable<any[]> {
+    return this.http.get<any[]>(`${this.certUrl}/ca/${caId}/crl`);
+  }
+
+  downloadLatestCrl(caId: string): Observable<string> {
+    return this.http.get(`${this.certUrl}/ca/${caId}/crl/latest`, { responseType: 'text' });
+  }
+
+  // ─── OCSP ─────────────────────────────────────────────
+
+  checkCertStatus(caId: string, serialNumber: string): Observable<any> {
+    return this.http.get<any>(`${this.certUrl}/ocsp/${caId}/${serialNumber}`);
+  }
+
+  // ─── Audit Trail ──────────────────────────────────────
+
+  listCertAuditEvents(
+    certId?: string,
+    caId?: string,
+    eventType?: string,
+    limit?: number,
+  ): Observable<any[]> {
+    const params: string[] = [];
+    if (certId) params.push(`certId=${certId}`);
+    if (caId) params.push(`caId=${caId}`);
+    if (eventType) params.push(`eventType=${eventType}`);
+    if (limit) params.push(`limit=${limit}`);
+    const qs = params.length ? `?${params.join('&')}` : '';
+    return this.http.get<any[]>(`${this.certUrl}/audit${qs}`);
+  }
+
+  deployCertificate(id: string, req: DeployCertRequest): Observable<CertDeployResult> {
+    return this.http.post<CertDeployResult>(`${this.certUrl}/certs/${id}/deploy`, req);
+  }
+
+  deployPgSsl(id: string): Observable<CertDeployResult> {
+    return this.http.post<CertDeployResult>(`${this.certUrl}/certs/${id}/deploy-pg`, {});
+  }
+
+  deployMinioSsl(id: string): Observable<CertDeployResult> {
+    return this.http.post<CertDeployResult>(`${this.certUrl}/certs/${id}/deploy-minio`, {});
+  }
+
+  deployReplicaPgSsl(id: string): Observable<CertDeployResult> {
+    return this.http.post<CertDeployResult>(`${this.certUrl}/certs/${id}/deploy-replica-pg`, {});
+  }
+
+  deployReplicaMinioSsl(id: string): Observable<CertDeployResult> {
+    return this.http.post<CertDeployResult>(`${this.certUrl}/certs/${id}/deploy-replica-minio`, {});
+  }
+
+  // Deploy logs
+  listDeployLogs(certId?: string, limit?: number): Observable<DeployLogItem[]> {
+    const params: string[] = [];
+    if (certId) params.push(`certId=${certId}`);
+    if (limit) params.push(`limit=${limit}`);
+    const qs = params.length ? `?${params.join('&')}` : '';
+    return this.http.get<DeployLogItem[]>(`${this.certUrl}/deploy-logs${qs}`);
+  }
+
+  getDeployLog(operationId: string): Observable<DeployLogItem> {
+    return this.http.get<DeployLogItem>(`${this.certUrl}/deploy-logs/${operationId}`);
+  }
+
+  // Deploy SignalR connection
+  private deployLogSubject = new Subject<{
+    operationId: string;
+    timestamp: string;
+    level: string;
+    message: string;
+  }>();
+  private deployStatusSubject = new Subject<{
+    operationId: string;
+    status: string;
+    error?: string;
+  }>();
+  public deployLog$ = this.deployLogSubject.asObservable();
+  public deployStatus$ = this.deployStatusSubject.asObservable();
+
+  async connectDeployHub(operationId: string): Promise<void> {
+    await this.disconnectHub();
+
+    const token = localStorage.getItem('token') ?? '';
+    this.hubConnection = new signalR.HubConnectionBuilder()
+      .withUrl(this.hubUrl, {
+        accessTokenFactory: () => token,
+        transport: signalR.HttpTransportType.WebSockets | signalR.HttpTransportType.LongPolling,
+      })
+      .withAutomaticReconnect()
+      .build();
+
+    this.hubConnection.on('DeployLog', (data: any) => {
+      this.deployLogSubject.next(data);
+    });
+
+    this.hubConnection.on('DeployStatus', (data: any) => {
+      this.deployStatusSubject.next(data);
+    });
+
+    // Also keep backup LogLine listener
+    this.hubConnection.on('LogLine', (data: { operationId: string } & BackupLogLine) => {
+      this.logLineSubject.next(data);
+    });
+    this.hubConnection.on('StatusChanged', (data: any) => {
+      this.statusSubject.next(data);
+    });
+
+    await this.hubConnection.start();
+    await this.hubConnection.invoke('JoinOperation', operationId);
   }
 
   // ─── SignalR ──────────────────────────────────────────
