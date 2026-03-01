@@ -1,12 +1,15 @@
 using System.Text;
 using FluentValidation;
+using IVF.API.Authorization;
 using IVF.API.Endpoints;
+using IVF.API.Middleware;
 using IVF.API.Services;
 using IVF.Application;
 using IVF.Application.Common.Interfaces;
 using IVF.Infrastructure;
 using IVF.Infrastructure.Persistence;
 using IVF.Infrastructure.Seeding;
+using IVF.Infrastructure.Services;
 using QuestPDF.Infrastructure;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
@@ -22,6 +25,7 @@ var builder = WebApplication.CreateBuilder(args);
 ResolveDockerSecrets(builder.Configuration);
 
 // Clean Architecture DI
+builder.Services.AddHttpContextAccessor();
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddMemoryCache();
@@ -219,6 +223,26 @@ builder.Services.AddRateLimiter(options =>
         limiterOptions.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
         limiterOptions.QueueLimit = 0;
     });
+
+    // Zero Trust: Strict rate limit for auth endpoints (brute force prevention)
+    options.AddFixedWindowLimiter("auth", limiterOptions =>
+    {
+        limiterOptions.AutoReplenishment = true;
+        limiterOptions.PermitLimit = 10; // 10 login attempts per minute per IP
+        limiterOptions.Window = TimeSpan.FromMinutes(1);
+        limiterOptions.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+        limiterOptions.QueueLimit = 0; // No queuing for auth — immediate reject
+    });
+
+    // Zero Trust: Sensitive operation rate limit
+    options.AddFixedWindowLimiter("sensitive", limiterOptions =>
+    {
+        limiterOptions.AutoReplenishment = true;
+        limiterOptions.PermitLimit = 30; // 30 requests per minute for admin/security endpoints
+        limiterOptions.Window = TimeSpan.FromMinutes(1);
+        limiterOptions.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+        limiterOptions.QueueLimit = 2;
+    });
 });
 
 builder.Services.AddSignalR();
@@ -258,7 +282,19 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<IVF.API.Services.C
 // ─── Key Vault & Zero Trust ───
 builder.Services.AddSingleton<IVF.Application.Common.Interfaces.IKeyVaultService, IVF.Infrastructure.Services.AzureKeyVaultService>();
 builder.Services.AddScoped<IVF.Application.Common.Interfaces.IVaultSecretService, IVF.Infrastructure.Services.VaultSecretService>();
+builder.Services.AddScoped<IVF.Application.Common.Interfaces.ISecretRotationService, IVF.Infrastructure.Services.SecretRotationService>();
 builder.Services.AddScoped<IVF.Application.Common.Interfaces.IZeroTrustService, IVF.Infrastructure.Services.ZeroTrustService>();
+builder.Services.AddScoped<IVF.Application.Common.Interfaces.ICurrentUserService, IVF.API.Services.CurrentUserService>();
+builder.Services.AddScoped<IVF.Application.Common.Services.IFieldAccessService, IVF.Application.Common.Services.FieldAccessService>();
+
+// ─── Zero Trust Security Services (Google BeyondCorp + Microsoft Sentinel + AWS GuardDuty) ───
+builder.Services.AddScoped<IVF.Application.Common.Interfaces.ISecurityEventService, IVF.Infrastructure.Services.SecurityEventService>();
+builder.Services.AddScoped<IVF.Application.Common.Interfaces.IThreatDetectionService, IVF.Infrastructure.Services.ThreatDetectionService>();
+builder.Services.AddScoped<IVF.Application.Common.Interfaces.IDeviceFingerprintService, IVF.Infrastructure.Services.DeviceFingerprintService>();
+builder.Services.AddScoped<IVF.Application.Common.Interfaces.IAdaptiveSessionService, IVF.Infrastructure.Services.AdaptiveSessionService>();
+
+// ─── Vault Policy Authorization ───
+builder.Services.AddVaultPolicyAuthorization();
 
 // ─── Certificate Authority & auto-renewal ───
 builder.Services.AddSingleton<IVF.API.Services.CertificateAuthorityService>();
@@ -284,11 +320,28 @@ builder.Services.AddSwaggerGen();
 
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAngular", policy =>
-        policy.SetIsOriginAllowed(_ => true) // Allow any origin for dev
-              .AllowAnyMethod()
-              .AllowAnyHeader()
-              .AllowCredentials());
+    if (builder.Environment.IsDevelopment())
+    {
+        options.AddPolicy("AllowAngular", policy =>
+            policy.SetIsOriginAllowed(_ => true)
+                  .AllowAnyMethod()
+                  .AllowAnyHeader()
+                  .AllowCredentials());
+    }
+    else
+    {
+        // Production: Zero Trust — explicit origin whitelist only
+        var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
+            ?? ["https://ivf.clinic"];
+        options.AddPolicy("AllowAngular", policy =>
+            policy.WithOrigins(allowedOrigins)
+                  .WithMethods("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS")
+                  .WithHeaders("Authorization", "Content-Type", "X-Vault-Token", "X-API-Key",
+                               "X-Device-Fingerprint", "X-Session-Id", "X-Correlation-Id",
+                               "X-Requested-With")
+                  .AllowCredentials()
+                  .SetPreflightMaxAge(TimeSpan.FromMinutes(10)));
+    }
 });
 
 var app = builder.Build();
@@ -321,17 +374,32 @@ if (app.Environment.IsDevelopment())
 
 // app.UseHttpsRedirection();
 
-// OWASP Secure Headers (Phase 1-3) + Phase 4 Compliance Hardening
+// OWASP Secure Headers (Phase 1-4) + Phase 5 Zero Trust Compliance Hardening
 app.Use(async (context, next) =>
 {
     // Phase 1: Core OWASP headers
     context.Response.Headers.Append("X-Content-Type-Options", "nosniff");
     context.Response.Headers.Append("X-Frame-Options", "DENY");
     context.Response.Headers.Append("X-XSS-Protection", "0"); // Modern browsers: CSP replaces this
-    context.Response.Headers.Append("Referrer-Policy", "strict-origin-when-cross-origin");
+    context.Response.Headers.Append("Referrer-Policy", "no-referrer"); // Strictest — no referrer info leaked
+
+    // Phase 5: Enhanced CSP with strict directives — aligned with Google/Microsoft security standards
     context.Response.Headers.Append("Content-Security-Policy",
-        "default-src 'self'; img-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline'; " +
-        "frame-ancestors 'none'; base-uri 'self'; form-action 'self';");
+        "default-src 'none'; " +                              // Deny everything by default
+        "script-src 'self'; " +                                // Scripts only from same origin
+        "style-src 'self' 'unsafe-inline'; " +                 // Allow inline styles for Angular
+        "img-src 'self' data: blob:; " +                       // Images from self, data URIs, blobs
+        "font-src 'self'; " +                                  // Fonts from self only
+        "connect-src 'self' wss: ws:; " +                      // API + WebSocket connections
+        "media-src 'none'; " +                                 // No media
+        "object-src 'none'; " +                                // No plugins
+        "frame-src 'none'; " +                                 // No iframes
+        "frame-ancestors 'none'; " +                           // Cannot be framed
+        "base-uri 'self'; " +                                  // Prevent base tag hijacking
+        "form-action 'self'; " +                               // Forms submit to self only
+        "upgrade-insecure-requests; " +                        // Upgrade HTTP to HTTPS
+        "block-all-mixed-content; " +                          // Block mixed HTTP/HTTPS content
+        "require-trusted-types-for 'script';");                // Trusted Types for DOM XSS prevention
 
     // Phase 4: HSTS — enforce HTTPS (max-age=2 years, includeSubDomains, preload-ready)
     if (context.Request.IsHttps || app.Environment.IsProduction())
@@ -340,26 +408,46 @@ app.Use(async (context, next) =>
             "max-age=63072000; includeSubDomains; preload");
     }
 
-    // Phase 4: Permissions-Policy — restrict browser features
+    // Phase 4: Permissions-Policy — restrict ALL browser features (strictest possible)
     context.Response.Headers.Append("Permissions-Policy",
         "camera=(), microphone=(), geolocation=(), payment=(), usb=(), " +
-        "accelerometer=(), gyroscope=(), magnetometer=(), autoplay=()");
+        "accelerometer=(), gyroscope=(), magnetometer=(), autoplay=(), " +
+        "ambient-light-sensor=(), battery=(), display-capture=(), " +
+        "document-domain=(), encrypted-media=(), execution-while-not-rendered=(), " +
+        "execution-while-out-of-viewport=(), fullscreen=(self), " +
+        "gamepad=(), hid=(), idle-detection=(), interest-cohort=(), " +
+        "keyboard-map=(), local-fonts=(), midi=(), otp-credentials=(), " +
+        "picture-in-picture=(), publickey-credentials-get=(self), " +
+        "screen-wake-lock=(), serial=(), speaker-selection=(), " +
+        "sync-xhr=(), web-share=(), xr-spatial-tracking=()");
 
-    // Phase 4: Additional hardening headers
+    // Phase 4+5: Cross-Origin isolation headers
     context.Response.Headers.Append("Cross-Origin-Embedder-Policy", "require-corp");
     context.Response.Headers.Append("Cross-Origin-Opener-Policy", "same-origin");
     context.Response.Headers.Append("Cross-Origin-Resource-Policy", "same-origin");
 
-    // Remove server identification header
+    // Phase 5: Zero Trust response headers
+    context.Response.Headers.Append("X-Permitted-Cross-Domain-Policies", "none");   // Block Flash/PDF cross-domain
+    context.Response.Headers.Append("X-Download-Options", "noopen");                 // IE download protection
+    context.Response.Headers.Append("X-DNS-Prefetch-Control", "off");                // Prevent DNS prefetch leaks
+    context.Response.Headers.Append("Cache-Control", "no-store, no-cache, must-revalidate, private");  // No caching of sensitive API responses
+    context.Response.Headers.Append("Pragma", "no-cache");
+
+    // Remove server identification headers (information disclosure prevention)
     context.Response.Headers.Remove("Server");
     context.Response.Headers.Remove("X-Powered-By");
+    context.Response.Headers.Remove("X-AspNet-Version");
+    context.Response.Headers.Remove("X-AspNetMvc-Version");
 
     await next();
 });
 
 // app.UseCors("AllowAngular"); // Moved to top
+app.UseVaultTokenAuth(); // Vault token authentication (X-Vault-Token header)
+app.UseApiKeyAuth(); // API key authentication (X-API-Key header or apiKey query param)
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseZeroTrust(); // Zero Trust continuous verification (Google BeyondCorp + Microsoft CAE + AWS GuardDuty)
 app.UseRateLimiter(); // Enable Rate Limiting
 
 // SignalR Hubs
@@ -407,6 +495,7 @@ app.MapPatientDocumentEndpoints();
 app.MapDocumentSignatureEndpoints();
 app.MapKeyVaultEndpoints();
 app.MapZeroTrustEndpoints();
+app.MapSecurityEventEndpoints(); // Zero Trust security monitoring dashboard
 
 // ── Config seeders: run in every environment (idempotent, no demo data) ──────
 {
@@ -437,6 +526,24 @@ if (app.Environment.IsDevelopment())
 
 // QuestPDF community license
 QuestPDF.Settings.License = LicenseType.Community;
+
+// ─── Vault Configuration Provider ───
+// Load vault secrets (under "config/" prefix) into IConfiguration pipeline.
+// Secrets refresh every 5 minutes. Example: vault "config/ConnectionStrings/Redis" → IConfiguration["ConnectionStrings:Redis"]
+try
+{
+    var configRoot = app.Services.GetRequiredService<IConfiguration>() as IConfigurationRoot;
+    if (configRoot is not null)
+    {
+        ((IConfigurationBuilder)configRoot).AddVaultSecrets(app.Services, TimeSpan.FromMinutes(5));
+        configRoot.Reload();
+        app.Logger.LogInformation("Vault configuration provider initialized");
+    }
+}
+catch (Exception ex)
+{
+    app.Logger.LogWarning(ex, "Vault configuration provider failed to initialize — using static config");
+}
 
 app.Run();
 

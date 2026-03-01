@@ -1,0 +1,9 @@
+# Pre-commit hooks for IVF System
+# Install: pip install pre-commit && pre-commit install
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.21.2
+    hooks:
+      - id: gitleaks
+        name: Detect secrets with Gitleaks
+        entry: gitleaks protect --staged --config .gitleaks.toml

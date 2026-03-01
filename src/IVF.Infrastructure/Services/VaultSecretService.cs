@@ -20,6 +20,7 @@ public class VaultSecretService : IVaultSecretService
     private readonly IKeyVaultService _keyVaultService;
     private readonly IConfiguration _config;
     private readonly ILogger<VaultSecretService> _logger;
+    private readonly VaultMetrics _metrics;
 
     // Static cache so KEK is unwrapped once across all scoped instances
     private static byte[]? s_kek;
@@ -38,12 +39,14 @@ public class VaultSecretService : IVaultSecretService
         IVaultRepository repo,
         IKeyVaultService keyVaultService,
         IConfiguration config,
-        ILogger<VaultSecretService> logger)
+        ILogger<VaultSecretService> logger,
+        VaultMetrics metrics)
     {
         _repo = repo;
         _keyVaultService = keyVaultService;
         _config = config;
         _logger = logger;
+        _metrics = metrics;
     }
 
     /// <summary>
@@ -143,11 +146,16 @@ public class VaultSecretService : IVaultSecretService
 
     public async Task<VaultSecretResult?> GetSecretAsync(string path, int? version = null, CancellationToken ct = default)
     {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
         var secret = await _repo.GetSecretAsync(path, version, ct);
         if (secret is null) return null;
 
         var kek = await GetKekAsync();
         var plaintext = DecryptWithKey(secret.EncryptedData, secret.Iv, kek);
+        sw.Stop();
+        _metrics.RecordSecretOperation("get", path);
+        _metrics.RecordSecretAccessDuration(sw.Elapsed.TotalMilliseconds, "get");
+        _metrics.RecordEncryptionOperation("decrypt");
         return new VaultSecretResult(
             secret.Id, secret.Path, secret.Version, plaintext,
             secret.Metadata, secret.CreatedAt, secret.UpdatedAt);
@@ -170,6 +178,8 @@ public class VaultSecretService : IVaultSecretService
         await _repo.AddSecretAsync(secret, ct);
 
         _logger.LogInformation("Vault secret created: {Path} v{Version}", path, newVersion);
+        _metrics.RecordSecretOperation("put", path);
+        _metrics.RecordEncryptionOperation("encrypt");
 
         return new VaultSecretResult(
             secret.Id, path, newVersion, plaintext,
@@ -179,6 +189,7 @@ public class VaultSecretService : IVaultSecretService
     public async Task DeleteSecretAsync(string path, CancellationToken ct = default)
     {
         await _repo.DeleteSecretAsync(path, ct);
+        _metrics.RecordSecretOperation("delete", path);
         _logger.LogInformation("Vault secret deleted: {Path}", path);
     }
 

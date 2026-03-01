@@ -1,3 +1,4 @@
+using IVF.Application.Common.Interfaces;
 using IVF.Application.Features.Patients.Commands;
 using IVF.Application.Features.Patients.Queries;
 using IVF.Domain.Enums;
@@ -12,7 +13,7 @@ public static class PatientBiometricsEndpoints
         var group = app.MapGroup("/api/patients").WithTags("Patient Biometrics").RequireAuthorization();
 
         // ==================== PHOTO ====================
-        
+
         // Upload photo (multipart/form-data)
         group.MapPost("/{patientId:guid}/photo", async (Guid patientId, IFormFile file, IMediator m) =>
         {
@@ -50,7 +51,7 @@ public static class PatientBiometricsEndpoints
         group.MapPost("/{patientId:guid}/fingerprints", async (Guid patientId, RegisterFingerprintRequest req, IMediator m) =>
         {
             var cmd = new RegisterPatientFingerprintCommand(
-                patientId, 
+                patientId,
                 Convert.FromBase64String(req.FingerprintDataBase64),
                 req.FingerType,
                 req.SdkType,
@@ -67,13 +68,15 @@ public static class PatientBiometricsEndpoints
         });
 
         // Get all fingerprints (for 1:N Identification) - Desktop Client Auth via API Key
-        group.MapGet("/fingerprints/all", async (IMediator m, HttpRequest request, IConfiguration config) =>
+        group.MapGet("/fingerprints/all", async (IMediator m, HttpContext httpContext, IApiKeyValidator apiKeyValidator) =>
         {
-            // Manual API Key Validation for Desktop Client
-            var apiKey = request.Headers["X-API-Key"].FirstOrDefault() ?? request.Query["apiKey"].FirstOrDefault();
-            var validApiKeys = config.GetSection("DesktopClients:ApiKeys").Get<string[]>() ?? Array.Empty<string>();
-            
-            if (string.IsNullOrEmpty(apiKey) || !validApiKeys.Contains(apiKey))
+            // API key is validated by middleware (ClaimsPrincipal already set),
+            // but verify auth_method for this sensitive endpoint
+            var isApiKeyAuth = httpContext.User.FindFirst("auth_method")?.Value == "api_key";
+            var isJwtAuth = httpContext.User.Identity?.IsAuthenticated == true
+                         && httpContext.User.FindFirst("auth_method")?.Value != "api_key";
+
+            if (!isApiKeyAuth && !isJwtAuth)
             {
                 return Results.Unauthorized();
             }

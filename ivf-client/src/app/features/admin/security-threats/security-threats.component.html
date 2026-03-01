@@ -1,0 +1,267 @@
+<div class="security-page">
+  <div class="page-header">
+    <h2>🔍 Đánh giá mối đe dọa</h2>
+    <p class="subtitle">Kiểm tra IP, thiết bị và đánh giá rủi ro theo Zero Trust</p>
+  </div>
+
+  <!-- Tab Navigation -->
+  <div class="tab-nav">
+    <button class="tab-btn" [class.active]="activeTab === 'assess'" (click)="activeTab = 'assess'">
+      ⚡ Đánh giá mối đe dọa
+    </button>
+    <button class="tab-btn" [class.active]="activeTab === 'ip'" (click)="activeTab = 'ip'">
+      🌐 IP Intelligence
+    </button>
+    <button class="tab-btn" [class.active]="activeTab === 'device'" (click)="activeTab = 'device'">
+      📱 Device Trust
+    </button>
+  </div>
+
+  <!-- Threat Assessment Tab -->
+  @if (activeTab === 'assess') {
+    <div class="card">
+      <div class="card-header">
+        <h3>⚡ Đánh giá mối đe dọa</h3>
+      </div>
+      <div class="card-body">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>IP Address *</label>
+            <input type="text" [(ngModel)]="assessForm.ipAddress" placeholder="192.168.1.1" />
+          </div>
+          <div class="form-group">
+            <label>Username</label>
+            <input type="text" [(ngModel)]="assessForm.username" placeholder="admin" />
+          </div>
+          <div class="form-group">
+            <label>User Agent</label>
+            <input type="text" [(ngModel)]="assessForm.userAgent" placeholder="Mozilla/5.0..." />
+          </div>
+          <div class="form-group">
+            <label>Country</label>
+            <input type="text" [(ngModel)]="assessForm.country" placeholder="VN" />
+          </div>
+          <div class="form-group">
+            <label>Request Path</label>
+            <input type="text" [(ngModel)]="assessForm.requestPath" placeholder="/api/patients" />
+          </div>
+        </div>
+        <div class="form-actions">
+          <button
+            class="btn btn-primary"
+            (click)="runAssessment()"
+            [disabled]="loading() || !assessForm.ipAddress"
+          >
+            ⚡ Đánh giá
+          </button>
+        </div>
+
+        @if (assessment()) {
+          <div class="result-card" [ngClass]="getRiskClass(assessment()!.riskLevel)">
+            <div class="result-header">
+              <div class="risk-overview">
+                <div class="risk-score-large">{{ assessment()!.riskScore }}</div>
+                <div class="risk-details">
+                  <span class="risk-level">{{ assessment()!.riskLevel }}</span>
+                  <span class="risk-action">{{ assessment()!.recommendedAction }}</span>
+                </div>
+              </div>
+              <div class="risk-bar-container">
+                <div class="risk-bar-bg">
+                  <div
+                    class="risk-bar"
+                    [style.width.%]="getRiskBarWidth(assessment()!.riskScore)"
+                    [ngClass]="getRiskClass(assessment()!.riskLevel)"
+                  ></div>
+                </div>
+                <div class="risk-bar-labels">
+                  <span>0</span><span>25</span><span>50</span><span>75</span><span>100</span>
+                </div>
+              </div>
+            </div>
+
+            @if (assessment()!.signals.length > 0) {
+              <div class="signals-section">
+                <h4>📡 Tín hiệu phát hiện</h4>
+                <div class="signals-list">
+                  @for (signal of assessment()!.signals; track signal.category) {
+                    <div class="signal-item">
+                      <div class="signal-header">
+                        <span class="signal-category">{{ signal.category }}</span>
+                        <span class="signal-score" [class.score-high]="signal.score >= 20">
+                          +{{ signal.score }}
+                        </span>
+                      </div>
+                      <p class="signal-desc">{{ signal.description }}</p>
+                      @if (signal.details) {
+                        <p class="signal-details">{{ signal.details }}</p>
+                      }
+                    </div>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  <!-- IP Intelligence Tab -->
+  @if (activeTab === 'ip') {
+    <div class="card">
+      <div class="card-header">
+        <h3>🌐 IP Intelligence</h3>
+      </div>
+      <div class="card-body">
+        <div class="search-form">
+          <div class="form-group">
+            <label>IP Address</label>
+            <input
+              type="text"
+              [(ngModel)]="ipLookup"
+              placeholder="Nhập địa chỉ IP..."
+              (keydown.enter)="checkIp()"
+            />
+          </div>
+          <button
+            class="btn btn-primary"
+            (click)="checkIp()"
+            [disabled]="loading() || !ipLookup.trim()"
+          >
+            🔍 Kiểm tra
+          </button>
+        </div>
+
+        @if (ipResult()) {
+          <div class="ip-result-card">
+            <div class="ip-header">
+              <span class="ip-address">{{ ipResult()!.ipAddress }}</span>
+              <span
+                class="risk-badge"
+                [class.risk-safe]="ipResult()!.riskScore < 25"
+                [class.risk-warn]="ipResult()!.riskScore >= 25 && ipResult()!.riskScore < 50"
+                [class.risk-danger]="ipResult()!.riskScore >= 50"
+              >
+                Risk: {{ ipResult()!.riskScore }}
+              </span>
+            </div>
+            <div class="ip-flags">
+              <div class="flag-item" [class.flag-danger]="ipResult()!.isTor">
+                <span class="flag-icon">🧅</span>
+                <span class="flag-label">Tor</span>
+                <span class="flag-value">{{ ipResult()!.isTor ? 'Có' : 'Không' }}</span>
+              </div>
+              <div class="flag-item" [class.flag-warn]="ipResult()!.isVpn">
+                <span class="flag-icon">🔒</span>
+                <span class="flag-label">VPN</span>
+                <span class="flag-value">{{ ipResult()!.isVpn ? 'Có' : 'Không' }}</span>
+              </div>
+              <div class="flag-item" [class.flag-warn]="ipResult()!.isProxy">
+                <span class="flag-icon">🔄</span>
+                <span class="flag-label">Proxy</span>
+                <span class="flag-value">{{ ipResult()!.isProxy ? 'Có' : 'Không' }}</span>
+              </div>
+              <div class="flag-item" [class.flag-warn]="ipResult()!.isHosting">
+                <span class="flag-icon">🖥️</span>
+                <span class="flag-label">Hosting</span>
+                <span class="flag-value">{{ ipResult()!.isHosting ? 'Có' : 'Không' }}</span>
+              </div>
+              <div class="flag-item" [class.flag-danger]="ipResult()!.isKnownAttacker">
+                <span class="flag-icon">☠️</span>
+                <span class="flag-label">Attacker</span>
+                <span class="flag-value">{{ ipResult()!.isKnownAttacker ? 'Có' : 'Không' }}</span>
+              </div>
+            </div>
+            @if (ipResult()!.country) {
+              <div class="ip-location">
+                📍 {{ ipResult()!.country }}{{ ipResult()!.city ? ', ' + ipResult()!.city : '' }}
+              </div>
+            }
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  <!-- Device Trust Tab -->
+  @if (activeTab === 'device') {
+    <div class="card">
+      <div class="card-header">
+        <h3>📱 Device Trust</h3>
+      </div>
+      <div class="card-body">
+        <div class="form-grid form-grid-2">
+          <div class="form-group">
+            <label>User ID (GUID)</label>
+            <input type="text" [(ngModel)]="deviceUserId" placeholder="User ID..." />
+          </div>
+          <div class="form-group">
+            <label>Device Fingerprint</label>
+            <input type="text" [(ngModel)]="deviceFingerprint" placeholder="Fingerprint hash..." />
+          </div>
+        </div>
+        <div class="form-actions">
+          <button
+            class="btn btn-primary"
+            (click)="checkDevice()"
+            [disabled]="loading() || !deviceUserId.trim() || !deviceFingerprint.trim()"
+          >
+            🔍 Kiểm tra
+          </button>
+        </div>
+
+        @if (deviceResult()) {
+          <div class="device-result-card">
+            <div class="device-header">
+              <div class="device-trust-level" [ngClass]="getTrustClass(deviceResult()!.trustLevel)">
+                {{ deviceResult()!.trustLevel }}
+              </div>
+              <span
+                class="risk-badge"
+                [class.risk-safe]="deviceResult()!.riskScore < 25"
+                [class.risk-warn]="
+                  deviceResult()!.riskScore >= 25 && deviceResult()!.riskScore < 50
+                "
+                [class.risk-danger]="deviceResult()!.riskScore >= 50"
+              >
+                Risk: {{ deviceResult()!.riskScore }}
+              </span>
+            </div>
+            <div class="device-info-grid">
+              <div class="info-item">
+                <span class="info-label">Fingerprint</span>
+                <span class="mono">{{ deviceResult()!.fingerprint.substring(0, 24) }}...</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Đã đăng ký</span>
+                <span>{{ deviceResult()!.isRegistered ? '✅ Có' : '❌ Chưa' }}</span>
+              </div>
+              @if (deviceResult()!.lastSeenAt) {
+                <div class="info-item">
+                  <span class="info-label">Lần cuối</span>
+                  <span>{{ formatDate(deviceResult()!.lastSeenAt!) }}</span>
+                </div>
+              }
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  <!-- Toast -->
+  @if (statusMessage()) {
+    <div
+      class="toast"
+      [class.toast-success]="statusMessage()!.type === 'success'"
+      [class.toast-error]="statusMessage()!.type === 'error'"
+    >
+      {{ statusMessage()!.text }}
+    </div>
+  }
+
+  @if (loading()) {
+    <div class="loading-indicator"><div class="spinner"></div></div>
+  }
+</div>

@@ -1,0 +1,343 @@
+.security-page {
+  padding: 1.5rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.page-header {
+  margin-bottom: 1.5rem;
+
+  h2 {
+    margin: 0;
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: #1e1e2f;
+  }
+  .subtitle {
+    color: #6b7280;
+    margin-top: 0.3rem;
+    font-size: 0.9rem;
+  }
+}
+
+// ─── Card ───────────────────────────────────────────
+.card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  margin-bottom: 1rem;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid #e5e7eb;
+  background: #f9fafb;
+  cursor: pointer;
+
+  h3 {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: #1e1e2f;
+  }
+  .header-actions {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+  }
+}
+
+.card-body {
+  padding: 1.25rem;
+}
+
+// ─── Search Form ────────────────────────────────────
+.search-form {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-end;
+
+  .form-group {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+
+    label {
+      font-weight: 600;
+      font-size: 0.75rem;
+      margin-bottom: 0.3rem;
+      color: #6b7280;
+      text-transform: uppercase;
+    }
+
+    input {
+      padding: 0.6rem 0.75rem;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      font-size: 0.88rem;
+      background: #fff;
+
+      &:focus {
+        outline: none;
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+      }
+
+      &::placeholder {
+        color: #9ca3af;
+      }
+    }
+  }
+}
+
+// ─── User Header ────────────────────────────────────
+.user-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.expand-icon {
+  font-size: 0.7rem;
+  color: #6b7280;
+  margin-right: 0.2rem;
+}
+
+.session-count {
+  font-size: 0.78rem;
+  color: #6b7280;
+  background: #f3f4f6;
+  padding: 0.15rem 0.5rem;
+  border-radius: 12px;
+}
+
+// ─── Sessions List ──────────────────────────────────
+.sessions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.session-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  transition: all 0.15s;
+
+  &:hover {
+    border-color: #d1d5db;
+    background: #fafafa;
+  }
+
+  &.session-active {
+    border-left: 3px solid #10b981;
+  }
+}
+
+.session-main {
+  flex: 1;
+}
+
+.session-info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 0.6rem;
+}
+
+.info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.info-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.fingerprint-row {
+  margin-top: 0.5rem;
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.session-actions {
+  margin-left: 1rem;
+  flex-shrink: 0;
+}
+
+.mono {
+  font-family: monospace;
+  font-size: 0.82rem;
+}
+.small {
+  font-size: 0.78rem;
+}
+
+// ─── Badges ─────────────────────────────────────────
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.55rem;
+  border-radius: 12px;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.badge-active {
+  background: #dcfce7;
+  color: #15803d;
+}
+.badge-inactive {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+// ─── Buttons ────────────────────────────────────────
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.btn-primary {
+  background: #2563eb;
+  color: #fff;
+  &:hover:not(:disabled) {
+    background: #1d4ed8;
+  }
+}
+
+.btn-danger {
+  background: #ef4444;
+  color: #fff;
+  &:hover:not(:disabled) {
+    background: #dc2626;
+  }
+}
+
+.btn-outline {
+  background: #fff;
+  border-color: #d1d5db;
+  color: #374151;
+  &:hover:not(:disabled) {
+    background: #f3f4f6;
+  }
+}
+
+.btn-sm {
+  padding: 0.35rem 0.7rem;
+  font-size: 0.8rem;
+}
+.btn-xs {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+}
+
+// ─── Empty State ────────────────────────────────────
+.empty-state {
+  text-align: center;
+  padding: 1.5rem;
+  color: #9ca3af;
+  font-size: 0.9rem;
+}
+
+.empty-state-large {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 3rem;
+  color: #9ca3af;
+
+  .empty-icon {
+    font-size: 2.5rem;
+    margin-bottom: 0.75rem;
+  }
+  .empty-text {
+    font-size: 0.95rem;
+  }
+}
+
+// ─── Toast ──────────────────────────────────────────
+.toast {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  padding: 0.75rem 1.25rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  z-index: 2000;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  animation: slideIn 0.3s ease-out;
+
+  &.toast-success {
+    background: #dcfce7;
+    color: #15803d;
+    border: 1px solid #86efac;
+  }
+  &.toast-error {
+    background: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #fca5a5;
+  }
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateY(1rem);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+// ─── Loading ────────────────────────────────────────
+.loading-indicator {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 100;
+}
+
+.spinner {
+  width: 24px;
+  height: 24px;
+  border: 3px solid #e5e7eb;
+  border-top-color: #2563eb;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

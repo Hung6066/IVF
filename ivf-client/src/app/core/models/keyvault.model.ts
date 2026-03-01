@@ -443,3 +443,212 @@ export interface DbColumnInfo {
   name: string;
   dataType: string;
 }
+
+// ─── Secret Rotation ─────────────────────────────
+export interface RotationSchedule {
+  secretPath: string;
+  rotationIntervalDays: number;
+  gracePeriodHours: number;
+  automaticallyRotate: boolean;
+  lastRotatedAt: string | null;
+  nextRotationAt: string;
+  rotationStrategy: string | null;
+}
+
+export interface RotationResult {
+  success: boolean;
+  secretPath: string;
+  newVersion: number | null;
+  oldVersion: number | null;
+  error: string | null;
+  rotatedAt: string;
+}
+
+export interface RotationHistoryEntry {
+  secretPath: string;
+  oldVersion: number;
+  newVersion: number;
+  rotatedAt: string;
+  triggeredBy: string | null;
+  success: boolean;
+  error: string | null;
+}
+
+export interface RotationScheduleCreateRequest {
+  secretPath: string;
+  rotationIntervalDays: number;
+  gracePeriodHours?: number;
+  automaticallyRotate?: boolean;
+  rotationStrategy?: string;
+  callbackUrl?: string;
+}
+
+// ─── DEK Rotation ────────────────────────────────
+export interface DekRotationResult {
+  success: boolean;
+  dekPurpose: string;
+  newVersion: number;
+  previousVersion: number | null;
+  error: string | null;
+}
+
+export interface DekVersionInfo {
+  dekPurpose: string;
+  currentVersion: number;
+  lastRotatedAt: string | null;
+  oldVersionsKept: number;
+}
+
+export interface ReEncryptionResult {
+  tableName: string;
+  totalRows: number;
+  reEncrypted: number;
+  failed: number;
+  skipped: number;
+  duration: string;
+}
+
+export interface ReEncryptionProgress {
+  tableName: string;
+  dekPurpose: string;
+  totalRows: number;
+  processedRows: number;
+  isComplete: boolean;
+  lastProcessedAt: string | null;
+}
+
+// ─── DB Credential Rotation ──────────────────────
+export interface DbCredentialRotationResult {
+  success: boolean;
+  activeSlot: string;
+  newUsername: string | null;
+  expiresAt: string | null;
+  error: string | null;
+}
+
+export interface DualCredentialStatus {
+  activeSlot: string;
+  slotAUsername: string | null;
+  slotAExpiresAt: string | null;
+  slotAActive: boolean;
+  slotBUsername: string | null;
+  slotBExpiresAt: string | null;
+  slotBActive: boolean;
+  lastRotatedAt: string | null;
+  rotationCount: number;
+}
+
+// ─── Compliance Scoring ──────────────────────────
+export interface ComplianceReport {
+  evaluatedAt: string;
+  overallScore: number;
+  maxScore: number;
+  percentage: number;
+  grade: string;
+  frameworks: FrameworkScore[];
+}
+
+export interface FrameworkScore {
+  framework: string;
+  name: string;
+  score: number;
+  maxScore: number;
+  percentage: number;
+  controls: ControlResult[];
+}
+
+export interface ControlResult {
+  controlId: string;
+  name: string;
+  description: string;
+  status: 'Pass' | 'Fail' | 'Partial' | 'NotApplicable';
+  score: number;
+  maxScore: number;
+  finding: string | null;
+}
+
+// ─── Vault Disaster Recovery ─────────────────────
+export interface VaultBackupResponse {
+  success: boolean;
+  backupId: string;
+  createdAt: string;
+  secretsCount: number;
+  policiesCount: number;
+  settingsCount: number;
+  encryptionConfigsCount: number;
+  integrityHash: string;
+  backupDataBase64: string;
+}
+
+export interface VaultRestoreResult {
+  success: boolean;
+  error: string | null;
+  secretsRestored: number;
+  policiesRestored: number;
+  settingsRestored: number;
+  encryptionConfigsRestored: number;
+}
+
+export interface VaultBackupValidation {
+  valid: boolean;
+  error: string | null;
+  backupId: string;
+  createdAt: string;
+  integrityHash: string;
+}
+
+export interface DrReadinessStatus {
+  autoUnsealConfigured: boolean;
+  encryptionActive: boolean;
+  activeSecrets: number;
+  activePolicies: number;
+  lastBackupAt: string | null;
+  readinessGrade: string;
+}
+
+// ─── Multi-Provider Unseal ───────────────────────
+export interface UnsealProviderStatus {
+  providerId: string;
+  providerType: string;
+  priority: number;
+  available: boolean;
+  lastUsedAt: string | null;
+  error: string | null;
+}
+
+export interface UnsealProviderConfigureRequest {
+  providerId: string;
+  providerType: string;
+  priority: number;
+  keyIdentifier: string;
+  masterPassword: string;
+  settings?: Record<string, string>;
+}
+
+export interface UnsealResult {
+  success: boolean;
+  providerId: string;
+  error: string | null;
+  attemptsTotal: number;
+}
+
+// ─── Vault Metrics ───────────────────────────────
+export interface VaultMetrics {
+  timestamp: string;
+  totals: {
+    secrets: number;
+    activeLeases: number;
+    activeTokens: number;
+    revokedTokens: number;
+    activeDynamicCredentials: number;
+    rotationSchedules: number;
+  };
+  last24Hours: {
+    totalOperations: number;
+    operationsByType: { operation: string; count: number }[];
+    secretOperations: number;
+    rotationOperations: number;
+    policyOperations: number;
+    tokenOperations: number;
+  };
+}

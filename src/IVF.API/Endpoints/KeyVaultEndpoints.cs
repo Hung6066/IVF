@@ -46,6 +46,68 @@ public static class KeyVaultEndpoints
         group.MapGet("/health", async (IKeyVaultService svc) =>
             Results.Ok(new { healthy = await svc.IsHealthyAsync() }));
 
+        // ─── Dashboard: aggregated vault health ────────────────
+        group.MapGet("/dashboard", async (
+            IVaultRepository repo,
+            IVaultSecretService secretService,
+            ILeaseManager leaseManager,
+            IKeyVaultService kvService) =>
+        {
+            var secrets = await secretService.ListSecretsAsync();
+            var secretCount = secrets.Count();
+
+            var leases = await leaseManager.GetActiveLeasesAsync();
+            var expiringLeases = leases.Where(l => l.ExpiresAt < DateTime.UtcNow.AddHours(24)).ToList();
+
+            var rotationSchedules = await repo.GetRotationSchedulesAsync(activeOnly: true);
+            var overdueRotations = rotationSchedules.Where(s => s.IsDueForRotation).ToList();
+
+            var recentAudits = await repo.GetAuditLogsAsync(1, 10, null);
+            var lastRotation = recentAudits
+                .Where(a => a.Action == "rotation.executed")
+                .OrderByDescending(a => a.CreatedAt)
+                .FirstOrDefault();
+
+            var kvHealthy = await kvService.IsHealthyAsync();
+
+            var complianceChecks = new
+            {
+                encryptionAtRest = true,
+                keyVaultHealthy = kvHealthy,
+                noOverdueRotations = overdueRotations.Count == 0,
+                activeRotationSchedules = rotationSchedules.Count > 0,
+                noExpiringLeases = expiringLeases.Count == 0
+            };
+
+            var passedChecks = new[] {
+                complianceChecks.encryptionAtRest,
+                complianceChecks.keyVaultHealthy,
+                complianceChecks.noOverdueRotations,
+                complianceChecks.activeRotationSchedules,
+                complianceChecks.noExpiringLeases
+            }.Count(c => c);
+
+            return Results.Ok(new
+            {
+                timestamp = DateTime.UtcNow,
+                secrets = new { total = secretCount },
+                leases = new { active = leases.Count, expiringSoon = expiringLeases.Count },
+                rotation = new
+                {
+                    activeSchedules = rotationSchedules.Count,
+                    overdueCount = overdueRotations.Count,
+                    lastRotationAt = lastRotation?.CreatedAt
+                },
+                keyVault = new { healthy = kvHealthy },
+                compliance = new
+                {
+                    score = $"{passedChecks}/5",
+                    percentage = passedChecks * 100 / 5,
+                    checks = complianceChecks
+                }
+            });
+        });
+
         // ═══════════════════════════════════════════════════════
         // ─── Secrets (DB-backed with AES-256-GCM encryption) ─
         // ═══════════════════════════════════════════════════════
@@ -711,6 +773,284 @@ public static class KeyVaultEndpoints
                 recentEvents
             });
         });
+
+        // ═══════════════════════════════════════════════════════
+        // ─── Current User Policies (non-admin) ───────────────
+        // ═══════════════════════════════════════════════════════
+
+        // Separate group without AdminOnly — any authenticated user can query their own policies
+        var userGroup = app.MapGroup("/api/keyvault/me").WithTags("KeyVault").RequireAuthorization();
+
+        userGroup.MapGet("/policies", async (IVaultPolicyEvaluator evaluator) =>
+        {
+            var policies = await evaluator.GetEffectivePoliciesAsync();
+            return Results.Ok(policies.Select(p => new
+            {
+                p.PolicyName,
+                p.PathPattern,
+                p.Capabilities,
+                p.Source
+            }));
+        });
+
+        userGroup.MapGet("/check", async (
+            string path, string capability, IVaultPolicyEvaluator evaluator) =>
+        {
+            var evaluation = await evaluator.EvaluateAsync(path, capability);
+            return Results.Ok(new
+            {
+                evaluation.Allowed,
+                evaluation.MatchedPolicy,
+                evaluation.Reason
+            });
+        });
+
+        // ═══════════════════════════════════════════════════════
+        // ─── Secret Rotation ─────────────────────────────────
+        // ═══════════════════════════════════════════════════════
+
+        group.MapGet("/rotation/schedules", async (ISecretRotationService svc) =>
+        {
+            var schedules = await svc.GetSchedulesAsync();
+            return Results.Ok(schedules);
+        });
+
+        group.MapPost("/rotation/schedules", async (RotationScheduleCreateRequest req, ISecretRotationService svc, IVaultRepository repo, HttpContext ctx) =>
+        {
+            var config = new RotationConfig(req.RotationIntervalDays, req.GracePeriodHours, req.AutomaticallyRotate, req.RotationStrategy, req.CallbackUrl);
+            var schedule = await svc.SetRotationScheduleAsync(req.SecretPath, config);
+            await repo.AddAuditLogAsync(VaultAuditLog.Create(
+                "rotation.schedule.create", "RotationSchedule", req.SecretPath,
+                ipAddress: ctx.Connection.RemoteIpAddress?.ToString()));
+            return Results.Ok(schedule);
+        });
+
+        group.MapDelete("/rotation/schedules/{*secretPath}", async (string secretPath, ISecretRotationService svc, IVaultRepository repo, HttpContext ctx) =>
+        {
+            await svc.RemoveRotationScheduleAsync(secretPath);
+            await repo.AddAuditLogAsync(VaultAuditLog.Create(
+                "rotation.schedule.delete", "RotationSchedule", secretPath,
+                ipAddress: ctx.Connection.RemoteIpAddress?.ToString()));
+            return Results.Ok(new { success = true });
+        });
+
+        group.MapPost("/rotation/rotate-now/{*secretPath}", async (string secretPath, ISecretRotationService svc, IVaultRepository repo, HttpContext ctx) =>
+        {
+            var result = await svc.RotateNowAsync(secretPath);
+            await repo.AddAuditLogAsync(VaultAuditLog.Create(
+                "rotation.executed", "Secret", secretPath,
+                details: $"{{\"success\":{result.Success.ToString().ToLowerInvariant()},\"newVersion\":{result.NewVersion}}}",
+                ipAddress: ctx.Connection.RemoteIpAddress?.ToString()));
+            return Results.Ok(result);
+        });
+
+        group.MapGet("/rotation/history/{*secretPath}", async (string secretPath, ISecretRotationService svc, int? limit) =>
+        {
+            var history = await svc.GetRotationHistoryAsync(secretPath, limit ?? 20);
+            return Results.Ok(history);
+        });
+
+        // ═══════════════════════════════════════════════════════
+        // ─── DEK Rotation ────────────────────────────────────
+        // ═══════════════════════════════════════════════════════
+
+        group.MapGet("/dek/status", async (IDekRotationService svc) =>
+        {
+            var purposes = new[] { "data", "session", "api", "backup" };
+            var results = new List<object>();
+            foreach (var p in purposes)
+            {
+                var info = await svc.GetDekVersionInfoAsync(p);
+                if (info is not null) results.Add(info);
+            }
+            return Results.Ok(results);
+        });
+
+        group.MapPost("/dek/{purpose}/rotate", async (string purpose, IDekRotationService svc, IVaultRepository repo, HttpContext ctx) =>
+        {
+            var result = await svc.RotateDekAsync(purpose);
+            await repo.AddAuditLogAsync(VaultAuditLog.Create(
+                "dek.rotate", "DEK", purpose,
+                details: $"{{\"success\":{result.Success.ToString().ToLowerInvariant()},\"newVersion\":{result.NewVersion}}}",
+                ipAddress: ctx.Connection.RemoteIpAddress?.ToString()));
+            return Results.Ok(result);
+        });
+
+        group.MapPost("/dek/{purpose}/re-encrypt/{tableName}", async (string purpose, string tableName, IDekRotationService svc, int? batchSize) =>
+        {
+            var result = await svc.ReEncryptTableAsync(tableName, purpose, batchSize ?? 100);
+            return Results.Ok(result);
+        });
+
+        group.MapGet("/dek/re-encrypt/progress", async (IDekRotationService svc) =>
+        {
+            var progress = await svc.GetReEncryptionProgressAsync();
+            return Results.Ok(progress);
+        });
+
+        // ═══════════════════════════════════════════════════════
+        // ─── DB Credential Rotation ──────────────────────────
+        // ═══════════════════════════════════════════════════════
+
+        group.MapGet("/db-credentials/status", async (IDbCredentialRotationService svc) =>
+        {
+            var status = await svc.GetStatusAsync();
+            return Results.Ok(status);
+        });
+
+        group.MapPost("/db-credentials/rotate", async (IDbCredentialRotationService svc, IVaultRepository repo, HttpContext ctx) =>
+        {
+            var result = await svc.RotateAsync();
+            await repo.AddAuditLogAsync(VaultAuditLog.Create(
+                "db_credential.rotate", "DbCredential", result.ActiveSlot,
+                details: $"{{\"success\":{result.Success.ToString().ToLowerInvariant()},\"newUsername\":\"{result.NewUsername}\"}}",
+                ipAddress: ctx.Connection.RemoteIpAddress?.ToString()));
+            return Results.Ok(result);
+        });
+
+        // ═══════════════════════════════════════════════════════
+        // ─── Compliance Scoring ──────────────────────────────
+        // ═══════════════════════════════════════════════════════
+
+        group.MapGet("/compliance/report", async (IComplianceScoringEngine engine) =>
+        {
+            var report = await engine.EvaluateAsync();
+            return Results.Ok(report);
+        });
+
+        group.MapGet("/compliance/framework/{framework}", async (string framework, IComplianceScoringEngine engine) =>
+        {
+            if (!Enum.TryParse<ComplianceFramework>(framework, true, out var fw))
+                return Results.BadRequest(new { error = $"Unknown framework: {framework}" });
+            var score = await engine.EvaluateFrameworkAsync(fw);
+            return Results.Ok(score);
+        });
+
+        // ═══════════════════════════════════════════════════════
+        // ─── Vault Disaster Recovery ─────────────────────────
+        // ═══════════════════════════════════════════════════════
+
+        group.MapGet("/dr/readiness", async (IVaultDrService svc) =>
+        {
+            var status = await svc.GetReadinessAsync();
+            return Results.Ok(status);
+        });
+
+        group.MapPost("/dr/backup", async (DrBackupRequest req, IVaultDrService svc, IVaultRepository repo, HttpContext ctx) =>
+        {
+            var result = await svc.BackupAsync(req.BackupKey);
+            if (result.Success)
+            {
+                await repo.AddAuditLogAsync(VaultAuditLog.Create(
+                    "dr.backup", "VaultBackup", result.BackupId,
+                    details: $"{{\"secrets\":{result.SecretsCount},\"policies\":{result.PoliciesCount}}}",
+                    ipAddress: ctx.Connection.RemoteIpAddress?.ToString()));
+            }
+            return Results.Ok(new
+            {
+                result.Success,
+                result.BackupId,
+                result.CreatedAt,
+                result.SecretsCount,
+                result.PoliciesCount,
+                result.SettingsCount,
+                result.EncryptionConfigsCount,
+                result.IntegrityHash,
+                backupDataBase64 = Convert.ToBase64String(result.BackupData)
+            });
+        });
+
+        group.MapPost("/dr/restore", async (DrRestoreRequest req, IVaultDrService svc, IVaultRepository repo, HttpContext ctx) =>
+        {
+            var data = Convert.FromBase64String(req.BackupDataBase64);
+            var result = await svc.RestoreAsync(data, req.BackupKey);
+            if (result.Success)
+            {
+                await repo.AddAuditLogAsync(VaultAuditLog.Create(
+                    "dr.restore", "VaultRestore", null,
+                    details: $"{{\"secrets\":{result.SecretsRestored},\"policies\":{result.PoliciesRestored}}}",
+                    ipAddress: ctx.Connection.RemoteIpAddress?.ToString()));
+            }
+            return Results.Ok(result);
+        });
+
+        group.MapPost("/dr/validate", async (DrRestoreRequest req, IVaultDrService svc) =>
+        {
+            var data = Convert.FromBase64String(req.BackupDataBase64);
+            var validation = await svc.ValidateBackupAsync(data, req.BackupKey);
+            return Results.Ok(validation);
+        });
+
+        // ═══════════════════════════════════════════════════════
+        // ─── Multi-Provider Unseal ───────────────────────────
+        // ═══════════════════════════════════════════════════════
+
+        group.MapGet("/unseal-providers", async (IMultiProviderUnsealService svc) =>
+        {
+            var providers = await svc.GetProviderStatusAsync();
+            return Results.Ok(providers);
+        });
+
+        group.MapPost("/unseal-providers/configure", async (UnsealProviderConfigureRequest req, IMultiProviderUnsealService svc, IVaultRepository repo, HttpContext ctx) =>
+        {
+            var config = new UnsealProviderConfig(req.ProviderId, req.ProviderType, req.Priority, req.KeyIdentifier, req.Settings);
+            var success = await svc.ConfigureProviderAsync(config, req.MasterPassword);
+            await repo.AddAuditLogAsync(VaultAuditLog.Create(
+                "unseal_provider.configure", "UnsealProvider", req.ProviderId,
+                details: $"{{\"type\":\"{req.ProviderType}\",\"priority\":{req.Priority}}}",
+                ipAddress: ctx.Connection.RemoteIpAddress?.ToString()));
+            return Results.Ok(new { success });
+        });
+
+        group.MapPost("/unseal-providers/unseal", async (IMultiProviderUnsealService svc) =>
+        {
+            var result = await svc.AutoUnsealAsync();
+            return Results.Ok(result);
+        });
+
+        // ═══════════════════════════════════════════════════════
+        // ─── Vault Metrics ───────────────────────────────────
+        // ═══════════════════════════════════════════════════════
+
+        group.MapGet("/metrics", async (IVaultRepository repo) =>
+        {
+            var secrets = await repo.ListSecretsAsync();
+            var leases = await repo.GetLeasesAsync(false);
+            var tokens = await repo.GetTokensAsync();
+            var dynamicCreds = await repo.GetDynamicCredentialsAsync();
+            var rotationSchedules = await repo.GetRotationSchedulesAsync(activeOnly: true);
+            var auditLogs = await repo.GetAuditLogsAsync(1, 500, null);
+            var last24h = auditLogs.Where(l => l.CreatedAt > DateTime.UtcNow.AddHours(-24)).ToList();
+
+            var operationsByType = last24h
+                .GroupBy(l => l.Action.Split('.')[0])
+                .Select(g => new { operation = g.Key, count = g.Count() })
+                .OrderByDescending(g => g.count)
+                .ToList();
+
+            return Results.Ok(new
+            {
+                timestamp = DateTime.UtcNow,
+                totals = new
+                {
+                    secrets = secrets.Count(),
+                    activeLeases = leases.Count,
+                    activeTokens = tokens.Count(t => t.IsValid),
+                    revokedTokens = tokens.Count(t => t.Revoked),
+                    activeDynamicCredentials = dynamicCreds.Count(c => !c.Revoked && !c.IsExpired),
+                    rotationSchedules = rotationSchedules.Count
+                },
+                last24Hours = new
+                {
+                    totalOperations = last24h.Count,
+                    operationsByType,
+                    secretOperations = last24h.Count(l => l.Action.StartsWith("secret.")),
+                    rotationOperations = last24h.Count(l => l.Action.StartsWith("rotation.")),
+                    policyOperations = last24h.Count(l => l.Action.StartsWith("policy.") || l.Action.StartsWith("field_access.")),
+                    tokenOperations = last24h.Count(l => l.Action.StartsWith("token."))
+                }
+            });
+        });
     }
 }
 
@@ -736,3 +1076,9 @@ public class DbTableColumn
     public string DataType { get; set; } = "";
 }
 public record FieldAccessPolicyUpdateRequest(string AccessLevel, string? MaskPattern, int PartialLength = 5, string? Description = null);
+
+// ─── Enterprise Feature Request Records ──────────────
+public record RotationScheduleCreateRequest(string SecretPath, int RotationIntervalDays, int GracePeriodHours = 24, bool AutomaticallyRotate = true, string? RotationStrategy = null, string? CallbackUrl = null);
+public record DrBackupRequest(string BackupKey);
+public record DrRestoreRequest(string BackupDataBase64, string BackupKey);
+public record UnsealProviderConfigureRequest(string ProviderId, string ProviderType, int Priority, string KeyIdentifier, string MasterPassword, Dictionary<string, string>? Settings = null);

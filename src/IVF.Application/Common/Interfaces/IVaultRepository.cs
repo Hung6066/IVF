@@ -77,4 +77,11 @@ public interface IVaultRepository
     Task AddFieldAccessPolicyAsync(FieldAccessPolicy policy, CancellationToken ct = default);
     Task UpdateFieldAccessPolicyAsync(FieldAccessPolicy policy, CancellationToken ct = default);
     Task DeleteFieldAccessPolicyAsync(Guid id, CancellationToken ct = default);
+
+    // ─── Secret Rotation Schedules ────────────────────────
+    Task<List<SecretRotationSchedule>> GetRotationSchedulesAsync(bool activeOnly = true, CancellationToken ct = default);
+    Task<SecretRotationSchedule?> GetRotationScheduleByPathAsync(string secretPath, CancellationToken ct = default);
+    Task AddRotationScheduleAsync(SecretRotationSchedule schedule, CancellationToken ct = default);
+    Task UpdateRotationScheduleAsync(SecretRotationSchedule schedule, CancellationToken ct = default);
+    Task DeleteRotationScheduleAsync(string secretPath, CancellationToken ct = default);
 }

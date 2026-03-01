@@ -1,0 +1,151 @@
+<div class="security-page">
+  <div class="page-header">
+    <h2>🖥️ Quản lý phiên hoạt động</h2>
+    <p class="subtitle">Theo dõi và quản lý phiên đăng nhập theo Zero Trust</p>
+  </div>
+
+  <!-- Search -->
+  <div class="card">
+    <div class="card-header">
+      <h3>🔍 Tra cứu phiên</h3>
+    </div>
+    <div class="card-body">
+      <div class="search-form">
+        <div class="form-group">
+          <label>User ID</label>
+          <input
+            type="text"
+            [(ngModel)]="lookupUserId"
+            placeholder="Nhập User ID (GUID)..."
+            (keydown.enter)="searchSessions()"
+          />
+        </div>
+        <button
+          class="btn btn-primary"
+          (click)="searchSessions()"
+          [disabled]="loading() || !lookupUserId.trim()"
+        >
+          🔍 Tìm phiên
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Session Results -->
+  @for (userSession of userSessions(); track userSession.userId) {
+    <div class="card session-card">
+      <div class="card-header" (click)="toggleExpand(userSession)">
+        <div class="user-header">
+          <span class="expand-icon">{{ userSession.expanded ? '▼' : '▶' }}</span>
+          <h3>👤 {{ userSession.userId.substring(0, 8) }}...</h3>
+          <span class="session-count">{{ userSession.sessions.length }} phiên</span>
+        </div>
+        <div class="header-actions">
+          @if (userSession.sessions.length > 0) {
+            <button
+              class="btn btn-xs btn-danger"
+              (click)="revokeAllSessions(userSession); $event.stopPropagation()"
+            >
+              🗑️ Thu hồi tất cả
+            </button>
+          }
+          <button
+            class="btn btn-xs btn-outline"
+            (click)="removeUser(userSession.userId); $event.stopPropagation()"
+          >
+            ✕
+          </button>
+        </div>
+      </div>
+
+      @if (userSession.expanded) {
+        <div class="card-body">
+          @if (userSession.sessions.length > 0) {
+            <div class="sessions-list">
+              @for (session of userSession.sessions; track session.sessionId) {
+                <div class="session-item" [class.session-active]="session.isActive">
+                  <div class="session-main">
+                    <div class="session-info-grid">
+                      <div class="info-item">
+                        <span class="info-label">Session ID</span>
+                        <span class="mono">{{ session.sessionId.substring(0, 16) }}...</span>
+                      </div>
+                      <div class="info-item">
+                        <span class="info-label">IP</span>
+                        <span class="mono">{{ session.ipAddress }}</span>
+                      </div>
+                      <div class="info-item">
+                        <span class="info-label">Quốc gia</span>
+                        <span>{{ session.country || '—' }}</span>
+                      </div>
+                      <div class="info-item">
+                        <span class="info-label">Tạo lúc</span>
+                        <span>{{ formatDate(session.createdAt) }}</span>
+                      </div>
+                      <div class="info-item">
+                        <span class="info-label">Hoạt động cuối</span>
+                        <span>{{ formatTimeAgo(session.lastActivityAt) }}</span>
+                      </div>
+                      <div class="info-item">
+                        <span class="info-label">Trạng thái</span>
+                        <span
+                          class="badge"
+                          [class.badge-active]="session.isActive"
+                          [class.badge-inactive]="!session.isActive"
+                        >
+                          {{ session.isActive ? '🟢 Hoạt động' : '⚫ Ngưng' }}
+                        </span>
+                      </div>
+                    </div>
+                    @if (session.deviceFingerprint) {
+                      <div class="fingerprint-row">
+                        <span class="info-label">Device Fingerprint</span>
+                        <span class="mono small">{{ session.deviceFingerprint }}</span>
+                      </div>
+                    }
+                  </div>
+                  <div class="session-actions">
+                    <button
+                      class="btn btn-sm btn-danger"
+                      (click)="revokeSession(userSession, session)"
+                    >
+                      🛑 Thu hồi
+                    </button>
+                  </div>
+                </div>
+              }
+            </div>
+          } @else {
+            <div class="empty-state">
+              <span>Không có phiên hoạt động</span>
+            </div>
+          }
+        </div>
+      }
+    </div>
+  }
+
+  @if (userSessions().length === 0) {
+    <div class="card">
+      <div class="empty-state-large">
+        <span class="empty-icon">🖥️</span>
+        <span class="empty-text">Nhập User ID để xem phiên hoạt động</span>
+      </div>
+    </div>
+  }
+
+  <!-- Toast -->
+  @if (statusMessage()) {
+    <div
+      class="toast"
+      [class.toast-success]="statusMessage()!.type === 'success'"
+      [class.toast-error]="statusMessage()!.type === 'error'"
+    >
+      {{ statusMessage()!.text }}
+    </div>
+  }
+
+  @if (loading()) {
+    <div class="loading-indicator"><div class="spinner"></div></div>
+  }
+</div>

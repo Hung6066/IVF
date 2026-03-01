@@ -1,0 +1,68 @@
+# Gitleaks configuration for IVF System
+# https://github.com/gitleaks/gitleaks
+title = "IVF System Secret Scanning"
+
+[extend]
+useDefault = true
+
+# Allowlist — exclude development defaults and test files
+[allowlist]
+  description = "Global allowlist"
+  paths = [
+    '''(^|/)tests/''',
+    '''(^|/)\.gitleaks\.toml$''',
+    '''(^|/)docs/''',
+    '''(^|/)backups/''',
+  ]
+
+# Additional custom rules
+[[rules]]
+  id = "ivf-jwt-secret"
+  description = "IVF JWT Secret in production config"
+  regex = '''JwtSettings.*Secret.*=\s*["'](?!IVF-System-Super-Secret)[^"']{20,}["']'''
+  keywords = ["JwtSettings", "Secret"]
+
+[[rules]]
+  id = "ivf-db-password"
+  description = "Database password (non-default)"
+  regex = '''Password\s*=\s*(?!postgres\b)[A-Za-z0-9@#$%^&*!]{8,}'''
+  keywords = ["Password"]
+  [rules.allowlist]
+    paths = [
+      '''appsettings\.json$''',
+      '''appsettings\.Development\.json$''',
+      '''docker-compose\.yml$''',
+    ]
+
+[[rules]]
+  id = "ivf-minio-secret"
+  description = "MinIO secret key (non-default)"
+  regex = '''SecretKey.*=\s*["'](?!minioadmin123)[^"']{10,}["']'''
+  keywords = ["SecretKey", "MinIO"]
+
+[[rules]]
+  id = "ivf-api-key"
+  description = "IVF API keys leaked in code"
+  regex = '''IVF-Desktop-FingerprintClient.*SecureKey'''
+  keywords = ["SecureKey", "FingerprintClient"]
+  [rules.allowlist]
+    paths = [
+      '''appsettings.*\.json$''',
+    ]
+
+[[rules]]
+  id = "ivf-cert-password"
+  description = "Certificate password in code"
+  regex = '''cert.*password\s*[:=]\s*["'][^"']{4,}["']'''
+  keywords = ["cert", "password"]
+  [rules.allowlist]
+    paths = [
+      '''secrets/''',
+      '''\.env''',
+    ]
+
+[[rules]]
+  id = "azure-client-secret"
+  description = "Azure AD client secret"
+  regex = '''ClientSecret\s*[:=]\s*["'][A-Za-z0-9~._-]{30,}["']'''
+  keywords = ["ClientSecret"]

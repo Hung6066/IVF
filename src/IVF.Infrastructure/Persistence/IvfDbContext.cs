@@ -93,6 +93,9 @@ public class IvfDbContext : DbContext
     public DbSet<CertificateRevocationList> CertificateRevocationLists => Set<CertificateRevocationList>();
     public DbSet<CertificateAuditEvent> CertificateAuditEvents => Set<CertificateAuditEvent>();
 
+    // Security Events (Zero Trust continuous monitoring)
+    public DbSet<SecurityEvent> SecurityEvents => Set<SecurityEvent>();
+
     // Key Vault & Zero Trust
     public DbSet<ApiKeyManagement> ApiKeyManagements => Set<ApiKeyManagement>();
     public DbSet<DeviceRisk> DeviceRisks => Set<DeviceRisk>();
@@ -110,6 +113,7 @@ public class IvfDbContext : DbContext
     public DbSet<VaultAuditLog> VaultAuditLogs => Set<VaultAuditLog>();
     public DbSet<EncryptionConfig> EncryptionConfigs => Set<EncryptionConfig>();
     public DbSet<FieldAccessPolicy> FieldAccessPolicies => Set<FieldAccessPolicy>();
+    public DbSet<SecretRotationSchedule> SecretRotationSchedules => Set<SecretRotationSchedule>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

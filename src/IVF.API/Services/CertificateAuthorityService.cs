@@ -5,7 +5,9 @@ using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.Json;
 using IVF.API.Hubs;
+using IVF.Application.Common.Interfaces;
 using IVF.Domain.Entities;
+using IVF.Domain.Enums;
 using IVF.Infrastructure.Persistence;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
@@ -17,13 +19,16 @@ namespace IVF.API.Services;
 /// Manages Certificate Authorities and mTLS certificates for secure inter-service
 /// communication (PostgreSQL SSL, MinIO TLS, API client certs).
 /// Uses System.Security.Cryptography for cert generation — no external openssl dependency.
+/// Private keys are encrypted via Vault envelope encryption (AES-256-GCM + KEK)
+/// with IDataProtectionProvider fallback when Vault is unavailable.
 /// </summary>
 public sealed class CertificateAuthorityService(
     IServiceScopeFactory scopeFactory,
     IHubContext<BackupHub> hubContext,
     IConfiguration configuration,
     ILogger<CertificateAuthorityService> logger,
-    IDataProtectionProvider dataProtectionProvider)
+    IDataProtectionProvider dataProtectionProvider,
+    IKeyVaultService keyVaultService)
 {
     private const string KeyProtectionPurpose = "IVF.CertificateAuthority.PrivateKeys";
 
@@ -34,17 +39,76 @@ public sealed class CertificateAuthorityService(
     // OID: Name Constraints
     private const string OidNameConstraints = "2.5.29.30";
 
-    /// <summary>Encrypt a private key PEM before storing in the database.</summary>
+    // Vault envelope encryption prefix — distinguishes Vault-encrypted from DPAPI-encrypted keys
+    private const string VaultEncryptedPrefix = "VAULT:";
+
+    /// <summary>
+    /// Encrypt a private key PEM before storing in the database.
+    /// Uses Vault envelope encryption (AES-256-GCM + KEK wrapped by Azure KV / local).
+    /// Falls back to IDataProtectionProvider if Vault encryption fails.
+    /// </summary>
+    private async Task<string> ProtectKeyAsync(string keyPem)
+    {
+        try
+        {
+            var payload = await keyVaultService.EncryptAsync(
+                Encoding.UTF8.GetBytes(keyPem), KeyPurpose.Certificate);
+            // Store as "VAULT:{ciphertext}:{iv}" so we can identify the encryption method
+            await VaultAuditAsync("ca.key.encrypt", details: "{\"method\":\"vault-envelope\",\"algorithm\":\"AES-256-GCM\"}");
+            return $"{VaultEncryptedPrefix}{payload.CiphertextBase64}:{payload.IvBase64}";
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Vault encryption failed for CA private key — falling back to DataProtection");
+            await VaultAuditAsync("ca.key.encrypt", details: "{\"method\":\"dpapi-fallback\"}");
+            var protector = dataProtectionProvider.CreateProtector(KeyProtectionPurpose);
+            return protector.Protect(keyPem);
+        }
+    }
+
+    /// <summary>Synchronous fallback — used only by legacy code paths.</summary>
     private string ProtectKey(string keyPem)
     {
         var protector = dataProtectionProvider.CreateProtector(KeyProtectionPurpose);
         return protector.Protect(keyPem);
     }
 
-    /// <summary>Decrypt a private key PEM retrieved from the database.</summary>
+    /// <summary>
+    /// Decrypt a private key PEM retrieved from the database.
+    /// Supports three formats:
+    ///   1. Legacy unencrypted (contains "-----BEGIN")
+    ///   2. Vault envelope encrypted (starts with "VAULT:")
+    ///   3. IDataProtectionProvider encrypted (DPAPI fallback)
+    /// </summary>
+    private async Task<string> UnprotectKeyAsync(string protectedKeyPem)
+    {
+        // Legacy unencrypted keys
+        if (protectedKeyPem.Contains("-----BEGIN", StringComparison.Ordinal))
+            return protectedKeyPem;
+
+        // Vault envelope encrypted
+        if (protectedKeyPem.StartsWith(VaultEncryptedPrefix, StringComparison.Ordinal))
+        {
+            var data = protectedKeyPem[VaultEncryptedPrefix.Length..];
+            var colonIdx = data.LastIndexOf(':');
+            if (colonIdx > 0)
+            {
+                var ciphertextBase64 = data[..colonIdx];
+                var ivBase64 = data[(colonIdx + 1)..];
+                var plainBytes = await keyVaultService.DecryptAsync(
+                    ciphertextBase64, ivBase64, KeyPurpose.Certificate);
+                return Encoding.UTF8.GetString(plainBytes);
+            }
+        }
+
+        // DPAPI fallback
+        var protector = dataProtectionProvider.CreateProtector(KeyProtectionPurpose);
+        return protector.Unprotect(protectedKeyPem);
+    }
+
+    /// <summary>Synchronous fallback for legacy code paths.</summary>
     private string UnprotectKey(string protectedKeyPem)
     {
-        // Handle legacy unencrypted keys (before migration)
         if (protectedKeyPem.Contains("-----BEGIN", StringComparison.Ordinal))
             return protectedKeyPem;
         var protector = dataProtectionProvider.CreateProtector(KeyProtectionPurpose);
@@ -237,7 +301,7 @@ public sealed class CertificateAuthorityService(
             keyAlgorithm: actualAlgorithm,
             keySize: actualKeySize,
             certificatePem: certPem,
-            privateKeyPem: ProtectKey(keyPem),
+            privateKeyPem: await ProtectKeyAsync(keyPem),
             fingerprint: fingerprint,
             notBefore: notBefore.UtcDateTime,
             notAfter: notAfter.UtcDateTime,
@@ -356,7 +420,8 @@ public sealed class CertificateAuthorityService(
         }
 
         // Load CA cert + key for signing (decrypt key if encrypted)
-        var caCert = X509Certificate2.CreateFromPem(ca.CertificatePem, UnprotectKey(ca.PrivateKeyPem));
+        var caKeyPem = await UnprotectKeyAsync(ca.PrivateKeyPem);
+        var caCert = X509Certificate2.CreateFromPem(ca.CertificatePem, caKeyPem);
 
         // Authority Key Identifier — links issued cert to issuing CA for chain validation
         certReq.CertificateExtensions.Add(
@@ -383,7 +448,7 @@ public sealed class CertificateAuthorityService(
             type: req.Type,
             purpose: req.Purpose,
             certificatePem: certPem,
-            privateKeyPem: ProtectKey(keyPem),
+            privateKeyPem: await ProtectKeyAsync(keyPem),
             fingerprint: fingerprint,
             serialNumber: serialHex,
             notBefore: notBefore.UtcDateTime,
@@ -606,7 +671,8 @@ public sealed class CertificateAuthorityService(
         var thisUpdate = DateTime.UtcNow;
         var nextUpdate = thisUpdate.AddDays(14); // CRL valid for 14 days
 
-        using var caCert = X509Certificate2.CreateFromPem(ca.CertificatePem, UnprotectKey(ca.PrivateKeyPem));
+        var crlCaKeyPem = await UnprotectKeyAsync(ca.PrivateKeyPem);
+        using var caCert = X509Certificate2.CreateFromPem(ca.CertificatePem, crlCaKeyPem);
         using var caKey = caCert.GetRSAPrivateKey()
             ?? throw new InvalidOperationException("CA key is not RSA");
 
@@ -782,7 +848,8 @@ public sealed class CertificateAuthorityService(
             certReq.CertificateExtensions.Add(BuildNameConstraintsExtension(req.PermittedDomains));
 
         // Load parent CA cert + key for signing (decrypt key if encrypted)
-        using var parentCert = X509Certificate2.CreateFromPem(parentCa.CertificatePem, UnprotectKey(parentCa.PrivateKeyPem));
+        var parentKeyPem = await UnprotectKeyAsync(parentCa.PrivateKeyPem);
+        using var parentCert = X509Certificate2.CreateFromPem(parentCa.CertificatePem, parentKeyPem);
 
         // Authority Key Identifier — links intermediate CA to parent CA for chain validation
         certReq.CertificateExtensions.Add(
@@ -819,7 +886,7 @@ public sealed class CertificateAuthorityService(
             keyAlgorithm: actualAlgorithm,
             keySize: actualKeySize,
             certificatePem: certPem,
-            privateKeyPem: ProtectKey(keyPem),
+            privateKeyPem: await ProtectKeyAsync(keyPem),
             fingerprint: fingerprint,
             notBefore: notBefore.UtcDateTime,
             notAfter: notAfter.UtcDateTime,
@@ -876,6 +943,25 @@ public sealed class CertificateAuthorityService(
         db.CertificateAuditEvents.Add(CertificateAuditEvent.Create(
             eventType, description, actor, certificateId, caId,
             sourceIp, metadata, success, errorMessage));
+    }
+
+    /// <summary>Record a CA key operation in the Vault audit log for centralized security monitoring.</summary>
+    private async Task VaultAuditAsync(string action, string? resourceId = null, string? details = null)
+    {
+        try
+        {
+            using var scope = scopeFactory.CreateScope();
+            var repo = scope.ServiceProvider.GetRequiredService<IVaultRepository>();
+            await repo.AddAuditLogAsync(VaultAuditLog.Create(
+                action: action,
+                resourceType: "CertificateAuthority",
+                resourceId: resourceId,
+                details: details));
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to write Vault audit log for CA operation: {Action}", action);
+        }
     }
 
     // ═══════════════════════════════════════════════════════
@@ -974,7 +1060,7 @@ public sealed class CertificateAuthorityService(
             await EmitLog(opId, log, "success", step);
 
             // Write key PEM (decrypt before writing, set restrictive permissions)
-            await WriteToContainerAsync(container, keyPath, UnprotectKey(cert.PrivateKeyPem), deployToken);
+            await WriteToContainerAsync(container, keyPath, await UnprotectKeyAsync(cert.PrivateKeyPem), deployToken);
             await RunCommandAsync($"docker exec {container} chmod 600 {keyPath}", deployToken);
             await RunCommandAsync($"docker exec {container} chown 999:999 {keyPath}", deployToken);
             step = $"✓ Private key → {container}:{keyPath} (chmod 600)";
@@ -1160,7 +1246,7 @@ public sealed class CertificateAuthorityService(
             await EmitLog(opId, log, "success", step);
 
             // Write key PEM (decrypt before writing)
-            await WriteToRemoteContainerAsync(remoteHost, container, keyPath, UnprotectKey(cert.PrivateKeyPem), deployToken);
+            await WriteToRemoteContainerAsync(remoteHost, container, keyPath, await UnprotectKeyAsync(cert.PrivateKeyPem), deployToken);
             await RunCommandAsync($"{sshPrefix} docker exec {container} chmod 600 {keyPath}", deployToken);
             await RunCommandAsync($"{sshPrefix} docker exec {container} chown 999:999 {keyPath}", deployToken);
             step = $"✓ Private key → {remoteHost}:{container}:{keyPath} (chmod 600)";
@@ -1347,7 +1433,7 @@ public sealed class CertificateAuthorityService(
 
         return new CertBundle(
             cert.CertificatePem,
-            UnprotectKey(cert.PrivateKeyPem),
+            await UnprotectKeyAsync(cert.PrivateKeyPem),
             cert.IssuingCa?.ChainPem ?? cert.IssuingCa?.CertificatePem ?? "",
             cert.CommonName,
             cert.Purpose
@@ -1476,7 +1562,8 @@ public sealed class CertificateAuthorityService(
         }
 
         // Load CA cert + key for signing (decrypt key if encrypted)
-        var caCert = X509Certificate2.CreateFromPem(ca.CertificatePem, UnprotectKey(ca.PrivateKeyPem));
+        var internalCaKeyPem = await UnprotectKeyAsync(ca.PrivateKeyPem);
+        var caCert = X509Certificate2.CreateFromPem(ca.CertificatePem, internalCaKeyPem);
 
         // Authority Key Identifier — links issued cert to issuing CA for chain validation
         certReq.CertificateExtensions.Add(
@@ -1503,7 +1590,7 @@ public sealed class CertificateAuthorityService(
             type: req.Type,
             purpose: req.Purpose,
             certificatePem: certPem,
-            privateKeyPem: ProtectKey(keyPem),
+            privateKeyPem: await ProtectKeyAsync(keyPem),
             fingerprint: fingerprint,
             serialNumber: serialHex,
             notBefore: notBefore.UtcDateTime,

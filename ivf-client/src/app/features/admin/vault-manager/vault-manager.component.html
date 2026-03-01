@@ -2474,6 +2474,46 @@
     </div>
   }
 
+  <!-- ═══ TAB: Secret Rotation ═══ -->
+  @if (activeTab() === 'secret-rotation') {
+    <app-secret-rotation-tab />
+  }
+
+  <!-- ═══ TAB: DEK Rotation ═══ -->
+  @if (activeTab() === 'dek-rotation') {
+    <app-dek-rotation-tab />
+  }
+
+  <!-- ═══ TAB: DB Credential Rotation ═══ -->
+  @if (activeTab() === 'db-rotation') {
+    <app-db-credential-rotation-tab />
+  }
+
+  <!-- ═══ TAB: Compliance ═══ -->
+  @if (activeTab() === 'compliance') {
+    <app-compliance-tab />
+  }
+
+  <!-- ═══ TAB: Vault DR & Backup ═══ -->
+  @if (activeTab() === 'vault-dr') {
+    <app-vault-dr-tab />
+  }
+
+  <!-- ═══ TAB: SIEM Events ═══ -->
+  @if (activeTab() === 'siem') {
+    <app-siem-tab />
+  }
+
+  <!-- ═══ TAB: Multi-Provider Unseal ═══ -->
+  @if (activeTab() === 'multi-unseal') {
+    <app-multi-unseal-tab />
+  }
+
+  <!-- ═══ TAB: Vault Metrics ═══ -->
+  @if (activeTab() === 'vault-metrics') {
+    <app-vault-metrics-tab />
+  }
+
   <!-- ═══ DIALOG: Edit ZT Policy ═══ -->
   @if (editingZTPolicy()) {
     <div class="modal-overlay" (click)="editingZTPolicy.set(false)">

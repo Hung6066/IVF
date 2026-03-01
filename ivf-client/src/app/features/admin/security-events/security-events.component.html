@@ -1,0 +1,273 @@
+<div class="security-page">
+  <div class="page-header">
+    <h2>📋 Sự kiện bảo mật</h2>
+    <p class="subtitle">Chi tiết sự kiện Zero Trust — Tất cả hoạt động bảo mật</p>
+  </div>
+
+  <!-- View Toggle + Filters -->
+  <div class="card filter-card">
+    <div class="filter-top">
+      <div class="view-toggle">
+        <button class="toggle-btn" [class.active]="viewMode === 'all'" (click)="switchView('all')">
+          📊 Tất cả
+        </button>
+        <button
+          class="toggle-btn"
+          [class.active]="viewMode === 'high-severity'"
+          (click)="switchView('high-severity')"
+        >
+          🚨 Nghiêm trọng
+        </button>
+      </div>
+      <div class="filter-actions">
+        <button class="btn btn-sm btn-outline" (click)="clearFilters()">✕ Xóa lọc</button>
+        <button class="btn btn-sm btn-outline" (click)="loadEvents()" [disabled]="loading()">
+          🔄 Làm mới
+        </button>
+      </div>
+    </div>
+    <div class="filter-row">
+      <div class="form-group">
+        <label>Mức độ</label>
+        <select [(ngModel)]="filterSeverity" (ngModelChange)="applyFilters()">
+          <option value="">Tất cả</option>
+          <option value="Critical">Critical</option>
+          <option value="High">High</option>
+          <option value="Medium">Medium</option>
+          <option value="Low">Low</option>
+          <option value="Info">Info</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Loại sự kiện</label>
+        <select [(ngModel)]="filterType" (ngModelChange)="applyFilters()">
+          <option value="">Tất cả</option>
+          @for (cat of getEventCategories(); track cat) {
+            <option [value]="cat">{{ cat }}</option>
+          }
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Địa chỉ IP</label>
+        <input
+          type="text"
+          [(ngModel)]="filterIp"
+          (ngModelChange)="applyFilters()"
+          placeholder="Lọc theo IP..."
+        />
+      </div>
+      <div class="form-group">
+        <label>Người dùng</label>
+        <input
+          type="text"
+          [(ngModel)]="filterUser"
+          (ngModelChange)="applyFilters()"
+          placeholder="Lọc theo tên..."
+        />
+      </div>
+      <div class="form-group">
+        <label>Trạng thái</label>
+        <select [(ngModel)]="filterBlocked" (ngModelChange)="applyFilters()">
+          <option value="">Tất cả</option>
+          <option value="blocked">Bị chặn</option>
+          <option value="allowed">Cho phép</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Events Count -->
+  <div class="results-count">
+    Hiển thị {{ filteredEvents().length }} / {{ events().length }} sự kiện
+  </div>
+
+  <!-- Events Table -->
+  <div class="card">
+    <div class="table-wrapper">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Thời gian</th>
+            <th>Loại sự kiện</th>
+            <th>Mức độ</th>
+            <th>Người dùng</th>
+            <th>IP</th>
+            <th>Đường dẫn</th>
+            <th>Risk Score</th>
+            <th>Trạng thái</th>
+            <th>Chi tiết</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (event of filteredEvents(); track event.id) {
+            <tr [class.row-blocked]="event.isBlocked">
+              <td class="time-cell">{{ formatDate(event.createdAt) }}</td>
+              <td>
+                <div class="event-type-cell">
+                  <span class="event-icon">{{ getEventIcon(event.eventType) }}</span>
+                  <span class="event-type">{{ formatEventType(event.eventType) }}</span>
+                </div>
+              </td>
+              <td>
+                <span class="badge" [ngClass]="getSeverityClass(event.severity)">
+                  {{ event.severity }}
+                </span>
+              </td>
+              <td>{{ event.username || '—' }}</td>
+              <td class="ip-cell">{{ event.ipAddress || '—' }}</td>
+              <td class="path-cell" [title]="event.requestPath || ''">
+                {{ event.requestPath || '—' }}
+              </td>
+              <td>
+                @if (event.riskScore !== null) {
+                  <span
+                    class="risk-score"
+                    [class.risk-high]="event.riskScore! >= 50"
+                    [class.risk-medium]="event.riskScore! >= 25 && event.riskScore! < 50"
+                    [class.risk-low]="event.riskScore! < 25"
+                  >
+                    {{ event.riskScore }}
+                  </span>
+                } @else {
+                  <span class="text-muted">—</span>
+                }
+              </td>
+              <td>
+                @if (event.isBlocked) {
+                  <span class="badge severity-critical">🛑 Chặn</span>
+                } @else {
+                  <span class="badge severity-info">✓</span>
+                }
+              </td>
+              <td>
+                <button class="btn btn-xs btn-outline" (click)="showDetail(event)">🔍</button>
+              </td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="9" class="empty-state">Không có sự kiện nào phù hợp</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Event Detail Modal -->
+  @if (selectedEvent()) {
+    <div class="modal-overlay" (click)="closeDetail()">
+      <div class="modal-content modal-lg" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h3>
+            {{ getEventIcon(selectedEvent()!.eventType) }}
+            {{ formatEventType(selectedEvent()!.eventType) }}
+          </h3>
+          <button class="btn-close" (click)="closeDetail()">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="detail-grid">
+            <div class="detail-item">
+              <span class="detail-label">Mức độ</span>
+              <span class="badge" [ngClass]="getSeverityClass(selectedEvent()!.severity)">
+                {{ selectedEvent()!.severity }}
+              </span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Thời gian</span>
+              <span>{{ formatDate(selectedEvent()!.createdAt) }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Người dùng</span>
+              <span>{{ selectedEvent()!.username || '—' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">IP</span>
+              <span class="mono">{{ selectedEvent()!.ipAddress || '—' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Quốc gia</span>
+              <span>{{ selectedEvent()!.country || '—' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Thành phố</span>
+              <span>{{ selectedEvent()!.city || '—' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Đường dẫn</span>
+              <span class="mono">{{ selectedEvent()!.requestPath || '—' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Phương thức</span>
+              <span>{{ selectedEvent()!.requestMethod || '—' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Risk Score</span>
+              <span>{{ selectedEvent()!.riskScore ?? '—' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Bị chặn</span>
+              <span>{{ selectedEvent()!.isBlocked ? '🛑 Có' : '✓ Không' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Correlation ID</span>
+              <span class="mono small">{{ selectedEvent()!.correlationId || '—' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Session ID</span>
+              <span class="mono small">{{ selectedEvent()!.sessionId || '—' }}</span>
+            </div>
+          </div>
+
+          @if (selectedEvent()!.userAgent) {
+            <div class="detail-section">
+              <span class="detail-label">User Agent</span>
+              <p class="mono small ua-text">{{ selectedEvent()!.userAgent }}</p>
+            </div>
+          }
+
+          @if (selectedEvent()!.deviceFingerprint) {
+            <div class="detail-section">
+              <span class="detail-label">Device Fingerprint</span>
+              <p class="mono small">{{ selectedEvent()!.deviceFingerprint }}</p>
+            </div>
+          }
+
+          @if (parseJson(selectedEvent()!.details); as details) {
+            <div class="detail-section">
+              <span class="detail-label">Chi tiết</span>
+              <div class="json-view">
+                @for (key of getObjectKeys(details); track key) {
+                  <div class="json-row">
+                    <span class="json-key">{{ key }}:</span>
+                    <span class="json-value">{{ details[key] }}</span>
+                  </div>
+                }
+              </div>
+            </div>
+          }
+
+          @if (parseJson(selectedEvent()!.threatIndicators); as indicators) {
+            <div class="detail-section">
+              <span class="detail-label">Threat Indicators</span>
+              <div class="json-view">
+                @for (key of getObjectKeys(indicators); track key) {
+                  <div class="json-row">
+                    <span class="json-key">{{ key }}:</span>
+                    <span class="json-value">{{ indicators[key] }}</span>
+                  </div>
+                }
+              </div>
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- Loading -->
+  @if (loading()) {
+    <div class="loading-indicator">
+      <div class="spinner"></div>
+    </div>
+  }
+</div>

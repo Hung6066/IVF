@@ -1,4 +1,5 @@
 using IVF.Application.Common;
+using IVF.Application.Common.Behaviors;
 using IVF.Application.Common.Interfaces;
 using IVF.Application.Features.Patients.Commands;
 using MediatR;
@@ -6,7 +7,10 @@ using MediatR;
 namespace IVF.Application.Features.Patients.Queries;
 
 // ==================== GET PATIENT BY ID ====================
-public record GetPatientByIdQuery(Guid Id) : IRequest<Result<PatientDto>>;
+public record GetPatientByIdQuery(Guid Id) : IRequest<Result<PatientDto>>, IFieldAccessProtected
+{
+    public string TableName => "patients";
+}
 
 public class GetPatientByIdHandler : IRequestHandler<GetPatientByIdQuery, Result<PatientDto>>
 {
@@ -28,8 +32,11 @@ public class GetPatientByIdHandler : IRequestHandler<GetPatientByIdQuery, Result
 }
 
 // ==================== SEARCH PATIENTS ====================
-public record SearchPatientsQuery(string? Query, string? Gender = null, int Page = 1, int PageSize = 20) 
-    : IRequest<PagedResult<PatientDto>>;
+public record SearchPatientsQuery(string? Query, string? Gender = null, int Page = 1, int PageSize = 20)
+    : IRequest<PagedResult<PatientDto>>, IFieldAccessProtected
+{
+    public string TableName => "patients";
+}
 
 public class SearchPatientsHandler : IRequestHandler<SearchPatientsQuery, PagedResult<PatientDto>>
 {

@@ -9,6 +9,7 @@ IVF Information System — a full-stack clinical management platform for fertili
 ## Commands
 
 ### Backend (.NET 10)
+
 ```bash
 dotnet restore
 dotnet build
@@ -24,6 +25,7 @@ dotnet ef database update --project src/IVF.Infrastructure --startup-project src
 ```
 
 ### Frontend (Angular 21)
+
 ```bash
 cd ivf-client
 npm install
@@ -33,6 +35,7 @@ npm test         # Vitest
 ```
 
 ### Docker (full stack)
+
 ```bash
 docker-compose up -d   # PostgreSQL:5433, Redis:6379, MinIO:9000, EJBCA:8443, SignServer:9443
 ```
@@ -40,14 +43,15 @@ docker-compose up -d   # PostgreSQL:5433, Redis:6379, MinIO:9000, EJBCA:8443, Si
 ## Architecture
 
 ### Backend — Clean Architecture
+
 Four layers with strict dependency direction (inward only):
 
-| Layer | Project | Responsibility |
-|---|---|---|
-| Domain | `IVF.Domain` | Entities, enums, no external deps |
-| Application | `IVF.Application` | CQRS handlers (MediatR), FluentValidation, service interfaces |
-| Infrastructure | `IVF.Infrastructure` | EF Core (PostgreSQL), repositories, MinIO, Redis, SignServer |
-| API | `IVF.API` | Minimal API endpoints, JWT auth, SignalR hubs, middleware |
+| Layer          | Project              | Responsibility                                                              |
+| -------------- | -------------------- | --------------------------------------------------------------------------- |
+| Domain         | `IVF.Domain`         | Entities, enums, no external deps                                           |
+| Application    | `IVF.Application`    | CQRS handlers (MediatR), FluentValidation, service interfaces               |
+| Infrastructure | `IVF.Infrastructure` | EF Core (PostgreSQL), repositories, MinIO, Redis, SignServer                |
+| API            | `IVF.API`            | Minimal API endpoints, JWT/VaultToken/ApiKey auth, SignalR hubs, middleware |
 
 **CQRS Pattern:** Every feature under `IVF.Application/Features/<Feature>/` has `Commands/` (writes) and `Queries/` (reads), each with a handler and optional FluentValidation validator. Add a MediatR pipeline behavior for cross-cutting concerns.
 
@@ -56,6 +60,7 @@ Four layers with strict dependency direction (inward only):
 **Seeding:** On startup in dev, `DatabaseSeeder`, `FlowSeeder`, `FormTemplateSeeder`, `MenuSeeder`, and `PermissionDefinitionSeeder` all run via `DatabaseSeeder.SeedAsync()`.
 
 ### Frontend — Angular 21
+
 All components are **standalone** (no NgModules). State is service-based with RxJS (no NgRx).
 
 ```
@@ -74,6 +79,8 @@ Routing: feature routes are lazy-loaded in `app.routes.ts`. Guards: `authGuard` 
 HTTP: `ApiService` is the base HTTP client. JWT token is injected via interceptor from localStorage. Token auto-refreshes before 60-min expiry. SignalR hubs pass the JWT as `?access_token=...` query param.
 
 ### Key Infrastructure
+
+- **Authentication:** Triple auth middleware pipeline: VaultTokenMiddleware (X-Vault-Token) → ApiKeyMiddleware (X-API-Key) → JWT Bearer. `IApiKeyValidator` validates against DB (BCrypt) with config fallback.
 - **Real-time:** Three SignalR hubs — `/hubs/queue`, `/hubs/notifications`, `/hubs/fingerprint`
 - **Digital Signing:** SignServer + EJBCA PKI via mTLS. `IDigitalSigningService` in Application, implementation in Infrastructure. Rate-limited to 30 ops/min.
 - **Biometrics:** DigitalPersona SDK (server-side matching, Windows only). Falls back to stub on Mac/Linux. `IBiometricMatcher` interface.
@@ -83,6 +90,7 @@ HTTP: `ApiService` is the base HTTP client. JWT token is injected via intercepto
 - **Audit Logging:** Partitioned PostgreSQL table. Auto-creates future partitions.
 
 ### API Conventions
+
 - Endpoints at `/api/<feature>` (minimal API pattern)
 - Paged responses: `{ items: [...], totalCount, page, pageSize }`
 - Validation errors → 400 via exception middleware
@@ -98,12 +106,14 @@ HTTP: `ApiService` is the base HTTP client. JWT token is injected via intercepto
 Default dev DB: `Host=localhost;Port=5433;Database=ivf_db;Username=postgres;Password=postgres`
 
 ## Domain Model Highlights
+
 Core aggregates: `Patient`, `Couple`, `TreatmentCycle`, `User`, `Doctor`.
 Treatment methods: `QHTN`, `IUI`, `ICSI`, `IVM`.
 Roles: Admin, Doctor, Nurse, LabTech, Embryologist, Receptionist, Cashier, Pharmacist.
 Forms system: `FormTemplate → FormField → FormResponse → FormFieldValue` supports dynamic clinical forms and report templates.
 
 ## Additional Docs
+
 - `/docs/form_report_builder.md` — form/report designer architecture
 - `/docs/digital_signing.md` — signing infrastructure
 - `/docs/matcher_infrastructure_guide.md` — biometric setup (Windows)

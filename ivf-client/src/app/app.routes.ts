@@ -250,6 +250,34 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'admin/security',
+        loadComponent: () =>
+          import('./features/admin/security-monitor/security-monitor.component').then(
+            (m) => m.SecurityMonitorComponent,
+          ),
+      },
+      {
+        path: 'admin/security-events',
+        loadComponent: () =>
+          import('./features/admin/security-events/security-events.component').then(
+            (m) => m.SecurityEventsComponent,
+          ),
+      },
+      {
+        path: 'admin/security-sessions',
+        loadComponent: () =>
+          import('./features/admin/security-sessions/security-sessions.component').then(
+            (m) => m.SecuritySessionsComponent,
+          ),
+      },
+      {
+        path: 'admin/security-threats',
+        loadComponent: () =>
+          import('./features/admin/security-threats/security-threats.component').then(
+            (m) => m.SecurityThreatsComponent,
+          ),
+      },
+      {
         path: 'forms',
         loadChildren: () => import('./features/forms/forms.routes').then((m) => m.FORMS_ROUTES),
       },

@@ -13,61 +13,71 @@ namespace IVF.API.Hubs;
 /// 3. WinForms app captures fingerprint and sends result back
 /// 4. UI receives CaptureResult with template data
 /// 
-/// Note: No authentication required - desktop clients on trusted network connect directly.
-/// For production, consider adding API key or certificate-based authentication.
+/// Desktop clients authenticate via API key (X-API-Key header or apiKey query param).
+/// JWT-authenticated users (Angular UI) are allowed through directly.
 /// </summary>
 public class FingerprintHub : Hub
 {
     private readonly ILogger<FingerprintHub> _logger;
-    private readonly IConfiguration _configuration;
+    private readonly IApiKeyValidator _apiKeyValidator;
     private readonly MediatR.ISender _sender;
     private readonly IBiometricMatcher _matcher;
 
     public FingerprintHub(
-        ILogger<FingerprintHub> logger, 
-        IConfiguration configuration, 
+        ILogger<FingerprintHub> logger,
+        IApiKeyValidator apiKeyValidator,
         MediatR.ISender sender,
         IBiometricMatcher matcher)
     {
         _logger = logger;
-        _configuration = configuration;
+        _apiKeyValidator = apiKeyValidator;
         _sender = sender;
         _matcher = matcher;
     }
 
     public override async Task OnConnectedAsync()
     {
-        // Validate API key for desktop clients
         var httpContext = Context.GetHttpContext();
-        var apiKey = httpContext?.Request.Query["apiKey"].FirstOrDefault();
-        
-        // Check if user is authenticated (Angular UI with JWT)
+
+        // Check if user is already authenticated (JWT via middleware or API key via middleware)
         var isAuthenticated = httpContext?.User?.Identity?.IsAuthenticated == true;
-        
-        if (!isAuthenticated && !string.IsNullOrEmpty(apiKey))
+
+        if (isAuthenticated)
         {
-            // Validate API key for desktop clients
-            var validApiKeys = _configuration.GetSection("DesktopClients:ApiKeys").Get<string[]>() ?? Array.Empty<string>();
-            
-            if (!validApiKeys.Contains(apiKey))
+            // API key or JWT already validated by middleware
+            var authMethod = httpContext?.User?.FindFirst("auth_method")?.Value;
+            if (authMethod == "api_key")
             {
-                _logger.LogWarning("Invalid API key attempt from {ConnectionId}", Context.ConnectionId);
+                _logger.LogInformation("Desktop client connected via API key middleware: {ConnectionId}", Context.ConnectionId);
+                await Groups.AddToGroupAsync(Context.ConnectionId, "DesktopClients");
+            }
+        }
+        else
+        {
+            // Try inline API key validation for SignalR connections 
+            // (middleware may not have processed query params for WebSocket upgrade)
+            var apiKey = httpContext?.Request.Query["apiKey"].FirstOrDefault();
+            if (!string.IsNullOrEmpty(apiKey))
+            {
+                var result = await _apiKeyValidator.ValidateAsync(apiKey);
+                if (result is null)
+                {
+                    _logger.LogWarning("Invalid API key attempt from {ConnectionId}", Context.ConnectionId);
+                    Context.Abort();
+                    return;
+                }
+
+                _logger.LogInformation("Desktop client authenticated with API key: {ConnectionId}", Context.ConnectionId);
+                await Groups.AddToGroupAsync(Context.ConnectionId, "DesktopClients");
+            }
+            else
+            {
+                _logger.LogWarning("Unauthenticated connection attempt from {ConnectionId}", Context.ConnectionId);
                 Context.Abort();
                 return;
             }
-            
-            _logger.LogInformation("Desktop client authenticated with API key: {ConnectionId}", Context.ConnectionId);
-            
-            // Add to DesktopClients group to receive capture requests
-            await Groups.AddToGroupAsync(Context.ConnectionId, "DesktopClients");
         }
-        else if (!isAuthenticated)
-        {
-            _logger.LogWarning("Unauthenticated connection attempt from {ConnectionId}", Context.ConnectionId);
-            Context.Abort();
-            return;
-        }
-        
+
         _logger.LogInformation("Client connected to FingerprintHub: {ConnectionId}", Context.ConnectionId);
         await base.OnConnectedAsync();
     }
@@ -86,7 +96,7 @@ public class FingerprintHub : Hub
         var groupName = GetPatientGroup(patientId);
         await Groups.AddToGroupAsync(Context.ConnectionId, groupName);
         _logger.LogInformation("Client {ConnectionId} joined patient capture group: {Group}", Context.ConnectionId, groupName);
-        
+
         await Clients.Caller.SendAsync("JoinedCapture", patientId);
     }
 
@@ -107,7 +117,7 @@ public class FingerprintHub : Hub
     public async Task RequestCapture(string patientId, string fingerType)
     {
         _logger.LogInformation("Capture requested for patient {PatientId}, finger: {FingerType}", patientId, fingerType);
-        
+
         // Notify all desktop clients
         // Desktop clients will filter requests or handle queueing if needed, 
         // then join the specific patient group to send results
@@ -127,7 +137,7 @@ public class FingerprintHub : Hub
     {
         var groupName = GetPatientGroup(patientId);
         _logger.LogInformation("Capture cancelled for patient {PatientId}", patientId);
-        
+
         await Clients.Group(groupName).SendAsync("CaptureCancelled", patientId);
     }
 
@@ -137,9 +147,9 @@ public class FingerprintHub : Hub
     public async Task SendCaptureResult(CaptureResultDto result)
     {
         var groupName = GetPatientGroup(result.PatientId);
-        _logger.LogInformation("Capture result received for patient {PatientId}, success: {Success}", 
+        _logger.LogInformation("Capture result received for patient {PatientId}, success: {Success}",
             result.PatientId, result.Success);
-        
+
         await Clients.Group(groupName).SendAsync("CaptureResult", result);
     }
 
@@ -149,7 +159,7 @@ public class FingerprintHub : Hub
     public async Task SendCaptureStatus(string patientId, string status, string? message = null)
     {
         var groupName = GetPatientGroup(patientId);
-        
+
         await Clients.Group(groupName).SendAsync("CaptureStatus", new CaptureStatusDto
         {
             PatientId = patientId,
@@ -165,7 +175,7 @@ public class FingerprintHub : Hub
     public async Task SendSampleQuality(string patientId, string quality, string? imageData = null)
     {
         var groupName = GetPatientGroup(patientId);
-        
+
         await Clients.Group(groupName).SendAsync("SampleQuality", new SampleQualityDto
         {
             PatientId = patientId,
@@ -181,7 +191,7 @@ public class FingerprintHub : Hub
     public async Task SendEnrollmentProgress(string patientId, int samplesCollected, int samplesNeeded)
     {
         var groupName = GetPatientGroup(patientId);
-        
+
         await Clients.Group(groupName).SendAsync("EnrollmentProgress", new EnrollmentProgressDto
         {
             PatientId = patientId,
@@ -238,7 +248,7 @@ public class FingerprintHub : Hub
                 TemplateData = f.TemplateData! // Validated by Where above
             })
             .ToList();
-            
+
         // Send verification request to desktop clients
         await Clients.Group("DesktopClients").SendAsync("VerificationRequested", new VerificationRequestDto
         {
@@ -257,7 +267,7 @@ public class FingerprintHub : Hub
     /// </summary>
     public async Task SendVerificationResult(VerificationResultDto result)
     {
-        _logger.LogInformation("Verification result received for patient {PatientId}, success: {Success}", 
+        _logger.LogInformation("Verification result received for patient {PatientId}, success: {Success}",
             result.PatientId, result.Success);
 
         // Notify the specific patient group (Angular UI)
@@ -273,27 +283,27 @@ public class FingerprintHub : Hub
     /// </summary>
     public async Task IdentifyFingerprint(string featureSetBase64, string? originalRequesterId)
     {
-        try 
+        try
         {
             _logger.LogInformation("Received identification request from {ConnectionId} (Server-Side Match)", Context.ConnectionId);
 
             if (!_matcher.IsLoaded)
             {
-                var error = new IdentificationResultDto 
-                { 
-                    Success = false, 
-                    ErrorMessage = "System is initializing. Please try again in a moment." 
+                var error = new IdentificationResultDto
+                {
+                    Success = false,
+                    ErrorMessage = "System is initializing. Please try again in a moment."
                 };
                 await Clients.Caller.SendAsync("IdentificationResult", error);
-                 if (!string.IsNullOrEmpty(originalRequesterId))
+                if (!string.IsNullOrEmpty(originalRequesterId))
                 {
-                     await Clients.Client(originalRequesterId).SendAsync("IdentificationResult", error);
+                    await Clients.Client(originalRequesterId).SendAsync("IdentificationResult", error);
                 }
                 return;
             }
 
             byte[] features = Convert.FromBase64String(featureSetBase64);
-            
+
             // Perform match in memory
             var (match, patientId, score) = _matcher.Identify(features);
 
@@ -317,15 +327,15 @@ public class FingerprintHub : Hub
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error during server-side identification");
-            var error = new IdentificationResultDto 
-            { 
-                Success = false, 
-                ErrorMessage = "Server error during matching." 
+            var error = new IdentificationResultDto
+            {
+                Success = false,
+                ErrorMessage = "Server error during matching."
             };
             await Clients.Caller.SendAsync("IdentificationResult", error);
             if (!string.IsNullOrEmpty(originalRequesterId))
             {
-                    await Clients.Client(originalRequesterId).SendAsync("IdentificationResult", error);
+                await Clients.Client(originalRequesterId).SendAsync("IdentificationResult", error);
             }
         }
     }
@@ -335,7 +345,7 @@ public class FingerprintHub : Hub
     /// </summary>
     public async Task SendIdentificationResult(IdentificationResultDto result)
     {
-        _logger.LogInformation("Identification result received. Match: {Success}, Patient: {PatientId}", 
+        _logger.LogInformation("Identification result received. Match: {Success}, Patient: {PatientId}",
             result.Success, result.PatientId);
 
         // Notify the specific requester (Angular UI)

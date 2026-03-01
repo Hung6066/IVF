@@ -1,0 +1,189 @@
+<div class="security-page">
+  <div class="page-header">
+    <div class="header-left">
+      <h2>🛡️ Giám sát bảo mật</h2>
+      <p class="subtitle">Zero Trust Security Monitor — Giám sát theo thời gian thực</p>
+    </div>
+    <div class="header-actions">
+      <label class="auto-refresh-toggle">
+        <input type="checkbox" [checked]="autoRefresh()" (change)="toggleAutoRefresh()" />
+        <span>Tự động làm mới (30s)</span>
+      </label>
+      <button class="btn btn-sm btn-outline" (click)="loadDashboard()" [disabled]="loading()">
+        🔄 Làm mới
+      </button>
+    </div>
+  </div>
+
+  <!-- Summary Stats -->
+  <div class="stats-grid">
+    <div class="stat-card stat-red" (click)="navigateTo('/admin/security-events')">
+      <div class="stat-icon">🚨</div>
+      <div class="stat-info">
+        <span class="stat-value">{{ totalHighSeverity() }}</span>
+        <span class="stat-label">Cảnh báo nghiêm trọng (24h)</span>
+      </div>
+    </div>
+    <div class="stat-card stat-orange">
+      <div class="stat-icon">🛑</div>
+      <div class="stat-info">
+        <span class="stat-value">{{ blockedRequests() }}</span>
+        <span class="stat-label">Yêu cầu bị chặn</span>
+      </div>
+    </div>
+    <div class="stat-card stat-blue">
+      <div class="stat-icon">🌐</div>
+      <div class="stat-info">
+        <span class="stat-value">{{ uniqueIps() }}</span>
+        <span class="stat-label">IP duy nhất</span>
+      </div>
+    </div>
+    <div class="stat-card stat-purple">
+      <div class="stat-icon">👤</div>
+      <div class="stat-info">
+        <span class="stat-value">{{ uniqueUsers() }}</span>
+        <span class="stat-label">Người dùng liên quan</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Grid -->
+  <div class="content-grid">
+    <!-- Threats by Type -->
+    <div class="card">
+      <div class="card-header">
+        <h3>⚠️ Mối đe dọa theo loại (24h)</h3>
+      </div>
+      <div class="card-body">
+        @if (threatsByType().length > 0) {
+          <div class="threat-list">
+            @for (threat of threatsByType(); track threat.type) {
+              <div class="threat-row">
+                <div class="threat-info">
+                  <span class="threat-type">{{ formatEventType(threat.type) }}</span>
+                  <span class="threat-count">{{ threat.count }}</span>
+                </div>
+                <div class="threat-bar-bg">
+                  <div class="threat-bar" [style.width.%]="getThreatBarWidth(threat)"></div>
+                </div>
+              </div>
+            }
+          </div>
+        } @else {
+          <div class="empty-state">
+            <span class="empty-icon">✅</span>
+            <span>Không phát hiện mối đe dọa trong 24h qua</span>
+          </div>
+        }
+      </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="card">
+      <div class="card-header">
+        <h3>🔧 Truy cập nhanh</h3>
+      </div>
+      <div class="card-body">
+        <div class="quick-actions">
+          <button class="action-card" (click)="navigateTo('/admin/security-events')">
+            <span class="action-icon">📋</span>
+            <span class="action-label">Sự kiện bảo mật</span>
+            <span class="action-desc">Xem chi tiết tất cả sự kiện</span>
+          </button>
+          <button class="action-card" (click)="navigateTo('/admin/security-sessions')">
+            <span class="action-icon">🖥️</span>
+            <span class="action-label">Phiên hoạt động</span>
+            <span class="action-desc">Quản lý phiên người dùng</span>
+          </button>
+          <button class="action-card" (click)="navigateTo('/admin/security-threats')">
+            <span class="action-icon">🔍</span>
+            <span class="action-label">Đánh giá mối đe dọa</span>
+            <span class="action-desc">Kiểm tra IP và thiết bị</span>
+          </button>
+          <button class="action-card" (click)="navigateTo('/admin/zero-trust')">
+            <span class="action-icon">🔐</span>
+            <span class="action-label">Chính sách Zero Trust</span>
+            <span class="action-desc">Cấu hình chính sách truy cập</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recent Events -->
+  <div class="card">
+    <div class="card-header">
+      <h3>📊 Sự kiện gần đây</h3>
+      <div class="header-actions">
+        <button class="btn btn-sm btn-primary" (click)="navigateTo('/admin/security-events')">
+          Xem tất cả →
+        </button>
+      </div>
+    </div>
+    <div class="table-wrapper">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Thời gian</th>
+            <th>Loại</th>
+            <th>Mức độ</th>
+            <th>Người dùng</th>
+            <th>IP</th>
+            <th>Đường dẫn</th>
+            <th>Trạng thái</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (event of recentEvents(); track event.id) {
+            <tr [class.row-blocked]="event.isBlocked">
+              <td class="time-cell">{{ formatTimeAgo(event.createdAt) }}</td>
+              <td>
+                <div class="event-type-cell">
+                  <span class="event-icon">{{ getEventIcon(event.eventType) }}</span>
+                  <span class="event-type">{{ formatEventType(event.eventType) }}</span>
+                </div>
+              </td>
+              <td>
+                <span class="badge" [ngClass]="getSeverityClass(event.severity)">
+                  {{ event.severity }}
+                </span>
+              </td>
+              <td>{{ event.username || '—' }}</td>
+              <td class="ip-cell">{{ event.ipAddress || '—' }}</td>
+              <td class="path-cell">{{ event.requestPath || '—' }}</td>
+              <td>
+                @if (event.isBlocked) {
+                  <span class="badge severity-critical">🛑 Bị chặn</span>
+                } @else {
+                  <span class="badge severity-info">✓ Cho phép</span>
+                }
+              </td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="7" class="empty-state">Chưa có sự kiện nào</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Loading Overlay -->
+  @if (loading()) {
+    <div class="loading-indicator">
+      <div class="spinner"></div>
+    </div>
+  }
+
+  <!-- Toast -->
+  @if (statusMessage()) {
+    <div
+      class="toast"
+      [class.toast-success]="statusMessage()!.type === 'success'"
+      [class.toast-error]="statusMessage()!.type === 'error'"
+    >
+      {{ statusMessage()!.text }}
+    </div>
+  }
+</div>

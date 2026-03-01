@@ -137,30 +137,26 @@
 // ─── Tabs Bar ───────────────────────────────────────
 .tabs-bar {
   display: flex;
+  flex-wrap: wrap;
   gap: 0;
   border-bottom: 2px solid #e5e7eb;
   margin-bottom: 1.5rem;
-  overflow-x: auto;
-  scrollbar-width: thin;
-
-  &::-webkit-scrollbar {
-    height: 3px;
-  }
-  &::-webkit-scrollbar-thumb {
-    background: #d1d5db;
-    border-radius: 3px;
-  }
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #f1f5f9;
+  padding-top: 0.25rem;
 }
 
 .tab-btn {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  padding: 0.65rem 1rem;
+  padding: 0.5rem 0.75rem;
   border: none;
   background: transparent;
   color: #6b7280;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
@@ -1577,3 +1573,914 @@ input[type='file'] {
   border: 1px solid #cbd5e1;
   color: #475569;
 }
+
+// ═══════════════════════════════════════════════════
+// Enterprise Vault Tabs (Shared styles)
+// Wrapped in ::ng-deep so parent scoped styles
+// apply to child standalone tab components
+// ═══════════════════════════════════════════════════
+:host ::ng-deep {
+
+.tab-content {
+  padding: 0.5rem 0;
+}
+
+// ─── Card Grid ──────────────────────────────────────
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+
+  &.three-col {
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  }
+
+  &.four-col {
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  }
+}
+
+// ─── Metric Card ────────────────────────────────────
+.metric-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  text-align: center;
+  transition: transform 0.2s, box-shadow 0.2s;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  }
+
+  &.danger {
+    border-color: #fca5a5;
+    background: #fef2f2;
+  }
+
+  .metric-icon {
+    font-size: 1.8rem;
+  }
+
+  .metric-value {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: #1e1e2f;
+  }
+
+  .metric-label {
+    font-size: 0.82rem;
+    color: #6b7280;
+    font-weight: 500;
+  }
+}
+
+// ─── Slot Cards (DB Credential Rotation) ────────────
+.slot-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.slot-card {
+  background: #fff;
+  border: 2px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 1.2rem;
+
+  &.active-slot {
+    border-color: #10b981;
+    background: #f0fdf4;
+  }
+
+  h4 {
+    margin: 0 0 0.5rem;
+    font-size: 1rem;
+  }
+
+  p {
+    margin: 0.3rem 0;
+    font-size: 0.88rem;
+    color: #4b5563;
+  }
+}
+
+// ─── Score Circle (Compliance) ──────────────────────
+.score-section {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  margin-bottom: 2rem;
+  padding: 1.5rem;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+}
+
+.score-circle {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+
+  &.grade-A {
+    background: linear-gradient(135deg, #10b981, #059669);
+  }
+  &.grade-B {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+  }
+  &.grade-C {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+  }
+  &.grade-D,
+  &.grade-F {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+  }
+
+  .grade-label {
+    font-size: 0.7rem;
+    font-weight: 500;
+    opacity: 0.9;
+    margin-top: 0.2rem;
+  }
+}
+
+.score-details {
+  h3 {
+    margin: 0 0 0.5rem;
+    font-size: 1.2rem;
+  }
+
+  p {
+    margin: 0.3rem 0;
+    color: #6b7280;
+    font-size: 0.9rem;
+  }
+}
+
+// ─── Framework Card (Compliance) ────────────────────
+.framework-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 1.2rem;
+
+  h4 {
+    margin: 0 0 0.75rem;
+    font-size: 1.05rem;
+  }
+
+  .progress-bar-container {
+    background: #f3f4f6;
+    border-radius: 6px;
+    height: 8px;
+    overflow: hidden;
+    margin-bottom: 0.75rem;
+
+    .progress-fill {
+      height: 100%;
+      border-radius: 6px;
+      transition: width 0.5s ease;
+
+      &.green { background: #10b981; }
+      &.blue { background: #3b82f6; }
+      &.yellow { background: #f59e0b; }
+      &.red { background: #ef4444; }
+    }
+  }
+
+  .controls-list {
+    max-height: 200px;
+    overflow-y: auto;
+  }
+
+  .control-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.35rem 0;
+    font-size: 0.85rem;
+    border-bottom: 1px solid #f9fafb;
+
+    .control-name {
+      color: #374151;
+    }
+
+    .control-status {
+      font-size: 1rem;
+    }
+  }
+}
+
+// ─── Readiness Card (DR) ────────────────────────────
+.readiness-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+
+  h4 {
+    margin: 0 0 1rem;
+    font-size: 1.1rem;
+  }
+
+  .check-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    font-size: 0.9rem;
+    border-bottom: 1px solid #f3f4f6;
+
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+}
+
+// ─── Provider Card (Multi Unseal) ───────────────────
+.provider-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.provider-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+
+  .provider-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: 600;
+    font-size: 1rem;
+  }
+
+  .provider-detail {
+    font-size: 0.85rem;
+    color: #6b7280;
+  }
+
+  .provider-error {
+    font-size: 0.82rem;
+    color: #dc2626;
+    background: #fef2f2;
+    padding: 0.3rem 0.6rem;
+    border-radius: 6px;
+  }
+}
+
+// ─── Threat Bars (SIEM) ─────────────────────────────
+.threat-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.threat-bar-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+
+  .threat-type {
+    width: 160px;
+    font-size: 0.85rem;
+    color: #374151;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  .threat-bar {
+    flex: 1;
+    height: 22px;
+    background: #f3f4f6;
+    border-radius: 4px;
+    position: relative;
+    overflow: hidden;
+
+    .threat-fill {
+      height: 100%;
+      background: linear-gradient(135deg, #ef4444, #f97316);
+      border-radius: 4px;
+      transition: width 0.5s ease;
+    }
+
+    .threat-count {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #374151;
+    }
+  }
+}
+
+// ─── Dialog (shared for new tabs) ───────────────────
+.dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.dialog {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  width: 90%;
+  max-width: 520px;
+  max-height: 85vh;
+  overflow-y: auto;
+  padding: 1.5rem;
+
+  h4 {
+    margin: 0 0 1rem;
+    font-size: 1.1rem;
+  }
+}
+
+// ─── Form Row (compact for inline forms) ────────────
+.form-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+
+  &.compact {
+    select, input {
+      padding: 0.3rem 0.5rem;
+      font-size: 0.85rem;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+    }
+  }
+}
+
+// ─── Progress Bar (inline) ──────────────────────────
+.progress-bar {
+  height: 6px;
+  background: #f3f4f6;
+  border-radius: 3px;
+  overflow: hidden;
+
+  .progress-fill {
+    height: 100%;
+    background: #3b82f6;
+    border-radius: 3px;
+    transition: width 0.5s ease;
+  }
+}
+
+// ─── Misc Utilities ─────────────────────────────────
+.mono {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 0.85rem;
+}
+
+.truncate {
+  max-width: 200px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.empty {
+  text-align: center;
+  color: #9ca3af;
+  padding: 2rem 0;
+  font-style: italic;
+}
+
+.blocked-row {
+  background: #fef2f2 !important;
+}
+
+.badge-warning {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.badge-muted {
+  background: #f3f4f6;
+  color: #9ca3af;
+}
+
+.status-msg {
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  margin-top: 1rem;
+
+  &.success {
+    background: #dcfce7;
+    color: #166534;
+  }
+
+  &.error {
+    background: #fee2e2;
+    color: #991b1b;
+  }
+}
+
+.table-container {
+  overflow-x: auto;
+}
+
+// ─── Remediation List (Compliance) ──────────────────
+.remediation-list {
+  margin-top: 1.5rem;
+
+  h4 {
+    margin: 0 0 0.75rem;
+  }
+
+  .remediation-item {
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.5rem;
+
+    .remediation-control {
+      font-weight: 600;
+      font-size: 0.9rem;
+      color: #991b1b;
+    }
+
+    .remediation-finding {
+      font-size: 0.85rem;
+      color: #374151;
+      margin-top: 0.3rem;
+    }
+  }
+}
+
+// ─── Operations Breakdown (Metrics) ─────────────────
+.ops-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+
+  th, td {
+    padding: 0.5rem 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid #f3f4f6;
+  }
+
+  th {
+    background: #f9fafb;
+    font-weight: 600;
+    color: #374151;
+  }
+
+  .mini-bar {
+    width: 100px;
+    height: 6px;
+    background: #f3f4f6;
+    border-radius: 3px;
+    overflow: hidden;
+    display: inline-block;
+    vertical-align: middle;
+
+    .mini-fill {
+      height: 100%;
+      background: #3b82f6;
+      border-radius: 3px;
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// Enterprise Tab Missing Styles
+// ═══════════════════════════════════════════════════
+
+// ─── Card Extensions ────────────────────────────────
+.card-actions {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  border-top: 1px solid #f3f4f6;
+  justify-content: flex-end;
+}
+
+.card-icon {
+  font-size: 1.3rem;
+}
+
+.empty-card {
+  background: #f9fafb;
+  border: 2px dashed #d1d5db;
+  border-radius: 12px;
+  padding: 2rem;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 0.92rem;
+}
+
+// ─── Stat Row ───────────────────────────────────────
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.35rem 0;
+  font-size: 0.88rem;
+
+  .label {
+    color: #6b7280;
+  }
+
+  .value {
+    font-weight: 600;
+    color: #1e1e2f;
+  }
+
+  &.error {
+    .value {
+      color: #dc2626;
+    }
+  }
+}
+
+// ─── Dialog Sub-sections ────────────────────────────
+.dialog-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+
+  h4 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+  }
+}
+
+.dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+// ─── Table Actions Column ───────────────────────────
+.actions {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+// ─── Overdue Row ────────────────────────────────────
+tr.overdue {
+  background: #fef2f2 !important;
+
+  td {
+    color: #991b1b;
+  }
+}
+
+// ─── Buttons (missing variants) ─────────────────────
+.btn-secondary {
+  background: #6b7280;
+  color: #fff;
+  &:hover:not(:disabled) {
+    background: #4b5563;
+  }
+}
+
+.btn-info {
+  background: #0ea5e9;
+  color: #fff;
+  &:hover:not(:disabled) {
+    background: #0284c7;
+  }
+}
+
+// ─── Alert (missing variants) ───────────────────────
+.alert-success {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1rem;
+  color: #166534;
+}
+
+.alert-danger {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1rem;
+  color: #991b1b;
+}
+
+// ─── Empty State ────────────────────────────────────
+.empty-state {
+  text-align: center;
+  padding: 2.5rem 1rem;
+  color: #9ca3af;
+  font-size: 0.95rem;
+}
+
+// ─── Re-Encrypt Form (DEK) ─────────────────────────
+.re-encrypt-form {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 1.25rem;
+  margin-top: 1.5rem;
+
+  h4 {
+    margin: 0 0 1rem;
+  }
+}
+
+// ─── Progress Extensions ────────────────────────────
+.progress-text {
+  font-size: 0.82rem;
+  color: #374151;
+  margin-top: 0.4rem;
+  text-align: center;
+  font-weight: 500;
+}
+
+.progress-bar-container {
+  .progress-fill {
+    &.progress-success { background: #10b981; }
+    &.progress-warning { background: #f59e0b; }
+    &.progress-danger  { background: #ef4444; }
+  }
+}
+
+// ─── Summary Card (DB Rotation) ─────────────────────
+.summary-card {
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 12px;
+  padding: 1.25rem;
+  margin-top: 1rem;
+
+  h4 {
+    margin: 0 0 0.75rem;
+    font-size: 1rem;
+    color: #0c4a6e;
+  }
+}
+
+// ─── Score Overview (Compliance) ────────────────────
+.score-overview {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  margin-bottom: 2rem;
+  padding: 1.5rem;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+}
+
+.score-circle {
+  .grade {
+    font-size: 2.2rem;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .percentage {
+    font-size: 0.75rem;
+    font-weight: 500;
+    opacity: 0.9;
+    margin-top: 0.15rem;
+  }
+
+  &.grade-Aplus {
+    background: linear-gradient(135deg, #059669, #047857);
+  }
+}
+
+.score-text {
+  font-size: 0.82rem;
+  color: #6b7280;
+  margin-top: 0.25rem;
+}
+
+// ─── Framework Card Extensions (Compliance) ─────────
+.framework-card {
+  &.framework-hipaa {
+    border-left: 4px solid #3b82f6;
+  }
+
+  &.framework-soc2 {
+    border-left: 4px solid #8b5cf6;
+  }
+
+  &.framework-gdpr {
+    border-left: 4px solid #10b981;
+  }
+}
+
+.control-item {
+  &.control-pass {
+    .control-name { color: #166534; }
+  }
+  &.control-fail {
+    background: #fef2f2;
+    .control-name { color: #991b1b; }
+  }
+  &.control-partial {
+    background: #fffbeb;
+    .control-name { color: #92400e; }
+  }
+  &.control-notapplicable {
+    opacity: 0.6;
+  }
+}
+
+.control-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.control-name {
+  font-weight: 500;
+  font-size: 0.85rem;
+  color: #374151;
+}
+
+.control-score {
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.control-finding {
+  font-size: 0.78rem;
+  color: #dc2626;
+  margin-top: 0.1rem;
+}
+
+.control-status {
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+.control-id {
+  font-weight: 600;
+  font-size: 0.88rem;
+  color: #991b1b;
+}
+
+.control-desc {
+  font-size: 0.85rem;
+  color: #374151;
+  margin-top: 0.2rem;
+}
+
+// ─── Remediation Section (Compliance) ───────────────
+.remediation-section {
+  margin-top: 2rem;
+
+  h4 {
+    margin: 0 0 0.75rem;
+    color: #991b1b;
+    font-size: 1.05rem;
+  }
+}
+
+// ─── Grade Badge (DR) ───────────────────────────────
+.grade-badge {
+  display: inline-block;
+  padding: 0.3rem 0.8rem;
+  border-radius: 20px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #fff;
+
+  &.grade-a { background: #10b981; }
+  &.grade-b { background: #3b82f6; }
+  &.grade-c { background: #f59e0b; }
+  &.grade-d { background: #ef4444; }
+  &.grade-f { background: #991b1b; }
+}
+
+.readiness-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+
+  h4 {
+    margin: 0;
+    font-size: 1.1rem;
+  }
+}
+
+.readiness-checks {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.backup-info {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-top: 0.75rem;
+  font-size: 0.88rem;
+  color: #166534;
+
+  p {
+    margin: 0.3rem 0;
+  }
+}
+
+// ─── Provider Card Extensions (Multi-Unseal) ────────
+.card {
+  &.provider-available {
+    border-color: #86efac;
+    background: #f0fdf4;
+  }
+
+  &.provider-down {
+    border-color: #fca5a5;
+    background: #fef2f2;
+  }
+}
+
+// ─── Operations Table (Metrics) ─────────────────────
+.operations-table {
+  margin-top: 1.5rem;
+
+  h4 {
+    margin: 0 0 0.75rem;
+  }
+}
+
+.progress-bar {
+  &.mini {
+    height: 4px;
+    width: 80px;
+    display: inline-block;
+    vertical-align: middle;
+  }
+}
+
+.highlight {
+  background: #eff6ff !important;
+  font-weight: 600;
+}
+
+.timestamp {
+  font-size: 0.78rem;
+  color: #9ca3af;
+  margin-top: 1rem;
+  text-align: right;
+}
+
+// ─── Status Message Extensions ──────────────────────
+.status-msg {
+  &.status-success {
+    background: #dcfce7;
+    color: #166534;
+  }
+
+  &.status-error {
+    background: #fee2e2;
+    color: #991b1b;
+  }
+}
+
+} // end :host ::ng-deep

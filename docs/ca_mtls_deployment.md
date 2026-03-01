@@ -1874,11 +1874,12 @@ The PKI system implements the following security measures aligned with NIST SP 8
 
 ### Private Key Protection
 
-- **Application-layer encryption**: All private keys are encrypted via `IDataProtectionProvider` before database storage, using a dedicated purpose string (`IVF.CertificateAuthority.PrivateKeys`).
-- **Persistent key storage**: DataProtection keys are persisted to file system (`DataProtection:KeysPath` config or `{ContentRoot}/keys/dp`), ensuring encrypted private keys remain recoverable across container restarts and redeployments.
-- **Legacy compatibility**: `UnprotectKey()` detects unencrypted legacy keys (PEM `-----BEGIN` header) and returns them as-is, enabling seamless migration.
+- **Vault envelope encryption (primary)**: Private keys are encrypted via Vault's `IKeyVaultService.EncryptAsync()` using AES-256-GCM with a DEK (purpose: `Certificate`), wrapped by KEK, which is wrapped by Azure RSA-OAEP-256 or local AES-256-GCM. Stored as `VAULT:{ciphertext}:{iv}`.
+- **DataProtection fallback**: If Vault encryption fails, falls back to `IDataProtectionProvider` (DPAPI). Keys persisted to file system (`DataProtection:KeysPath`).
+- **Three-format support**: `UnprotectKeyAsync()` auto-detects: (1) legacy PEM unencrypted, (2) Vault envelope `VAULT:` prefix, (3) DPAPI encrypted.
+- **Vault audit trail**: All key encrypt/decrypt operations logged to `vault_audit_logs` table via `IVaultRepository.AddAuditLogAsync()`.
 - **In-memory only**: Decrypted keys are held only in memory during signing operations; never written to disk unencrypted.
-- **Production recommendation**: Consider HSM (Hardware Security Module) integration for highest assurance environments. Mount `DataProtection:KeysPath` as a persistent Docker volume.
+- **Production recommendation**: Enable Azure Key Vault (`AzureKeyVault:Enabled: true`) for HSM-backed KEK wrapping.
 
 ### Certificate Extensions (RFC 5280 Compliance)
 
@@ -1925,7 +1926,7 @@ The PKI system implements the following security measures aligned with NIST SP 8
 | CRL Distribution       | ✅           | ✅             | ✅        | ✅         | ✅        |
 | OCSP                   | ✅ Signed    | ✅ Signed      | ✅        | ✅ Stapled | ⚠️ JSON   |
 | CT Logging             | ✅ Mandatory | ✅             | Optional  | ✅         | ❌ N/A    |
-| Key Encryption at Rest | ✅ HSM       | ✅ HSM         | ✅ HSM    | ✅ HSM     | ✅ DPAPI  |
+| Key Encryption at Rest | ✅ HSM       | ✅ HSM         | ✅ HSM    | ✅ HSM     | ✅ Vault Envelope + Azure HSM |
 | Auto-Renewal           | ✅           | ✅             | ✅        | ✅         | ✅        |
 | Rate Limiting          | ✅           | ✅             | ✅        | ✅         | ✅ 30/min |
 

@@ -20,11 +20,19 @@ public class ZeroTrustBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest
     where TRequest : IRequest<TResponse>
 {
     private readonly IZeroTrustService _ztService;
+    private readonly ICurrentUserService _currentUser;
+    private readonly ISecurityEventPublisher _securityEvents;
     private readonly ILogger<ZeroTrustBehavior<TRequest, TResponse>> _logger;
 
-    public ZeroTrustBehavior(IZeroTrustService ztService, ILogger<ZeroTrustBehavior<TRequest, TResponse>> logger)
+    public ZeroTrustBehavior(
+        IZeroTrustService ztService,
+        ICurrentUserService currentUser,
+        ISecurityEventPublisher securityEvents,
+        ILogger<ZeroTrustBehavior<TRequest, TResponse>> logger)
     {
         _ztService = ztService;
+        _currentUser = currentUser;
+        _securityEvents = securityEvents;
         _logger = logger;
     }
 
@@ -34,9 +42,9 @@ public class ZeroTrustBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest
             return await next();
 
         var context = new ZTAccessContext(
-            UserId: "system",
+            UserId: _currentUser.UserId?.ToString() ?? "anonymous",
             DeviceId: "server",
-            IpAddress: "127.0.0.1",
+            IpAddress: _currentUser.IpAddress ?? "127.0.0.1",
             Country: "VN",
             CurrentAuthLevel: AuthLevel.Session,
             LastPasswordVerification: null,
@@ -52,6 +60,19 @@ public class ZeroTrustBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest
         if (!decision.Allowed)
         {
             _logger.LogWarning("Zero Trust denied {Action}: {Reason}", ztRequest.RequiredAction, decision.Reason);
+
+            await _securityEvents.PublishAsync(new VaultSecurityEvent
+            {
+                EventType = "vault.zerotrust.denied",
+                Severity = SecuritySeverity.Critical,
+                Source = "ZeroTrustBehavior",
+                Action = ztRequest.RequiredAction.ToString(),
+                UserId = _currentUser.UserId?.ToString(),
+                IpAddress = _currentUser.IpAddress,
+                Outcome = "deny",
+                Reason = decision.Reason
+            }, cancellationToken);
+
             throw new UnauthorizedAccessException($"Zero Trust access denied: {decision.Reason}");
         }
 

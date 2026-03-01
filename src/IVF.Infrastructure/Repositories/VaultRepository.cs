@@ -393,4 +393,39 @@ public class VaultRepository : IVaultRepository
             await _db.SaveChangesAsync(ct);
         }
     }
+
+    // ─── Secret Rotation Schedules ────────────────────
+
+    public async Task<List<SecretRotationSchedule>> GetRotationSchedulesAsync(bool activeOnly = true, CancellationToken ct = default)
+    {
+        var query = _db.SecretRotationSchedules.AsNoTracking().AsQueryable();
+        if (activeOnly)
+            query = query.Where(s => s.IsActive);
+        return await query.OrderBy(s => s.NextRotationAt).ToListAsync(ct);
+    }
+
+    public async Task<SecretRotationSchedule?> GetRotationScheduleByPathAsync(string secretPath, CancellationToken ct = default)
+        => await _db.SecretRotationSchedules.FirstOrDefaultAsync(s => s.SecretPath == secretPath, ct);
+
+    public async Task AddRotationScheduleAsync(SecretRotationSchedule schedule, CancellationToken ct = default)
+    {
+        await _db.SecretRotationSchedules.AddAsync(schedule, ct);
+        await _db.SaveChangesAsync(ct);
+    }
+
+    public async Task UpdateRotationScheduleAsync(SecretRotationSchedule schedule, CancellationToken ct = default)
+    {
+        _db.SecretRotationSchedules.Update(schedule);
+        await _db.SaveChangesAsync(ct);
+    }
+
+    public async Task DeleteRotationScheduleAsync(string secretPath, CancellationToken ct = default)
+    {
+        var schedule = await _db.SecretRotationSchedules.FirstOrDefaultAsync(s => s.SecretPath == secretPath, ct);
+        if (schedule is not null)
+        {
+            _db.SecretRotationSchedules.Remove(schedule);
+            await _db.SaveChangesAsync(ct);
+        }
+    }
 }

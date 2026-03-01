@@ -6,6 +6,14 @@ import { forkJoin } from 'rxjs';
 import { KeyVaultService } from '../../../core/services/keyvault.service';
 import { ZeroTrustService } from '../../../core/services/zerotrust.service';
 import { environment } from '../../../../environments/environment';
+import { SecretRotationTabComponent } from './tabs/secret-rotation-tab.component';
+import { DekRotationTabComponent } from './tabs/dek-rotation-tab.component';
+import { DbCredentialRotationTabComponent } from './tabs/db-credential-rotation-tab.component';
+import { ComplianceTabComponent } from './tabs/compliance-tab.component';
+import { VaultDrTabComponent } from './tabs/vault-dr-tab.component';
+import { SiemTabComponent } from './tabs/siem-tab.component';
+import { MultiUnsealTabComponent } from './tabs/multi-unseal-tab.component';
+import { VaultMetricsTabComponent } from './tabs/vault-metrics-tab.component';
 import {
   VaultStatus,
   ApiKeyResponse,
@@ -58,12 +66,31 @@ type VaultTab =
   | 'history'
   | 'encryption'
   | 'field-access'
-  | 'zero-trust';
+  | 'zero-trust'
+  | 'secret-rotation'
+  | 'dek-rotation'
+  | 'db-rotation'
+  | 'compliance'
+  | 'vault-dr'
+  | 'siem'
+  | 'multi-unseal'
+  | 'vault-metrics';
 
 @Component({
   selector: 'app-vault-manager',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [
+    CommonModule,
+    FormsModule,
+    SecretRotationTabComponent,
+    DekRotationTabComponent,
+    DbCredentialRotationTabComponent,
+    ComplianceTabComponent,
+    VaultDrTabComponent,
+    SiemTabComponent,
+    MultiUnsealTabComponent,
+    VaultMetricsTabComponent,
+  ],
   templateUrl: './vault-manager.component.html',
   styleUrls: ['./vault-manager.component.scss'],
 })
@@ -281,6 +308,14 @@ export class VaultManagerComponent implements OnInit {
     { key: 'encryption', label: 'Encryption', icon: '🔒' },
     { key: 'field-access', label: 'Phân quyền', icon: '🔐' },
     { key: 'zero-trust', label: 'Zero Trust', icon: '🛡️' },
+    { key: 'secret-rotation', label: 'Secret Rotation', icon: '🔄' },
+    { key: 'dek-rotation', label: 'DEK Rotation', icon: '🗝️' },
+    { key: 'db-rotation', label: 'DB Credentials', icon: '🗄️' },
+    { key: 'compliance', label: 'Compliance', icon: '✅' },
+    { key: 'vault-dr', label: 'DR & Backup', icon: '💾' },
+    { key: 'siem', label: 'SIEM Events', icon: '🔍' },
+    { key: 'multi-unseal', label: 'Multi-Unseal', icon: '🔓' },
+    { key: 'vault-metrics', label: 'Metrics', icon: '📊' },
   ];
 
   constructor(
@@ -346,6 +381,15 @@ export class VaultManagerComponent implements OnInit {
       case 'history':
         this.loadAuditLogs();
         break;
+      case 'secret-rotation':
+      case 'dek-rotation':
+      case 'db-rotation':
+      case 'compliance':
+      case 'vault-dr':
+      case 'siem':
+      case 'multi-unseal':
+      case 'vault-metrics':
+        break; // These tabs self-load via their own ngOnInit
     }
   }
 

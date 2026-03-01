@@ -2,6 +2,7 @@ using IVF.Application.Common.Interfaces;
 using IVF.Infrastructure.Persistence;
 using IVF.Infrastructure.Repositories;
 using IVF.Infrastructure.Services;
+using IVF.Infrastructure.Services.Kms;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -15,13 +16,15 @@ public static class DependencyInjection
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        // Register AuditInterceptor
+        // Register Interceptors
         services.AddScoped<AuditInterceptor>();
+        services.AddScoped<VaultEncryptionInterceptor>();
 
-        // Add DbContext with AuditInterceptor
+        // Add DbContext with Interceptors
         services.AddDbContext<IvfDbContext>((sp, options) =>
         {
             var auditInterceptor = sp.GetRequiredService<AuditInterceptor>();
+            var encryptionInterceptor = sp.GetRequiredService<VaultEncryptionInterceptor>();
             options.UseNpgsql(
                 configuration.GetConnectionString("DefaultConnection"),
                 npgsqlOptions =>
@@ -29,7 +32,7 @@ public static class DependencyInjection
                     npgsqlOptions.MigrationsAssembly(typeof(IvfDbContext).Assembly.FullName);
                     npgsqlOptions.EnableRetryOnFailure(3);
                 })
-                .AddInterceptors(auditInterceptor);
+                .AddInterceptors(auditInterceptor, encryptionInterceptor);
         });
 
         // Register Repositories
@@ -68,7 +71,42 @@ public static class DependencyInjection
 
         // Key Vault & Zero Trust
         services.AddScoped<IApiKeyManagementRepository, ApiKeyManagementRepository>();
+        services.AddScoped<IApiKeyValidator, IVF.Infrastructure.Services.ApiKeyValidator>();
         services.AddScoped<IVaultRepository, VaultRepository>();
+        services.AddScoped<IVF.Infrastructure.Services.IVaultDecryptionService, IVF.Infrastructure.Services.VaultDecryptionService>();
+
+        // Vault Integration Services (Secrets, Tokens, Dynamic Credentials, Leases)
+        services.AddScoped<IVaultTokenValidator, VaultTokenValidator>();
+        services.AddScoped<IDynamicCredentialProvider, DynamicCredentialProvider>();
+        services.AddScoped<ILeaseManager, LeaseManager>();
+        services.AddScoped<IVaultPolicyEvaluator, VaultPolicyEvaluator>();
+
+        // Vault Metrics (uses System.Diagnostics.Metrics via IMeterFactory)
+        services.AddSingleton<VaultMetrics>();
+
+        // SIEM Integration
+        services.AddSingleton<ISecurityEventPublisher, SecurityEventPublisher>();
+
+        // DEK Rotation
+        services.AddScoped<IDekRotationService, DekRotationService>();
+
+        // DB Credential Rotation (dual-credential pattern)
+        services.AddScoped<IDbCredentialRotationService, DbCredentialRotationService>();
+
+        // KMS Provider Abstraction (Azure/Local, via config)
+        services.AddKmsProvider(configuration);
+
+        // Continuous Access Evaluation (Google CAE pattern)
+        services.AddScoped<IContinuousAccessEvaluator, ContinuousAccessEvaluator>();
+
+        // Compliance Scoring Engine (HIPAA, SOC 2, GDPR)
+        services.AddScoped<IComplianceScoringEngine, ComplianceScoringEngine>();
+
+        // Vault Disaster Recovery (encrypted backup/restore)
+        services.AddScoped<IVaultDrService, VaultDrService>();
+
+        // Multi-Provider Unseal (primary + fallback KMS)
+        services.AddScoped<IMultiProviderUnsealService, MultiProviderUnsealService>();
 
         // ─── MinIO Object Storage (S3-compatible) ───
         var minioSection = configuration.GetSection(MinioOptions.SectionName);
@@ -114,6 +152,9 @@ public static class DependencyInjection
 
         // Partition Maintenance (auto-creates future partitions)
         services.AddHostedService<PartitionMaintenanceService>();
+
+        // Vault Lease Maintenance (auto-revoke expired leases, credentials, tokens)
+        services.AddHostedService<VaultLeaseMaintenanceService>();
 
         // Redis Configuration (High-Performance Matcher Cache)
         var redisConnectionString = configuration.GetConnectionString("Redis") ?? "localhost:6379";

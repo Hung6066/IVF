@@ -45,6 +45,26 @@ import {
   FieldAccessPolicyUpdateRequest,
   SecurityDashboard,
   DbTableSchema,
+  RotationSchedule,
+  RotationResult,
+  RotationHistoryEntry,
+  RotationScheduleCreateRequest,
+  DekVersionInfo,
+  DekRotationResult,
+  ReEncryptionResult,
+  ReEncryptionProgress,
+  DualCredentialStatus,
+  DbCredentialRotationResult,
+  ComplianceReport,
+  FrameworkScore,
+  DrReadinessStatus,
+  VaultBackupResponse,
+  VaultRestoreResult,
+  VaultBackupValidation,
+  UnsealProviderStatus,
+  UnsealProviderConfigureRequest,
+  UnsealResult,
+  VaultMetrics,
 } from '../models/keyvault.model';
 
 @Injectable({ providedIn: 'root' })
@@ -339,5 +359,131 @@ export class KeyVaultService {
   // ─── DB Schema Introspection ────────────────────
   getDbSchema(): Observable<DbTableSchema[]> {
     return this.http.get<DbTableSchema[]>(`${this.baseUrl}/db-schema`);
+  }
+
+  // ─── Secret Rotation ──────────────────────────────
+  getRotationSchedules(): Observable<RotationSchedule[]> {
+    return this.http.get<RotationSchedule[]>(`${this.baseUrl}/rotation/schedules`);
+  }
+
+  createRotationSchedule(req: RotationScheduleCreateRequest): Observable<RotationSchedule> {
+    return this.http.post<RotationSchedule>(`${this.baseUrl}/rotation/schedules`, req);
+  }
+
+  deleteRotationSchedule(secretPath: string): Observable<{ success: boolean }> {
+    const encoded = secretPath
+      .split('/')
+      .map((s) => encodeURIComponent(s))
+      .join('/');
+    return this.http.delete<{ success: boolean }>(`${this.baseUrl}/rotation/schedules/${encoded}`);
+  }
+
+  rotateNow(secretPath: string): Observable<RotationResult> {
+    const encoded = secretPath
+      .split('/')
+      .map((s) => encodeURIComponent(s))
+      .join('/');
+    return this.http.post<RotationResult>(`${this.baseUrl}/rotation/rotate-now/${encoded}`, {});
+  }
+
+  getRotationHistory(secretPath: string, limit?: number): Observable<RotationHistoryEntry[]> {
+    const encoded = secretPath
+      .split('/')
+      .map((s) => encodeURIComponent(s))
+      .join('/');
+    const params: Record<string, string> = {};
+    if (limit) params['limit'] = limit.toString();
+    return this.http.get<RotationHistoryEntry[]>(`${this.baseUrl}/rotation/history/${encoded}`, {
+      params,
+    });
+  }
+
+  // ─── DEK Rotation ─────────────────────────────────
+  getDekStatus(): Observable<DekVersionInfo[]> {
+    return this.http.get<DekVersionInfo[]>(`${this.baseUrl}/dek/status`);
+  }
+
+  rotateDek(purpose: string): Observable<DekRotationResult> {
+    return this.http.post<DekRotationResult>(`${this.baseUrl}/dek/${purpose}/rotate`, {});
+  }
+
+  reEncryptTable(
+    purpose: string,
+    tableName: string,
+    batchSize?: number,
+  ): Observable<ReEncryptionResult> {
+    const params: Record<string, string> = {};
+    if (batchSize) params['batchSize'] = batchSize.toString();
+    return this.http.post<ReEncryptionResult>(
+      `${this.baseUrl}/dek/${purpose}/re-encrypt/${tableName}`,
+      {},
+      { params },
+    );
+  }
+
+  getReEncryptionProgress(): Observable<ReEncryptionProgress[]> {
+    return this.http.get<ReEncryptionProgress[]>(`${this.baseUrl}/dek/re-encrypt/progress`);
+  }
+
+  // ─── DB Credential Rotation ────────────────────────
+  getDbCredentialStatus(): Observable<DualCredentialStatus> {
+    return this.http.get<DualCredentialStatus>(`${this.baseUrl}/db-credentials/status`);
+  }
+
+  rotateDbCredential(): Observable<DbCredentialRotationResult> {
+    return this.http.post<DbCredentialRotationResult>(`${this.baseUrl}/db-credentials/rotate`, {});
+  }
+
+  // ─── Compliance Scoring ────────────────────────────
+  getComplianceReport(): Observable<ComplianceReport> {
+    return this.http.get<ComplianceReport>(`${this.baseUrl}/compliance/report`);
+  }
+
+  getFrameworkScore(framework: string): Observable<FrameworkScore> {
+    return this.http.get<FrameworkScore>(`${this.baseUrl}/compliance/framework/${framework}`);
+  }
+
+  // ─── Vault DR ──────────────────────────────────────
+  getDrReadiness(): Observable<DrReadinessStatus> {
+    return this.http.get<DrReadinessStatus>(`${this.baseUrl}/dr/readiness`);
+  }
+
+  createVaultBackup(backupKey: string): Observable<VaultBackupResponse> {
+    return this.http.post<VaultBackupResponse>(`${this.baseUrl}/dr/backup`, { backupKey });
+  }
+
+  restoreVaultBackup(backupDataBase64: string, backupKey: string): Observable<VaultRestoreResult> {
+    return this.http.post<VaultRestoreResult>(`${this.baseUrl}/dr/restore`, {
+      backupDataBase64,
+      backupKey,
+    });
+  }
+
+  validateVaultBackup(
+    backupDataBase64: string,
+    backupKey: string,
+  ): Observable<VaultBackupValidation> {
+    return this.http.post<VaultBackupValidation>(`${this.baseUrl}/dr/validate`, {
+      backupDataBase64,
+      backupKey,
+    });
+  }
+
+  // ─── Multi-Provider Unseal ─────────────────────────
+  getUnsealProviders(): Observable<UnsealProviderStatus[]> {
+    return this.http.get<UnsealProviderStatus[]>(`${this.baseUrl}/unseal-providers`);
+  }
+
+  configureUnsealProvider(req: UnsealProviderConfigureRequest): Observable<{ success: boolean }> {
+    return this.http.post<{ success: boolean }>(`${this.baseUrl}/unseal-providers/configure`, req);
+  }
+
+  multiProviderUnseal(): Observable<UnsealResult> {
+    return this.http.post<UnsealResult>(`${this.baseUrl}/unseal-providers/unseal`, {});
+  }
+
+  // ─── Vault Metrics ─────────────────────────────────
+  getVaultMetrics(): Observable<VaultMetrics> {
+    return this.http.get<VaultMetrics>(`${this.baseUrl}/metrics`);
   }
 }
