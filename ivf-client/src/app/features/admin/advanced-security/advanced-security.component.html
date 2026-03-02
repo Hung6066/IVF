@@ -118,99 +118,160 @@
   <!-- ═══════════════════════════════════════════════════ -->
   @if (activeTab() === 'overview') {
     <div class="tab-content">
-      <!-- Security Score -->
       @if (securityScore(); as score) {
-        <div class="score-section">
-          <div class="score-ring-container">
+        <!-- Top Section: Score + Key Metrics -->
+        <div class="overview-hero">
+          <!-- Security Score Ring -->
+          <div class="overview-score-card">
             <div class="score-ring" [style.border-color]="getScoreColor()">
               <span class="score-value" [style.color]="getScoreColor()">{{ score.score }}</span>
               <span class="score-label">/ 100</span>
             </div>
             <p class="score-desc" [style.color]="getScoreColor()">{{ getScoreDescription() }}</p>
+            <span class="score-updated">Cập nhật: {{ formatTimeAgo(score.lastUpdated) }}</span>
+          </div>
+
+          <!-- Key Threat Metrics -->
+          <div class="overview-metrics">
+            <div class="metric-card metric-card--danger" (click)="setTab('threats')">
+              <div class="metric-icon">🚨</div>
+              <div class="metric-content">
+                <span class="metric-value">{{ score.criticalAlerts }}</span>
+                <span class="metric-label">Cảnh báo nghiêm trọng</span>
+              </div>
+            </div>
+            <div class="metric-card metric-card--warning">
+              <div class="metric-icon">🛑</div>
+              <div class="metric-content">
+                <span class="metric-value">{{ score.blockedRequests }}</span>
+                <span class="metric-label">Yêu cầu bị chặn</span>
+              </div>
+            </div>
+            <div class="metric-card metric-card--alert" (click)="setTab('history')">
+              <div class="metric-icon">⚠️</div>
+              <div class="metric-content">
+                <span class="metric-value">{{ score.failedLogins }}</span>
+                <span class="metric-label">Đăng nhập thất bại</span>
+              </div>
+            </div>
+            <div class="metric-card metric-card--info">
+              <div class="metric-icon">🔍</div>
+              <div class="metric-content">
+                <span class="metric-value">{{ score.suspiciousLogins }}</span>
+                <span class="metric-label">Hoạt động đáng ngờ</span>
+              </div>
+            </div>
           </div>
         </div>
 
-        <!-- Summary Cards -->
-        <div class="stats-grid">
-          <div class="stat-card stat-red" (click)="setTab('threats')">
-            <div class="stat-icon">🚨</div>
-            <div class="stat-info">
-              <span class="stat-value">{{ score.criticalAlerts }}</span>
-              <span class="stat-label">Cảnh báo nghiêm trọng</span>
+        <!-- Feature Status Cards -->
+        <div class="overview-features">
+          <div class="feature-card" (click)="setTab('sessions')">
+            <div class="feature-icon feature-icon--blue">🔗</div>
+            <div class="feature-info">
+              <span class="feature-value">{{ score.activeSessions }}</span>
+              <span class="feature-label">Phiên hoạt động</span>
             </div>
           </div>
-          <div class="stat-card stat-orange">
-            <div class="stat-icon">🛑</div>
-            <div class="stat-info">
-              <span class="stat-value">{{ score.blockedRequests }}</span>
-              <span class="stat-label">Yêu cầu bị chặn</span>
+          <div class="feature-card" (click)="setTab('devices')">
+            <div class="feature-icon feature-icon--green">🖥️</div>
+            <div class="feature-info">
+              <span class="feature-value">{{ score.trustedDevices }}</span>
+              <span class="feature-label">Thiết bị tin cậy</span>
             </div>
           </div>
-          <div class="stat-card stat-yellow" (click)="setTab('history')">
-            <div class="stat-icon">⚠️</div>
-            <div class="stat-info">
-              <span class="stat-value">{{ score.failedLogins }}</span>
-              <span class="stat-label">Đăng nhập thất bại</span>
+          <div class="feature-card" (click)="setTab('passkeys')">
+            <div class="feature-icon feature-icon--purple">🔑</div>
+            <div class="feature-info">
+              <span class="feature-value">{{ score.passkeyCount }}</span>
+              <span class="feature-label">Passkeys đã đăng ký</span>
             </div>
           </div>
-          <div class="stat-card stat-purple">
-            <div class="stat-icon">🔍</div>
-            <div class="stat-info">
-              <span class="stat-value">{{ score.suspiciousLogins }}</span>
-              <span class="stat-label">Hoạt động đáng ngờ</span>
+          <div class="feature-card" (click)="setTab('passkeys')">
+            <div class="feature-icon feature-icon--teal">🔐</div>
+            <div class="feature-info">
+              <span class="feature-value">{{ score.mfaEnabledUsers }}</span>
+              <span class="feature-label">Người dùng MFA</span>
+            </div>
+          </div>
+          <div class="feature-card" (click)="setTab('lockouts')">
+            <div class="feature-icon feature-icon--red">🔒</div>
+            <div class="feature-info">
+              <span class="feature-value">{{ score.activeLockouts }}</span>
+              <span class="feature-label">Tài khoản bị khóa</span>
+            </div>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon feature-icon--orange">📊</div>
+            <div class="feature-info">
+              <span class="feature-value">{{ score.totalEvents24h }}</span>
+              <span class="feature-label">Sự kiện 24h</span>
             </div>
           </div>
         </div>
 
-        <!-- Score Factors -->
-        @if (score.factors.length > 0) {
+        <!-- Two-column: Factors + Quick Actions -->
+        <div class="overview-bottom-grid">
+          <!-- Score Factors -->
+          @if (score.factors.length > 0) {
+            <div class="card">
+              <div class="card-header">
+                <h3>📉 Yếu tố ảnh hưởng điểm bảo mật</h3>
+              </div>
+              <div class="card-body">
+                @for (factor of score.factors; track factor.factor) {
+                  <div class="factor-row">
+                    <span class="factor-name">{{
+                      formatEventType(factor.factor) || factor.factor
+                    }}</span>
+                    <span class="factor-count">{{ factor.count }} sự kiện</span>
+                    <span class="factor-impact" [class.negative]="factor.impact < 0"
+                      >{{ factor.impact > 0 ? '+' : '' }}{{ factor.impact }}</span
+                    >
+                  </div>
+                }
+              </div>
+            </div>
+          }
+
+          <!-- Quick Actions -->
           <div class="card">
             <div class="card-header">
-              <h3>📉 Yếu tố ảnh hưởng điểm bảo mật</h3>
+              <h3>🔧 Truy cập nhanh</h3>
             </div>
             <div class="card-body">
-              @for (factor of score.factors; track factor.factor) {
-                <div class="factor-row">
-                  <span class="factor-name">{{
-                    formatEventType(factor.factor) || factor.factor
-                  }}</span>
-                  <span class="factor-count">{{ factor.count }} sự kiện</span>
-                  <span class="factor-impact" [class.negative]="factor.impact < 0">{{
-                    factor.impact
-                  }}</span>
-                </div>
-              }
-            </div>
-          </div>
-        }
-
-        <!-- Quick Actions -->
-        <div class="card">
-          <div class="card-header">
-            <h3>🔧 Truy cập nhanh</h3>
-          </div>
-          <div class="card-body">
-            <div class="quick-actions">
-              <button class="action-card" (click)="navigateTo('/admin/security')">
-                <span class="action-icon">🛡️</span>
-                <span class="action-label">Giám sát bảo mật</span>
-                <span class="action-desc">Dashboard Zero Trust chính</span>
-              </button>
-              <button class="action-card" (click)="navigateTo('/admin/security-events')">
-                <span class="action-icon">📋</span>
-                <span class="action-label">Sự kiện bảo mật</span>
-                <span class="action-desc">Xem chi tiết tất cả sự kiện</span>
-              </button>
-              <button class="action-card" (click)="setTab('sessions')">
-                <span class="action-icon">🖥️</span>
-                <span class="action-label">Phiên hoạt động</span>
-                <span class="action-desc">Quản lý phiên người dùng</span>
-              </button>
-              <button class="action-card" (click)="setTab('threats')">
-                <span class="action-icon">🔍</span>
-                <span class="action-label">Đánh giá mối đe dọa</span>
-                <span class="action-desc">Phân tích rủi ro IP/User</span>
-              </button>
+              <div class="quick-actions">
+                <button class="action-card" (click)="navigateTo('/admin/security')">
+                  <span class="action-icon">🛡️</span>
+                  <span class="action-label">Giám sát bảo mật</span>
+                  <span class="action-desc">Dashboard Zero Trust</span>
+                </button>
+                <button class="action-card" (click)="navigateTo('/admin/security-events')">
+                  <span class="action-icon">📋</span>
+                  <span class="action-label">Sự kiện bảo mật</span>
+                  <span class="action-desc">Chi tiết sự kiện</span>
+                </button>
+                <button class="action-card" (click)="setTab('rate-limit')">
+                  <span class="action-icon">⏱️</span>
+                  <span class="action-label">Rate Limit</span>
+                  <span class="action-desc">Kiểm soát giới hạn</span>
+                </button>
+                <button class="action-card" (click)="setTab('geo-security')">
+                  <span class="action-icon">🌍</span>
+                  <span class="action-label">Geo Security</span>
+                  <span class="action-desc">Bảo mật địa lý</span>
+                </button>
+                <button class="action-card" (click)="setTab('threats')">
+                  <span class="action-icon">⚡</span>
+                  <span class="action-label">Phân tích mối đe dọa</span>
+                  <span class="action-desc">Rủi ro IP/User</span>
+                </button>
+                <button class="action-card" (click)="setTab('ip-whitelist')">
+                  <span class="action-icon">🌐</span>
+                  <span class="action-label">IP Whitelist</span>
+                  <span class="action-desc">Quản lý IP tin cậy</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -228,40 +289,100 @@
   <!-- ═══════════════════════════════════════════════════ -->
   @if (activeTab() === 'passkeys') {
     <div class="tab-content">
-      <div class="content-grid">
-        <!-- Passkey Management -->
+      <!-- Top row: 2 columns -->
+      <div class="passkeys-grid">
+        <!-- ─── Passkey Registration Card ─── -->
         <div class="card">
           <div class="card-header">
             <h3>🔑 Passkeys (WebAuthn/FIDO2)</h3>
           </div>
           <div class="card-body">
+            <!-- Browser support banner -->
             <div class="passkey-status">
               @if (passkeysSupported()) {
-                <div class="status-item status-success">
-                  <span class="status-icon">✅</span>
-                  <div>
+                <div class="status-banner status-banner--success">
+                  <span class="status-banner__icon">✅</span>
+                  <div class="status-banner__text">
                     <strong>Trình duyệt hỗ trợ Passkeys</strong>
-                    <p>Thiết bị này hỗ trợ xác thực sinh trắc học (Passkeys/WebAuthn)</p>
+                    <span>Thiết bị này hỗ trợ xác thực sinh trắc học (Passkeys/WebAuthn)</span>
                   </div>
                 </div>
               } @else {
-                <div class="status-item status-warning">
-                  <span class="status-icon">⚠️</span>
-                  <div>
+                <div class="status-banner status-banner--warning">
+                  <span class="status-banner__icon">⚠️</span>
+                  <div class="status-banner__text">
                     <strong>Trình duyệt không hỗ trợ Passkeys</strong>
-                    <p>Vui lòng sử dụng trình duyệt hiện đại (Chrome, Edge, Safari)</p>
+                    <span>Vui lòng sử dụng trình duyệt hiện đại (Chrome, Edge, Safari)</span>
                   </div>
                 </div>
               }
             </div>
 
-            <!-- Register Passkey -->
-            <div class="passkey-register-section">
-              <h4>Đăng ký Passkey mới</h4>
-              <div class="form-row">
+            <!-- Register form -->
+            <div class="section-block">
+              <h4 class="section-title">Đăng ký Passkey mới</h4>
+              <div class="form-stack">
+                <div class="form-group">
+                  <label>Người dùng</label>
+                  <select
+                    class="input-field"
+                    [(ngModel)]="passkeyUserId"
+                    (ngModelChange)="onUserSelected($event)"
+                  >
+                    <option value="" disabled>-- Chọn người dùng --</option>
+                    @for (u of users(); track u.id) {
+                      <option [value]="u.id">{{ u.fullName || u.username }} ({{ u.role }})</option>
+                    }
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Tên thiết bị</label>
+                  <input
+                    type="text"
+                    class="input-field"
+                    placeholder="Tùy chọn"
+                    [(ngModel)]="passkeyDeviceName"
+                  />
+                </div>
+                <div class="form-actions-row">
+                  <button
+                    class="btn btn-primary"
+                    (click)="registerPasskey()"
+                    [disabled]="
+                      !passkeysSupported() || passkeyRegistering() || !passkeyUserId.trim()
+                    "
+                  >
+                    @if (passkeyRegistering()) {
+                      <span class="btn-spinner"></span> Đang đăng ký...
+                    } @else {
+                      🔑 Đăng ký Passkey
+                    }
+                  </button>
+                  <button
+                    class="btn btn-outline"
+                    (click)="loadPasskeys()"
+                    [disabled]="!passkeyUserId.trim()"
+                  >
+                    📋 Xem danh sách
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ─── MFA Status Card ─── -->
+        <div class="card">
+          <div class="card-header">
+            <h3>🔐 Xác thực đa yếu tố (MFA)</h3>
+          </div>
+          <div class="card-body">
+            <div class="form-group" style="margin-bottom: 1rem">
+              <label>Người dùng</label>
+              <div class="input-with-action">
                 <select
                   class="input-field"
-                  [(ngModel)]="passkeyUserId"
+                  [(ngModel)]="mfaUserId"
                   (ngModelChange)="onUserSelected($event)"
                 >
                   <option value="" disabled>-- Chọn người dùng --</option>
@@ -269,151 +390,74 @@
                     <option [value]="u.id">{{ u.fullName || u.username }} ({{ u.role }})</option>
                   }
                 </select>
-                <input
-                  type="text"
-                  class="input-field"
-                  placeholder="Tên thiết bị (tùy chọn)"
-                  [(ngModel)]="passkeyDeviceName"
-                />
                 <button
                   class="btn btn-primary"
-                  (click)="registerPasskey()"
-                  [disabled]="!passkeysSupported() || passkeyRegistering() || !passkeyUserId.trim()"
+                  (click)="loadMfaSettings()"
+                  [disabled]="!mfaUserId.trim()"
                 >
-                  @if (passkeyRegistering()) {
-                    ⏳ Đang đăng ký...
-                  } @else {
-                    🔑 Đăng ký Passkey
-                  }
-                </button>
-                <button
-                  class="btn btn-outline"
-                  (click)="loadPasskeys()"
-                  [disabled]="!passkeyUserId.trim()"
-                >
-                  📋 Xem danh sách
+                  Tra cứu MFA
                 </button>
               </div>
-            </div>
-
-            <!-- Passkey List -->
-            @if (passkeys().length > 0) {
-              <div class="table-wrapper">
-                <table class="data-table">
-                  <thead>
-                    <tr>
-                      <th>Tên thiết bị</th>
-                      <th>Loại</th>
-                      <th>Format</th>
-                      <th>Counter</th>
-                      <th>Đăng ký</th>
-                      <th>Sử dụng cuối</th>
-                      <th>Trạng thái</th>
-                      <th>Hành động</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    @for (pk of passkeys(); track pk.id) {
-                      <tr [class.row-blocked]="!pk.isActive">
-                        <td>
-                          <strong>{{ pk.deviceName || 'Passkey' }}</strong>
-                        </td>
-                        <td>{{ pk.credentialType }}</td>
-                        <td>{{ pk.attestationFormat || '-' }}</td>
-                        <td>{{ pk.signatureCounter }}</td>
-                        <td class="time-cell">{{ formatDate(pk.registeredAt) }}</td>
-                        <td class="time-cell">
-                          {{ pk.lastUsedAt ? formatTimeAgo(pk.lastUsedAt) : 'Chưa sử dụng' }}
-                        </td>
-                        <td>
-                          @if (pk.isActive) {
-                            <span class="badge severity-low">✅ Hoạt động</span>
-                          } @else {
-                            <span class="badge severity-info">🚫 Đã thu hồi</span>
-                          }
-                        </td>
-                        <td>
-                          <div class="action-buttons">
-                            <button class="btn btn-sm btn-outline" (click)="renamePasskey(pk.id)">
-                              ✏️
-                            </button>
-                            @if (pk.isActive) {
-                              <button class="btn btn-sm btn-danger" (click)="revokePasskey(pk.id)">
-                                🗑️
-                              </button>
-                            }
-                          </div>
-                        </td>
-                      </tr>
-                    }
-                  </tbody>
-                </table>
-              </div>
-            }
-          </div>
-        </div>
-
-        <!-- MFA & TOTP & SMS -->
-        <div class="card">
-          <div class="card-header">
-            <h3>🔐 Xác thực đa yếu tố (MFA)</h3>
-          </div>
-          <div class="card-body">
-            <!-- MFA Status Lookup -->
-            <div class="form-row">
-              <select
-                class="input-field"
-                [(ngModel)]="mfaUserId"
-                (ngModelChange)="onUserSelected($event)"
-              >
-                <option value="" disabled>-- Chọn người dùng --</option>
-                @for (u of users(); track u.id) {
-                  <option [value]="u.id">{{ u.fullName || u.username }} ({{ u.role }})</option>
-                }
-              </select>
-              <button
-                class="btn btn-sm btn-primary"
-                (click)="loadMfaSettings()"
-                [disabled]="!mfaUserId.trim()"
-              >
-                Tra cứu MFA
-              </button>
             </div>
 
             @if (mfaSettings(); as mfa) {
-              <div class="mfa-status-card">
-                <div class="mfa-row">
-                  <span>Trạng thái MFA:</span>
+              <div class="mfa-status-grid">
+                <div class="mfa-status-item">
+                  <span class="mfa-status-label">Trạng thái MFA</span>
                   @if (mfa.isMfaEnabled) {
-                    <span class="badge severity-low">✅ Đã bật ({{ mfa.mfaMethod }})</span>
+                    <span class="badge badge-lg severity-low">✅ Đã bật ({{ mfa.mfaMethod }})</span>
                   } @else {
-                    <span class="badge severity-info">❌ Chưa bật</span>
+                    <span class="badge badge-lg severity-info">❌ Chưa bật</span>
                   }
                 </div>
-                <div class="mfa-row">
-                  <span>TOTP:</span>
-                  <span>{{ mfa.isTotpVerified ? '✅ Đã xác minh' : '❌ Chưa thiết lập' }}</span>
+                <div class="mfa-status-item">
+                  <span class="mfa-status-label">TOTP</span>
+                  @if (mfa.isTotpVerified) {
+                    <span class="badge badge-lg severity-low">✅ Đã xác minh</span>
+                  } @else {
+                    <span class="badge badge-lg severity-info">❌ Chưa thiết lập</span>
+                  }
                 </div>
-                <div class="mfa-row">
-                  <span>Điện thoại:</span>
-                  <span>{{
-                    mfa.isPhoneVerified ? '✅ ' + (mfa.phoneNumber || '') : '❌ Chưa xác minh'
-                  }}</span>
+                <div class="mfa-status-item">
+                  <span class="mfa-status-label">Điện thoại</span>
+                  @if (mfa.isPhoneVerified) {
+                    <span class="badge badge-lg severity-low"
+                      >✅ {{ mfa.phoneNumber || 'Đã xác minh' }}</span
+                    >
+                  } @else {
+                    <span class="badge badge-lg severity-warning">❌ Chưa xác minh</span>
+                  }
                 </div>
-                <div class="mfa-row">
-                  <span>MFA thất bại:</span>
-                  <span class="badge severity-high">{{ mfa.failedMfaAttempts }}</span>
+                <div class="mfa-status-item">
+                  <span class="mfa-status-label">MFA thất bại</span>
+                  <span
+                    class="badge badge-lg"
+                    [class]="mfa.failedMfaAttempts > 0 ? 'severity-high' : 'severity-low'"
+                    >{{ mfa.failedMfaAttempts }}</span
+                  >
                 </div>
-                @if (mfa.isMfaEnabled) {
-                  <button class="btn btn-sm btn-danger" (click)="disableMfa()">🔓 Tắt MFA</button>
-                }
               </div>
+              @if (mfa.isMfaEnabled) {
+                <div class="mfa-disable-action">
+                  <button class="btn btn-danger btn-sm" (click)="disableMfa()">🔓 Tắt MFA</button>
+                </div>
+              }
             }
+          </div>
+        </div>
+      </div>
 
-            <!-- TOTP Setup -->
-            <div class="mfa-section">
-              <h4>📱 Thiết lập TOTP (Authenticator App)</h4>
-              <div class="form-row">
+      <!-- Second row: TOTP & SMS side by side -->
+      <div class="passkeys-grid">
+        <!-- ─── TOTP Setup Card ─── -->
+        <div class="card">
+          <div class="card-header">
+            <h3>📱 Thiết lập TOTP (Authenticator App)</h3>
+          </div>
+          <div class="card-body">
+            <div class="form-group" style="margin-bottom: 1rem">
+              <label>Người dùng</label>
+              <div class="input-with-action">
                 <select
                   class="input-field"
                   [(ngModel)]="totpUserId"
@@ -425,57 +469,63 @@
                   }
                 </select>
                 <button
-                  class="btn btn-sm btn-primary"
+                  class="btn btn-primary"
                   (click)="setupTotp()"
                   [disabled]="!totpUserId.trim()"
                 >
                   Tạo TOTP Secret
                 </button>
               </div>
-              @if (totpSetup(); as setup) {
-                <div class="totp-setup-card">
-                  @if (totpQrDataUrl()) {
-                    <div class="totp-qr-container">
-                      <img
-                        [src]="totpQrDataUrl()"
-                        alt="TOTP QR Code"
-                        class="totp-qr-image"
-                        width="256"
-                        height="256"
-                      />
-                    </div>
-                  }
-                  <p class="text-muted">
-                    Quét mã QR bằng ứng dụng xác thực (Google Authenticator, Authy...)
-                  </p>
-                  <p class="text-muted">
-                    Hoặc nhập thủ công secret:
-                    <strong class="totp-secret">{{ setup.secret }}</strong>
-                  </p>
-                  <div class="form-row">
-                    <input
-                      type="text"
-                      class="input-field"
-                      placeholder="Nhập mã 6 chữ số"
-                      [(ngModel)]="totpCode"
-                      maxlength="6"
-                    />
-                    <button
-                      class="btn btn-sm btn-primary"
-                      (click)="verifyTotp()"
-                      [disabled]="totpCode.length < 6"
-                    >
-                      Xác minh
-                    </button>
-                  </div>
-                </div>
-              }
             </div>
+            @if (totpSetup(); as setup) {
+              <div class="totp-result">
+                @if (totpQrDataUrl()) {
+                  <div class="totp-qr-container">
+                    <img
+                      [src]="totpQrDataUrl()"
+                      alt="TOTP QR Code"
+                      class="totp-qr-image"
+                      width="200"
+                      height="200"
+                    />
+                  </div>
+                }
+                <div class="totp-instructions">
+                  <p>Quét mã QR bằng ứng dụng xác thực (Google Authenticator, Authy...)</p>
+                  <p>
+                    Hoặc nhập thủ công secret: <code class="totp-secret">{{ setup.secret }}</code>
+                  </p>
+                </div>
+                <div class="totp-verify-row">
+                  <input
+                    type="text"
+                    class="input-field"
+                    placeholder="Nhập mã 6 chữ số"
+                    [(ngModel)]="totpCode"
+                    maxlength="6"
+                  />
+                  <button
+                    class="btn btn-primary"
+                    (click)="verifyTotp()"
+                    [disabled]="totpCode.length < 6"
+                  >
+                    Xác minh
+                  </button>
+                </div>
+              </div>
+            }
+          </div>
+        </div>
 
-            <!-- SMS OTP -->
-            <div class="mfa-section">
-              <h4>💬 SMS OTP</h4>
-              <div class="form-row">
+        <!-- ─── SMS OTP Card ─── -->
+        <div class="card">
+          <div class="card-header">
+            <h3>💬 SMS OTP</h3>
+          </div>
+          <div class="card-body">
+            <div class="form-stack">
+              <div class="form-group">
+                <label>Người dùng</label>
                 <select
                   class="input-field"
                   [(ngModel)]="smsUserId"
@@ -486,47 +536,126 @@
                     <option [value]="u.id">{{ u.fullName || u.username }} ({{ u.role }})</option>
                   }
                 </select>
-                <input
-                  type="text"
-                  class="input-field"
-                  placeholder="Số điện thoại"
-                  [(ngModel)]="smsPhone"
-                />
-                <button
-                  class="btn btn-sm btn-primary"
-                  (click)="registerSmsOtp()"
-                  [disabled]="!smsUserId.trim() || !smsPhone.trim()"
-                >
-                  Đăng ký
-                </button>
-                <button
-                  class="btn btn-sm btn-outline"
-                  (click)="sendSmsOtp()"
-                  [disabled]="!smsUserId.trim()"
-                >
-                  Gửi OTP
-                </button>
               </div>
-              <div class="form-row">
-                <input
-                  type="text"
-                  class="input-field"
-                  placeholder="Mã OTP"
-                  [(ngModel)]="smsCode"
-                  maxlength="6"
-                />
-                <button
-                  class="btn btn-sm btn-primary"
-                  (click)="verifySmsOtp()"
-                  [disabled]="smsCode.length < 6"
-                >
-                  Xác minh
-                </button>
+              <div class="form-group">
+                <label>Số điện thoại</label>
+                <div class="input-with-action">
+                  <input
+                    type="text"
+                    class="input-field"
+                    placeholder="+84 xxx xxx xxx"
+                    [(ngModel)]="smsPhone"
+                  />
+                  <button
+                    class="btn btn-primary"
+                    (click)="registerSmsOtp()"
+                    [disabled]="!smsUserId.trim() || !smsPhone.trim()"
+                  >
+                    Đăng ký
+                  </button>
+                  <button
+                    class="btn btn-outline"
+                    (click)="sendSmsOtp()"
+                    [disabled]="!smsUserId.trim()"
+                  >
+                    Gửi OTP
+                  </button>
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Mã xác minh</label>
+                <div class="input-with-action">
+                  <input
+                    type="text"
+                    class="input-field"
+                    placeholder="Mã OTP 6 chữ số"
+                    [(ngModel)]="smsCode"
+                    maxlength="6"
+                  />
+                  <button
+                    class="btn btn-primary"
+                    (click)="verifySmsOtp()"
+                    [disabled]="smsCode.length < 6"
+                  >
+                    Xác minh
+                  </button>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
+
+      <!-- Passkey List Table (full width) -->
+      @if (passkeys().length > 0) {
+        <div class="card">
+          <div class="card-header">
+            <h3>📋 Danh sách Passkeys</h3>
+            <span class="badge severity-info">{{ passkeys().length }} thiết bị</span>
+          </div>
+          <div class="card-body card-body--flush">
+            <div class="table-wrapper">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Tên thiết bị</th>
+                    <th>Loại</th>
+                    <th>Format</th>
+                    <th>Counter</th>
+                    <th>Đăng ký</th>
+                    <th>Sử dụng cuối</th>
+                    <th>Trạng thái</th>
+                    <th>Hành động</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (pk of passkeys(); track pk.id) {
+                    <tr [class.row-blocked]="!pk.isActive">
+                      <td>
+                        <strong>{{ pk.deviceName || 'Passkey' }}</strong>
+                      </td>
+                      <td>{{ pk.credentialType }}</td>
+                      <td>{{ pk.attestationFormat || '-' }}</td>
+                      <td class="text-center">{{ pk.signatureCounter }}</td>
+                      <td class="time-cell">{{ formatDate(pk.registeredAt) }}</td>
+                      <td class="time-cell">
+                        {{ pk.lastUsedAt ? formatTimeAgo(pk.lastUsedAt) : 'Chưa sử dụng' }}
+                      </td>
+                      <td>
+                        @if (pk.isActive) {
+                          <span class="badge severity-low">✅ Hoạt động</span>
+                        } @else {
+                          <span class="badge severity-info">🚫 Đã thu hồi</span>
+                        }
+                      </td>
+                      <td>
+                        <div class="action-buttons">
+                          <button
+                            class="btn btn-sm btn-icon"
+                            (click)="renamePasskey(pk.id)"
+                            title="Đổi tên"
+                          >
+                            ✏️
+                          </button>
+                          @if (pk.isActive) {
+                            <button
+                              class="btn btn-sm btn-icon btn-icon--danger"
+                              (click)="revokePasskey(pk.id)"
+                              title="Thu hồi"
+                            >
+                              🗑️
+                            </button>
+                          }
+                        </div>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      }
     </div>
   }
 

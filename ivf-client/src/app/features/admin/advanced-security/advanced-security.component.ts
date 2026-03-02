@@ -1057,6 +1057,17 @@ export class AdvancedSecurityComponent implements OnInit, OnDestroy {
       ZT_ACCESS_DENIED: 'ZT Từ chối',
       ZT_DEVICE_UNTRUSTED: 'Thiết bị không tin cậy',
       ZT_GEO_FENCE_VIOLATION: 'Vi phạm Geo-fence',
+      // Security score factors
+      critical_events: 'Sự kiện nghiêm trọng',
+      failed_logins: 'Đăng nhập thất bại',
+      blocked_requests: 'Yêu cầu bị chặn',
+      suspicious_logins: 'Đăng nhập đáng ngờ',
+      no_mfa_users: 'Người dùng chưa bật MFA',
+      active_lockouts: 'Tài khoản đang bị khóa',
+      untrusted_devices: 'Thiết bị không tin cậy',
+      no_passkeys: 'Chưa đăng ký Passkey',
+      low_trusted_devices: 'Ít thiết bị tin cậy',
+      high_risk_sessions: 'Phiên rủi ro cao',
     };
     return labels[type] || type;
   }
