@@ -50,4 +50,5 @@ public sealed record ControlResult(
     ControlStatus Status,
     int Score,
     int MaxScore,
-    string? Finding);
+    string? Finding,
+    string? Remediation = null);

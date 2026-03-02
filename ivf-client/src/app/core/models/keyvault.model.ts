@@ -565,6 +565,7 @@ export interface ControlResult {
   score: number;
   maxScore: number;
   finding: string | null;
+  remediation: string | null;
 }
 
 // ─── Vault Disaster Recovery ─────────────────────

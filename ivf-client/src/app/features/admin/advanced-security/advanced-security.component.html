@@ -1,0 +1,1519 @@
+<div class="security-page">
+  <!-- Header -->
+  <div class="page-header">
+    <div class="header-left">
+      <h2>🛡️ Bảo mật nâng cao</h2>
+      <p class="subtitle">
+        Passkeys, Thiết bị, Phiên, Rate Limit, Geo Security, Threats, IP Whitelist
+      </p>
+    </div>
+    <div class="header-actions">
+      <label class="auto-refresh-toggle">
+        <input type="checkbox" [checked]="autoRefresh()" (change)="toggleAutoRefresh()" />
+        <span>Tự động làm mới (30s)</span>
+      </label>
+      <button class="btn btn-sm btn-outline" (click)="refresh()" [disabled]="loading()">
+        🔄 Làm mới
+      </button>
+    </div>
+  </div>
+
+  <!-- Current User Context -->
+  @if (currentUser(); as user) {
+    <div class="user-context-banner">
+      <span class="user-context-icon">👤</span>
+      <span class="user-context-label">Đang hoạt động:</span>
+      <strong>{{ user.fullName || user.username }}</strong>
+      <span class="badge severity-info">{{ user.role }}</span>
+      <span class="text-muted text-xs">ID: {{ user.id }}</span>
+      @if (machineFingerprint) {
+        <span class="text-muted text-xs">| Device: {{ machineFingerprint | slice: 0 : 12 }}…</span>
+      }
+    </div>
+  }
+
+  <!-- Toast -->
+  @if (statusMessage(); as msg) {
+    <div
+      class="toast"
+      [class.toast-success]="msg.type === 'success'"
+      [class.toast-error]="msg.type === 'error'"
+    >
+      {{ msg.type === 'success' ? '✅' : '❌' }} {{ msg.text }}
+    </div>
+  }
+
+  <!-- Loading -->
+  @if (loading()) {
+    <div class="loading-indicator"><div class="spinner"></div></div>
+  }
+
+  <!-- Tabs Navigation -->
+  <div class="tabs-nav">
+    <button
+      class="tab-btn"
+      [class.active]="activeTab() === 'overview'"
+      (click)="setTab('overview')"
+    >
+      📊 Tổng quan
+    </button>
+    <button
+      class="tab-btn"
+      [class.active]="activeTab() === 'passkeys'"
+      (click)="setTab('passkeys')"
+    >
+      🔑 Passkeys
+    </button>
+    <button class="tab-btn" [class.active]="activeTab() === 'devices'" (click)="setTab('devices')">
+      🖥️ Thiết bị
+    </button>
+    <button
+      class="tab-btn"
+      [class.active]="activeTab() === 'sessions'"
+      (click)="setTab('sessions')"
+    >
+      🔗 Phiên
+    </button>
+    <button class="tab-btn" [class.active]="activeTab() === 'history'" (click)="setTab('history')">
+      📋 Lịch sử đăng nhập
+    </button>
+    <button
+      class="tab-btn"
+      [class.active]="activeTab() === 'rate-limit'"
+      (click)="setTab('rate-limit')"
+    >
+      ⏱️ Rate Limit
+    </button>
+    <button
+      class="tab-btn"
+      [class.active]="activeTab() === 'geo-security'"
+      (click)="setTab('geo-security')"
+    >
+      🌍 Geo Security
+    </button>
+    <button class="tab-btn" [class.active]="activeTab() === 'threats'" (click)="setTab('threats')">
+      ⚡ Threats
+    </button>
+    <button
+      class="tab-btn"
+      [class.active]="activeTab() === 'lockouts'"
+      (click)="setTab('lockouts')"
+    >
+      🔒 Khóa tài khoản
+    </button>
+    <button
+      class="tab-btn"
+      [class.active]="activeTab() === 'ip-whitelist'"
+      (click)="setTab('ip-whitelist')"
+    >
+      🌐 IP Whitelist
+    </button>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- TAB: OVERVIEW -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  @if (activeTab() === 'overview') {
+    <div class="tab-content">
+      <!-- Security Score -->
+      @if (securityScore(); as score) {
+        <div class="score-section">
+          <div class="score-ring-container">
+            <div class="score-ring" [style.border-color]="getScoreColor()">
+              <span class="score-value" [style.color]="getScoreColor()">{{ score.score }}</span>
+              <span class="score-label">/ 100</span>
+            </div>
+            <p class="score-desc" [style.color]="getScoreColor()">{{ getScoreDescription() }}</p>
+          </div>
+        </div>
+
+        <!-- Summary Cards -->
+        <div class="stats-grid">
+          <div class="stat-card stat-red" (click)="setTab('threats')">
+            <div class="stat-icon">🚨</div>
+            <div class="stat-info">
+              <span class="stat-value">{{ score.criticalAlerts }}</span>
+              <span class="stat-label">Cảnh báo nghiêm trọng</span>
+            </div>
+          </div>
+          <div class="stat-card stat-orange">
+            <div class="stat-icon">🛑</div>
+            <div class="stat-info">
+              <span class="stat-value">{{ score.blockedRequests }}</span>
+              <span class="stat-label">Yêu cầu bị chặn</span>
+            </div>
+          </div>
+          <div class="stat-card stat-yellow" (click)="setTab('history')">
+            <div class="stat-icon">⚠️</div>
+            <div class="stat-info">
+              <span class="stat-value">{{ score.failedLogins }}</span>
+              <span class="stat-label">Đăng nhập thất bại</span>
+            </div>
+          </div>
+          <div class="stat-card stat-purple">
+            <div class="stat-icon">🔍</div>
+            <div class="stat-info">
+              <span class="stat-value">{{ score.suspiciousLogins }}</span>
+              <span class="stat-label">Hoạt động đáng ngờ</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Score Factors -->
+        @if (score.factors.length > 0) {
+          <div class="card">
+            <div class="card-header">
+              <h3>📉 Yếu tố ảnh hưởng điểm bảo mật</h3>
+            </div>
+            <div class="card-body">
+              @for (factor of score.factors; track factor.factor) {
+                <div class="factor-row">
+                  <span class="factor-name">{{
+                    formatEventType(factor.factor) || factor.factor
+                  }}</span>
+                  <span class="factor-count">{{ factor.count }} sự kiện</span>
+                  <span class="factor-impact" [class.negative]="factor.impact < 0">{{
+                    factor.impact
+                  }}</span>
+                </div>
+              }
+            </div>
+          </div>
+        }
+
+        <!-- Quick Actions -->
+        <div class="card">
+          <div class="card-header">
+            <h3>🔧 Truy cập nhanh</h3>
+          </div>
+          <div class="card-body">
+            <div class="quick-actions">
+              <button class="action-card" (click)="navigateTo('/admin/security')">
+                <span class="action-icon">🛡️</span>
+                <span class="action-label">Giám sát bảo mật</span>
+                <span class="action-desc">Dashboard Zero Trust chính</span>
+              </button>
+              <button class="action-card" (click)="navigateTo('/admin/security-events')">
+                <span class="action-icon">📋</span>
+                <span class="action-label">Sự kiện bảo mật</span>
+                <span class="action-desc">Xem chi tiết tất cả sự kiện</span>
+              </button>
+              <button class="action-card" (click)="navigateTo('/admin/security-sessions')">
+                <span class="action-icon">🖥️</span>
+                <span class="action-label">Phiên hoạt động</span>
+                <span class="action-desc">Quản lý phiên người dùng</span>
+              </button>
+              <button class="action-card" (click)="navigateTo('/admin/security-threats')">
+                <span class="action-icon">🔍</span>
+                <span class="action-label">Đánh giá mối đe dọa</span>
+                <span class="action-desc">Phân tích rủi ro IP/User</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      } @else if (!loading()) {
+        <div class="empty-state">
+          <span class="empty-icon">🛡️</span>
+          <span>Đang tải dữ liệu bảo mật...</span>
+        </div>
+      }
+    </div>
+  }
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- TAB: PASSKEYS -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  @if (activeTab() === 'passkeys') {
+    <div class="tab-content">
+      <div class="content-grid">
+        <!-- Passkey Management -->
+        <div class="card">
+          <div class="card-header">
+            <h3>🔑 Passkeys (WebAuthn/FIDO2)</h3>
+          </div>
+          <div class="card-body">
+            <div class="passkey-status">
+              @if (passkeysSupported()) {
+                <div class="status-item status-success">
+                  <span class="status-icon">✅</span>
+                  <div>
+                    <strong>Trình duyệt hỗ trợ Passkeys</strong>
+                    <p>Thiết bị này hỗ trợ xác thực sinh trắc học (Passkeys/WebAuthn)</p>
+                  </div>
+                </div>
+              } @else {
+                <div class="status-item status-warning">
+                  <span class="status-icon">⚠️</span>
+                  <div>
+                    <strong>Trình duyệt không hỗ trợ Passkeys</strong>
+                    <p>Vui lòng sử dụng trình duyệt hiện đại (Chrome, Edge, Safari)</p>
+                  </div>
+                </div>
+              }
+            </div>
+
+            <!-- Register Passkey -->
+            <div class="passkey-register-section">
+              <h4>Đăng ký Passkey mới</h4>
+              <div class="form-row">
+                <input
+                  type="text"
+                  class="input-field"
+                  placeholder="User ID"
+                  [(ngModel)]="passkeyUserId"
+                />
+                <input
+                  type="text"
+                  class="input-field"
+                  placeholder="Tên thiết bị (tùy chọn)"
+                  [(ngModel)]="passkeyDeviceName"
+                />
+                <button
+                  class="btn btn-primary"
+                  (click)="registerPasskey()"
+                  [disabled]="!passkeysSupported() || passkeyRegistering() || !passkeyUserId.trim()"
+                >
+                  @if (passkeyRegistering()) {
+                    ⏳ Đang đăng ký...
+                  } @else {
+                    🔑 Đăng ký Passkey
+                  }
+                </button>
+                <button
+                  class="btn btn-outline"
+                  (click)="loadPasskeys()"
+                  [disabled]="!passkeyUserId.trim()"
+                >
+                  📋 Xem danh sách
+                </button>
+              </div>
+            </div>
+
+            <!-- Passkey List -->
+            @if (passkeys().length > 0) {
+              <div class="table-wrapper">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Tên thiết bị</th>
+                      <th>Loại</th>
+                      <th>Format</th>
+                      <th>Counter</th>
+                      <th>Đăng ký</th>
+                      <th>Sử dụng cuối</th>
+                      <th>Trạng thái</th>
+                      <th>Hành động</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (pk of passkeys(); track pk.id) {
+                      <tr [class.row-blocked]="!pk.isActive">
+                        <td>
+                          <strong>{{ pk.deviceName || 'Passkey' }}</strong>
+                        </td>
+                        <td>{{ pk.credentialType }}</td>
+                        <td>{{ pk.attestationFormat || '-' }}</td>
+                        <td>{{ pk.signatureCounter }}</td>
+                        <td class="time-cell">{{ formatDate(pk.registeredAt) }}</td>
+                        <td class="time-cell">
+                          {{ pk.lastUsedAt ? formatTimeAgo(pk.lastUsedAt) : 'Chưa sử dụng' }}
+                        </td>
+                        <td>
+                          @if (pk.isActive) {
+                            <span class="badge severity-low">✅ Hoạt động</span>
+                          } @else {
+                            <span class="badge severity-info">🚫 Đã thu hồi</span>
+                          }
+                        </td>
+                        <td>
+                          <div class="action-buttons">
+                            <button class="btn btn-sm btn-outline" (click)="renamePasskey(pk.id)">
+                              ✏️
+                            </button>
+                            @if (pk.isActive) {
+                              <button class="btn btn-sm btn-danger" (click)="revokePasskey(pk.id)">
+                                🗑️
+                              </button>
+                            }
+                          </div>
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          </div>
+        </div>
+
+        <!-- MFA & TOTP & SMS -->
+        <div class="card">
+          <div class="card-header">
+            <h3>🔐 Xác thực đa yếu tố (MFA)</h3>
+          </div>
+          <div class="card-body">
+            <!-- MFA Status Lookup -->
+            <div class="form-row">
+              <input
+                type="text"
+                class="input-field"
+                placeholder="User ID"
+                [(ngModel)]="mfaUserId"
+              />
+              <button
+                class="btn btn-sm btn-primary"
+                (click)="loadMfaSettings()"
+                [disabled]="!mfaUserId.trim()"
+              >
+                Tra cứu MFA
+              </button>
+            </div>
+
+            @if (mfaSettings(); as mfa) {
+              <div class="mfa-status-card">
+                <div class="mfa-row">
+                  <span>Trạng thái MFA:</span>
+                  @if (mfa.isMfaEnabled) {
+                    <span class="badge severity-low">✅ Đã bật ({{ mfa.mfaMethod }})</span>
+                  } @else {
+                    <span class="badge severity-info">❌ Chưa bật</span>
+                  }
+                </div>
+                <div class="mfa-row">
+                  <span>TOTP:</span>
+                  <span>{{ mfa.isTotpVerified ? '✅ Đã xác minh' : '❌ Chưa thiết lập' }}</span>
+                </div>
+                <div class="mfa-row">
+                  <span>Điện thoại:</span>
+                  <span>{{
+                    mfa.isPhoneVerified ? '✅ ' + (mfa.phoneNumber || '') : '❌ Chưa xác minh'
+                  }}</span>
+                </div>
+                <div class="mfa-row">
+                  <span>MFA thất bại:</span>
+                  <span class="badge severity-high">{{ mfa.failedMfaAttempts }}</span>
+                </div>
+                @if (mfa.isMfaEnabled) {
+                  <button class="btn btn-sm btn-danger" (click)="disableMfa()">🔓 Tắt MFA</button>
+                }
+              </div>
+            }
+
+            <!-- TOTP Setup -->
+            <div class="mfa-section">
+              <h4>📱 Thiết lập TOTP (Authenticator App)</h4>
+              <div class="form-row">
+                <input
+                  type="text"
+                  class="input-field"
+                  placeholder="User ID"
+                  [(ngModel)]="totpUserId"
+                />
+                <button
+                  class="btn btn-sm btn-primary"
+                  (click)="setupTotp()"
+                  [disabled]="!totpUserId.trim()"
+                >
+                  Tạo TOTP Secret
+                </button>
+              </div>
+              @if (totpSetup(); as setup) {
+                <div class="totp-setup-card">
+                  <p><strong>OTPAuth URI:</strong></p>
+                  <code class="totp-uri">{{ setup.otpauthUri }}</code>
+                  <p class="text-muted">
+                    Quét mã QR hoặc nhập thủ công secret: <strong>{{ setup.secret }}</strong>
+                  </p>
+                  <div class="form-row">
+                    <input
+                      type="text"
+                      class="input-field"
+                      placeholder="Nhập mã 6 chữ số"
+                      [(ngModel)]="totpCode"
+                      maxlength="6"
+                    />
+                    <button
+                      class="btn btn-sm btn-primary"
+                      (click)="verifyTotp()"
+                      [disabled]="totpCode.length < 6"
+                    >
+                      Xác minh
+                    </button>
+                  </div>
+                </div>
+              }
+            </div>
+
+            <!-- SMS OTP -->
+            <div class="mfa-section">
+              <h4>💬 SMS OTP</h4>
+              <div class="form-row">
+                <input
+                  type="text"
+                  class="input-field"
+                  placeholder="User ID"
+                  [(ngModel)]="smsUserId"
+                />
+                <input
+                  type="text"
+                  class="input-field"
+                  placeholder="Số điện thoại"
+                  [(ngModel)]="smsPhone"
+                />
+                <button
+                  class="btn btn-sm btn-primary"
+                  (click)="registerSmsOtp()"
+                  [disabled]="!smsUserId.trim() || !smsPhone.trim()"
+                >
+                  Đăng ký
+                </button>
+                <button
+                  class="btn btn-sm btn-outline"
+                  (click)="sendSmsOtp()"
+                  [disabled]="!smsUserId.trim()"
+                >
+                  Gửi OTP
+                </button>
+              </div>
+              <div class="form-row">
+                <input
+                  type="text"
+                  class="input-field"
+                  placeholder="Mã OTP"
+                  [(ngModel)]="smsCode"
+                  maxlength="6"
+                />
+                <button
+                  class="btn btn-sm btn-primary"
+                  (click)="verifySmsOtp()"
+                  [disabled]="smsCode.length < 6"
+                >
+                  Xác minh
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- TAB: DEVICES -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  @if (activeTab() === 'devices') {
+    <div class="tab-content">
+      <div class="card">
+        <div class="card-header">
+          <h3>🖥️ Thiết bị đã đăng ký</h3>
+          <div class="header-actions">
+            <input
+              type="text"
+              class="input-field input-sm"
+              placeholder="User ID..."
+              [(ngModel)]="deviceUserId"
+            />
+            <button
+              class="btn btn-sm btn-primary"
+              (click)="loadDevices()"
+              [disabled]="!deviceUserId.trim()"
+            >
+              Tra cứu
+            </button>
+          </div>
+        </div>
+        <div class="card-body">
+          @if (devices().length > 0) {
+            <div class="table-wrapper">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Thiết bị</th>
+                    <th>IP</th>
+                    <th>Quốc gia</th>
+                    <th>Rủi ro</th>
+                    <th>Tin cậy</th>
+                    <th>Lần đầu</th>
+                    <th>Lần cuối</th>
+                    <th>Hành động</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (device of devices(); track device.id) {
+                    <tr
+                      [class.row-blocked]="
+                        device.riskLevel === 'High' || device.riskLevel === 'Critical'
+                      "
+                    >
+                      <td>
+                        <div class="event-type-cell">
+                          <span class="event-icon">{{ getDeviceIcon(device.userAgent) }}</span>
+                          <div>
+                            <span class="event-type">{{ getBrowserName(device.userAgent) }}</span>
+                            <span class="text-muted text-xs">{{
+                              getOsName(device.userAgent)
+                            }}</span>
+                          </div>
+                        </div>
+                      </td>
+                      <td class="ip-cell">{{ device.ipAddress || '-' }}</td>
+                      <td>{{ device.country || '-' }}</td>
+                      <td>
+                        <div class="risk-bar-container">
+                          <div class="risk-bar-bg">
+                            <div
+                              class="risk-bar"
+                              [class]="getRiskScoreClass(device.riskScore)"
+                              [style.width.%]="device.riskScore"
+                            ></div>
+                          </div>
+                          <span class="risk-value">{{ device.riskLevel }}</span>
+                        </div>
+                      </td>
+                      <td>
+                        @if (device.isTrusted) {
+                          <span class="badge severity-low">✅ Tin cậy</span>
+                        } @else {
+                          <span class="badge severity-info">❌</span>
+                        }
+                      </td>
+                      <td class="time-cell">{{ formatDate(device.firstSeen) }}</td>
+                      <td class="time-cell">{{ formatTimeAgo(device.lastSeen) }}</td>
+                      <td>
+                        <div class="action-buttons">
+                          @if (!device.isTrusted) {
+                            <button class="btn btn-sm btn-primary" (click)="trustDevice(device.id)">
+                              ✅ Tin cậy
+                            </button>
+                          }
+                          <button class="btn btn-sm btn-danger" (click)="removeDevice(device.id)">
+                            🗑️
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          } @else {
+            <div class="empty-state">
+              <span class="empty-icon">🖥️</span>
+              <span>Nhập User ID để xem danh sách thiết bị</span>
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- TAB: SESSIONS -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  @if (activeTab() === 'sessions') {
+    <div class="tab-content">
+      <div class="card">
+        <div class="card-header">
+          <h3>🔗 Quản lý phiên hoạt động</h3>
+          <div class="header-actions">
+            <input
+              type="text"
+              class="input-field input-sm"
+              placeholder="User ID..."
+              [(ngModel)]="sessionUserId"
+            />
+            <button
+              class="btn btn-sm btn-primary"
+              (click)="loadSessions()"
+              [disabled]="!sessionUserId.trim()"
+            >
+              Tra cứu
+            </button>
+          </div>
+        </div>
+        <div class="card-body">
+          @if (sessions().length > 0) {
+            <div class="table-wrapper">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Session ID</th>
+                    <th>IP</th>
+                    <th>Device</th>
+                    <th>Quốc gia</th>
+                    <th>Tạo lúc</th>
+                    <th>Hoạt động cuối</th>
+                    <th>Trạng thái</th>
+                    <th>Hành động</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (session of sessions(); track session.sessionId) {
+                    <tr>
+                      <td class="path-cell">{{ session.sessionId.substring(0, 12) }}...</td>
+                      <td class="ip-cell">{{ session.ipAddress || '-' }}</td>
+                      <td>{{ session.deviceFingerprint?.substring(0, 8) || '-' }}...</td>
+                      <td>{{ session.country || '-' }}</td>
+                      <td class="time-cell">{{ formatDate(session.createdAt) }}</td>
+                      <td class="time-cell">{{ formatTimeAgo(session.lastActivityAt) }}</td>
+                      <td>
+                        @if (session.isActive) {
+                          <span class="badge severity-low">Hoạt động</span>
+                        } @else {
+                          <span class="badge severity-info">Hết hạn</span>
+                        }
+                      </td>
+                      <td>
+                        <button
+                          class="btn btn-sm btn-danger"
+                          (click)="revokeSession(session.sessionId)"
+                        >
+                          🗑️ Thu hồi
+                        </button>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          } @else {
+            <div class="empty-state">
+              <span class="empty-icon">🔗</span>
+              <span>Nhập User ID để xem danh sách phiên</span>
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- TAB: LOGIN HISTORY -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  @if (activeTab() === 'history') {
+    <div class="tab-content">
+      <div class="card">
+        <div class="card-header">
+          <h3>📋 Lịch sử đăng nhập</h3>
+          <p class="text-muted">50 lần đăng nhập gần nhất với phân tích rủi ro</p>
+        </div>
+        <div class="card-body">
+          @if (loginHistory().length > 0) {
+            <div class="table-wrapper">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Trạng thái</th>
+                    <th>Người dùng</th>
+                    <th>IP</th>
+                    <th>Quốc gia</th>
+                    <th>Risk Score</th>
+                    <th>Yếu tố rủi ro</th>
+                    <th>Thời gian</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (entry of loginHistory(); track entry.id) {
+                    <tr [class.row-blocked]="entry.isSuspicious">
+                      <td>
+                        @if (entry.isSuspicious) {
+                          <span class="badge severity-high">⚠️ Đáng ngờ</span>
+                        } @else {
+                          <span class="badge severity-low">✅ An toàn</span>
+                        }
+                      </td>
+                      <td>{{ entry.username || '-' }}</td>
+                      <td class="ip-cell">{{ entry.ipAddress || '-' }}</td>
+                      <td>{{ entry.country || '-' }}</td>
+                      <td>
+                        <div class="risk-bar-container">
+                          <div class="risk-bar-bg">
+                            <div
+                              class="risk-bar"
+                              [class]="getRiskScoreClass(entry.riskScore)"
+                              [style.width.%]="entry.riskScore || 0"
+                            ></div>
+                          </div>
+                          <span class="risk-value">{{ entry.riskScore || 0 }}%</span>
+                        </div>
+                      </td>
+                      <td>
+                        <div class="risk-factors">
+                          @for (factor of entry.riskFactors; track factor) {
+                            <span class="badge badge-outline text-xs">{{
+                              riskFactorLabels[factor] || factor
+                            }}</span>
+                          }
+                        </div>
+                      </td>
+                      <td class="time-cell">{{ formatDate(entry.createdAt) }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          } @else if (!loading()) {
+            <div class="empty-state">
+              <span class="empty-icon">📋</span>
+              <span>Không có lịch sử đăng nhập</span>
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- TAB: RATE LIMIT -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  @if (activeTab() === 'rate-limit') {
+    <div class="tab-content">
+      <div class="content-grid">
+        <!-- Built-in Rate Limit Policies -->
+        <div class="card">
+          <div class="card-header">
+            <h3>⏱️ Rate Limit hệ thống</h3>
+          </div>
+          <div class="card-body">
+            @if (rateLimitStatus(); as status) {
+              <div class="table-wrapper">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Policy</th>
+                      <th>Window</th>
+                      <th>Giới hạn</th>
+                      <th>Loại</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (p of status.builtInPolicies; track p.name) {
+                      <tr>
+                        <td>
+                          <strong>{{ p.name }}</strong>
+                        </td>
+                        <td>{{ p.window }}</td>
+                        <td>
+                          <span class="badge severity-info">{{ p.limit }} req</span>
+                        </td>
+                        <td>{{ p.policy }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          </div>
+        </div>
+
+        <!-- Custom Rate Limit Configs -->
+        <div class="card">
+          <div class="card-header">
+            <h3>⚙️ Rate Limit tùy chỉnh</h3>
+            <button class="btn btn-sm btn-primary" (click)="openRateLimitForm()">
+              ➕ Thêm mới
+            </button>
+          </div>
+          <div class="card-body">
+            <!-- Create/Edit Form -->
+            @if (showRateLimitForm()) {
+              <div class="inline-form">
+                <div class="form-row">
+                  <input
+                    type="text"
+                    class="input-field"
+                    placeholder="Tên policy"
+                    [(ngModel)]="rlForm.policyName"
+                    [disabled]="!!editingRateLimit()"
+                  />
+                  <select class="input-field" [(ngModel)]="rlForm.windowType">
+                    <option value="fixed">Fixed Window</option>
+                    <option value="sliding">Sliding Window</option>
+                    <option value="token_bucket">Token Bucket</option>
+                  </select>
+                </div>
+                <div class="form-row">
+                  <input
+                    type="number"
+                    class="input-field"
+                    placeholder="Window (giây)"
+                    [(ngModel)]="rlForm.windowSeconds"
+                    min="1"
+                  />
+                  <input
+                    type="number"
+                    class="input-field"
+                    placeholder="Permit Limit"
+                    [(ngModel)]="rlForm.permitLimit"
+                    min="1"
+                  />
+                  <input
+                    type="text"
+                    class="input-field"
+                    placeholder="Áp dụng cho (endpoint)"
+                    [(ngModel)]="rlForm.appliesTo"
+                  />
+                </div>
+                <div class="form-row">
+                  <input
+                    type="text"
+                    class="input-field"
+                    placeholder="Mô tả"
+                    [(ngModel)]="rlForm.description"
+                  />
+                  <button class="btn btn-sm btn-primary" (click)="saveRateLimit()">💾 Lưu</button>
+                  <button class="btn btn-sm btn-outline" (click)="showRateLimitForm.set(false)">
+                    Hủy
+                  </button>
+                </div>
+              </div>
+            }
+
+            @if (rateLimitStatus()?.customConfigs?.length) {
+              <div class="table-wrapper">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Tên</th>
+                      <th>Loại</th>
+                      <th>Window</th>
+                      <th>Limit</th>
+                      <th>Áp dụng</th>
+                      <th>Trạng thái</th>
+                      <th>Hành động</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (cfg of rateLimitStatus()!.customConfigs; track cfg.id) {
+                      <tr>
+                        <td>
+                          <strong>{{ cfg.policyName }}</strong>
+                        </td>
+                        <td>{{ cfg.windowType }}</td>
+                        <td>{{ cfg.windowSeconds }}s</td>
+                        <td>
+                          <span class="badge severity-info">{{ cfg.permitLimit }}</span>
+                        </td>
+                        <td>{{ cfg.appliesTo || '*' }}</td>
+                        <td>
+                          @if (cfg.isEnabled) {
+                            <span class="badge severity-low">✅</span>
+                          } @else {
+                            <span class="badge severity-info">❌</span>
+                          }
+                        </td>
+                        <td>
+                          <div class="action-buttons">
+                            <button class="btn btn-sm btn-outline" (click)="openRateLimitForm(cfg)">
+                              ✏️
+                            </button>
+                            <button class="btn btn-sm btn-danger" (click)="deleteRateLimit(cfg.id)">
+                              🗑️
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            } @else if (!showRateLimitForm()) {
+              <div class="empty-state">
+                <span class="empty-icon">⚙️</span>
+                <span>Chưa có rate limit tùy chỉnh</span>
+              </div>
+            }
+          </div>
+        </div>
+
+        <!-- Rate Limit Events -->
+        <div class="card">
+          <div class="card-header">
+            <h3>🚫 Vi phạm Rate Limit (24h)</h3>
+          </div>
+          <div class="card-body">
+            @if (rateLimitEvents().length > 0) {
+              <div class="table-wrapper">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>IP</th>
+                      <th>User</th>
+                      <th>Path</th>
+                      <th>Thời gian</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (event of rateLimitEvents(); track event.id) {
+                      <tr>
+                        <td class="ip-cell">{{ event.ipAddress || '-' }}</td>
+                        <td>{{ event.username || '-' }}</td>
+                        <td class="path-cell">{{ event.requestPath || '-' }}</td>
+                        <td class="time-cell">{{ formatDate(event.createdAt) }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            } @else {
+              <div class="empty-state">
+                <span class="empty-icon">✅</span>
+                <span>Không có vi phạm rate limit trong 24h qua</span>
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- TAB: GEO SECURITY -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  @if (activeTab() === 'geo-security') {
+    <div class="tab-content">
+      <div class="content-grid">
+        <!-- Geo Distribution -->
+        <div class="card">
+          <div class="card-header">
+            <h3>🌍 Phân bổ địa lý</h3>
+            <span class="badge severity-info">{{ geoData()?.totalCountries || 0 }} quốc gia</span>
+          </div>
+          <div class="card-body">
+            @if (geoData()?.geoDistribution?.length) {
+              <div class="table-wrapper">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Quốc gia</th>
+                      <th>Tổng sự kiện</th>
+                      <th>Đáng ngờ</th>
+                      <th>Bị chặn</th>
+                      <th>IP duy nhất</th>
+                      <th>Lần cuối</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (geo of geoData()!.geoDistribution; track geo.country) {
+                      <tr [class.row-blocked]="geo.suspiciousEvents > 0">
+                        <td>
+                          <strong>🌐 {{ geo.country }}</strong>
+                        </td>
+                        <td>{{ geo.totalEvents }}</td>
+                        <td>
+                          @if (geo.suspiciousEvents > 0) {
+                            <span class="badge severity-high">{{ geo.suspiciousEvents }}</span>
+                          } @else {
+                            <span class="badge severity-low">0</span>
+                          }
+                        </td>
+                        <td>
+                          @if (geo.blockedEvents > 0) {
+                            <span class="badge severity-critical">{{ geo.blockedEvents }}</span>
+                          } @else {
+                            <span>0</span>
+                          }
+                        </td>
+                        <td>{{ geo.uniqueIps }}</td>
+                        <td class="time-cell">{{ formatTimeAgo(geo.lastSeen) }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            } @else {
+              <div class="empty-state">
+                <span class="empty-icon">🌍</span>
+                <span>Không có dữ liệu địa lý trong 48h qua</span>
+              </div>
+            }
+          </div>
+        </div>
+
+        <!-- Impossible Travel Alerts -->
+        <div class="card">
+          <div class="card-header">
+            <h3>✈️ Cảnh báo di chuyển bất thường</h3>
+          </div>
+          <div class="card-body">
+            @if (geoData()?.impossibleTravelAlerts?.length) {
+              @for (alert of geoData()!.impossibleTravelAlerts; track alert.id) {
+                <div class="alert-card alert-warning">
+                  <div class="alert-header">
+                    <span class="alert-icon">⚠️</span>
+                    <strong>{{ alert.username || 'Unknown' }}</strong>
+                    <span class="badge severity-high">Risk: {{ alert.riskScore || 0 }}%</span>
+                  </div>
+                  <div class="alert-body">
+                    <span>📍 {{ alert.country || '?' }} / {{ alert.city || '?' }}</span>
+                    <span>🌐 {{ alert.ipAddress }}</span>
+                    <span class="time-cell">{{ formatDate(alert.createdAt) }}</span>
+                  </div>
+                  @if (alert.details) {
+                    <p class="alert-details">{{ alert.details }}</p>
+                  }
+                </div>
+              }
+            } @else {
+              <div class="empty-state">
+                <span class="empty-icon">✈️</span>
+                <span>Không phát hiện di chuyển bất thường</span>
+              </div>
+            }
+          </div>
+        </div>
+
+        <!-- Geo Block Rules -->
+        <div class="card">
+          <div class="card-header">
+            <h3>🚫 Luật chặn Geo</h3>
+            <button class="btn btn-sm btn-primary" (click)="openGeoRuleForm()">➕ Thêm luật</button>
+          </div>
+          <div class="card-body">
+            @if (showGeoRuleForm()) {
+              <div class="inline-form">
+                <div class="form-row">
+                  <input
+                    type="text"
+                    class="input-field"
+                    placeholder="Mã quốc gia (VD: CN)"
+                    [(ngModel)]="geoRuleForm.countryCode"
+                    maxlength="2"
+                  />
+                  <input
+                    type="text"
+                    class="input-field"
+                    placeholder="Tên quốc gia"
+                    [(ngModel)]="geoRuleForm.countryName"
+                  />
+                  <input
+                    type="text"
+                    class="input-field"
+                    placeholder="Lý do"
+                    [(ngModel)]="geoRuleForm.reason"
+                  />
+                  <label class="auto-refresh-toggle">
+                    <input type="checkbox" [(ngModel)]="geoRuleForm.isBlocked" />
+                    <span>Chặn</span>
+                  </label>
+                  <button class="btn btn-sm btn-primary" (click)="saveGeoBlockRule()">
+                    💾 Lưu
+                  </button>
+                  <button class="btn btn-sm btn-outline" (click)="showGeoRuleForm.set(false)">
+                    Hủy
+                  </button>
+                </div>
+              </div>
+            }
+
+            @if (geoData()?.geoBlockRules?.length) {
+              <div class="table-wrapper">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Mã</th>
+                      <th>Quốc gia</th>
+                      <th>Trạng thái</th>
+                      <th>Lý do</th>
+                      <th>Tạo bởi</th>
+                      <th>Ngày tạo</th>
+                      <th>Hành động</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (rule of geoData()!.geoBlockRules; track rule.id) {
+                      <tr>
+                        <td>
+                          <strong>{{ rule.countryCode }}</strong>
+                        </td>
+                        <td>{{ rule.countryName }}</td>
+                        <td>
+                          @if (rule.isBlocked) {
+                            <span class="badge severity-critical">🚫 Chặn</span>
+                          } @else {
+                            <span class="badge severity-low">✅ Cho phép</span>
+                          }
+                        </td>
+                        <td>{{ rule.reason || '-' }}</td>
+                        <td>{{ rule.createdBy }}</td>
+                        <td class="time-cell">{{ formatDate(rule.createdAt) }}</td>
+                        <td>
+                          <button
+                            class="btn btn-sm btn-danger"
+                            (click)="deleteGeoBlockRule(rule.id)"
+                          >
+                            🗑️
+                          </button>
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            } @else if (!showGeoRuleForm()) {
+              <div class="empty-state">
+                <span class="empty-icon">🚫</span>
+                <span>Chưa có luật chặn Geo</span>
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- TAB: THREATS -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  @if (activeTab() === 'threats') {
+    <div class="tab-content">
+      @if (threatOverview(); as threats) {
+        <!-- Threat Summary -->
+        <div class="stats-grid">
+          <div class="stat-card stat-red">
+            <div class="stat-icon">💀</div>
+            <div class="stat-info">
+              <span class="stat-value">{{ threats.summary.criticalCount }}</span>
+              <span class="stat-label">Critical</span>
+            </div>
+          </div>
+          <div class="stat-card stat-orange">
+            <div class="stat-icon">🔥</div>
+            <div class="stat-info">
+              <span class="stat-value">{{ threats.summary.highCount }}</span>
+              <span class="stat-label">High</span>
+            </div>
+          </div>
+          <div class="stat-card stat-blue">
+            <div class="stat-icon">🛑</div>
+            <div class="stat-info">
+              <span class="stat-value">{{ threats.summary.blockedCount }}</span>
+              <span class="stat-label">Bị chặn</span>
+            </div>
+          </div>
+          <div class="stat-card stat-purple">
+            <div class="stat-icon">⚡</div>
+            <div class="stat-info">
+              <span class="stat-value">{{ threats.summary.totalThreats }}</span>
+              <span class="stat-label">Tổng mối đe dọa</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="content-grid">
+          <!-- Threat Categories -->
+          <div class="card">
+            <div class="card-header">
+              <h3>⚡ Mối đe dọa theo loại (24h)</h3>
+            </div>
+            <div class="card-body">
+              @if (threats.categories.length > 0) {
+                @for (cat of threats.categories; track cat.type) {
+                  <div class="threat-row">
+                    <div class="threat-info">
+                      <span class="threat-type">{{ formatEventType(cat.type) }}</span>
+                      <div>
+                        <span
+                          class="badge"
+                          [class]="'severity-' + (cat.severity || 'info').toLowerCase()"
+                        >
+                          {{ cat.count }}
+                        </span>
+                      </div>
+                    </div>
+                    <div class="threat-bar-bg">
+                      <div
+                        class="threat-bar"
+                        [style.width.%]="getThreatBarWidth(cat.count, threats.summary.totalThreats)"
+                      ></div>
+                    </div>
+                  </div>
+                }
+              } @else {
+                <div class="empty-state">
+                  <span class="empty-icon">✅</span>
+                  <span>Không phát hiện mối đe dọa trong 24h qua</span>
+                </div>
+              }
+            </div>
+          </div>
+
+          <!-- Top IPs -->
+          <div class="card">
+            <div class="card-header">
+              <h3>🌐 Top IP nguy hiểm</h3>
+            </div>
+            <div class="card-body">
+              @if (threats.summary.topIps.length > 0) {
+                <div class="table-wrapper">
+                  <table class="data-table">
+                    <thead>
+                      <tr>
+                        <th>IP Address</th>
+                        <th>Số vi phạm</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (ip of threats.summary.topIps; track ip.ip) {
+                        <tr>
+                          <td class="ip-cell">{{ ip.ip }}</td>
+                          <td>
+                            <span class="badge severity-high">{{ ip.count }}</span>
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              } @else {
+                <div class="empty-state">
+                  <span class="empty-icon">✅</span>
+                  <span>Không có IP đáng ngờ</span>
+                </div>
+              }
+            </div>
+          </div>
+        </div>
+      } @else if (!loading()) {
+        <div class="empty-state">
+          <span class="empty-icon">⚡</span>
+          <span>Không có dữ liệu mối đe dọa</span>
+        </div>
+      }
+    </div>
+  }
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- TAB: ACCOUNT LOCKOUTS -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  @if (activeTab() === 'lockouts') {
+    <div class="tab-content">
+      <div class="card">
+        <div class="card-header">
+          <h3>🔒 Tài khoản bị khóa</h3>
+          <div class="header-actions">
+            <span class="badge severity-high">{{ activeLockouts().length }} đang khóa</span>
+            <button class="btn btn-sm btn-primary" (click)="openLockForm()">
+              🔒 Khóa tài khoản
+            </button>
+          </div>
+        </div>
+        <div class="card-body">
+          <!-- Lock Account Form -->
+          @if (showLockForm()) {
+            <div class="inline-form">
+              <div class="form-row">
+                <input
+                  type="text"
+                  class="input-field"
+                  placeholder="User ID"
+                  [(ngModel)]="lockForm.userId"
+                />
+                <input
+                  type="text"
+                  class="input-field"
+                  placeholder="Username"
+                  [(ngModel)]="lockForm.username"
+                />
+                <input
+                  type="text"
+                  class="input-field"
+                  placeholder="Lý do"
+                  [(ngModel)]="lockForm.reason"
+                />
+              </div>
+              <div class="form-row">
+                <input
+                  type="number"
+                  class="input-field input-sm"
+                  placeholder="Thời gian (phút)"
+                  [(ngModel)]="lockForm.durationMinutes"
+                  min="1"
+                />
+                <input
+                  type="number"
+                  class="input-field input-sm"
+                  placeholder="Số lần thất bại"
+                  [(ngModel)]="lockForm.failedAttempts"
+                  min="0"
+                />
+                <button class="btn btn-sm btn-primary" (click)="saveLockAccount()">🔒 Khóa</button>
+                <button class="btn btn-sm btn-outline" (click)="showLockForm.set(false)">
+                  Hủy
+                </button>
+              </div>
+            </div>
+          }
+
+          @if (lockouts().length > 0) {
+            <div class="table-wrapper">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Người dùng</th>
+                    <th>Lý do</th>
+                    <th>Số lần thất bại</th>
+                    <th>Khóa bởi</th>
+                    <th>Khóa lúc</th>
+                    <th>Mở khóa lúc</th>
+                    <th>Trạng thái</th>
+                    <th>Hành động</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (lockout of lockouts(); track lockout.id) {
+                    <tr [class.row-blocked]="lockout.isLocked">
+                      <td>
+                        <strong>{{ lockout.username }}</strong>
+                      </td>
+                      <td>{{ lockout.reason }}</td>
+                      <td>
+                        <span class="badge severity-high">{{ lockout.failedAttempts }}</span>
+                      </td>
+                      <td>
+                        {{ lockout.lockedBy || (lockout.isManualLock ? 'Thủ công' : 'Tự động') }}
+                      </td>
+                      <td class="time-cell">{{ formatDate(lockout.lockedAt) }}</td>
+                      <td class="time-cell">{{ formatDate(lockout.unlocksAt) }}</td>
+                      <td>
+                        @if (lockout.isLocked) {
+                          <span class="badge severity-critical">🔒 Đang khóa</span>
+                        } @else {
+                          <span class="badge severity-low">🔓 Đã mở</span>
+                        }
+                      </td>
+                      <td>
+                        @if (lockout.isLocked) {
+                          <button
+                            class="btn btn-sm btn-primary"
+                            (click)="unlockAccount(lockout.id)"
+                          >
+                            🔓 Mở khóa
+                          </button>
+                        }
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          } @else {
+            <div class="empty-state">
+              <span class="empty-icon">🔓</span>
+              <span>Không có tài khoản nào bị khóa</span>
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- TAB: IP WHITELIST -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  @if (activeTab() === 'ip-whitelist') {
+    <div class="tab-content">
+      <div class="card">
+        <div class="card-header">
+          <h3>🌐 IP Whitelist</h3>
+        </div>
+        <div class="card-body">
+          <!-- Add IP Form -->
+          <div class="whitelist-form">
+            <div class="form-row">
+              <input
+                type="text"
+                class="input-field"
+                placeholder="Địa chỉ IP (ví dụ: 192.168.1.1)"
+                [(ngModel)]="newIp"
+              />
+              <input
+                type="text"
+                class="input-field"
+                placeholder="CIDR Range (ví dụ: /24)"
+                [(ngModel)]="newIpCidrRange"
+              />
+              <input
+                type="text"
+                class="input-field"
+                placeholder="Mô tả (tùy chọn)"
+                [(ngModel)]="newIpDescription"
+              />
+              <input
+                type="number"
+                class="input-field input-sm"
+                placeholder="Hết hạn (ngày)"
+                [(ngModel)]="newIpExpiresDays"
+                min="1"
+                max="365"
+              />
+              <button
+                class="btn btn-primary"
+                (click)="addIpToWhitelist()"
+                [disabled]="!newIp.trim()"
+              >
+                ➕ Thêm IP
+              </button>
+            </div>
+          </div>
+
+          <!-- IP List -->
+          @if (ipWhitelist().length > 0) {
+            <div class="table-wrapper">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>IP Address</th>
+                    <th>CIDR</th>
+                    <th>Mô tả</th>
+                    <th>Người thêm</th>
+                    <th>Ngày thêm</th>
+                    <th>Hết hạn</th>
+                    <th>Trạng thái</th>
+                    <th>Hành động</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (ip of ipWhitelist(); track ip.id) {
+                    <tr>
+                      <td class="ip-cell">
+                        <strong>{{ ip.ipAddress }}</strong>
+                      </td>
+                      <td>{{ ip.cidrRange || '-' }}</td>
+                      <td>{{ ip.description || '-' }}</td>
+                      <td>{{ ip.addedBy }}</td>
+                      <td class="time-cell">{{ formatDate(ip.addedAt) }}</td>
+                      <td class="time-cell">
+                        {{ ip.expiresAt ? formatDate(ip.expiresAt) : 'Vĩnh viễn' }}
+                      </td>
+                      <td>
+                        @if (ip.isActive) {
+                          <span class="badge severity-low">✅ Hoạt động</span>
+                        } @else {
+                          <span class="badge severity-info">⏰ Hết hạn</span>
+                        }
+                      </td>
+                      <td>
+                        <button
+                          class="btn btn-sm btn-danger"
+                          (click)="removeIpFromWhitelist(ip.id, ip.ipAddress)"
+                        >
+                          🗑️ Xóa
+                        </button>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          } @else {
+            <div class="empty-state">
+              <span class="empty-icon">🌐</span>
+              <span>Chưa có IP nào trong whitelist</span>
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+  }
+</div>

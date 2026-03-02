@@ -49,6 +49,7 @@ public static class MenuSeeder
             MenuItem.Create("admin", null,        "🔏", "Ký số",       "/admin/digital-signing",  null,           true,  80),
             MenuItem.Create("admin", null,        "⚙️", "Cấu hình menu", "/admin/menu",              null,           true,  90),
             MenuItem.Create("admin", null,        "🛡️", "Cấu hình quyền", "/admin/permission-config", null,         true, 100),
+            MenuItem.Create("admin", null,        "🔐", "Bảo mật nâng cao", "/admin/advanced-security", null,        true, 105),
         };
 
         await context.MenuItems.AddRangeAsync(items);

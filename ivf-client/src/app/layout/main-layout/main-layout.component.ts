@@ -65,6 +65,7 @@ const FALLBACK_MENU: MenuSection[] = [
         route: '/admin/security-threats',
         adminOnly: true,
       },
+      { icon: '🔐', label: 'Bảo mật nâng cao', route: '/admin/advanced-security', adminOnly: true },
       { icon: '🎨', label: 'UI Library', route: '/ui-library', adminOnly: true },
     ],
   },

@@ -16,6 +16,9 @@ import {
     <div class="tab-content">
       <div class="section-header">
         <h3>📊 Compliance Scoring Engine</h3>
+        <span class="control-badge" *ngIf="report()">
+          {{ report()!.frameworks.reduce(sumControls, 0) }} controls across 3 frameworks
+        </span>
         <button class="btn btn-primary" (click)="loadReport()" [disabled]="loading()">
           🔄 Đánh giá lại
         </button>
@@ -31,6 +34,11 @@ import {
           <div class="score-details">
             <h4>Tổng điểm: {{ report()!.overallScore }}/{{ report()!.maxScore }}</h4>
             <p>Đánh giá lúc: {{ report()!.evaluatedAt | date: 'dd/MM/yy HH:mm:ss' }}</p>
+            <div class="summary-stats">
+              <span class="stat pass">✅ {{ passCount() }} Pass</span>
+              <span class="stat partial">⚠️ {{ partialCount() }} Partial</span>
+              <span class="stat fail">❌ {{ failCount() }} Fail</span>
+            </div>
           </div>
         </div>
 
@@ -52,7 +60,9 @@ import {
                     [style.width.%]="fw.percentage"
                   ></div>
                 </div>
-                <p class="score-text">{{ fw.score }}/{{ fw.maxScore }} điểm</p>
+                <p class="score-text">
+                  {{ fw.score }}/{{ fw.maxScore }} điểm ({{ fw.controls.length }} controls)
+                </p>
 
                 <!-- Controls -->
                 <div class="controls-list">
@@ -60,7 +70,7 @@ import {
                     <div class="control-item" [class]="'control-' + ctrl.status.toLowerCase()">
                       <span class="control-status">{{ getStatusIcon(ctrl.status) }}</span>
                       <div class="control-info">
-                        <span class="control-name">{{ ctrl.name }}</span>
+                        <span class="control-name">{{ ctrl.controlId }}: {{ ctrl.name }}</span>
                         <span class="control-score">{{ ctrl.score }}/{{ ctrl.maxScore }}</span>
                       </div>
                       @if (ctrl.finding) {
@@ -75,17 +85,24 @@ import {
         </div>
 
         <!-- Remediation Summary -->
-        @if (failedControls().length > 0) {
+        @if (remediationControls().length > 0) {
           <div class="remediation-section">
-            <h3>⚠️ Cần khắc phục ({{ failedControls().length }} controls)</h3>
+            <h3>🔧 Cần khắc phục ({{ remediationControls().length }} controls)</h3>
             <div class="remediation-list">
-              @for (ctrl of failedControls(); track ctrl.controlId) {
-                <div class="remediation-item">
-                  <span class="control-id">{{ ctrl.controlId }}</span>
-                  <span class="control-name">{{ ctrl.name }}</span>
+              @for (ctrl of remediationControls(); track ctrl.controlId) {
+                <div class="remediation-item" [class]="'severity-' + ctrl.status.toLowerCase()">
+                  <div class="remediation-header">
+                    <span class="control-status">{{ getStatusIcon(ctrl.status) }}</span>
+                    <span class="control-id">{{ ctrl.controlId }}</span>
+                    <span class="control-name">{{ ctrl.name }}</span>
+                    <span class="control-score-badge">{{ ctrl.score }}/{{ ctrl.maxScore }}</span>
+                  </div>
                   <span class="control-desc">{{ ctrl.description }}</span>
                   @if (ctrl.finding) {
-                    <span class="control-finding">💡 {{ ctrl.finding }}</span>
+                    <span class="control-finding">📋 {{ ctrl.finding }}</span>
+                  }
+                  @if (ctrl.remediation) {
+                    <span class="control-remediation">💡 {{ ctrl.remediation }}</span>
                   }
                 </div>
               }
@@ -108,11 +125,23 @@ export class ComplianceTabComponent implements OnInit {
   report = signal<ComplianceReport | null>(null);
   loading = signal(false);
 
-  failedControls = computed(() => {
+  private allControls = computed(() => {
     const r = this.report();
     if (!r) return [];
-    return r.frameworks.flatMap((fw) => fw.controls.filter((c) => c.status === 'Fail'));
+    return r.frameworks.flatMap((fw) => fw.controls);
   });
+
+  failedControls = computed(() => this.allControls().filter((c) => c.status === 'Fail'));
+
+  remediationControls = computed(() =>
+    this.allControls().filter((c) => c.status === 'Fail' || c.status === 'Partial'),
+  );
+
+  passCount = computed(() => this.allControls().filter((c) => c.status === 'Pass').length);
+  partialCount = computed(() => this.allControls().filter((c) => c.status === 'Partial').length);
+  failCount = computed(() => this.allControls().filter((c) => c.status === 'Fail').length);
+
+  sumControls = (acc: number, fw: FrameworkScore) => acc + fw.controls.length;
 
   ngOnInit() {
     this.loadReport();

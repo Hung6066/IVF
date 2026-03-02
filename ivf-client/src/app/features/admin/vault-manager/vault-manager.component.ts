@@ -4,7 +4,6 @@ import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { forkJoin } from 'rxjs';
 import { KeyVaultService } from '../../../core/services/keyvault.service';
-import { ZeroTrustService } from '../../../core/services/zerotrust.service';
 import { environment } from '../../../../environments/environment';
 import { SecretRotationTabComponent } from './tabs/secret-rotation-tab.component';
 import { DekRotationTabComponent } from './tabs/dek-rotation-tab.component';
@@ -45,36 +44,35 @@ import {
   SecurityEvent,
   DbTableSchema,
 } from '../../../core/models/keyvault.model';
-import {
-  ZTPolicyResponse,
-  ZTAccessDecision,
-  UpdateZTPolicyRequest,
-} from '../../../core/models/zerotrust.model';
 
 type VaultTab =
   | 'secrets'
-  | 'database'
+  | 'import'
   | 'api-keys'
-  | 'policies'
-  | 'user-policies'
-  | 'leases'
-  | 'rotation'
   | 'dynamic'
   | 'tokens'
-  | 'settings'
-  | 'import'
-  | 'history'
-  | 'encryption'
+  | 'policies'
+  | 'user-policies'
   | 'field-access'
-  | 'zero-trust'
-  | 'secret-rotation'
+  | 'encryption'
   | 'dek-rotation'
-  | 'db-rotation'
-  | 'compliance'
-  | 'vault-dr'
+  | 'secret-rotation'
+  | 'leases'
+  | 'vault-metrics'
+  | 'history'
   | 'siem'
+  | 'compliance'
+  | 'settings'
   | 'multi-unseal'
-  | 'vault-metrics';
+  | 'vault-dr'
+  | 'db-rotation';
+
+interface TabGroup {
+  key: string;
+  label: string;
+  icon: string;
+  tabs: { key: VaultTab; label: string }[];
+}
 
 @Component({
   selector: 'app-vault-manager',
@@ -133,25 +131,6 @@ export class VaultManagerComponent implements OnInit {
     rotatedBy: '',
   };
 
-  // ─── Zero Trust ─────────────────────────────────
-  ztPolicies = signal<ZTPolicyResponse[]>([]);
-  editingZTPolicy = signal(false);
-  accessDecision = signal<ZTAccessDecision | null>(null);
-  accessCheckAction = '';
-  editForm: UpdateZTPolicyRequest = {
-    action: '',
-    requiredAuthLevel: 'Session',
-    maxAllowedRisk: 'Medium',
-    requireTrustedDevice: false,
-    requireFreshSession: false,
-    blockAnomaly: false,
-    requireGeoFence: false,
-    allowedCountries: null,
-    blockVpnTor: false,
-    allowBreakGlassOverride: false,
-    updatedBy: '',
-  };
-
   // ─── Status Message ─────────────────────────────
   statusMessage = signal<{ text: string; type: 'success' | 'error' } | null>(null);
 
@@ -173,11 +152,6 @@ export class VaultManagerComponent implements OnInit {
   settingsForm = { vaultUrl: '', keyName: '', tenantId: '', clientId: '', clientSecret: '' };
   testingConnection = signal(false);
   connectionResult = signal<{ connected: boolean; message: string } | null>(null);
-
-  // ─── Database Secrets ───────────────────────────
-  databaseSecrets = signal<{ name: string; host?: string; database?: string; port?: number }[]>([]);
-  showDbDialog = signal(false);
-  newDbForm = { name: '', host: '', port: 5432, username: '', password: '', database: '' };
 
   // ─── Policies ───────────────────────────────────
   policies = signal<VaultPolicy[]>([]);
@@ -253,8 +227,7 @@ export class VaultManagerComponent implements OnInit {
   fieldAccessPolicies = signal<FieldAccessPolicyResponse[]>([]);
   showFAPolicyDialog = signal(false);
   editingFAPolicy = signal<FieldAccessPolicyResponse | null>(null);
-  faActiveSubTab = signal<'policies' | 'audit'>('policies');
-  faAuditLogs = signal<VaultAuditLog[]>([]);
+
   newFAPolicyForm = {
     tableName: '',
     fieldNames: [] as string[],
@@ -285,42 +258,90 @@ export class VaultManagerComponent implements OnInit {
   // ─── Computed ───────────────────────────────────
   isInitialized = computed(() => this.vaultStatus()?.isInitialized ?? false);
   activeKeyCount = computed(() => this.vaultStatus()?.activeKeyCount ?? 0);
-  activeZTPolicies = computed(() => this.ztPolicies().filter((p) => p.isActive).length);
-  vpnBlockCount = computed(() => this.ztPolicies().filter((p) => p.blockVpnTor).length);
-  trustedDeviceCount = computed(
-    () => this.ztPolicies().filter((p) => p.requireTrustedDevice).length,
-  );
   currentPath = computed(() => this.breadcrumb().join('/'));
 
-  tabs: { key: VaultTab; label: string; icon: string }[] = [
-    { key: 'secrets', label: 'Secrets', icon: '🔑' },
-    { key: 'database', label: 'Database', icon: '🗄️' },
-    { key: 'api-keys', label: 'API Keys', icon: '🗝️' },
-    { key: 'policies', label: 'Policies', icon: '📋' },
-    { key: 'user-policies', label: 'User Policies', icon: '👤' },
-    { key: 'leases', label: 'Leases', icon: '⏱️' },
-    { key: 'rotation', label: 'Rotation', icon: '🔄' },
-    { key: 'dynamic', label: 'Dynamic', icon: '⚡' },
-    { key: 'tokens', label: 'Tokens', icon: '🎟️' },
-    { key: 'settings', label: 'Settings', icon: '⚙️' },
-    { key: 'import', label: 'Import', icon: '📥' },
-    { key: 'history', label: 'Lịch sử', icon: '📜' },
-    { key: 'encryption', label: 'Encryption', icon: '🔒' },
-    { key: 'field-access', label: 'Phân quyền', icon: '🔐' },
-    { key: 'zero-trust', label: 'Zero Trust', icon: '🛡️' },
-    { key: 'secret-rotation', label: 'Secret Rotation', icon: '🔄' },
-    { key: 'dek-rotation', label: 'DEK Rotation', icon: '🗝️' },
-    { key: 'db-rotation', label: 'DB Credentials', icon: '🗄️' },
-    { key: 'compliance', label: 'Compliance', icon: '✅' },
-    { key: 'vault-dr', label: 'DR & Backup', icon: '💾' },
-    { key: 'siem', label: 'SIEM Events', icon: '🔍' },
-    { key: 'multi-unseal', label: 'Multi-Unseal', icon: '🔓' },
-    { key: 'vault-metrics', label: 'Metrics', icon: '📊' },
+  // ─── Tab Groups ─────────────────────────────────
+  activeGroup = signal<string>('secrets');
+
+  tabGroups: TabGroup[] = [
+    {
+      key: 'secrets',
+      label: 'Secrets',
+      icon: '🔑',
+      tabs: [
+        { key: 'secrets', label: 'Duyệt' },
+        { key: 'import', label: 'Import' },
+      ],
+    },
+    {
+      key: 'credentials',
+      label: 'Credentials',
+      icon: '🗝️',
+      tabs: [
+        { key: 'api-keys', label: 'API Keys' },
+        { key: 'dynamic', label: 'Dynamic' },
+        { key: 'tokens', label: 'Tokens' },
+      ],
+    },
+    {
+      key: 'access',
+      label: 'Access Control',
+      icon: '📋',
+      tabs: [
+        { key: 'policies', label: 'Policies' },
+        { key: 'user-policies', label: 'User Policies' },
+        { key: 'field-access', label: 'Field Access' },
+      ],
+    },
+    {
+      key: 'encryption',
+      label: 'Encryption',
+      icon: '🔒',
+      tabs: [
+        { key: 'encryption', label: 'Config' },
+        { key: 'dek-rotation', label: 'DEK Rotation' },
+      ],
+    },
+    {
+      key: 'rotation',
+      label: 'Rotation & Leases',
+      icon: '🔄',
+      tabs: [
+        { key: 'secret-rotation', label: 'Secret Rotation' },
+        { key: 'db-rotation', label: 'DB Credentials' },
+        { key: 'leases', label: 'Leases' },
+      ],
+    },
+    {
+      key: 'monitoring',
+      label: 'Monitoring',
+      icon: '📊',
+      tabs: [
+        { key: 'vault-metrics', label: 'Metrics' },
+        { key: 'history', label: 'Audit Log' },
+        { key: 'siem', label: 'SIEM' },
+        { key: 'compliance', label: 'Compliance' },
+      ],
+    },
+    {
+      key: 'infra',
+      label: 'Infrastructure',
+      icon: '⚙️',
+      tabs: [
+        { key: 'settings', label: 'Settings' },
+        { key: 'multi-unseal', label: 'Unseal' },
+        { key: 'vault-dr', label: 'DR & Backup' },
+      ],
+    },
   ];
+
+  activeGroupTabs = computed(() => {
+    const group = this.tabGroups.find((g) => g.key === this.activeGroup());
+    return group?.tabs ?? [];
+  });
 
   constructor(
     private kvService: KeyVaultService,
-    private ztService: ZeroTrustService,
     private http: HttpClient,
   ) {}
 
@@ -331,14 +352,19 @@ export class VaultManagerComponent implements OnInit {
   }
 
   // ─── Tab Switch ─────────────────────────────────
+  onGroupChange(groupKey: string) {
+    this.activeGroup.set(groupKey);
+    const group = this.tabGroups.find((g) => g.key === groupKey);
+    if (group && group.tabs.length > 0) {
+      this.onTabChange(group.tabs[0].key);
+    }
+  }
+
   onTabChange(tab: VaultTab) {
     this.activeTab.set(tab);
     switch (tab) {
       case 'secrets':
         this.loadSecrets();
-        break;
-      case 'database':
-        this.loadDatabaseSecrets();
         break;
       case 'api-keys':
         this.loadVaultStatus();
@@ -352,9 +378,6 @@ export class VaultManagerComponent implements OnInit {
       case 'leases':
         this.loadLeases();
         break;
-      case 'rotation':
-        this.loadVaultStatus();
-        break;
       case 'dynamic':
         this.loadDynamicCredentials();
         break;
@@ -363,14 +386,10 @@ export class VaultManagerComponent implements OnInit {
         break;
       case 'settings':
         this.loadSettings();
-        break;
-      case 'zero-trust':
-        this.loadZTPolicies();
-        this.loadSecurityDashboard();
+        this.loadAutoUnsealStatus();
         break;
       case 'encryption':
         this.loadEncryptionConfigs();
-        this.loadAutoUnsealStatus();
         this.loadDbSchema();
         break;
       case 'field-access':
@@ -389,7 +408,7 @@ export class VaultManagerComponent implements OnInit {
       case 'siem':
       case 'multi-unseal':
       case 'vault-metrics':
-        break; // These tabs self-load via their own ngOnInit
+        break;
     }
   }
 
@@ -569,84 +588,6 @@ export class VaultManagerComponent implements OnInit {
         this.loading.set(false);
       },
     });
-  }
-
-  // ─── Zero Trust ─────────────────────────────────
-  loadZTPolicies() {
-    this.ztService.getAllPolicies().subscribe({
-      next: (p) => this.ztPolicies.set(p),
-      error: () => this.showStatus('Không thể tải chính sách ZT', 'error'),
-    });
-  }
-
-  editPolicy(policy: ZTPolicyResponse) {
-    this.editForm = {
-      action: policy.action,
-      requiredAuthLevel: policy.requiredAuthLevel,
-      maxAllowedRisk: policy.maxAllowedRisk,
-      requireTrustedDevice: policy.requireTrustedDevice,
-      requireFreshSession: policy.requireFreshSession,
-      blockAnomaly: policy.blockAnomaly,
-      requireGeoFence: policy.requireGeoFence,
-      allowedCountries: policy.allowedCountries,
-      blockVpnTor: policy.blockVpnTor,
-      allowBreakGlassOverride: policy.allowBreakGlassOverride,
-      updatedBy: '',
-    };
-    this.editingZTPolicy.set(true);
-  }
-
-  savePolicy() {
-    this.loading.set(true);
-    this.ztService.updatePolicy(this.editForm).subscribe({
-      next: () => {
-        this.showStatus('Chính sách đã được cập nhật', 'success');
-        this.editingZTPolicy.set(false);
-        this.loadZTPolicies();
-        this.loading.set(false);
-      },
-      error: () => {
-        this.showStatus('Lỗi cập nhật chính sách', 'error');
-        this.loading.set(false);
-      },
-    });
-  }
-
-  testAccess() {
-    if (!this.accessCheckAction) return;
-    this.loading.set(true);
-    this.ztService.checkAccess({ action: this.accessCheckAction }).subscribe({
-      next: (d) => {
-        this.accessDecision.set(d);
-        this.loading.set(false);
-      },
-      error: () => {
-        this.showStatus('Lỗi kiểm tra truy cập', 'error');
-        this.loading.set(false);
-      },
-    });
-  }
-
-  getAuthLevelClass(level: string): string {
-    const map: Record<string, string> = {
-      None: 'badge-none',
-      Session: 'badge-session',
-      Password: 'badge-password',
-      MFA: 'badge-mfa',
-      FreshSession: 'badge-freshsession',
-      Biometric: 'badge-biometric',
-    };
-    return map[level] || 'badge-none';
-  }
-
-  getRiskClass(risk: string): string {
-    const map: Record<string, string> = {
-      Low: 'badge-low',
-      Medium: 'badge-medium',
-      High: 'badge-high',
-      Critical: 'badge-critical',
-    };
-    return map[risk] || 'badge-secondary';
   }
 
   // ─── Encryption / Key Wrap ───────────────────────
@@ -833,86 +774,6 @@ export class VaultManagerComponent implements OnInit {
         this.showStatus('Lỗi test kết nối', 'error');
         this.testingConnection.set(false);
       },
-    });
-  }
-
-  // ─── Database Secrets ────────────────────────────
-  loadDatabaseSecrets() {
-    this.kvService.listSecrets('database').subscribe({
-      next: (list) => {
-        const secrets = list
-          .filter((e) => e.type === 'secret')
-          .map(
-            (e) =>
-              ({ name: e.name }) as {
-                name: string;
-                host?: string;
-                database?: string;
-                port?: number;
-              },
-          );
-        this.databaseSecrets.set(secrets);
-        // Load details for each
-        secrets.forEach((s) => {
-          this.kvService.getSecret(`database/${s.name}`).subscribe({
-            next: (detail) => {
-              try {
-                const parsed = JSON.parse(detail.value);
-                this.databaseSecrets.update((list) =>
-                  list.map((d) =>
-                    d.name === s.name
-                      ? { ...d, host: parsed.host, database: parsed.database, port: parsed.port }
-                      : d,
-                  ),
-                );
-              } catch {}
-            },
-          });
-        });
-      },
-      error: () => {},
-    });
-  }
-
-  createDatabaseSecret() {
-    const path = `database/${this.newDbForm.name}`;
-    const data = JSON.stringify({
-      host: this.newDbForm.host,
-      port: this.newDbForm.port,
-      username: this.newDbForm.username,
-      password: this.newDbForm.password,
-      database: this.newDbForm.database,
-    });
-    this.loading.set(true);
-    this.kvService.createSecret({ name: path, value: data }).subscribe({
-      next: () => {
-        this.showStatus(`Database "${this.newDbForm.name}" đã được lưu`, 'success');
-        this.showDbDialog.set(false);
-        this.newDbForm = {
-          name: '',
-          host: '',
-          port: 5432,
-          username: '',
-          password: '',
-          database: '',
-        };
-        this.loadDatabaseSecrets();
-        this.loading.set(false);
-      },
-      error: () => {
-        this.showStatus('Lỗi tạo database secret', 'error');
-        this.loading.set(false);
-      },
-    });
-  }
-
-  deleteDbSecret(name: string) {
-    this.kvService.deleteSecret(`database/${name}`).subscribe({
-      next: () => {
-        this.showStatus('Đã xóa database credential', 'success');
-        this.loadDatabaseSecrets();
-      },
-      error: () => this.showStatus('Lỗi xóa credential', 'error'),
     });
   }
 
@@ -1398,13 +1259,6 @@ export class VaultManagerComponent implements OnInit {
     });
   }
 
-  loadFAAuditLogs() {
-    this.kvService.getAuditLogs(1, 50, 'field_access').subscribe({
-      next: (r) => this.faAuditLogs.set(r.items),
-      error: () => this.faAuditLogs.set([]),
-    });
-  }
-
   toggleFAGroup(tableName: string) {
     this.faExpandedGroups.update((g) => ({ ...g, [tableName]: !g[tableName] }));
   }
@@ -1538,14 +1392,6 @@ export class VaultManagerComponent implements OnInit {
     return labels[level] || level;
   }
 
-  // ─── Security Dashboard ──────────────────────────
-  loadSecurityDashboard() {
-    this.kvService.getSecurityDashboard().subscribe({
-      next: (d) => this.securityDashboard.set(d),
-      error: () => {},
-    });
-  }
-
   // ─── Helpers ────────────────────────────────────
   formatDate(dateStr: string | null): string {
     if (!dateStr) return '—';
@@ -1555,9 +1401,7 @@ export class VaultManagerComponent implements OnInit {
   refresh() {
     this.loadVaultStatus();
     this.loadHealth();
-    const tab = this.activeTab();
-    if (tab === 'secrets') this.loadSecrets();
-    if (tab === 'zero-trust') this.loadZTPolicies();
+    this.onTabChange(this.activeTab());
   }
 
   private showStatus(text: string, type: 'success' | 'error') {

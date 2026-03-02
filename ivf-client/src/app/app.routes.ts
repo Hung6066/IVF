@@ -278,6 +278,13 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'admin/advanced-security',
+        loadComponent: () =>
+          import('./features/admin/advanced-security/advanced-security.component').then(
+            (m) => m.AdvancedSecurityComponent,
+          ),
+      },
+      {
         path: 'forms',
         loadChildren: () => import('./features/forms/forms.routes').then((m) => m.FORMS_ROUTES),
       },

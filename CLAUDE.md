@@ -114,6 +114,7 @@ Forms system: `FormTemplate → FormField → FormResponse → FormFieldValue` s
 
 ## Additional Docs
 
+- `/docs/advanced_security.md` — advanced security module (Passkeys, MFA, TOTP, SMS OTP, rate limiting, geo-fencing, threats, lockouts, IP whitelist)
 - `/docs/form_report_builder.md` — form/report designer architecture
 - `/docs/digital_signing.md` — signing infrastructure
 - `/docs/matcher_infrastructure_guide.md` — biometric setup (Windows)

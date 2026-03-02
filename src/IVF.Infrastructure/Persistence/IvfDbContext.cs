@@ -101,6 +101,14 @@ public class IvfDbContext : DbContext
     public DbSet<DeviceRisk> DeviceRisks => Set<DeviceRisk>();
     public DbSet<ZTPolicy> ZTPolicies => Set<ZTPolicy>();
 
+    // Advanced Security (Passkeys, MFA, Lockouts, IP Whitelist, Rate Limit, Geo Blocking)
+    public DbSet<PasskeyCredential> PasskeyCredentials => Set<PasskeyCredential>();
+    public DbSet<UserMfaSetting> UserMfaSettings => Set<UserMfaSetting>();
+    public DbSet<AccountLockout> AccountLockouts => Set<AccountLockout>();
+    public DbSet<IpWhitelistEntry> IpWhitelistEntries => Set<IpWhitelistEntry>();
+    public DbSet<RateLimitConfig> RateLimitConfigs => Set<RateLimitConfig>();
+    public DbSet<GeoBlockRule> GeoBlockRules => Set<GeoBlockRule>();
+
     // Vault System (self-hosted, Azure KV only for auto-unseal wrap/unwrap)
     public DbSet<VaultSecret> VaultSecrets => Set<VaultSecret>();
     public DbSet<VaultPolicy> VaultPolicies => Set<VaultPolicy>();

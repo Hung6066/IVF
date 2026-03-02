@@ -51,12 +51,15 @@ public class DynamicCredentialProvider : IDynamicCredentialProvider
 
         await using (var cmd = conn.CreateCommand())
         {
-            // Role name is generated internally (ivf_dyn_<hex>), safe as identifier
+            // Role name is generated internally (ivf_dyn_<hex>), safe as identifier.
+            // DDL statements (CREATE ROLE) do not support parameterized queries in PostgreSQL,
+            // so we escape the password as a string literal. The password is generated internally
+            // via RandomNumberGenerator (base64), so SQL injection is not a concern.
+            var escapedPassword = password.Replace("'", "''");
             cmd.CommandText = $"""
-                CREATE ROLE "{username}" LOGIN PASSWORD @pwd VALID UNTIL '{validUntil}';
+                CREATE ROLE "{username}" LOGIN PASSWORD '{escapedPassword}' VALID UNTIL '{validUntil}';
                 GRANT CONNECT ON DATABASE "{SanitizeIdentifier(request.DbName)}" TO "{username}";
                 """;
-            cmd.Parameters.AddWithValue("pwd", password);
             await cmd.ExecuteNonQueryAsync(ct);
         }
 

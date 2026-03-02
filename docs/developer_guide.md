@@ -832,6 +832,14 @@ Global:     100 requests/minute per client
 Signing:     30 operations/minute (digital signing)
 ```
 
+### Advanced Security Module
+
+The advanced security module provides comprehensive protection features including Passkeys/WebAuthn, TOTP, SMS OTP, device management, session control, geo-fencing, threat detection, account lockouts, and IP whitelisting.
+
+All endpoints are under `/api/security/advanced/*` with `AdminOnly` authorization.
+
+**See:** [Advanced Security Documentation](advanced_security.md) for full details.
+
 ---
 
 ## 8. Real-Time Communication (SignalR)

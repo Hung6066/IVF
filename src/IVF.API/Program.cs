@@ -17,6 +17,7 @@ using System.Threading.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.IdentityModel.Tokens;
+using Fido2NetLib;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -29,6 +30,15 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddMemoryCache();
+
+// ─── Fido2 / WebAuthn ───
+builder.Services.AddFido2(options =>
+{
+    options.ServerDomain = builder.Configuration["Fido2:ServerDomain"] ?? "localhost";
+    options.ServerName = builder.Configuration["Fido2:ServerName"] ?? "IVF System";
+    options.Origins = builder.Configuration.GetSection("Fido2:Origins").Get<HashSet<string>>()
+        ?? new HashSet<string> { "https://localhost:4200", "http://localhost:4200" };
+});
 
 // ─── DataProtection: persistent key storage for private key encryption ───
 {
@@ -443,6 +453,7 @@ app.Use(async (context, next) =>
 });
 
 // app.UseCors("AllowAngular"); // Moved to top
+app.UseSecurityEnforcement(); // IP whitelist & geo-blocking enforcement (before auth)
 app.UseVaultTokenAuth(); // Vault token authentication (X-Vault-Token header)
 app.UseApiKeyAuth(); // API key authentication (X-API-Key header or apiKey query param)
 app.UseAuthentication();
@@ -496,6 +507,7 @@ app.MapDocumentSignatureEndpoints();
 app.MapKeyVaultEndpoints();
 app.MapZeroTrustEndpoints();
 app.MapSecurityEventEndpoints(); // Zero Trust security monitoring dashboard
+app.MapAdvancedSecurityEndpoints(); // Advanced security: lockouts, rate-limits, geo, IP whitelist
 
 // ── Config seeders: run in every environment (idempotent, no demo data) ──────
 {
@@ -506,6 +518,7 @@ app.MapSecurityEventEndpoints(); // Zero Trust security monitoring dashboard
     await CloudReplicationSeeder.SeedAsync(db);      // default cloud replication config
     await ZTPolicySeeder.SeedAsync(db);              // default Zero Trust policies
     await EncryptionConfigSeeder.SeedAsync(db);      // default encryption configs
+    await VaultComplianceSeeder.SeedAsync(db, scope.ServiceProvider);        // vault compliance baseline data
 
     // Permission definitions must always be present
     var permDefRepo = scope.ServiceProvider.GetRequiredService<IPermissionDefinitionRepository>();
