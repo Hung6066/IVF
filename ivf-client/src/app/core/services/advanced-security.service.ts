@@ -36,6 +36,10 @@ export class AdvancedSecurityService {
   private http = inject(HttpClient);
   private readonly baseUrl = `${environment.apiUrl}/security/advanced`;
 
+  getMyIp(): Observable<{ ip: string }> {
+    return this.http.get<{ ip: string }>(`${this.baseUrl}/my-ip`);
+  }
+
   // ─── Security Score ───
   getSecurityScore(): Observable<SecurityScore> {
     return this.http.get<SecurityScore>(`${this.baseUrl}/score`);
@@ -192,15 +196,15 @@ export class AdvancedSecurityService {
 
   // ─── SMS OTP ───
   registerSmsOtp(request: SmsRegisterRequest): Observable<{ message: string }> {
-    return this.http.post<{ message: string }>(`${this.baseUrl}/sms-otp/register`, request);
+    return this.http.post<{ message: string }>(`${this.baseUrl}/sms/register`, request);
   }
 
   verifySmsOtp(request: SmsVerifyRequest): Observable<{ message: string }> {
-    return this.http.post<{ message: string }>(`${this.baseUrl}/sms-otp/verify`, request);
+    return this.http.post<{ message: string }>(`${this.baseUrl}/sms/verify`, request);
   }
 
   sendSmsOtp(userId: string): Observable<{ message: string }> {
-    return this.http.post<{ message: string }>(`${this.baseUrl}/sms-otp/send`, { userId });
+    return this.http.post<{ message: string }>(`${this.baseUrl}/sms/send`, { userId });
   }
 
   // ─── MFA Settings ───

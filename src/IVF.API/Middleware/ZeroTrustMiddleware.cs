@@ -34,6 +34,9 @@ public class ZeroTrustMiddleware
     {
         "/api/auth/login",
         "/api/auth/refresh",
+        "/api/auth/mfa-verify",
+        "/api/auth/mfa-send-sms",
+        "/api/auth/passkey-login",
         "/health",
         "/healthz",
         "/swagger",
@@ -191,7 +194,9 @@ public class ZeroTrustMiddleware
         var ipAddress = GetClientIp(context);
         var userAgent = context.Request.Headers.UserAgent.FirstOrDefault();
         var deviceFp = context.Request.Headers["X-Device-Fingerprint"].FirstOrDefault();
-        var sessionId = context.Request.Headers["X-Session-Id"].FirstOrDefault();
+        // Prefer session_id from JWT (set by TokenBindingMiddleware) over header
+        var sessionId = context.Items["TokenSessionId"] as string
+            ?? context.Request.Headers["X-Session-Id"].FirstOrDefault();
 
         return new RequestSecurityContext(
             UserId: userId,

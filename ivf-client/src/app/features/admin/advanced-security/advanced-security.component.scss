@@ -899,3 +899,226 @@
     transform: translateY(0);
   }
 }
+
+.totp-qr-container {
+  display: flex;
+  justify-content: center;
+  padding: 1rem 0;
+}
+
+.totp-qr-image {
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 8px;
+  padding: 8px;
+  background: #fff;
+}
+
+.totp-secret {
+  font-family: monospace;
+  letter-spacing: 2px;
+  user-select: all;
+}
+
+// ─── Sub-Tab Navigation ─────────────────────────────
+.sub-tab-nav {
+  display: flex;
+  gap: 0.25rem;
+  margin-bottom: 1rem;
+  padding: 0.25rem;
+  background: #e5e7eb;
+  border-radius: 8px;
+  width: fit-content;
+}
+
+.sub-tab-btn {
+  padding: 0.4rem 0.8rem;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #6b7280;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+
+  &:hover {
+    background: #d1d5db;
+    color: #1e1e2f;
+  }
+
+  &.active {
+    background: #fff;
+    color: #2563eb;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+    font-weight: 600;
+  }
+}
+
+.card-subtitle {
+  margin: 0;
+  font-size: 0.82rem;
+  color: #6b7280;
+}
+
+.btn-sm {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+}
+
+.btn-outline {
+  background: transparent;
+  border: 1px solid #2563eb;
+  color: #2563eb;
+
+  &:hover {
+    background: #2563eb;
+    color: #fff;
+  }
+}
+
+.stat-card.stat-green {
+  border-left: 3px solid #22c55e;
+  .stat-icon {
+    color: #22c55e;
+  }
+}
+
+.stat-card.stat-yellow {
+  border-left: 3px solid #eab308;
+  .stat-icon {
+    color: #eab308;
+  }
+}
+
+// ─── Form Grid (Threat Assess / IP Intel) ───────────
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+
+  &.form-grid-2 {
+    grid-template-columns: 1fr 1fr;
+
+    @media (max-width: 600px) {
+      grid-template-columns: 1fr;
+    }
+  }
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+
+  label {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #374151;
+  }
+
+  input,
+  select,
+  textarea {
+    padding: 0.55rem 0.75rem;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    color: #1e1e2f;
+    background: #fff;
+    transition: border-color 0.2s, box-shadow 0.2s;
+
+    &:focus {
+      outline: none;
+      border-color: #2563eb;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+    }
+
+    &::placeholder {
+      color: #9ca3af;
+    }
+  }
+}
+
+.form-actions {
+  margin-top: 1rem;
+  display: flex;
+  gap: 0.5rem;
+}
+
+// ─── Search Form (IP Intelligence) ──────────────────
+.search-form {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-end;
+
+  .form-group {
+    flex: 1;
+  }
+
+  @media (max-width: 500px) {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+// ─── Assess Result ──────────────────────────────────
+.assess-result {
+  margin-top: 1.5rem;
+}
+
+.risk-bar-section {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+
+  .risk-bar-label {
+    font-weight: 600;
+    font-size: 0.88rem;
+    color: #374151;
+  }
+
+  .risk-bar-value {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #1e1e2f;
+  }
+}
+
+.risk-scale-bar {
+  height: 12px;
+  background: #f3f4f6;
+  border-radius: 6px;
+  overflow: hidden;
+
+  .risk-scale-fill {
+    height: 100%;
+    border-radius: 6px;
+    transition: width 0.5s ease;
+  }
+}
+
+.risk-scale-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+// ─── Severity Warning Badge ─────────────────────────
+.severity-warning {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+// ─── Result detail cards spacing ────────────────────
+.signal-details-card,
+.ip-flags-card {
+  margin-top: 1rem;
+}

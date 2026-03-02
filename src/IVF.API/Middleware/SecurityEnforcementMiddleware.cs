@@ -15,12 +15,14 @@ public class SecurityEnforcementMiddleware
     private readonly RequestDelegate _next;
     private readonly ILogger<SecurityEnforcementMiddleware> _logger;
 
-    // Paths that bypass enforcement (health checks, static files)
+    // Paths that bypass enforcement (health checks, static files, security management)
     private static readonly HashSet<string> ExemptPrefixes = new(StringComparer.OrdinalIgnoreCase)
     {
         "/health",
         "/healthz",
         "/swagger",
+        "/api/auth",                    // login/refresh must always be reachable
+        "/api/security/advanced",       // admin must be able to manage whitelist
     };
 
     public SecurityEnforcementMiddleware(RequestDelegate next, ILogger<SecurityEnforcementMiddleware> logger)
@@ -42,6 +44,13 @@ public class SecurityEnforcementMiddleware
 
         var clientIp = GetClientIp(context);
         if (string.IsNullOrEmpty(clientIp))
+        {
+            await _next(context);
+            return;
+        }
+
+        // Always allow loopback addresses (local development)
+        if (IPAddress.TryParse(clientIp, out var parsed) && IPAddress.IsLoopback(parsed))
         {
             await _next(context);
             return;

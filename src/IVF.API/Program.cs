@@ -140,9 +140,19 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(options =
     options.SerializerOptions.Converters.Add(new IVF.API.Converters.UtcDateTimeConverter());
 });
 
-// JWT Authentication
+// ─── Enterprise Security Services ───
+builder.Services.AddSingleton<IVF.API.Services.JwtKeyService>();
+builder.Services.AddSingleton<IVF.API.Services.RefreshTokenFamilyService>();
+builder.Services.AddSingleton<IVF.API.Services.PasswordPolicyService>();
+
+// JWT Authentication — RS256 Asymmetric (Google/Microsoft standard)
+// Private key signs tokens, public key verifies. Even if validation key is
+// exposed, attackers cannot forge tokens without the private key.
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
-var secretKey = jwtSettings["Secret"] ?? throw new InvalidOperationException("JWT Secret not configured");
+var jwtKeyService = new IVF.API.Services.JwtKeyService(
+    builder.Configuration,
+    LoggerFactory.Create(b => b.AddConsole()).CreateLogger<IVF.API.Services.JwtKeyService>());
+builder.Services.AddSingleton(jwtKeyService);
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -155,8 +165,10 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateIssuerSigningKey = true,
             ValidIssuer = jwtSettings["Issuer"],
             ValidAudience = jwtSettings["Audience"],
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey)),
-            ClockSkew = TimeSpan.Zero
+            IssuerSigningKey = jwtKeyService.ValidationKey,
+            ClockSkew = TimeSpan.Zero,
+            // Restrict accepted algorithms (prevent algorithm confusion attacks)
+            ValidAlgorithms = new[] { SecurityAlgorithms.RsaSha256 }
         };
 
         // Support SignalR authentication via query string token
@@ -453,13 +465,14 @@ app.Use(async (context, next) =>
 });
 
 // app.UseCors("AllowAngular"); // Moved to top
+app.UseRateLimiter(); // Rate Limiting BEFORE auth (protect from brute force — Google/AWS standard)
 app.UseSecurityEnforcement(); // IP whitelist & geo-blocking enforcement (before auth)
 app.UseVaultTokenAuth(); // Vault token authentication (X-Vault-Token header)
 app.UseApiKeyAuth(); // API key authentication (X-API-Key header or apiKey query param)
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseTokenBinding(); // Token binding enforcement — validate device/session claims (Microsoft CAE)
 app.UseZeroTrust(); // Zero Trust continuous verification (Google BeyondCorp + Microsoft CAE + AWS GuardDuty)
-app.UseRateLimiter(); // Enable Rate Limiting
 
 // SignalR Hubs
 app.MapHub<IVF.API.Hubs.QueueHub>("/hubs/queue");

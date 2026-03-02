@@ -46,6 +46,33 @@ public static class AdvancedSecurityEndpoints
         MapTotp(group);
         MapSmsOtp(group);
         MapMfaSettings(group);
+
+        // Client IP endpoint
+        group.MapGet("/my-ip", async (HttpContext context, IHttpClientFactory httpClientFactory) =>
+        {
+            var ip = context.Request.Headers["X-Forwarded-For"].FirstOrDefault()
+                     ?? context.Request.Headers["X-Real-IP"].FirstOrDefault()
+                     ?? context.Connection.RemoteIpAddress?.MapToIPv4().ToString()
+                     ?? "unknown";
+            // Strip port if present in X-Forwarded-For
+            if (ip.Contains(',')) ip = ip.Split(',')[0].Trim();
+
+            // If loopback, resolve public IP server-side (no CORS issues)
+            if (ip is "127.0.0.1" or "::1" or "0.0.0.1" or "unknown")
+            {
+                try
+                {
+                    var client = httpClientFactory.CreateClient();
+                    client.Timeout = TimeSpan.FromSeconds(5);
+                    var publicIp = await client.GetStringAsync("https://api.ipify.org");
+                    if (!string.IsNullOrWhiteSpace(publicIp))
+                        ip = publicIp.Trim();
+                }
+                catch { /* keep original ip */ }
+            }
+
+            return Results.Ok(new { ip });
+        }).WithName("GetMyIp");
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -703,8 +730,12 @@ public static class AdvancedSecurityEndpoints
             return Results.Text(json, "application/json");
         }).WithName("BeginPasskeyAuthentication");
 
-        group.MapPost("/passkeys/authenticate/complete", async (PasskeyAuthCompleteRequest request, IvfDbContext db, IFido2 fido2) =>
+        group.MapPost("/passkeys/authenticate/complete", async (HttpContext context, IvfDbContext db, IFido2 fido2) =>
         {
+            var request = await JsonSerializer.DeserializeAsync<PasskeyAuthCompleteRequest>(context.Request.Body, _fidoJsonOptions);
+            if (request is null)
+                return Results.BadRequest(new { message = "Invalid request" });
+
             if (!_pendingAssertions.TryRemove(request.UserId.ToString(), out var options))
                 return Results.BadRequest(new { message = "No pending authentication found" });
 
@@ -926,6 +957,21 @@ public static class AdvancedSecurityEndpoints
                 devOtp = otp
             });
         }).WithName("SendSmsOtp");
+    }
+
+    // ─── Public helpers for cross-endpoint SMS OTP access ───
+    public static bool ValidateSmsOtp(string userId, string code)
+    {
+        if (!_pendingSmsOtp.TryRemove(userId, out var pending))
+            return false;
+        if (DateTime.UtcNow > pending.ExpiresAt)
+            return false;
+        return string.Equals(pending.Code, code, StringComparison.Ordinal);
+    }
+
+    public static void StoreSmsOtp(string userId, string code, TimeSpan expiry)
+    {
+        _pendingSmsOtp[userId] = (code, DateTime.UtcNow.Add(expiry));
     }
 
     // ═══════════════════════════════════════════════════════════

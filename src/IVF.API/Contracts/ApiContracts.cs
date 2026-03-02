@@ -5,6 +5,10 @@ namespace IVF.API.Contracts;
 // ==================== REQUEST RECORDS ====================
 public record LoginRequest(string Username, string Password);
 public record RefreshTokenRequest(string RefreshToken);
+public record MfaVerifyRequest(string MfaToken, string Code);
+public record MfaSendSmsRequest(string MfaToken);
+public record PasskeyLoginBeginRequest(string Username);
+public record PasskeyLoginCompleteRequest(Guid UserId, Fido2NetLib.AuthenticatorAssertionRawResponse AssertionResponse);
 public record AuthResponse(string AccessToken, string RefreshToken, int ExpiresIn, UserDto User);
 public record UserDto(Guid Id, string Username, string FullName, string Role, string? Department)
 {

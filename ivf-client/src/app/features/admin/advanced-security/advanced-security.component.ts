@@ -5,6 +5,8 @@ import { Router } from '@angular/router';
 import { AdvancedSecurityService } from '../../../core/services/advanced-security.service';
 import { SecurityService } from '../../../core/services/security.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { UserService } from '../../../core/services/user.service';
+import QRCode from 'qrcode';
 import {
   SecurityScore,
   LoginHistoryEntry,
@@ -22,7 +24,7 @@ import {
   TotpSetupResponse,
   RISK_FACTOR_LABELS,
 } from '../../../core/models/advanced-security.model';
-import { SessionInfo } from '../../../core/models/security.model';
+import { SessionInfo, ThreatAssessment, IpIntelligence } from '../../../core/models/security.model';
 
 type TabKey =
   | 'overview'
@@ -83,6 +85,11 @@ export class AdvancedSecurityComponent implements OnInit, OnDestroy {
 
   // Threats
   threatOverview = signal<ThreatOverview | null>(null);
+  threatAssessResult = signal<ThreatAssessment | null>(null);
+  threatIpResult = signal<IpIntelligence | null>(null);
+  threatAssessForm = { ipAddress: '', username: '', userAgent: '', country: '', requestPath: '' };
+  threatIpLookup = '';
+  threatToolTab = signal<'dashboard' | 'assess' | 'ip'>('dashboard');
 
   // Account Lockouts
   lockouts = signal<AccountLockout[]>([]);
@@ -116,8 +123,16 @@ export class AdvancedSecurityComponent implements OnInit, OnDestroy {
   mfaSettings = signal<MfaSettings | null>(null);
   mfaUserId = '';
 
+  // User list for selection
+  users = signal<{ id: string; username: string; fullName: string; role: string }[]>([]);
+  userSearch = '';
+
+  // Public IP
+  publicIp = signal<string>('');
+
   // TOTP
   totpSetup = signal<TotpSetupResponse | null>(null);
+  totpQrDataUrl = signal<string>('');
   totpCode = '';
   totpUserId = '';
 
@@ -144,12 +159,15 @@ export class AdvancedSecurityComponent implements OnInit, OnDestroy {
     private advancedSecurityService: AdvancedSecurityService,
     private securityService: SecurityService,
     private authService: AuthService,
+    private userService: UserService,
     private router: Router,
   ) {}
 
   ngOnInit() {
     this.initCurrentUser();
     this.checkPasskeySupport();
+    this.loadUsers();
+    this.fetchPublicIp();
     this.loadOverview();
     this.startAutoRefresh();
   }
@@ -168,6 +186,47 @@ export class AdvancedSecurityComponent implements OnInit, OnDestroy {
 
     // Machine fingerprint from localStorage if available
     this.machineFingerprint = localStorage.getItem('x-device-fingerprint') ?? '';
+  }
+
+  loadUsers(search?: string) {
+    this.userService.getUsers(search, undefined, true, 1, 100).subscribe({
+      next: (res: any) => {
+        this.users.set(
+          (res.items || []).map((u: any) => ({
+            id: u.id,
+            username: u.username,
+            fullName: u.fullName,
+            role: u.role,
+          })),
+        );
+      },
+    });
+  }
+
+  onUserSelected(userId: string) {
+    this.passkeyUserId = userId;
+    this.deviceUserId = userId;
+    this.sessionUserId = userId;
+    this.mfaUserId = userId;
+    this.totpUserId = userId;
+    this.smsUserId = userId;
+    this.lockForm.userId = userId;
+    const user = this.users().find((u) => u.id === userId);
+    if (user) {
+      this.lockForm.username = user.fullName || user.username;
+    }
+  }
+
+  getUserDisplay(userId: string): string {
+    const user = this.users().find((u) => u.id === userId);
+    return user ? `${user.fullName || user.username} (${user.role})` : userId;
+  }
+
+  private fetchPublicIp() {
+    this.advancedSecurityService.getMyIp().subscribe({
+      next: (res) => this.publicIp.set(res.ip || ''),
+      error: () => {},
+    });
   }
 
   ngOnDestroy() {
@@ -305,16 +364,34 @@ export class AdvancedSecurityComponent implements OnInit, OnDestroy {
   async registerPasskey() {
     const userId = this.passkeyUserId.trim();
     if (!userId) {
-      this.showStatus('Vui lòng nhập User ID', 'error');
+      this.showStatus('Vui lòng chọn người dùng', 'error');
       return;
     }
     this.passkeyRegistering.set(true);
 
     this.advancedSecurityService.beginPasskeyRegistration({ userId }).subscribe({
-      next: async (options) => {
+      next: async (serverOptions) => {
         try {
+          // Convert server JSON to WebAuthn-compatible PublicKeyCredentialCreationOptions
+          const publicKey: PublicKeyCredentialCreationOptions = {
+            rp: serverOptions.rp,
+            user: {
+              ...serverOptions.user,
+              id: this.base64urlToBuffer(serverOptions.user.id),
+            },
+            challenge: this.base64urlToBuffer(serverOptions.challenge),
+            pubKeyCredParams: serverOptions.pubKeyCredParams,
+            timeout: serverOptions.timeout,
+            attestation: serverOptions.attestation,
+            authenticatorSelection: serverOptions.authenticatorSelection,
+            excludeCredentials: (serverOptions.excludeCredentials || []).map((c: any) => ({
+              ...c,
+              id: this.base64urlToBuffer(c.id),
+            })),
+          };
+
           const credential = (await navigator.credentials.create({
-            publicKey: options,
+            publicKey,
           })) as PublicKeyCredential;
           if (!credential) {
             this.showStatus('Đăng ký passkey bị hủy', 'error');
@@ -392,6 +469,15 @@ export class AdvancedSecurityComponent implements OnInit, OnDestroy {
     return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
   }
 
+  private base64urlToBuffer(base64url: string): ArrayBuffer {
+    let base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
+    while (base64.length % 4) base64 += '=';
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return bytes.buffer;
+  }
+
   // ─── MFA Settings ───
 
   loadMfaSettings() {
@@ -430,10 +516,17 @@ export class AdvancedSecurityComponent implements OnInit, OnDestroy {
     this.advancedSecurityService.setupTotp(userId).subscribe({
       next: (data) => {
         this.totpSetup.set(data);
+        this.generateTotpQr(data.otpauthUri);
         this.showStatus('Đã tạo TOTP secret. Quét mã QR bằng ứng dụng xác thực.', 'success');
       },
       error: () => this.showStatus('Lỗi thiết lập TOTP', 'error'),
     });
+  }
+
+  private generateTotpQr(otpauthUri: string) {
+    QRCode.toDataURL(otpauthUri, { width: 256, margin: 2 })
+      .then((url: string) => this.totpQrDataUrl.set(url))
+      .catch(() => this.totpQrDataUrl.set(''));
   }
 
   verifyTotp() {
@@ -664,6 +757,55 @@ export class AdvancedSecurityComponent implements OnInit, OnDestroy {
     });
   }
 
+  runQuickAssessment() {
+    if (!this.threatAssessForm.ipAddress.trim()) return;
+    this.loading.set(true);
+    this.securityService.assessThreat(this.threatAssessForm).subscribe({
+      next: (result) => {
+        this.threatAssessResult.set(result);
+        this.loading.set(false);
+      },
+      error: () => {
+        this.showStatus('Lỗi đánh giá mối đe dọa', 'error');
+        this.loading.set(false);
+      },
+    });
+  }
+
+  quickIpLookup() {
+    if (!this.threatIpLookup.trim()) return;
+    this.loading.set(true);
+    this.securityService.checkIpIntelligence(this.threatIpLookup.trim()).subscribe({
+      next: (result) => {
+        this.threatIpResult.set(result);
+        this.loading.set(false);
+      },
+      error: () => {
+        this.showStatus('Lỗi kiểm tra IP', 'error');
+        this.loading.set(false);
+      },
+    });
+  }
+
+  getRiskLevelClass(level: string): string {
+    switch (level) {
+      case 'Critical':
+        return 'severity-critical';
+      case 'High':
+        return 'severity-high';
+      case 'Medium':
+        return 'severity-warning';
+      case 'Low':
+        return 'severity-info';
+      default:
+        return '';
+    }
+  }
+
+  getRiskBarWidth(score: number): number {
+    return Math.min(score, 100);
+  }
+
   // ─── Account Lockouts ───
 
   loadLockouts() {
@@ -723,6 +865,12 @@ export class AdvancedSecurityComponent implements OnInit, OnDestroy {
   }
 
   // ─── IP Whitelist ───
+
+  isCurrentIpWhitelisted(): boolean {
+    const currentIp = this.publicIp();
+    if (!currentIp) return true; // Don't warn if we can't determine IP
+    return this.ipWhitelist().some((entry) => entry.isActive && entry.ipAddress === currentIp);
+  }
 
   loadIpWhitelist() {
     this.loading.set(true);

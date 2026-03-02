@@ -28,10 +28,12 @@ public sealed class AdaptiveSessionService : IAdaptiveSessionService
     private const int MaxConcurrentSessions = 3;
 
     // Context drift thresholds
+    // Only block when MULTIPLE signals drift (e.g. IP + device = 70 > 60)
+    // Single-factor drift (device alone = 40) should warn but not block
     private const decimal IpChangePenalty = 30m;
-    private const decimal DeviceChangePenalty = 50m;
+    private const decimal DeviceChangePenalty = 40m;
     private const decimal CountryChangePenalty = 60m;
-    private const decimal DriftBlockThreshold = 50m;
+    private const decimal DriftBlockThreshold = 60m;
 
     public AdaptiveSessionService(
         IMemoryCache cache,

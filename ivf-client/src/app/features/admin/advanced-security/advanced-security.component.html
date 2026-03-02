@@ -26,6 +26,9 @@
       <strong>{{ user.fullName || user.username }}</strong>
       <span class="badge severity-info">{{ user.role }}</span>
       <span class="text-muted text-xs">ID: {{ user.id }}</span>
+      @if (publicIp()) {
+        <span class="text-muted text-xs">| IP: {{ publicIp() }}</span>
+      }
       @if (machineFingerprint) {
         <span class="text-muted text-xs">| Device: {{ machineFingerprint | slice: 0 : 12 }}…</span>
       }
@@ -198,12 +201,12 @@
                 <span class="action-label">Sự kiện bảo mật</span>
                 <span class="action-desc">Xem chi tiết tất cả sự kiện</span>
               </button>
-              <button class="action-card" (click)="navigateTo('/admin/security-sessions')">
+              <button class="action-card" (click)="setTab('sessions')">
                 <span class="action-icon">🖥️</span>
                 <span class="action-label">Phiên hoạt động</span>
                 <span class="action-desc">Quản lý phiên người dùng</span>
               </button>
-              <button class="action-card" (click)="navigateTo('/admin/security-threats')">
+              <button class="action-card" (click)="setTab('threats')">
                 <span class="action-icon">🔍</span>
                 <span class="action-label">Đánh giá mối đe dọa</span>
                 <span class="action-desc">Phân tích rủi ro IP/User</span>
@@ -256,12 +259,16 @@
             <div class="passkey-register-section">
               <h4>Đăng ký Passkey mới</h4>
               <div class="form-row">
-                <input
-                  type="text"
+                <select
                   class="input-field"
-                  placeholder="User ID"
                   [(ngModel)]="passkeyUserId"
-                />
+                  (ngModelChange)="onUserSelected($event)"
+                >
+                  <option value="" disabled>-- Chọn người dùng --</option>
+                  @for (u of users(); track u.id) {
+                    <option [value]="u.id">{{ u.fullName || u.username }} ({{ u.role }})</option>
+                  }
+                </select>
                 <input
                   type="text"
                   class="input-field"
@@ -354,12 +361,16 @@
           <div class="card-body">
             <!-- MFA Status Lookup -->
             <div class="form-row">
-              <input
-                type="text"
+              <select
                 class="input-field"
-                placeholder="User ID"
                 [(ngModel)]="mfaUserId"
-              />
+                (ngModelChange)="onUserSelected($event)"
+              >
+                <option value="" disabled>-- Chọn người dùng --</option>
+                @for (u of users(); track u.id) {
+                  <option [value]="u.id">{{ u.fullName || u.username }} ({{ u.role }})</option>
+                }
+              </select>
               <button
                 class="btn btn-sm btn-primary"
                 (click)="loadMfaSettings()"
@@ -403,12 +414,16 @@
             <div class="mfa-section">
               <h4>📱 Thiết lập TOTP (Authenticator App)</h4>
               <div class="form-row">
-                <input
-                  type="text"
+                <select
                   class="input-field"
-                  placeholder="User ID"
                   [(ngModel)]="totpUserId"
-                />
+                  (ngModelChange)="onUserSelected($event)"
+                >
+                  <option value="" disabled>-- Chọn người dùng --</option>
+                  @for (u of users(); track u.id) {
+                    <option [value]="u.id">{{ u.fullName || u.username }} ({{ u.role }})</option>
+                  }
+                </select>
                 <button
                   class="btn btn-sm btn-primary"
                   (click)="setupTotp()"
@@ -419,10 +434,23 @@
               </div>
               @if (totpSetup(); as setup) {
                 <div class="totp-setup-card">
-                  <p><strong>OTPAuth URI:</strong></p>
-                  <code class="totp-uri">{{ setup.otpauthUri }}</code>
+                  @if (totpQrDataUrl()) {
+                    <div class="totp-qr-container">
+                      <img
+                        [src]="totpQrDataUrl()"
+                        alt="TOTP QR Code"
+                        class="totp-qr-image"
+                        width="256"
+                        height="256"
+                      />
+                    </div>
+                  }
                   <p class="text-muted">
-                    Quét mã QR hoặc nhập thủ công secret: <strong>{{ setup.secret }}</strong>
+                    Quét mã QR bằng ứng dụng xác thực (Google Authenticator, Authy...)
+                  </p>
+                  <p class="text-muted">
+                    Hoặc nhập thủ công secret:
+                    <strong class="totp-secret">{{ setup.secret }}</strong>
                   </p>
                   <div class="form-row">
                     <input
@@ -448,12 +476,16 @@
             <div class="mfa-section">
               <h4>💬 SMS OTP</h4>
               <div class="form-row">
-                <input
-                  type="text"
+                <select
                   class="input-field"
-                  placeholder="User ID"
                   [(ngModel)]="smsUserId"
-                />
+                  (ngModelChange)="onUserSelected($event)"
+                >
+                  <option value="" disabled>-- Chọn người dùng --</option>
+                  @for (u of users(); track u.id) {
+                    <option [value]="u.id">{{ u.fullName || u.username }} ({{ u.role }})</option>
+                  }
+                </select>
                 <input
                   type="text"
                   class="input-field"
@@ -507,12 +539,16 @@
         <div class="card-header">
           <h3>🖥️ Thiết bị đã đăng ký</h3>
           <div class="header-actions">
-            <input
-              type="text"
+            <select
               class="input-field input-sm"
-              placeholder="User ID..."
               [(ngModel)]="deviceUserId"
-            />
+              (ngModelChange)="onUserSelected($event)"
+            >
+              <option value="" disabled>-- Chọn người dùng --</option>
+              @for (u of users(); track u.id) {
+                <option [value]="u.id">{{ u.fullName || u.username }} ({{ u.role }})</option>
+              }
+            </select>
             <button
               class="btn btn-sm btn-primary"
               (click)="loadDevices()"
@@ -599,7 +635,7 @@
           } @else {
             <div class="empty-state">
               <span class="empty-icon">🖥️</span>
-              <span>Nhập User ID để xem danh sách thiết bị</span>
+              <span>Nhập người dùng để xem danh sách thiết bị</span>
             </div>
           }
         </div>
@@ -616,12 +652,16 @@
         <div class="card-header">
           <h3>🔗 Quản lý phiên hoạt động</h3>
           <div class="header-actions">
-            <input
-              type="text"
+            <select
               class="input-field input-sm"
-              placeholder="User ID..."
               [(ngModel)]="sessionUserId"
-            />
+              (ngModelChange)="onUserSelected($event)"
+            >
+              <option value="" disabled>-- Chọn người dùng --</option>
+              @for (u of users(); track u.id) {
+                <option [value]="u.id">{{ u.fullName || u.username }} ({{ u.role }})</option>
+              }
+            </select>
             <button
               class="btn btn-sm btn-primary"
               (click)="loadSessions()"
@@ -1167,117 +1207,516 @@
   <!-- ═══════════════════════════════════════════════════ -->
   @if (activeTab() === 'threats') {
     <div class="tab-content">
-      @if (threatOverview(); as threats) {
-        <!-- Threat Summary -->
-        <div class="stats-grid">
-          <div class="stat-card stat-red">
-            <div class="stat-icon">💀</div>
-            <div class="stat-info">
-              <span class="stat-value">{{ threats.summary.criticalCount }}</span>
-              <span class="stat-label">Critical</span>
-            </div>
-          </div>
-          <div class="stat-card stat-orange">
-            <div class="stat-icon">🔥</div>
-            <div class="stat-info">
-              <span class="stat-value">{{ threats.summary.highCount }}</span>
-              <span class="stat-label">High</span>
-            </div>
-          </div>
-          <div class="stat-card stat-blue">
-            <div class="stat-icon">🛑</div>
-            <div class="stat-info">
-              <span class="stat-value">{{ threats.summary.blockedCount }}</span>
-              <span class="stat-label">Bị chặn</span>
-            </div>
-          </div>
-          <div class="stat-card stat-purple">
-            <div class="stat-icon">⚡</div>
-            <div class="stat-info">
-              <span class="stat-value">{{ threats.summary.totalThreats }}</span>
-              <span class="stat-label">Tổng mối đe dọa</span>
-            </div>
-          </div>
-        </div>
+      <!-- Sub-tabs for Threats -->
+      <div class="sub-tab-nav">
+        <button
+          class="sub-tab-btn"
+          [class.active]="threatToolTab() === 'dashboard'"
+          (click)="threatToolTab.set('dashboard')"
+        >
+          📊 Tổng quan mối đe dọa
+        </button>
+        <button
+          class="sub-tab-btn"
+          [class.active]="threatToolTab() === 'assess'"
+          (click)="threatToolTab.set('assess')"
+        >
+          ⚡ Đánh giá nhanh
+        </button>
+        <button
+          class="sub-tab-btn"
+          [class.active]="threatToolTab() === 'ip'"
+          (click)="threatToolTab.set('ip')"
+        >
+          🌐 IP Intelligence
+        </button>
+      </div>
 
-        <div class="content-grid">
-          <!-- Threat Categories -->
-          <div class="card">
-            <div class="card-header">
-              <h3>⚡ Mối đe dọa theo loại (24h)</h3>
+      <!-- Dashboard Sub-tab -->
+      @if (threatToolTab() === 'dashboard') {
+        @if (threatOverview(); as threats) {
+          <!-- Threat Summary -->
+          <div class="stats-grid">
+            <div class="stat-card stat-red">
+              <div class="stat-icon">💀</div>
+              <div class="stat-info">
+                <span class="stat-value">{{ threats.summary.criticalCount }}</span>
+                <span class="stat-label">Critical</span>
+              </div>
             </div>
-            <div class="card-body">
-              @if (threats.categories.length > 0) {
-                @for (cat of threats.categories; track cat.type) {
-                  <div class="threat-row">
-                    <div class="threat-info">
-                      <span class="threat-type">{{ formatEventType(cat.type) }}</span>
-                      <div>
-                        <span
-                          class="badge"
-                          [class]="'severity-' + (cat.severity || 'info').toLowerCase()"
-                        >
-                          {{ cat.count }}
-                        </span>
+            <div class="stat-card stat-orange">
+              <div class="stat-icon">🔥</div>
+              <div class="stat-info">
+                <span class="stat-value">{{ threats.summary.highCount }}</span>
+                <span class="stat-label">High</span>
+              </div>
+            </div>
+            <div class="stat-card stat-blue">
+              <div class="stat-icon">🛑</div>
+              <div class="stat-info">
+                <span class="stat-value">{{ threats.summary.blockedCount }}</span>
+                <span class="stat-label">Bị chặn</span>
+              </div>
+            </div>
+            <div class="stat-card stat-purple">
+              <div class="stat-icon">⚡</div>
+              <div class="stat-info">
+                <span class="stat-value">{{ threats.summary.totalThreats }}</span>
+                <span class="stat-label">Tổng mối đe dọa</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="content-grid">
+            <!-- Threat Categories -->
+            <div class="card">
+              <div class="card-header">
+                <h3>⚡ Mối đe dọa theo loại (24h)</h3>
+              </div>
+              <div class="card-body">
+                @if (threats.categories.length > 0) {
+                  @for (cat of threats.categories; track cat.type) {
+                    <div class="threat-row">
+                      <div class="threat-info">
+                        <span class="threat-type">{{ formatEventType(cat.type) }}</span>
+                        <div>
+                          <span
+                            class="badge"
+                            [class]="'severity-' + (cat.severity || 'info').toLowerCase()"
+                          >
+                            {{ cat.count }}
+                          </span>
+                        </div>
+                      </div>
+                      <div class="threat-bar-bg">
+                        <div
+                          class="threat-bar"
+                          [style.width.%]="
+                            getThreatBarWidth(cat.count, threats.summary.totalThreats)
+                          "
+                        ></div>
                       </div>
                     </div>
-                    <div class="threat-bar-bg">
-                      <div
-                        class="threat-bar"
-                        [style.width.%]="getThreatBarWidth(cat.count, threats.summary.totalThreats)"
-                      ></div>
-                    </div>
+                  }
+                } @else {
+                  <div class="empty-state">
+                    <span class="empty-icon">✅</span>
+                    <span>Không phát hiện mối đe dọa trong 24h qua</span>
                   </div>
                 }
-              } @else {
-                <div class="empty-state">
-                  <span class="empty-icon">✅</span>
-                  <span>Không phát hiện mối đe dọa trong 24h qua</span>
-                </div>
-              }
+              </div>
+            </div>
+
+            <!-- Top IPs -->
+            <div class="card">
+              <div class="card-header">
+                <h3>🌐 Top IP nguy hiểm</h3>
+              </div>
+              <div class="card-body">
+                @if (threats.summary.topIps.length > 0) {
+                  <div class="table-wrapper">
+                    <table class="data-table">
+                      <thead>
+                        <tr>
+                          <th>IP Address</th>
+                          <th>Số vi phạm</th>
+                          <th>Hành động</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        @for (ip of threats.summary.topIps; track ip.ip) {
+                          <tr>
+                            <td class="ip-cell">{{ ip.ip }}</td>
+                            <td>
+                              <span class="badge severity-high">{{ ip.count }}</span>
+                            </td>
+                            <td>
+                              <button
+                                class="btn-sm btn-outline"
+                                (click)="
+                                  threatIpLookup = ip.ip; threatToolTab.set('ip'); quickIpLookup()
+                                "
+                              >
+                                🔍 Kiểm tra
+                              </button>
+                            </td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  </div>
+                } @else {
+                  <div class="empty-state">
+                    <span class="empty-icon">✅</span>
+                    <span>Không có IP đáng ngờ</span>
+                  </div>
+                }
+              </div>
             </div>
           </div>
 
-          <!-- Top IPs -->
-          <div class="card">
-            <div class="card-header">
-              <h3>🌐 Top IP nguy hiểm</h3>
-            </div>
-            <div class="card-body">
-              @if (threats.summary.topIps.length > 0) {
+          <!-- Recent Threat Events -->
+          @if (threats.categories.length > 0) {
+            <div class="card" style="margin-top: 1rem">
+              <div class="card-header">
+                <h3>📋 Sự kiện đe dọa gần đây</h3>
+              </div>
+              <div class="card-body">
                 <div class="table-wrapper">
                   <table class="data-table">
                     <thead>
                       <tr>
-                        <th>IP Address</th>
-                        <th>Số vi phạm</th>
+                        <th>Thời gian</th>
+                        <th>Loại</th>
+                        <th>IP</th>
+                        <th>User</th>
+                        <th>Risk</th>
+                        <th>Trạng thái</th>
                       </tr>
                     </thead>
                     <tbody>
-                      @for (ip of threats.summary.topIps; track ip.ip) {
-                        <tr>
-                          <td class="ip-cell">{{ ip.ip }}</td>
-                          <td>
-                            <span class="badge severity-high">{{ ip.count }}</span>
-                          </td>
-                        </tr>
+                      @for (cat of threats.categories; track cat.type) {
+                        @for (event of cat.events; track event.id) {
+                          <tr>
+                            <td>{{ formatDate(event.createdAt) }}</td>
+                            <td>
+                              <span
+                                class="badge"
+                                [class]="'severity-' + (event.severity || 'info').toLowerCase()"
+                              >
+                                {{ formatEventType(cat.type) }}
+                              </span>
+                            </td>
+                            <td class="ip-cell">{{ event.ipAddress || '-' }}</td>
+                            <td>{{ event.username || '-' }}</td>
+                            <td>
+                              @if (event.riskScore) {
+                                <span class="badge" [class]="getRiskScoreClass(event.riskScore)">
+                                  {{ event.riskScore }}
+                                </span>
+                              } @else {
+                                <span>-</span>
+                              }
+                            </td>
+                            <td>
+                              @if (event.isBlocked) {
+                                <span class="badge severity-critical">🛑 Bị chặn</span>
+                              } @else {
+                                <span class="badge severity-info">✅ Ghi nhận</span>
+                              }
+                            </td>
+                          </tr>
+                        }
                       }
                     </tbody>
                   </table>
                 </div>
-              } @else {
-                <div class="empty-state">
-                  <span class="empty-icon">✅</span>
-                  <span>Không có IP đáng ngờ</span>
-                </div>
-              }
+              </div>
             </div>
+          }
+        } @else if (!loading()) {
+          <div class="empty-state">
+            <span class="empty-icon">⚡</span>
+            <span>Không có dữ liệu mối đe dọa</span>
+          </div>
+        }
+      }
+
+      <!-- Quick Assessment Sub-tab -->
+      @if (threatToolTab() === 'assess') {
+        <div class="card">
+          <div class="card-header">
+            <h3>⚡ Đánh giá mối đe dọa nhanh</h3>
+            <p class="card-subtitle">Kiểm tra mức độ rủi ro từ IP, user agent, và context</p>
+          </div>
+          <div class="card-body">
+            <div class="form-grid">
+              <div class="form-group">
+                <label>IP Address *</label>
+                <input
+                  type="text"
+                  [(ngModel)]="threatAssessForm.ipAddress"
+                  placeholder="192.168.1.1"
+                />
+              </div>
+              <div class="form-group">
+                <label>Username</label>
+                <input type="text" [(ngModel)]="threatAssessForm.username" placeholder="admin" />
+              </div>
+              <div class="form-group">
+                <label>User Agent</label>
+                <input
+                  type="text"
+                  [(ngModel)]="threatAssessForm.userAgent"
+                  placeholder="Mozilla/5.0..."
+                />
+              </div>
+              <div class="form-group">
+                <label>Country</label>
+                <input type="text" [(ngModel)]="threatAssessForm.country" placeholder="VN" />
+              </div>
+              <div class="form-group">
+                <label>Request Path</label>
+                <input
+                  type="text"
+                  [(ngModel)]="threatAssessForm.requestPath"
+                  placeholder="/api/patients"
+                />
+              </div>
+            </div>
+            <div class="form-actions">
+              <button
+                class="btn btn-primary"
+                (click)="runQuickAssessment()"
+                [disabled]="loading() || !threatAssessForm.ipAddress.trim()"
+              >
+                ⚡ Đánh giá
+              </button>
+            </div>
+
+            @if (threatAssessResult(); as result) {
+              <div class="assess-result">
+                <div class="stats-grid">
+                  <div
+                    class="stat-card"
+                    [class.stat-red]="result.riskLevel === 'Critical'"
+                    [class.stat-orange]="result.riskLevel === 'High'"
+                    [class.stat-yellow]="result.riskLevel === 'Medium'"
+                    [class.stat-green]="result.riskLevel === 'Low'"
+                  >
+                    <div class="stat-icon">🎯</div>
+                    <div class="stat-info">
+                      <span class="stat-value">{{ result.riskScore }}</span>
+                      <span class="stat-label">Risk Score</span>
+                    </div>
+                  </div>
+                  <div class="stat-card">
+                    <div class="stat-icon">⚖️</div>
+                    <div class="stat-info">
+                      <span class="stat-value">
+                        <span class="badge" [class]="getRiskLevelClass(result.riskLevel)">{{
+                          result.riskLevel
+                        }}</span>
+                      </span>
+                      <span class="stat-label">Mức rủi ro</span>
+                    </div>
+                  </div>
+                  <div class="stat-card">
+                    <div class="stat-icon">📋</div>
+                    <div class="stat-info">
+                      <span class="stat-value">{{ result.recommendedAction }}</span>
+                      <span class="stat-label">Hành động đề xuất</span>
+                    </div>
+                  </div>
+                  <div class="stat-card">
+                    <div class="stat-icon">📡</div>
+                    <div class="stat-info">
+                      <span class="stat-value">{{ result.signals.length }}</span>
+                      <span class="stat-label">Tín hiệu phát hiện</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Risk Bar -->
+                <div class="card" style="margin-top: 1rem">
+                  <div class="card-body">
+                    <div class="risk-bar-section">
+                      <span class="risk-bar-label">Thang rủi ro:</span>
+                      <span class="risk-bar-value">{{ result.riskScore }} / 100</span>
+                    </div>
+                    <div class="risk-scale-bar">
+                      <div
+                        class="risk-scale-fill"
+                        [style.width.%]="getRiskBarWidth(result.riskScore)"
+                        [style.background]="
+                          result.riskScore >= 70
+                            ? '#ef4444'
+                            : result.riskScore >= 50
+                              ? '#f97316'
+                              : result.riskScore >= 25
+                                ? '#eab308'
+                                : '#22c55e'
+                        "
+                      ></div>
+                    </div>
+                    <div class="risk-scale-labels">
+                      <span>0 (An toàn)</span><span>25</span><span>50</span><span>75</span>
+                      <span>100 (Nguy hiểm)</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Signal Details -->
+                @if (result.signals.length > 0) {
+                  <div class="card signal-details-card">
+                    <div class="card-header">
+                      <h3>📡 Tín hiệu phát hiện ({{ result.signals.length }})</h3>
+                    </div>
+                    <div class="card-body">
+                      <div class="table-wrapper">
+                        <table class="data-table">
+                          <thead>
+                            <tr>
+                              <th>Tín hiệu</th>
+                              <th>Mô tả</th>
+                              <th>Điểm</th>
+                              <th>Chi tiết</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            @for (sig of result.signals; track sig.category) {
+                              <tr>
+                                <td>
+                                  <span class="badge severity-warning">{{ sig.category }}</span>
+                                </td>
+                                <td>{{ sig.description }}</td>
+                                <td>
+                                  <span
+                                    class="badge"
+                                    [class.severity-critical]="sig.score >= 30"
+                                    [class.severity-high]="sig.score >= 15 && sig.score < 30"
+                                    [class.severity-warning]="sig.score < 15"
+                                  >
+                                    +{{ sig.score }}
+                                  </span>
+                                </td>
+                                <td>{{ sig.details || '-' }}</td>
+                              </tr>
+                            }
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                }
+              </div>
+            }
           </div>
         </div>
-      } @else if (!loading()) {
-        <div class="empty-state">
-          <span class="empty-icon">⚡</span>
-          <span>Không có dữ liệu mối đe dọa</span>
+      }
+
+      <!-- IP Intelligence Sub-tab -->
+      @if (threatToolTab() === 'ip') {
+        <div class="card">
+          <div class="card-header">
+            <h3>🌐 IP Intelligence</h3>
+            <p class="card-subtitle">Kiểm tra danh tiếng và thông tin IP</p>
+          </div>
+          <div class="card-body">
+            <div class="search-form">
+              <div class="form-group">
+                <label>IP Address</label>
+                <input
+                  type="text"
+                  [(ngModel)]="threatIpLookup"
+                  placeholder="Nhập địa chỉ IP..."
+                  (keydown.enter)="quickIpLookup()"
+                />
+              </div>
+              <button
+                class="btn btn-primary"
+                (click)="quickIpLookup()"
+                [disabled]="loading() || !threatIpLookup.trim()"
+              >
+                🔍 Kiểm tra
+              </button>
+            </div>
+
+            @if (threatIpResult(); as ip) {
+              <div class="assess-result">
+                <!-- IP Header -->
+                <div class="stats-grid">
+                  <div
+                    class="stat-card"
+                    [class.stat-green]="ip.riskScore < 25"
+                    [class.stat-yellow]="ip.riskScore >= 25 && ip.riskScore < 50"
+                    [class.stat-red]="ip.riskScore >= 50"
+                  >
+                    <div class="stat-icon">🎯</div>
+                    <div class="stat-info">
+                      <span class="stat-value">{{ ip.riskScore }}</span>
+                      <span class="stat-label">Risk Score</span>
+                    </div>
+                  </div>
+                  <div class="stat-card">
+                    <div class="stat-icon">🌍</div>
+                    <div class="stat-info">
+                      <span class="stat-value">{{ ip.ipAddress }}</span>
+                      <span class="stat-label"
+                        >{{ ip.country || 'Unknown' }}{{ ip.city ? ', ' + ip.city : '' }}</span
+                      >
+                    </div>
+                  </div>
+                </div>
+
+                <!-- IP Flags -->
+                <div class="card ip-flags-card">
+                  <div class="card-header">
+                    <h3>🏷️ Flags</h3>
+                  </div>
+                  <div class="card-body">
+                    <div class="stats-grid">
+                      <div
+                        class="stat-card"
+                        [class.stat-red]="ip.isTor"
+                        [class.stat-green]="!ip.isTor"
+                      >
+                        <div class="stat-icon">🧅</div>
+                        <div class="stat-info">
+                          <span class="stat-value">{{ ip.isTor ? 'CÓ' : 'Không' }}</span>
+                          <span class="stat-label">Tor Exit Node</span>
+                        </div>
+                      </div>
+                      <div
+                        class="stat-card"
+                        [class.stat-orange]="ip.isVpn"
+                        [class.stat-green]="!ip.isVpn"
+                      >
+                        <div class="stat-icon">🔒</div>
+                        <div class="stat-info">
+                          <span class="stat-value">{{ ip.isVpn ? 'CÓ' : 'Không' }}</span>
+                          <span class="stat-label">VPN</span>
+                        </div>
+                      </div>
+                      <div
+                        class="stat-card"
+                        [class.stat-orange]="ip.isProxy"
+                        [class.stat-green]="!ip.isProxy"
+                      >
+                        <div class="stat-icon">🔄</div>
+                        <div class="stat-info">
+                          <span class="stat-value">{{ ip.isProxy ? 'CÓ' : 'Không' }}</span>
+                          <span class="stat-label">Proxy</span>
+                        </div>
+                      </div>
+                      <div
+                        class="stat-card"
+                        [class.stat-yellow]="ip.isHosting"
+                        [class.stat-green]="!ip.isHosting"
+                      >
+                        <div class="stat-icon">🖥️</div>
+                        <div class="stat-info">
+                          <span class="stat-value">{{ ip.isHosting ? 'CÓ' : 'Không' }}</span>
+                          <span class="stat-label">Hosting/DC</span>
+                        </div>
+                      </div>
+                      <div
+                        class="stat-card"
+                        [class.stat-red]="ip.isKnownAttacker"
+                        [class.stat-green]="!ip.isKnownAttacker"
+                      >
+                        <div class="stat-icon">☠️</div>
+                        <div class="stat-info">
+                          <span class="stat-value">{{ ip.isKnownAttacker ? 'CÓ' : 'Không' }}</span>
+                          <span class="stat-label">Known Attacker</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
         </div>
       }
     </div>
@@ -1303,12 +1742,16 @@
           @if (showLockForm()) {
             <div class="inline-form">
               <div class="form-row">
-                <input
-                  type="text"
+                <select
                   class="input-field"
-                  placeholder="User ID"
                   [(ngModel)]="lockForm.userId"
-                />
+                  (ngModelChange)="onUserSelected($event)"
+                >
+                  <option value="" disabled>-- Chọn người dùng --</option>
+                  @for (u of users(); track u.id) {
+                    <option [value]="u.id">{{ u.fullName || u.username }} ({{ u.role }})</option>
+                  }
+                </select>
                 <input
                   type="text"
                   class="input-field"
@@ -1413,6 +1856,67 @@
   <!-- ═══════════════════════════════════════════════════ -->
   @if (activeTab() === 'ip-whitelist') {
     <div class="tab-content">
+      <!-- Warning Banner -->
+      <div
+        class="alert alert-warning"
+        style="
+          background: #fff3cd;
+          border: 1px solid #ffc107;
+          border-radius: 8px;
+          padding: 16px;
+          margin-bottom: 16px;
+          display: flex;
+          align-items: flex-start;
+          gap: 12px;
+        "
+      >
+        <span style="font-size: 24px">⚠️</span>
+        <div>
+          <strong style="color: #856404">Cảnh báo quan trọng về IP Whitelist</strong>
+          <p style="margin: 8px 0 0; color: #856404; font-size: 13px; line-height: 1.5">
+            Khi bật IP Whitelist,
+            <strong>chỉ các IP trong danh sách mới được truy cập hệ thống</strong>. Nếu bạn quên
+            thêm IP của mình, bạn sẽ bị khóa khỏi hệ thống. Hãy đảm bảo thêm IP hiện tại (<strong>{{
+              publicIp() || '::1'
+            }}</strong
+            >) trước khi kích hoạt. Trong môi trường phát triển (localhost), IP loopback (::1,
+            127.0.0.1) luôn được cho phép.
+          </p>
+        </div>
+      </div>
+
+      @if (ipWhitelist().length > 0 && !isCurrentIpWhitelisted()) {
+        <div
+          class="alert alert-danger"
+          style="
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+          "
+        >
+          <span style="font-size: 24px">🚫</span>
+          <div>
+            <strong style="color: #721c24">IP hiện tại chưa được thêm vào whitelist!</strong>
+            <p style="margin: 8px 0 0; color: #721c24; font-size: 13px">
+              IP <strong>{{ publicIp() || '::1' }}</strong> chưa có trong danh sách cho phép. Khi
+              triển khai production, bạn sẽ bị chặn truy cập nếu chưa thêm IP này.
+            </p>
+            <button
+              class="btn btn-sm btn-danger"
+              style="margin-top: 8px"
+              (click)="newIp = publicIp() || ''; addIpToWhitelist()"
+            >
+              🛡️ Thêm IP hiện tại ngay
+            </button>
+          </div>
+        </div>
+      }
+
       <div class="card">
         <div class="card-header">
           <h3>🌐 IP Whitelist</h3>
@@ -1420,6 +1924,16 @@
         <div class="card-body">
           <!-- Add IP Form -->
           <div class="whitelist-form">
+            @if (publicIp()) {
+              <div class="form-row">
+                <span class="text-muted text-xs"
+                  >IP công khai hiện tại: <strong>{{ publicIp() }}</strong></span
+                >
+                <button class="btn btn-sm btn-outline" (click)="newIp = publicIp()">
+                  📋 Dùng IP này
+                </button>
+              </div>
+            }
             <div class="form-row">
               <input
                 type="text"

@@ -20,6 +20,7 @@
 12. [Quản lý thiết bị & phiên](#12-quản-lý-thiết-bị--phiên)
 13. [Cấu hình & triển khai](#13-cấu-hình--triển-khai)
 14. [Tích hợp Zero Trust](#14-tích-hợp-zero-trust)
+15. [Enterprise Security (Google/Microsoft/AWS)](#15-enterprise-security-googlemicrosoftaws)
 
 ---
 
@@ -32,14 +33,22 @@
 │                    Angular 21 Frontend                  │
 │  AdvancedSecurityComponent (10 tabs, standalone)        │
 │  ├── AdvancedSecurityService (HTTP client)              │
-│  ├── AuthService (JWT user context, auto-populate)      │
+│  ├── AuthService (JWT + session binding)                │
+│  ├── SecurityInterceptor (ZT headers)                   │
 │  └── SecurityService (security events)                  │
 └────────────────────────┬────────────────────────────────┘
-                         │ HTTP (JWT Bearer)
+                         │ HTTP (JWT RS256 Bearer)
+                         │ + X-Device-Fingerprint
+                         │ + X-Session-Id
+                         │ + X-Correlation-Id
                          ▼
 ┌─────────────────────────────────────────────────────────┐
 │              .NET 10 Minimal API                        │
 │  /api/security/advanced/* (AdminOnly policy)            │
+│  ├── JwtKeyService (RSA 3072-bit, RS256 signing)       │
+│  ├── TokenBindingMiddleware (device/session validation) │
+│  ├── RefreshTokenFamilyService (reuse detection)       │
+│  ├── PasswordPolicyService (NIST SP 800-63B)           │
 │  ├── Fido2 (WebAuthn / Passkeys)                       │
 │  ├── Otp.NET (TOTP generation & validation)             │
 │  ├── SecurityEvent (audit trail, 40+ event types)      │
@@ -61,7 +70,7 @@
 | ORM            | EF Core + Npgsql              | 10.0          |
 | Frontend       | Angular Standalone Components | 21            |
 | UI             | Tailwind CSS                  | 4.2           |
-| Auth           | JWT Bearer + Refresh Token    | HS256, 60 min |
+| Auth           | JWT Bearer + Refresh Token    | **RS256** (asymmetric), 60 min |
 | Database       | PostgreSQL                    | 16            |
 
 ### Phân quyền
@@ -830,9 +839,13 @@ Endpoint passkeys inject `IFido2` từ DI thay vì tạo instance thủ công.
 Middleware `SecurityEnforcementMiddleware` thực thi IP whitelist và geo-blocking ở mức network boundary:
 
 ```
-Request Pipeline:
-  CORS → SecurityEnforcement → VaultToken → ApiKey → Authentication → Authorization → ZeroTrust → RateLimiter → Endpoints
+Request Pipeline (Enterprise-grade ordering):
+  CORS → ExceptionHandler → SecurityHeaders → RateLimiter → SecurityEnforcement
+       → VaultToken → ApiKey → Authentication → Authorization
+       → TokenBinding → ZeroTrust → Endpoints
 ```
+
+> **Lưu ý quan trọng:** `RateLimiter` đặt **trước** Authentication (chuẩn Google/AWS) để ngăn DDoS trên endpoint xác thực. `TokenBinding` đặt **sau** Authorization để validate JWT claims match request context.
 
 **IP Whitelist Enforcement:**
 
@@ -907,13 +920,13 @@ Module bảo mật nâng cao là thành phần chính trong kiến trúc Zero Tr
 
 ### 14.1 Mapping CISA Zero Trust Maturity
 
-| Pillar       | Tính năng trong module                                     | Level    |
-| ------------ | ---------------------------------------------------------- | -------- |
-| Identity     | MFA (TOTP + SMS + Passkey), account lockout, login history | Advanced |
-| Devices      | Device fingerprinting, trust scoring, registration         | Advanced |
-| Networks     | Rate limiting, IP whitelist, geo-fencing                   | Advanced |
-| Applications | AdminOnly policy, per-endpoint rate limits                 | Optimal  |
-| Data         | Audit trail (SecurityEvent), threat indicators             | Advanced |
+| Pillar       | Tính năng trong module                                                                         | Level    |
+| ------------ | ---------------------------------------------------------------------------------------------- | -------- |
+| Identity     | MFA (TOTP + SMS + Passkey), RS256 JWT, token binding, password policy (NIST 800-63B)          | Optimal  |
+| Devices      | Device fingerprinting, trust scoring, token-device binding, proof-of-possession               | Optimal  |
+| Networks     | Rate limiting (before auth), IP whitelist, geo-fencing, CIDR support                          | Optimal  |
+| Applications | AdminOnly policy, per-endpoint rate limits, refresh token reuse detection                     | Optimal  |
+| Data         | Audit trail (SecurityEvent), threat indicators, asymmetric signing (forgery-proof)            | Optimal  |
 
 ### 14.2 MITRE ATT&CK Coverage
 
@@ -943,3 +956,334 @@ Module bảo mật nâng cao là thành phần chính trong kiến trúc Zero Tr
 - [Vault Integration Guide](vault_integration_guide.md) — Quản lý secrets & tokens
 - [Digital Signing](digital_signing.md) — Ký số PDF
 - [Developer Guide](developer_guide.md) — Hướng dẫn phát triển tổng thể
+
+---
+
+## 15. Enterprise Security (Google/Microsoft/AWS)
+
+> Nâng cấp bảo mật đạt chuẩn enterprise theo Google BeyondCorp, Microsoft Entra ID và AWS IAM.
+
+### 15.1 JWT RS256 Asymmetric Signing
+
+> `src/IVF.API/Services/JwtKeyService.cs`
+
+**Trước:** HS256 (symmetric) — nếu secret key bị lộ, attacker có thể tạo token giả mạo bất kỳ.
+
+**Sau:** RS256 (asymmetric, RSA 3072-bit) — chỉ private key mới ký được token. Kể cả khi validation key bị lộ, token cũng không thể bị giả mạo.
+
+#### Kiến trúc
+
+```
+┌─────────────────────────────────────────────────┐
+│              JwtKeyService (Singleton)            │
+│  ┌─────────────────────────────────────────────┐ │
+│  │  RSA 3072-bit Key Pair                      │ │
+│  │  ├── Private Key (jwt-private.pem)          │ │
+│  │  │   → Ký token (chỉ server sử dụng)       │ │
+│  │  └── Public Key (derived)                   │ │
+│  │      → Xác thực token (có thể chia sẻ)     │ │
+│  └─────────────────────────────────────────────┘ │
+│  SigningCredentials: RS256 + KeyId (SHA256)       │
+│  ValidationKey: RSA Public Key                    │
+└─────────────────────────────────────────────────┘
+```
+
+#### Cấu hình
+
+```json
+{
+  "JwtSettings": {
+    "RsaKeysPath": "keys/jwt",
+    "Issuer": "IVF-System",
+    "Audience": "IVF-Client"
+  }
+}
+```
+
+- Key tự động tạo lần đầu khởi động, lưu tại `keys/jwt/jwt-private.pem`
+- File được đặt thuộc tính `ReadOnly | Hidden`
+- NIST khuyến nghị RSA 3072-bit cho hệ thống hoạt động sau 2030
+- Có `KeyId` (SHA256 của public modulus) hỗ trợ key rotation
+
+#### API Chống Algorithm Confusion
+
+```csharp
+TokenValidationParameters = new TokenValidationParameters
+{
+    ValidAlgorithms = new[] { SecurityAlgorithms.RsaSha256 },
+    // ... chỉ chấp nhận RS256, chặn HS256/none attack
+}
+```
+
+#### So sánh với Enterprise Standards
+
+| Tiêu chí              | HS256 (cũ)          | RS256 (hiện tại)       | Google/Microsoft   |
+| --------------------- | ------------------- | ---------------------- | ------------------ |
+| Loại key              | Symmetric (shared)  | Asymmetric (pub/priv)  | Asymmetric         |
+| Key size              | 256-bit             | 3072-bit               | 2048-4096 bit      |
+| Token forgery risk    | Cao (key lộ = done) | Không (cần private)    | Không              |
+| Key rotation          | Khó (toàn hệ thống) | Dễ (KeyId-based)       | Tự động            |
+| Algorithm confusion   | Dễ tấn công         | Chặn (ValidAlgorithms) | Chặn               |
+
+---
+
+### 15.2 Refresh Token Family Detection (RFC 6749 §10.4)
+
+> `src/IVF.API/Services/RefreshTokenFamilyService.cs`
+
+Phát hiện tấn công refresh token reuse — khi attacker đánh cắp refresh token và cả attacker lẫn nạn nhân đều sử dụng nó.
+
+#### Cách hoạt động
+
+```
+Login → Token Family A created
+  │
+  ├─ Refresh #1: Token A₁ → A₂ (A₁ marked as used)
+  │
+  ├─ Refresh #2: Token A₂ → A₃ (A₂ marked as used)
+  │
+  └─ ⚠️ Attacker replays A₁ (already used!)
+     → REUSE DETECTED → Revoke entire Family A
+     → Revoke user's refresh token in DB
+     → Log Critical security event
+     → 401 TOKEN_REUSE_DETECTED
+```
+
+#### API
+
+```csharp
+// Đăng ký token mới khi login/refresh
+tokenFamily.RegisterToken(userId, refreshToken, previousToken: null); // login
+tokenFamily.RegisterToken(userId, newToken, previousToken);          // refresh
+
+// Validate trước khi chấp nhận refresh
+var validation = tokenFamily.ValidateToken(refreshToken);
+if (validation.IsReuse)
+{
+    tokenFamily.RevokeFamily(validation.FamilyId!);
+    // Revoke user session + log critical event
+}
+```
+
+#### Tích hợp endpoints
+
+| Endpoint                            | Hành động                                           |
+| ----------------------------------- | --------------------------------------------------- |
+| `POST /api/auth/login`              | `RegisterToken(userId, refreshToken, null)`          |
+| `POST /api/auth/refresh`            | `ValidateToken()` → `RegisterToken()` nếu hợp lệ   |
+| `POST /api/auth/mfa-verify`         | `RegisterToken(userId, refreshToken, null)`          |
+| `POST /api/auth/passkey-login`      | `RegisterToken(userId, refreshToken, null)`          |
+
+#### So sánh
+
+| Tiêu chí            | Trước                   | Sau (RFC 6749)                        | Google/Microsoft        |
+| -------------------- | ----------------------- | ------------------------------------- | ----------------------- |
+| Token reuse          | Không phát hiện         | Phát hiện + revoke cả family          | Phát hiện + revoke      |
+| Token lineage        | Không theo dõi          | Family → Used → Active tracking       | Family tracking         |
+| Stolen token impact  | Vĩnh viễn (7 ngày)     | Bị phát hiện ngay khi reuse           | Tương tự                |
+
+---
+
+### 15.3 Token Binding Middleware (Microsoft CAE Pattern)
+
+> `src/IVF.API/Middleware/TokenBindingMiddleware.cs`
+
+Xác thực rằng JWT claims khớp với request context thực tế. Ngăn chặn stolen token được sử dụng trên thiết bị khác.
+
+#### Validation Flow
+
+```
+Request → TokenBindingMiddleware
+  │
+  ├─ Extract JWT claims: device_fingerprint, session_id, jti
+  │
+  ├─ Compare device_fingerprint claim vs X-Device-Fingerprint header
+  │   └─ Mismatch → Log warning (drift detection)
+  │
+  ├─ Store session_id → context.Items["TokenSessionId"]
+  │   └─ ZeroTrust middleware sẽ validate session còn active
+  │
+  └─ Store jti → context.Items["TokenJti"]
+      └─ Hỗ trợ token revocation kiểm tra
+```
+
+#### JWT Claims được bind
+
+| Claim              | Mô tả                      | Validation                     |
+| ------------------ | --------------------------- | ------------------------------ |
+| `device_fingerprint` | Fingerprint thiết bị gốc  | So sánh X-Device-Fingerprint   |
+| `session_id`        | Session ID tại thời điểm login | Truyền cho ZeroTrust validate |
+| `jti`               | JWT unique ID              | Hỗ trợ token revocation        |
+| `iat`               | Issued-at timestamp        | Kiểm tra freshness             |
+
+#### Exempt Paths
+
+```
+/api/auth/login, /api/auth/refresh, /api/auth/mfa-verify,
+/api/auth/mfa-send-sms, /api/auth/passkey-login,
+/health, /healthz, /swagger, /hubs/*
+```
+
+---
+
+### 15.4 Password Policy Engine (NIST SP 800-63B)
+
+> `src/IVF.API/Services/PasswordPolicyService.cs`
+
+Tuân thủ đầy đủ NIST Special Publication 800-63B — Digital Identity Guidelines.
+
+#### Quy tắc validation
+
+| Quy tắc                    | Giá trị             | Chuẩn NIST             |
+| --------------------------- | ------------------- | ---------------------- |
+| Độ dài tối thiểu            | 10 ký tự            | ≥8 (khuyến nghị ≥10)  |
+| Độ dài tối đa               | 128 ký tự           | ≥64                   |
+| Complexity categories       | 3/4 required        | Khuyến nghị            |
+| Banned passwords            | 50+ common passwords | Bắt buộc              |
+| Username similarity         | Blocked             | Bắt buộc              |
+| Repetitive patterns         | Blocked (aaa, 111)  | Khuyến nghị            |
+| Sequential patterns         | Blocked (abc, 123)  | Khuyến nghị            |
+
+#### Complexity Categories
+
+- Chữ hoa (A-Z)
+- Chữ thường (a-z)
+- Số (0-9)
+- Ký tự đặc biệt (!@#$%^&*...)
+
+→ Cần ít nhất **3 trong 4** loại.
+
+#### Entropy Scoring
+
+| Strength    | Entropy (bits) | Mô tả                    |
+| ----------- | -------------- | ------------------------ |
+| VeryWeak    | < 28           | Không chấp nhận          |
+| Weak        | 28–35          | Không chấp nhận          |
+| Fair        | 36–59          | Tối thiểu chấp nhận     |
+| Strong      | 60–80          | Tốt                     |
+| VeryStrong  | > 80           | Xuất sắc                 |
+
+#### API Usage
+
+```csharp
+var result = passwordPolicy.Validate(password, username);
+// result.IsValid      — true/false
+// result.Errors       — string[] chi tiết lỗi
+// result.Strength     — VeryWeak → VeryStrong
+// result.EntropyBits  — entropy tính bằng bit
+```
+
+#### Banned Password List (trích)
+
+```
+password, 123456, qwerty, admin, letmein, welcome,
+monkey, dragon, master, 1234567890, abc123, ...
+```
+
+---
+
+### 15.5 Frontend Security Hardening
+
+#### Security Interceptor
+
+> `ivf-client/src/app/core/interceptors/security.interceptor.ts`
+
+Tự động gắn security headers vào mọi HTTP request:
+
+| Header               | Mô tả                          | Pattern                     |
+| -------------------- | ------------------------------ | --------------------------- |
+| `X-Device-Fingerprint` | Fingerprint thiết bị (hash)  | Deterministic từ browser signals |
+| `X-Session-Id`        | Session ID từ JWT             | Lưu sessionStorage          |
+| `X-Correlation-Id`    | Request tracing ID            | Timestamp + random          |
+| `X-Requested-With`    | CSRF protection               | `XMLHttpRequest`            |
+
+#### Session Binding
+
+> `ivf-client/src/app/core/services/auth.service.ts`
+
+Sau khi login thành công:
+1. Decode JWT payload (Base64)
+2. Extract `session_id` claim
+3. Lưu vào `sessionStorage['zt_session_id']`
+4. Security interceptor tự động gắn vào header `X-Session-Id`
+
+Khi logout:
+- Xóa `zt_session_id` và `zt_device_fingerprint` khỏi sessionStorage
+- Xóa tokens và user data khỏi localStorage
+
+#### Device Fingerprint Generation
+
+Tính từ các tín hiệu browser (không thu thập PII):
+
+```
+navigator.userAgent + navigator.language + navigator.platform
++ Intl.DateTimeFormat().resolvedOptions().timeZone
++ screen.width + "x" + screen.height
+→ simpleHash() → 8-char hex string
+→ Cache trong sessionStorage['zt_device_fingerprint']
+```
+
+---
+
+### 15.6 Middleware Pipeline (Enterprise Order)
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  1. CORS                    — Cross-origin handling          │
+│  2. ExceptionHandler        — Global error handling          │
+│  3. SecurityHeaders         — OWASP A+ headers               │
+│     ├── X-Content-Type-Options: nosniff                      │
+│     ├── X-Frame-Options: DENY                                │
+│     ├── Strict-Transport-Security: max-age=31536000          │
+│     ├── Content-Security-Policy                              │
+│     ├── Referrer-Policy: strict-origin-when-cross-origin     │
+│     └── Permissions-Policy                                   │
+│  4. RateLimiter ⚡          — TRƯỚC auth (chặn DDoS)         │
+│  5. SecurityEnforcement     — IP whitelist + geo-blocking    │
+│  6. VaultToken Auth         — X-Vault-Token middleware       │
+│  7. ApiKey Auth             — X-API-Key middleware           │
+│  8. Authentication          — JWT Bearer validation (RS256)  │
+│  9. Authorization           — Role/policy checks             │
+│ 10. TokenBinding 🆕        — Device + session claim binding  │
+│ 11. ZeroTrust              — Adaptive risk assessment        │
+│ 12. Endpoints              — Minimal API handlers            │
+└──────────────────────────────────────────────────────────────┘
+```
+
+> **Key insight:** RateLimiter đặt ở vị trí 4 (trước Authentication) theo chuẩn Google Cloud & AWS API Gateway — ngăn chặn DDoS tấn công endpoint xác thực. TokenBinding đặt ở vị trí 10 (sau Authorization) để validate JWT claims match request context.
+
+---
+
+### 15.7 So sánh với Enterprise Standards
+
+#### Google BeyondCorp
+
+| Tiêu chí                           | IVF System                           | Google BeyondCorp        | Đạt? |
+| ----------------------------------- | ------------------------------------ | ------------------------ | ---- |
+| Device trust required               | ✅ DeviceFingerprint + trust scoring | Device inventory         | ✅   |
+| User identity verification          | ✅ MFA (TOTP + SMS + Passkey)        | 2FA mandatory            | ✅   |
+| Context-aware access                | ✅ ZeroTrust middleware + risk score | Access Context Manager   | ✅   |
+| No VPN dependency                   | ✅ Token-based, no VPN needed        | No VPN                   | ✅   |
+| Continuous verification             | ✅ Per-request TokenBinding          | Continuous evaluation    | ✅   |
+
+#### Microsoft Entra ID / Azure AD
+
+| Tiêu chí                           | IVF System                           | Microsoft Entra          | Đạt? |
+| ----------------------------------- | ------------------------------------ | ------------------------ | ---- |
+| Conditional Access Evaluation (CAE) | ✅ TokenBindingMiddleware            | CAE                      | ✅   |
+| Passwordless auth                   | ✅ Passkeys/WebAuthn (FIDO2)         | Windows Hello, FIDO2     | ✅   |
+| Asymmetric token signing            | ✅ RS256 (RSA 3072-bit)              | RS256                    | ✅   |
+| Token reuse detection               | ✅ RefreshTokenFamilyService         | Token protection         | ✅   |
+| Risk-based session management       | ✅ Adaptive sessions + risk scoring  | Identity Protection      | ✅   |
+| Session binding                     | ✅ Device + session JWT claims       | Token binding            | ✅   |
+
+#### AWS IAM / Cognito
+
+| Tiêu chí                           | IVF System                           | AWS                      | Đạt? |
+| ----------------------------------- | ------------------------------------ | ------------------------ | ---- |
+| Rate limiting before auth           | ✅ Pipeline position 4               | API Gateway throttling   | ✅   |
+| Password policy (NIST 800-63B)      | ✅ PasswordPolicyService             | Cognito password policy  | ✅   |
+| Geo-blocking                        | ✅ GeoBlockRules + enforcement       | WAF geo-blocking         | ✅   |
+| IP allowlisting                     | ✅ CIDR support + expiry             | Security groups          | ✅   |
+| Threat detection                    | ✅ 40+ event types, MITRE ATT&CK    | GuardDuty                | ✅   |
+| Audit logging                       | ✅ SecurityEvent (partitioned)       | CloudTrail               | ✅   |
