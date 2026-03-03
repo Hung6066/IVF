@@ -1041,53 +1041,83 @@ public static class AdvancedSecurityEndpoints
 
             var since24h = DateTime.UtcNow.AddHours(-24);
             var highSeverity = await securityEvents.GetHighSeverityEventsAsync(since24h);
-            var hasAuditLogging = true; // Always enabled
+            var hasAuditLogging = true;
             var auditEvents24h = highSeverity.Count;
+
+            // Enterprise user management stats
+            var activeSessions = await db.UserSessions.CountAsync(s => !s.IsRevoked && !s.IsDeleted && s.ExpiresAt > DateTime.UtcNow);
+            var totalLogins24h = await db.UserLoginHistories.CountAsync(h => h.LoginAt >= since24h && !h.IsDeleted);
+            var failedLogins24h = await db.UserLoginHistories.CountAsync(h => h.LoginAt >= since24h && !h.IsSuccess && !h.IsDeleted);
+            var suspiciousLogins24h = await db.UserLoginHistories.CountAsync(h => h.LoginAt >= since24h && h.IsSuspicious && !h.IsDeleted);
+            var totalConsents = await db.UserConsents.CountAsync(c => !c.IsDeleted);
+            var activeConsents = await db.UserConsents.CountAsync(c => c.IsGranted && !c.IsDeleted && (c.ExpiresAt == null || c.ExpiresAt > DateTime.UtcNow));
+            var totalGroups = await db.UserGroups.CountAsync(g => g.IsActive && !g.IsDeleted);
+            var sessionEnforced = activeSessions <= totalUsers * 3; // max 3 per user
 
             // HIPAA compliance checks
             var checks = new List<object>();
 
             // 1. Access Control (§164.312(a))
             var accessControlScore = 0;
-            if (totalUsers > 0 && mfaEnabled > 0) accessControlScore += 25;
-            if (passkeys > 0) accessControlScore += 25;
-            if (ztPolicies > 0) accessControlScore += 25;
-            if (rateLimitPolicies >= 3) accessControlScore += 25;
-            checks.Add(new { id = "access_control", name = "Kiểm soát truy cập", standard = "HIPAA §164.312(a)", score = accessControlScore, maxScore = 100, status = accessControlScore >= 75 ? "pass" : accessControlScore >= 50 ? "warning" : "fail", details = $"MFA: {mfaEnabled}/{totalUsers} users, Passkeys: {passkeys}, ZT Policies: {ztPolicies}" });
+            if (totalUsers > 0 && mfaEnabled > 0) accessControlScore += 20;
+            if (passkeys > 0) accessControlScore += 20;
+            if (ztPolicies > 0) accessControlScore += 20;
+            if (rateLimitPolicies >= 3) accessControlScore += 20;
+            if (totalGroups > 0) accessControlScore += 20; // Group-based access control
+            checks.Add(new { id = "access_control", name = "Kiểm soát truy cập", standard = "HIPAA §164.312(a)", score = Math.Min(accessControlScore, 100), maxScore = 100, status = accessControlScore >= 75 ? "pass" : accessControlScore >= 50 ? "warning" : "fail", details = $"MFA: {mfaEnabled}/{totalUsers} users, Passkeys: {passkeys}, ZT: {ztPolicies}, Nhóm: {totalGroups}" });
 
-            // 2. Audit Controls (§164.312(b))
-            var auditScore = hasAuditLogging ? 50 : 0;
-            if (auditEvents24h > 0) auditScore += 25;
-            if (highSeverity.Any(e => e.IsBlocked)) auditScore += 25;
-            checks.Add(new { id = "audit_controls", name = "Kiểm soát kiểm toán", standard = "HIPAA §164.312(b)", score = auditScore, maxScore = 100, status = auditScore >= 75 ? "pass" : auditScore >= 50 ? "warning" : "fail", details = $"Audit logging: Active, Events 24h: {auditEvents24h}, Blocked threats: {highSeverity.Count(e => e.IsBlocked)}" });
+            // 2. Audit Controls (§164.312(b)) — enhanced with login history
+            var auditScore = hasAuditLogging ? 30 : 0;
+            if (auditEvents24h > 0) auditScore += 20;
+            if (highSeverity.Any(e => e.IsBlocked)) auditScore += 20;
+            if (totalLogins24h > 0) auditScore += 15; // Login history tracking active
+            if (failedLogins24h < totalLogins24h) auditScore += 15; // Failure tracking
+            checks.Add(new { id = "audit_controls", name = "Kiểm soát kiểm toán", standard = "HIPAA §164.312(b)", score = Math.Min(auditScore, 100), maxScore = 100, status = auditScore >= 75 ? "pass" : auditScore >= 50 ? "warning" : "fail", details = $"Audit: Active, Events 24h: {auditEvents24h}, Đăng nhập 24h: {totalLogins24h}, Thất bại: {failedLogins24h}, Đáng ngờ: {suspiciousLogins24h}" });
 
             // 3. Integrity Controls (§164.312(c))
-            var integrityScore = 50; // Base — encryption at rest (DB)
+            var integrityScore = 50;
             if (ipWhitelist > 0) integrityScore += 25;
             if (geoRules > 0) integrityScore += 25;
-            checks.Add(new { id = "integrity", name = "Kiểm soát toàn vẹn", standard = "HIPAA §164.312(c)", score = integrityScore, maxScore = 100, status = integrityScore >= 75 ? "pass" : integrityScore >= 50 ? "warning" : "fail", details = $"Encryption: Active, IP Whitelist: {ipWhitelist} entries, Geo Rules: {geoRules}" });
+            checks.Add(new { id = "integrity", name = "Kiểm soát toàn vẹn", standard = "HIPAA §164.312(c)", score = Math.Min(integrityScore, 100), maxScore = 100, status = integrityScore >= 75 ? "pass" : integrityScore >= 50 ? "warning" : "fail", details = $"Encryption: Active, IP Whitelist: {ipWhitelist}, Geo Rules: {geoRules}" });
 
             // 4. Transmission Security (§164.312(e))
-            var transmissionScore = 75; // HTTPS enforced + JWT
+            var transmissionScore = 75;
             if (rateLimitPolicies > 0) transmissionScore += 25;
             checks.Add(new { id = "transmission", name = "Bảo mật truyền tải", standard = "HIPAA §164.312(e)", score = Math.Min(transmissionScore, 100), maxScore = 100, status = transmissionScore >= 75 ? "pass" : "warning", details = "HTTPS: Enforced, JWT RS256: Active, Rate Limiting: Active" });
 
-            // 5. Person Authentication (§164.312(d))
+            // 5. Person Authentication (§164.312(d)) — enhanced with session management
             var authScore = 0;
-            if (mfaEnabled > 0) authScore += 40;
-            if (passkeys > 0) authScore += 30;
-            if (trustedDevices > 0) authScore += 30;
-            checks.Add(new { id = "authentication", name = "Xác thực người dùng", standard = "HIPAA §164.312(d)", score = Math.Min(authScore, 100), maxScore = 100, status = authScore >= 75 ? "pass" : authScore >= 50 ? "warning" : "fail", details = $"MFA Users: {mfaEnabled}, Passkeys: {passkeys}, Trusted Devices: {trustedDevices}" });
+            if (mfaEnabled > 0) authScore += 30;
+            if (passkeys > 0) authScore += 25;
+            if (trustedDevices > 0) authScore += 20;
+            if (sessionEnforced) authScore += 25; // Session limit enforcement
+            checks.Add(new { id = "authentication", name = "Xác thực người dùng", standard = "HIPAA §164.312(d)", score = Math.Min(authScore, 100), maxScore = 100, status = authScore >= 75 ? "pass" : authScore >= 50 ? "warning" : "fail", details = $"MFA: {mfaEnabled}, Passkeys: {passkeys}, Thiết bị tin cậy: {trustedDevices}, Phiên hoạt động: {activeSessions}" });
 
             // 6. Incident Response (§164.308(a)(6))
             var incidentScore = 0;
             var blockedThreats = highSeverity.Count(e => e.IsBlocked);
             if (hasAuditLogging) incidentScore += 30;
-            if (blockedThreats > 0) incidentScore += 30; // Active blocking = incident response
+            if (blockedThreats > 0) incidentScore += 30;
             var lockouts = await db.AccountLockouts.CountAsync(l => !l.IsDeleted && l.UnlocksAt > DateTime.UtcNow);
-            if (lockouts >= 0) incidentScore += 20; // Auto-lockout = incident response
+            if (lockouts >= 0) incidentScore += 20;
             if (rateLimitPolicies >= 3) incidentScore += 20;
             checks.Add(new { id = "incident_response", name = "Phản ứng sự cố", standard = "HIPAA §164.308(a)(6)", score = Math.Min(incidentScore, 100), maxScore = 100, status = incidentScore >= 75 ? "pass" : incidentScore >= 50 ? "warning" : "fail", details = $"Auto-blocking: Active, Lockouts: {lockouts}, Rate Limits: {rateLimitPolicies}" });
+
+            // 7. Consent Management (§164.530) — NEW from enterprise user mgmt
+            var consentScore = 0;
+            if (totalConsents > 0) consentScore += 40; // Consent system in use
+            if (activeConsents > 0) consentScore += 30; // Active consents exist
+            var consentCoverage = totalUsers > 0 ? (double)await db.UserConsents.Where(c => c.IsGranted && !c.IsDeleted).Select(c => c.UserId).Distinct().CountAsync() / totalUsers * 100 : 0;
+            if (consentCoverage >= 50) consentScore += 30;
+            checks.Add(new { id = "consent_management", name = "Quản lý đồng ý", standard = "HIPAA §164.530", score = Math.Min(consentScore, 100), maxScore = 100, status = consentScore >= 75 ? "pass" : consentScore >= 50 ? "warning" : "fail", details = $"Tổng đồng ý: {totalConsents}, Còn hiệu lực: {activeConsents}, Phủ sóng: {consentCoverage:F0}%" });
+
+            // 8. Session Management (§164.312(a)(2)(iii)) — NEW
+            var sessionScore = 0;
+            if (sessionEnforced) sessionScore += 40;
+            if (activeSessions > 0) sessionScore += 30; // Tracking active
+            var revokedSessions = await db.UserSessions.CountAsync(s => s.IsRevoked && !s.IsDeleted);
+            if (revokedSessions > 0) sessionScore += 30; // Revocation functioning
+            checks.Add(new { id = "session_management", name = "Quản lý phiên", standard = "HIPAA §164.312(a)(2)(iii)", score = Math.Min(sessionScore, 100), maxScore = 100, status = sessionScore >= 75 ? "pass" : sessionScore >= 50 ? "warning" : "fail", details = $"Phiên hoạt động: {activeSessions}, Đã thu hồi: {revokedSessions}, Giới hạn: 3/user" });
 
             var overallScore = checks.Count > 0 ? (int)Math.Round(checks.Average(c => (int)((dynamic)c).score)) : 0;
 
@@ -1097,6 +1127,18 @@ public static class AdvancedSecurityEndpoints
                 level = overallScore >= 80 ? "compliant" : overallScore >= 60 ? "partial" : "non_compliant",
                 framework = "HIPAA",
                 checks,
+                enterpriseStats = new
+                {
+                    activeSessions,
+                    totalLogins24h,
+                    failedLogins24h,
+                    suspiciousLogins24h,
+                    activeConsents,
+                    totalConsents,
+                    consentCoverage = Math.Round(consentCoverage, 1),
+                    totalGroups,
+                    revokedSessions = await db.UserSessions.CountAsync(s => s.IsRevoked && !s.IsDeleted)
+                },
                 summary = new
                 {
                     totalChecks = checks.Count,
@@ -1122,7 +1164,16 @@ public static class AdvancedSecurityEndpoints
             var ztPolicies = await db.ZTPolicies.Where(z => !z.IsDeleted).ToListAsync();
             var rateLimits = await db.RateLimitConfigs.Where(r => !r.IsDeleted).ToListAsync();
 
-            // Aggregate policies from existing config into a unified view
+            // Enterprise user management stats
+            var activeSessions = await db.UserSessions.CountAsync(s => !s.IsRevoked && !s.IsDeleted && s.ExpiresAt > DateTime.UtcNow);
+            var totalGroups = await db.UserGroups.CountAsync(g => g.IsActive && !g.IsDeleted);
+            var totalGroupMembers = await db.UserGroupMembers.CountAsync(m => !m.IsDeleted);
+            var totalGroupPermissions = await db.UserGroupPermissions.CountAsync(p => !p.IsDeleted);
+            var totalConsents = await db.UserConsents.CountAsync(c => !c.IsDeleted);
+            var activeConsents = await db.UserConsents.CountAsync(c => c.IsGranted && !c.IsDeleted && (c.ExpiresAt == null || c.ExpiresAt > DateTime.UtcNow));
+            var consentTypes = await db.UserConsents.Where(c => !c.IsDeleted).Select(c => c.ConsentType).Distinct().CountAsync();
+            var usersWithConsent = await db.UserConsents.Where(c => c.IsGranted && !c.IsDeleted).Select(c => c.UserId).Distinct().CountAsync();
+
             var policies = new List<object>
             {
                 new {
@@ -1154,7 +1205,9 @@ public static class AdvancedSecurityEndpoints
                         sessionTimeout = "60 phút",
                         requireReauthForSensitive = true,
                         bindToDevice = true,
-                        bindToIp = true
+                        bindToIp = true,
+                        activeSessions,
+                        sessionEnforcement = "Database-level (enterprise)"
                     }
                 },
                 new {
@@ -1245,6 +1298,37 @@ public static class AdvancedSecurityEndpoints
                         piiProtection = true,
                         auditLogging = true
                     }
+                },
+                new {
+                    id = "user_group_policy",
+                    category = "access",
+                    name = "Chính sách nhóm người dùng",
+                    description = "Quản lý quyền theo nhóm (IAM)",
+                    isEnabled = totalGroups > 0,
+                    settings = new {
+                        totalGroups,
+                        totalMembers = totalGroupMembers,
+                        totalPermissions = totalGroupPermissions,
+                        inheritPermissions = true,
+                        groupTypes = new[] { "department", "role", "team", "custom" }
+                    }
+                },
+                new {
+                    id = "consent_policy",
+                    category = "data",
+                    name = "Chính sách đồng ý (GDPR/HIPAA)",
+                    description = "Quản lý đồng ý người dùng",
+                    isEnabled = totalConsents > 0,
+                    settings = new {
+                        totalConsents,
+                        activeConsents,
+                        consentTypes,
+                        usersWithConsent,
+                        coveragePercent = totalUsers > 0 ? Math.Round((double)usersWithConsent / totalUsers * 100, 1) : 0,
+                        supportedTypes = new[] { "data_processing", "medical_records", "marketing", "analytics", "research", "third_party", "biometric_data", "cookies" },
+                        versionTracking = true,
+                        expirationSupport = true
+                    }
                 }
             };
 
@@ -1265,7 +1349,7 @@ public static class AdvancedSecurityEndpoints
             string? severity,
             string? eventType) =>
         {
-            var since = DateTime.UtcNow.AddHours(-(hours ?? 168)); // Default: 7 days
+            var since = DateTime.UtcNow.AddHours(-(hours ?? 168));
             var allEvents = await securityEvents.GetRecentEventsAsync(1000);
 
             var filtered = allEvents.Where(e => e.CreatedAt >= since);
@@ -1276,6 +1360,65 @@ public static class AdvancedSecurityEndpoints
                 filtered = filtered.Where(e => e.EventType == eventType);
 
             var events = filtered.OrderByDescending(e => e.CreatedAt).ToList();
+
+            // Enterprise login history stats
+            var loginStats = new
+            {
+                totalLogins = await db.UserLoginHistories.CountAsync(h => h.LoginAt >= since && !h.IsDeleted),
+                successfulLogins = await db.UserLoginHistories.CountAsync(h => h.LoginAt >= since && h.IsSuccess && !h.IsDeleted),
+                failedLogins = await db.UserLoginHistories.CountAsync(h => h.LoginAt >= since && !h.IsSuccess && !h.IsDeleted),
+                suspiciousLogins = await db.UserLoginHistories.CountAsync(h => h.LoginAt >= since && h.IsSuspicious && !h.IsDeleted),
+                uniqueLoginUsers = await db.UserLoginHistories.Where(h => h.LoginAt >= since && !h.IsDeleted).Select(h => h.UserId).Distinct().CountAsync(),
+                loginMethods = await db.UserLoginHistories.Where(h => h.LoginAt >= since && h.IsSuccess && !h.IsDeleted)
+                    .GroupBy(h => h.LoginMethod)
+                    .Select(g => new { method = g.Key, count = g.Count() })
+                    .ToListAsync()
+            };
+
+            // Enterprise session stats
+            var sessionStats = new
+            {
+                activeSessions = await db.UserSessions.CountAsync(s => !s.IsRevoked && !s.IsDeleted && s.ExpiresAt > DateTime.UtcNow),
+                revokedSessions = await db.UserSessions.CountAsync(s => s.IsRevoked && !s.IsDeleted && s.CreatedAt >= since),
+                expiredSessions = await db.UserSessions.CountAsync(s => !s.IsRevoked && !s.IsDeleted && s.ExpiresAt <= DateTime.UtcNow && s.CreatedAt >= since),
+                totalSessions = await db.UserSessions.CountAsync(s => s.CreatedAt >= since && !s.IsDeleted)
+            };
+
+            // Enterprise consent stats
+            var consentStats = new
+            {
+                totalConsents = await db.UserConsents.CountAsync(c => !c.IsDeleted),
+                activeConsents = await db.UserConsents.CountAsync(c => c.IsGranted && !c.IsDeleted && (c.ExpiresAt == null || c.ExpiresAt > DateTime.UtcNow)),
+                revokedConsents = await db.UserConsents.CountAsync(c => !c.IsGranted && !c.IsDeleted),
+                recentChanges = await db.UserConsents.CountAsync(c => c.CreatedAt >= since && !c.IsDeleted)
+            };
+
+            // Recent login history entries (merged with security events)
+            var recentLogins = await db.UserLoginHistories
+                .Where(h => h.LoginAt >= since && !h.IsDeleted)
+                .OrderByDescending(h => h.LoginAt)
+                .Take(50)
+                .Select(h => new
+                {
+                    h.Id,
+                    h.UserId,
+                    username = db.Users.Where(u => u.Id == h.UserId).Select(u => u.Username).FirstOrDefault(),
+                    h.LoginMethod,
+                    h.IsSuccess,
+                    h.IsSuspicious,
+                    h.FailureReason,
+                    h.IpAddress,
+                    h.Country,
+                    h.City,
+                    h.DeviceType,
+                    h.OperatingSystem,
+                    h.Browser,
+                    h.RiskScore,
+                    h.LoginAt,
+                    h.LogoutAt,
+                    h.SessionDuration
+                })
+                .ToListAsync();
 
             // Summary statistics
             var byCategory = events.GroupBy(e => e.EventType.Split('_')[0])
@@ -1314,11 +1457,15 @@ public static class AdvancedSecurityEndpoints
                     uniqueIps = events.Select(e => e.IpAddress).Where(ip => ip != null).Distinct().Count(),
                     uniqueUsers = events.Select(e => e.Username).Where(u => u != null).Distinct().Count()
                 },
+                loginStats,
+                sessionStats,
+                consentStats,
                 byCategory,
                 bySeverity,
                 byHour,
                 topIps,
                 topUsers,
+                recentLogins,
                 recentEvents = events.Take(100).Select(e => new
                 {
                     e.Id,

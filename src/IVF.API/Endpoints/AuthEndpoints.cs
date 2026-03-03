@@ -702,6 +702,21 @@ public static class AuthEndpoints
                     operatingSystem: os,
                     browser: browser);
                 await repo.AddSessionAsync(session);
+
+                // Enforce max concurrent sessions (revoke oldest beyond limit)
+                const int maxConcurrentSessions = 3;
+                var activeSessions = await repo.GetUserSessionsAsync(user.Id, true);
+                if (activeSessions.Count >= maxConcurrentSessions)
+                {
+                    var sessionsToRevoke = activeSessions
+                        .OrderByDescending(s => s.LastActivityAt)
+                        .Skip(maxConcurrentSessions - 1) // keep newest (maxConcurrentSessions - 1) + the new one
+                        .ToList();
+                    foreach (var old in sessionsToRevoke)
+                    {
+                        old.Revoke("Exceeded concurrent session limit", "system");
+                    }
+                }
             }
 
             await repo.SaveChangesAsync();

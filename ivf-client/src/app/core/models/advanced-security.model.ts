@@ -335,6 +335,17 @@ export interface ComplianceDashboard {
   level: 'compliant' | 'partial' | 'non_compliant';
   framework: string;
   checks: ComplianceCheck[];
+  enterpriseStats: {
+    activeSessions: number;
+    totalLogins24h: number;
+    failedLogins24h: number;
+    suspiciousLogins24h: number;
+    activeConsents: number;
+    totalConsents: number;
+    consentCoverage: number;
+    totalGroups: number;
+    revokedSessions: number;
+  };
   summary: {
     totalChecks: number;
     passed: number;
@@ -385,11 +396,50 @@ export interface AuditReportEvent {
 export interface AuditReport {
   period: { from: string; to: string; hours: number };
   summary: AuditReportSummary;
+  loginStats: {
+    totalLogins: number;
+    successfulLogins: number;
+    failedLogins: number;
+    suspiciousLogins: number;
+    uniqueLoginUsers: number;
+    loginMethods: { method: string; count: number }[];
+  };
+  sessionStats: {
+    activeSessions: number;
+    revokedSessions: number;
+    expiredSessions: number;
+    totalSessions: number;
+  };
+  consentStats: {
+    totalConsents: number;
+    activeConsents: number;
+    revokedConsents: number;
+    recentChanges: number;
+  };
   byCategory: { category: string; count: number }[];
   bySeverity: { severity: string; count: number }[];
   byHour: { hour: string; count: number }[];
   topIps: { ip: string; count: number; blocked: number }[];
   topUsers: { username: string; count: number; suspicious: number }[];
+  recentLogins: {
+    id: string;
+    userId: string;
+    username: string | null;
+    loginMethod: string;
+    isSuccess: boolean;
+    isSuspicious: boolean;
+    failureReason: string | null;
+    ipAddress: string | null;
+    country: string | null;
+    city: string | null;
+    deviceType: string | null;
+    operatingSystem: string | null;
+    browser: string | null;
+    riskScore: number | null;
+    loginAt: string;
+    logoutAt: string | null;
+    sessionDuration: string | null;
+  }[];
   recentEvents: AuditReportEvent[];
   generatedAt: string;
 }

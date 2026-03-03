@@ -357,6 +357,54 @@
           </div>
         </div>
 
+        <!-- Enterprise Stats Cards -->
+        @if (compliance.enterpriseStats) {
+          <div class="stats-grid enterprise-stats-grid">
+            <div class="stat-card stat-blue">
+              <div class="stat-icon">🔗</div>
+              <div class="stat-info">
+                <span class="stat-value">{{ compliance.enterpriseStats.activeSessions }}</span>
+                <span class="stat-label">Phiên hoạt động</span>
+              </div>
+            </div>
+            <div class="stat-card stat-green">
+              <div class="stat-icon">🔑</div>
+              <div class="stat-info">
+                <span class="stat-value">{{ compliance.enterpriseStats.totalLogins24h }}</span>
+                <span class="stat-label">Đăng nhập 24h</span>
+              </div>
+            </div>
+            <div class="stat-card stat-orange">
+              <div class="stat-icon">⚠️</div>
+              <div class="stat-info">
+                <span class="stat-value">{{ compliance.enterpriseStats.failedLogins24h }}</span>
+                <span class="stat-label">Thất bại 24h</span>
+              </div>
+            </div>
+            <div class="stat-card stat-red">
+              <div class="stat-icon">🚨</div>
+              <div class="stat-info">
+                <span class="stat-value">{{ compliance.enterpriseStats.suspiciousLogins24h }}</span>
+                <span class="stat-label">Đáng ngờ 24h</span>
+              </div>
+            </div>
+            <div class="stat-card stat-purple">
+              <div class="stat-icon">📋</div>
+              <div class="stat-info">
+                <span class="stat-value">{{ compliance.enterpriseStats.activeConsents }}/{{ compliance.enterpriseStats.totalConsents }}</span>
+                <span class="stat-label">Đồng ý ({{ compliance.enterpriseStats.consentCoverage }}%)</span>
+              </div>
+            </div>
+            <div class="stat-card stat-blue">
+              <div class="stat-icon">👥</div>
+              <div class="stat-info">
+                <span class="stat-value">{{ compliance.enterpriseStats.totalGroups }}</span>
+                <span class="stat-label">Nhóm người dùng</span>
+              </div>
+            </div>
+          </div>
+        }
+
         <!-- Compliance Checks -->
         <div class="compliance-checks">
           @for (check of compliance.checks; track check.id) {
@@ -516,6 +564,125 @@
           </div>
         </div>
 
+        <!-- Enterprise Login Stats -->
+        @if (report.loginStats) {
+          <div class="card">
+            <div class="card-header">
+              <h3>🔑 Thống kê đăng nhập (Enterprise)</h3>
+            </div>
+            <div class="card-body">
+              <div class="stats-grid">
+                <div class="stat-card stat-green">
+                  <div class="stat-icon">✅</div>
+                  <div class="stat-info">
+                    <span class="stat-value">{{ report.loginStats.successfulLogins }}</span>
+                    <span class="stat-label">Thành công</span>
+                  </div>
+                </div>
+                <div class="stat-card stat-red">
+                  <div class="stat-icon">❌</div>
+                  <div class="stat-info">
+                    <span class="stat-value">{{ report.loginStats.failedLogins }}</span>
+                    <span class="stat-label">Thất bại</span>
+                  </div>
+                </div>
+                <div class="stat-card stat-orange">
+                  <div class="stat-icon">🔍</div>
+                  <div class="stat-info">
+                    <span class="stat-value">{{ report.loginStats.suspiciousLogins }}</span>
+                    <span class="stat-label">Đáng ngờ</span>
+                  </div>
+                </div>
+                <div class="stat-card stat-purple">
+                  <div class="stat-icon">👤</div>
+                  <div class="stat-info">
+                    <span class="stat-value">{{ report.loginStats.uniqueLoginUsers }}</span>
+                    <span class="stat-label">Người dùng</span>
+                  </div>
+                </div>
+              </div>
+
+              @if (report.loginStats.loginMethods && report.loginStats.loginMethods.length > 0) {
+                <div class="login-methods-bar" style="margin-top: 12px;">
+                  <h4 style="margin-bottom: 8px; font-size: 0.85rem; color: #94a3b8;">Phương thức đăng nhập</h4>
+                  @for (m of report.loginStats.loginMethods; track m.method) {
+                    <div class="audit-bar-row">
+                      <span class="audit-bar-label">
+                        <span class="badge severity-info">{{ m.method }}</span>
+                      </span>
+                      <div class="audit-bar-bg">
+                        <div class="audit-bar-fill"
+                          [style.width.%]="getAuditBarWidth(m.count, report.loginStats.totalLogins)"></div>
+                      </div>
+                      <span class="audit-bar-count">{{ m.count }}</span>
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+          </div>
+        }
+
+        <!-- Enterprise Session & Consent Stats -->
+        @if (report.sessionStats || report.consentStats) {
+          <div class="content-grid">
+            @if (report.sessionStats) {
+              <div class="card">
+                <div class="card-header">
+                  <h3>🔗 Phiên làm việc</h3>
+                </div>
+                <div class="card-body">
+                  <div class="mini-stats">
+                    <div class="mini-stat">
+                      <span class="mini-stat-value">{{ report.sessionStats.activeSessions }}</span>
+                      <span class="mini-stat-label">Hoạt động</span>
+                    </div>
+                    <div class="mini-stat">
+                      <span class="mini-stat-value">{{ report.sessionStats.revokedSessions }}</span>
+                      <span class="mini-stat-label">Thu hồi</span>
+                    </div>
+                    <div class="mini-stat">
+                      <span class="mini-stat-value">{{ report.sessionStats.expiredSessions }}</span>
+                      <span class="mini-stat-label">Hết hạn</span>
+                    </div>
+                    <div class="mini-stat">
+                      <span class="mini-stat-value">{{ report.sessionStats.totalSessions }}</span>
+                      <span class="mini-stat-label">Tổng cộng</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            }
+            @if (report.consentStats) {
+              <div class="card">
+                <div class="card-header">
+                  <h3>📋 Đồng ý (Consent)</h3>
+                </div>
+                <div class="card-body">
+                  <div class="mini-stats">
+                    <div class="mini-stat">
+                      <span class="mini-stat-value">{{ report.consentStats.activeConsents }}</span>
+                      <span class="mini-stat-label">Còn hiệu lực</span>
+                    </div>
+                    <div class="mini-stat">
+                      <span class="mini-stat-value">{{ report.consentStats.revokedConsents }}</span>
+                      <span class="mini-stat-label">Đã thu hồi</span>
+                    </div>
+                    <div class="mini-stat">
+                      <span class="mini-stat-value">{{ report.consentStats.recentChanges }}</span>
+                      <span class="mini-stat-label">Thay đổi gần đây</span>
+                    </div>
+                    <div class="mini-stat">
+                      <span class="mini-stat-value">{{ report.consentStats.totalConsents }}</span>
+                      <span class="mini-stat-label">Tổng cộng</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
+        }
+
         <div class="content-grid">
           <!-- By Category -->
           <div class="card">
@@ -657,6 +824,63 @@
             </div>
           </div>
         </div>
+
+        <!-- Recent Logins Table (Enterprise) -->
+        @if (report.recentLogins && report.recentLogins.length > 0) {
+          <div class="card">
+            <div class="card-header">
+              <h3>🔑 Lịch sử đăng nhập gần đây</h3>
+              <span class="badge severity-info">{{ report.recentLogins.length }} lượt</span>
+            </div>
+            <div class="card-body card-body--flush">
+              <div class="table-wrapper">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Thời gian</th>
+                      <th>Người dùng</th>
+                      <th>Phương thức</th>
+                      <th>Kết quả</th>
+                      <th>IP</th>
+                      <th>Thiết bị</th>
+                      <th>Vị trí</th>
+                      <th>Risk</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (login of report.recentLogins; track login.id) {
+                      <tr [class.row-blocked]="!login.isSuccess || login.isSuspicious">
+                        <td class="time-cell">{{ formatDate(login.loginAt) }}</td>
+                        <td><strong>{{ login.username || '-' }}</strong></td>
+                        <td><span class="badge severity-info">{{ login.loginMethod }}</span></td>
+                        <td>
+                          @if (login.isSuccess) {
+                            <span class="badge severity-low">✅ OK</span>
+                          } @else {
+                            <span class="badge severity-critical">❌ {{ login.failureReason || 'Thất bại' }}</span>
+                          }
+                          @if (login.isSuspicious) {
+                            <span class="badge severity-high" style="margin-left: 4px;">🚨</span>
+                          }
+                        </td>
+                        <td class="ip-cell">{{ login.ipAddress || '-' }}</td>
+                        <td>{{ login.browser || '' }} {{ login.operatingSystem ? '/ ' + login.operatingSystem : '' }}</td>
+                        <td>{{ login.country || '-' }}{{ login.city ? ', ' + login.city : '' }}</td>
+                        <td>
+                          @if (login.riskScore !== null && login.riskScore !== undefined) {
+                            <span class="badge" [class]="getRiskScoreClass(login.riskScore)">{{ login.riskScore }}</span>
+                          } @else {
+                            <span>-</span>
+                          }
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        }
 
         <!-- Recent Events Table -->
         @if (report.recentEvents.length > 0) {
