@@ -128,6 +128,9 @@
     >
       🌐 IP Whitelist
     </button>
+    <button class="tab-btn" [class.active]="activeTab() === 'consent'" (click)="setTab('consent')">
+      📋 Đồng ý dữ liệu
+    </button>
   </div>
 
   <!-- ═══════════════════════════════════════════════════ -->
@@ -391,8 +394,14 @@
             <div class="stat-card stat-purple">
               <div class="stat-icon">📋</div>
               <div class="stat-info">
-                <span class="stat-value">{{ compliance.enterpriseStats.activeConsents }}/{{ compliance.enterpriseStats.totalConsents }}</span>
-                <span class="stat-label">Đồng ý ({{ compliance.enterpriseStats.consentCoverage }}%)</span>
+                <span class="stat-value"
+                  >{{ compliance.enterpriseStats.activeConsents }}/{{
+                    compliance.enterpriseStats.totalConsents
+                  }}</span
+                >
+                <span class="stat-label"
+                  >Đồng ý ({{ compliance.enterpriseStats.consentCoverage }}%)</span
+                >
               </div>
             </div>
             <div class="stat-card stat-blue">
@@ -603,16 +612,20 @@
               </div>
 
               @if (report.loginStats.loginMethods && report.loginStats.loginMethods.length > 0) {
-                <div class="login-methods-bar" style="margin-top: 12px;">
-                  <h4 style="margin-bottom: 8px; font-size: 0.85rem; color: #94a3b8;">Phương thức đăng nhập</h4>
+                <div class="login-methods-bar" style="margin-top: 12px">
+                  <h4 style="margin-bottom: 8px; font-size: 0.85rem; color: #94a3b8">
+                    Phương thức đăng nhập
+                  </h4>
                   @for (m of report.loginStats.loginMethods; track m.method) {
                     <div class="audit-bar-row">
                       <span class="audit-bar-label">
                         <span class="badge severity-info">{{ m.method }}</span>
                       </span>
                       <div class="audit-bar-bg">
-                        <div class="audit-bar-fill"
-                          [style.width.%]="getAuditBarWidth(m.count, report.loginStats.totalLogins)"></div>
+                        <div
+                          class="audit-bar-fill"
+                          [style.width.%]="getAuditBarWidth(m.count, report.loginStats.totalLogins)"
+                        ></div>
                       </div>
                       <span class="audit-bar-count">{{ m.count }}</span>
                     </div>
@@ -851,24 +864,35 @@
                     @for (login of report.recentLogins; track login.id) {
                       <tr [class.row-blocked]="!login.isSuccess || login.isSuspicious">
                         <td class="time-cell">{{ formatDate(login.loginAt) }}</td>
-                        <td><strong>{{ login.username || '-' }}</strong></td>
-                        <td><span class="badge severity-info">{{ login.loginMethod }}</span></td>
+                        <td>
+                          <strong>{{ login.username || '-' }}</strong>
+                        </td>
+                        <td>
+                          <span class="badge severity-info">{{ login.loginMethod }}</span>
+                        </td>
                         <td>
                           @if (login.isSuccess) {
                             <span class="badge severity-low">✅ OK</span>
                           } @else {
-                            <span class="badge severity-critical">❌ {{ login.failureReason || 'Thất bại' }}</span>
+                            <span class="badge severity-critical"
+                              >❌ {{ login.failureReason || 'Thất bại' }}</span
+                            >
                           }
                           @if (login.isSuspicious) {
-                            <span class="badge severity-high" style="margin-left: 4px;">🚨</span>
+                            <span class="badge severity-high" style="margin-left: 4px">🚨</span>
                           }
                         </td>
                         <td class="ip-cell">{{ login.ipAddress || '-' }}</td>
-                        <td>{{ login.browser || '' }} {{ login.operatingSystem ? '/ ' + login.operatingSystem : '' }}</td>
+                        <td>
+                          {{ login.browser || '' }}
+                          {{ login.operatingSystem ? '/ ' + login.operatingSystem : '' }}
+                        </td>
                         <td>{{ login.country || '-' }}{{ login.city ? ', ' + login.city : '' }}</td>
                         <td>
                           @if (login.riskScore !== null && login.riskScore !== undefined) {
-                            <span class="badge" [class]="getRiskScoreClass(login.riskScore)">{{ login.riskScore }}</span>
+                            <span class="badge" [class]="getRiskScoreClass(login.riskScore)">{{
+                              login.riskScore
+                            }}</span>
                           } @else {
                             <span>-</span>
                           }
@@ -947,6 +971,174 @@
         <div class="empty-state">
           <span class="empty-icon">📑</span>
           <span>Đang tải báo cáo kiểm toán...</span>
+        </div>
+      }
+    </div>
+  }
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- TAB: CONSENT (ĐỒNG Ý DỮ LIỆU) -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  @if (activeTab() === 'consent') {
+    <div class="tab-content">
+      <!-- User selector -->
+      <div class="card">
+        <div class="card-header">
+          <h3>📋 Quản lý đồng ý dữ liệu</h3>
+        </div>
+        <div class="card-body">
+          <div class="consent-user-selector">
+            <div class="form-group">
+              <label>Chọn người dùng</label>
+              <select
+                class="input-field"
+                [(ngModel)]="consentUserId"
+                (ngModelChange)="loadConsentData()"
+              >
+                <option value="">-- Chọn người dùng --</option>
+                @for (u of users(); track u.id) {
+                  <option [value]="u.id">{{ u.fullName || u.username }} ({{ u.role }})</option>
+                }
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      @if (consentUserId) {
+        <!-- Grant consent form -->
+        <div class="card">
+          <div class="card-header">
+            <h3>✅ Cấp đồng ý mới</h3>
+          </div>
+          <div class="card-body">
+            <div class="consent-grant-row">
+              <div class="form-group">
+                <label>Loại đồng ý</label>
+                <select class="input-field" [(ngModel)]="consentGrantType">
+                  <option value="">-- Chọn loại --</option>
+                  @for (ct of consentTypesList; track ct.value) {
+                    <option [value]="ct.value">{{ ct.icon }} {{ ct.label }}</option>
+                  }
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Phiên bản</label>
+                <input
+                  class="input-field"
+                  [(ngModel)]="consentGrantVersion"
+                  placeholder="vd: 1.0"
+                />
+              </div>
+              <div class="form-group form-group--btn">
+                <button
+                  class="btn btn-primary"
+                  (click)="grantConsentForUser()"
+                  [disabled]="!consentGrantType"
+                >
+                  ✅ Cấp đồng ý
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Consent overview grid -->
+        <div class="consent-type-grid">
+          @for (ct of consentTypesList; track ct.value) {
+            @let status = getConsentStatus(ct.value);
+            <div
+              class="consent-type-card"
+              [class.granted]="status === 'granted'"
+              [class.revoked]="status === 'revoked'"
+              [class.none]="status === 'none'"
+            >
+              <div class="consent-type-icon">{{ ct.icon }}</div>
+              <div class="consent-type-info">
+                <strong>{{ ct.label }}</strong>
+                @if (status === 'granted') {
+                  <span class="status-badge active">✅ Đã đồng ý</span>
+                } @else if (status === 'revoked') {
+                  <span class="status-badge inactive">❌ Đã thu hồi</span>
+                } @else {
+                  <span class="status-badge pending">⏳ Chưa đồng ý</span>
+                }
+              </div>
+              <div class="consent-type-actions">
+                @if (status === 'granted') {
+                  <button class="btn btn-danger btn-sm" (click)="revokeConsentByType(ct.value)">
+                    Thu hồi
+                  </button>
+                }
+              </div>
+            </div>
+          }
+        </div>
+
+        <!-- Consent history -->
+        @if (userConsentList().length > 0) {
+          <div class="card">
+            <div class="card-header">
+              <h3>📜 Lịch sử đồng ý</h3>
+              <span class="badge severity-info">{{ userConsentList().length }}</span>
+            </div>
+            <div class="card-body card-body--flush">
+              <div class="table-wrapper">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Loại</th>
+                      <th>Trạng thái</th>
+                      <th>Phiên bản</th>
+                      <th>Ngày đồng ý</th>
+                      <th>Ngày thu hồi</th>
+                      <th>Hết hạn</th>
+                      <th>Hành động</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (c of userConsentList(); track c.id) {
+                      <tr [class.row-blocked]="!c.isGranted">
+                        <td>
+                          <span
+                            >{{ getConsentTypeIcon(c.consentType) }}
+                            {{ getConsentTypeLabel(c.consentType) }}</span
+                          >
+                        </td>
+                        <td>
+                          @if (c.isGranted) {
+                            <span class="badge severity-low">Đã đồng ý</span>
+                          } @else {
+                            <span class="badge severity-critical">Đã thu hồi</span>
+                          }
+                        </td>
+                        <td>{{ c.consentVersion || '-' }}</td>
+                        <td class="time-cell">{{ formatConsentDate(c.consentedAt) }}</td>
+                        <td class="time-cell">
+                          {{ c.revokedAt ? formatConsentDate(c.revokedAt) : '-' }}
+                        </td>
+                        <td class="time-cell">
+                          {{ c.expiresAt ? formatConsentDate(c.expiresAt) : 'Vĩnh viễn' }}
+                        </td>
+                        <td>
+                          @if (c.isGranted) {
+                            <button class="btn btn-danger btn-sm" (click)="revokeConsentById(c.id)">
+                              Thu hồi
+                            </button>
+                          }
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        }
+      } @else {
+        <div class="empty-state">
+          <span class="empty-icon">👤</span>
+          <span>Vui lòng chọn người dùng để quản lý đồng ý dữ liệu</span>
         </div>
       }
     </div>

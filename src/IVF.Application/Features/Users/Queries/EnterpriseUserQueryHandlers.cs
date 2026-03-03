@@ -31,9 +31,10 @@ public class GetUserGroupsHandler(IEnterpriseUserRepository repo) : IRequestHand
         {
             var memberCount = await repo.GetGroupMemberCountAsync(g.Id, ct);
             var permCount = await repo.GetGroupPermissionCountAsync(g.Id, ct);
+            var consentCount = await repo.GetGroupConsentCountAsync(g.Id, ct);
             items.Add(new UserGroupDto(
                 g.Id, g.Name, g.DisplayName, g.Description, g.GroupType,
-                g.ParentGroupId, g.IsSystem, g.IsActive, memberCount, permCount));
+                g.ParentGroupId, g.IsSystem, g.IsActive, memberCount, permCount, consentCount));
         }
 
         return new UserGroupListResponse(items, total, r.Page, r.PageSize);

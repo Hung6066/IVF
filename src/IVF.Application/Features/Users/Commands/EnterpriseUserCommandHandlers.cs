@@ -196,3 +196,74 @@ public class RevokeConsentHandler(IEnterpriseUserRepository repo) : IRequestHand
         }
     }
 }
+
+// ═══════════════════════════════════════════════════════════════
+// GROUP CONSENT HANDLERS
+// ═══════════════════════════════════════════════════════════════
+
+public class GrantGroupConsentHandler(IEnterpriseUserRepository repo) : IRequestHandler<GrantGroupConsentCommand, int>
+{
+    public async Task<int> Handle(GrantGroupConsentCommand r, CancellationToken ct)
+    {
+        var memberIds = await repo.GetGroupMemberIdsAsync(r.GroupId, ct);
+        var count = 0;
+        foreach (var userId in memberIds)
+        {
+            await repo.SupersedeConsentsAsync(userId, r.ConsentType, ct);
+            var consent = UserConsent.Grant(userId, r.ConsentType, r.ConsentVersion, r.IpAddress, r.UserAgent, r.ExpiresAt);
+            await repo.AddConsentAsync(consent, ct);
+            count++;
+        }
+        await repo.SaveChangesAsync(ct);
+        return count;
+    }
+}
+
+public class RevokeGroupConsentHandler(IEnterpriseUserRepository repo) : IRequestHandler<RevokeGroupConsentCommand, int>
+{
+    public async Task<int> Handle(RevokeGroupConsentCommand r, CancellationToken ct)
+    {
+        var memberIds = await repo.GetGroupMemberIdsAsync(r.GroupId, ct);
+        var count = 0;
+        foreach (var userId in memberIds)
+        {
+            var consents = await repo.GetUserConsentsAsync(userId, ct);
+            var active = consents.Where(c => c.ConsentType == r.ConsentType && c.IsValid());
+            foreach (var consent in active)
+            {
+                consent.Revoke(r.Reason);
+                count++;
+            }
+        }
+        await repo.SaveChangesAsync(ct);
+        return count;
+    }
+}
+
+public class GetGroupConsentStatusHandler(IEnterpriseUserRepository repo) : IRequestHandler<GetGroupConsentStatusQuery, GroupConsentStatusResult>
+{
+    public async Task<GroupConsentStatusResult> Handle(GetGroupConsentStatusQuery r, CancellationToken ct)
+    {
+        var membersInfo = await repo.GetGroupMembersWithUserInfoAsync(r.GroupId, ct);
+        var allTypes = new[] { "data_processing", "medical_records", "marketing", "analytics",
+                               "research", "third_party", "biometric_data", "cookies" };
+
+        var members = new List<GroupMemberConsentDto>();
+        var summary = allTypes.ToDictionary(t => t, _ => new GroupConsentSummary(0, membersInfo.Count));
+
+        foreach (var (member, username, fullName, _) in membersInfo)
+        {
+            var consents = await repo.GetUserConsentsAsync(member.UserId, ct);
+            var valid = consents.Where(c => c.IsValid()).Select(c => c.ConsentType).Distinct().ToList();
+            members.Add(new GroupMemberConsentDto(member.UserId, username, fullName, valid));
+
+            foreach (var type in allTypes)
+            {
+                if (valid.Contains(type))
+                    summary[type] = summary[type] with { GrantedCount = summary[type].GrantedCount + 1 };
+            }
+        }
+
+        return new GroupConsentStatusResult(members, summary);
+    }
+}

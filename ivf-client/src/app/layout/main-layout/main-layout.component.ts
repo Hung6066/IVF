@@ -4,6 +4,7 @@ import { RouterModule, Router } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
 import { SignalRService } from '../../core/services/signalr.service';
 import { MenuService, MenuSectionDto } from '../../core/services/menu.service';
+import { ConsentBannerService } from '../../core/services/consent-banner.service';
 import { NotificationBellComponent } from '../../shared/components/notification-bell/notification-bell.component';
 import { GlobalToastComponent } from '../../shared/components/global-toast/global-toast.component';
 
@@ -91,11 +92,17 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     private signalRService: SignalRService,
     private menuService: MenuService,
     private router: Router,
+    public consentBanner: ConsentBannerService,
   ) {}
 
   async ngOnInit() {
     // Load menu from database
     this.loadMenuFromApi();
+
+    // Load consent status for menu lock indicators
+    if (this.authService.isAuthenticated()) {
+      this.consentBanner.loadConsentStatus();
+    }
 
     const token = localStorage.getItem('token');
     if (token) {
@@ -221,5 +228,18 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
 
   isAdmin(): boolean {
     return this.authService.hasRole('Admin');
+  }
+
+  /** Whether a menu item requires consent the user hasn't granted */
+  isMenuConsentBlocked(item: MenuItem): boolean {
+    return this.consentBanner.isRouteBlocked(item.route);
+  }
+
+  /** Tooltip showing which consents are missing for a menu item */
+  getConsentTooltip(item: MenuItem): string {
+    const missing = this.consentBanner.getMissingForRoute(item.route);
+    if (missing.length === 0) return '';
+    const labels = missing.map((t) => this.consentBanner.getLabel(t));
+    return `Thiếu đồng ý: ${labels.join(', ')}`;
   }
 }

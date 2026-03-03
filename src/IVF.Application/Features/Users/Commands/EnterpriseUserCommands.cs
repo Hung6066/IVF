@@ -89,3 +89,37 @@ public record GrantConsentCommand(
     DateTime? ExpiresAt) : IRequest<Guid>;
 
 public record RevokeConsentCommand(Guid ConsentId, string? Reason) : IRequest;
+
+// ═══════════════════════════════════════════════════════════════
+// GROUP CONSENT (Bulk consent for all members of a group)
+// ═══════════════════════════════════════════════════════════════
+
+public record GrantGroupConsentCommand(
+    Guid GroupId,
+    string ConsentType,
+    string? ConsentVersion,
+    string? IpAddress,
+    string? UserAgent,
+    DateTime? ExpiresAt) : IRequest<int>;
+
+public record RevokeGroupConsentCommand(
+    Guid GroupId,
+    string ConsentType,
+    string? Reason) : IRequest<int>;
+
+public record GetGroupConsentStatusQuery(
+    Guid GroupId) : IRequest<GroupConsentStatusResult>;
+
+public record GroupConsentStatusResult(
+    List<GroupMemberConsentDto> Members,
+    Dictionary<string, GroupConsentSummary> ConsentSummary);
+
+public record GroupMemberConsentDto(
+    Guid UserId,
+    string Username,
+    string FullName,
+    List<string> ValidConsents);
+
+public record GroupConsentSummary(
+    int GrantedCount,
+    int TotalMembers);

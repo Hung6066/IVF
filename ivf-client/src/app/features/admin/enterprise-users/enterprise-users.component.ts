@@ -12,6 +12,7 @@ import {
   UserGroupDetail,
   UserLoginHistory,
   UserConsent,
+  GroupConsentStatus,
   GROUP_TYPES,
   CONSENT_TYPES,
   LOGIN_METHOD_LABELS,
@@ -92,6 +93,16 @@ export class EnterpriseUsersComponent implements OnInit {
   permissionGroups: { name: string; permissions: string[] }[] = [];
   private permissionDisplayNames: Record<string, string> = {};
 
+  showGroupConsentModal = false;
+
+  // Group Consent
+  groupConsentStatus = signal<GroupConsentStatus | null>(null);
+  groupConsentForm = { consentType: '', consentVersion: '' };
+  consentGroupId = '';
+
+  // Consent Sub-tab
+  consentSubTab = signal<'user' | 'group'>('user');
+
   // Login History
   loginHistory = signal<UserLoginHistory[]>([]);
   loginSearch = '';
@@ -106,6 +117,7 @@ export class EnterpriseUsersComponent implements OnInit {
   // Consent
   consents = signal<UserConsent[]>([]);
   consentUserId = '';
+  consentForm = { consentType: '', consentVersion: '' };
 
   // User Create/Edit Modal
   showUserModal = false;
@@ -180,6 +192,10 @@ export class EnterpriseUsersComponent implements OnInit {
         break;
       case 'login-history':
         this.loadLoginHistory();
+        break;
+      case 'consent':
+        this.loadUsers();
+        this.loadGroups();
         break;
     }
   }
@@ -266,6 +282,87 @@ export class EnterpriseUsersComponent implements OnInit {
     this.enterpriseService.getUserConsents(userId).subscribe({
       next: (consents) => this.selectedUserConsents.set(consents),
     });
+  }
+
+  grantConsent() {
+    const detail = this.selectedUserDetail();
+    if (!detail || !this.consentForm.consentType) return;
+    this.enterpriseService
+      .grantConsent({
+        userId: detail.id,
+        consentType: this.consentForm.consentType,
+        consentVersion: this.consentForm.consentVersion || undefined,
+        ipAddress: window.location.hostname,
+        userAgent: navigator.userAgent,
+      })
+      .subscribe({
+        next: () => {
+          this.loadUserConsents(detail.id);
+          this.consentForm = { consentType: '', consentVersion: '' };
+        },
+      });
+  }
+
+  revokeConsent(consentId: string) {
+    if (!confirm('Xác nhận thu hồi đồng ý này?')) return;
+    const detail = this.selectedUserDetail();
+    this.enterpriseService.revokeConsent(consentId, 'Admin revoked').subscribe({
+      next: () => {
+        if (detail) this.loadUserConsents(detail.id);
+      },
+    });
+  }
+
+  // ─── Consent Tab (main level) ───
+
+  loadConsentForUser() {
+    if (!this.consentUserId) {
+      this.consents.set([]);
+      return;
+    }
+    this.enterpriseService.getUserConsents(this.consentUserId).subscribe({
+      next: (data) => this.consents.set(data),
+      error: () => this.consents.set([]),
+    });
+  }
+
+  grantConsentFromTab() {
+    if (!this.consentUserId || !this.consentForm.consentType) return;
+    this.enterpriseService
+      .grantConsent({
+        userId: this.consentUserId,
+        consentType: this.consentForm.consentType,
+        consentVersion: this.consentForm.consentVersion || undefined,
+        ipAddress: window.location.hostname,
+        userAgent: navigator.userAgent,
+      })
+      .subscribe({
+        next: () => {
+          this.loadConsentForUser();
+          this.consentForm = { consentType: '', consentVersion: '' };
+        },
+      });
+  }
+
+  revokeConsentFromTab(consentId: string) {
+    if (!confirm('Xác nhận thu hồi đồng ý này?')) return;
+    this.enterpriseService.revokeConsent(consentId, 'Admin revoked').subscribe({
+      next: () => this.loadConsentForUser(),
+    });
+  }
+
+  revokeConsentByType(consentType: string) {
+    const consent = this.consents().find((c) => c.consentType === consentType && c.isGranted);
+    if (consent) this.revokeConsentFromTab(consent.id);
+  }
+
+  getConsentStatusForType(type: string): 'granted' | 'revoked' | 'none' {
+    const list = this.consents().filter((c) => c.consentType === type);
+    if (list.length === 0) return 'none';
+    const latest = list.sort(
+      (a, b) => new Date(b.consentedAt).getTime() - new Date(a.consentedAt).getTime(),
+    )[0];
+    return latest.isGranted ? 'granted' : 'revoked';
   }
 
   loadUserDetailLoginHistory(userId: string) {
@@ -617,6 +714,87 @@ export class EnterpriseUsersComponent implements OnInit {
         this.openGroupDetail({ id: detail.id } as UserGroup);
       },
     });
+  }
+
+  openGroupConsentModal() {
+    const detail = this.selectedGroupDetail();
+    if (!detail) return;
+    this.showGroupConsentModal = true;
+    this.groupConsentForm = { consentType: '', consentVersion: '' };
+    this.loadGroupConsentStatus(detail.id);
+  }
+
+  closeGroupConsentModal() {
+    this.showGroupConsentModal = false;
+  }
+
+  // ─── Group Consent ───
+
+  loadGroupConsentFromTab() {
+    if (!this.consentGroupId) {
+      this.groupConsentStatus.set(null);
+      return;
+    }
+    this.loadGroupConsentStatus(this.consentGroupId);
+  }
+
+  loadGroupConsentStatus(groupId: string) {
+    this.enterpriseService.getGroupConsentStatus(groupId).subscribe({
+      next: (status) => this.groupConsentStatus.set(status),
+    });
+  }
+
+  grantGroupConsent() {
+    if (!this.consentGroupId || !this.groupConsentForm.consentType) return;
+    this.loading.set(true);
+    this.enterpriseService
+      .grantGroupConsent(
+        this.consentGroupId,
+        this.groupConsentForm.consentType,
+        this.groupConsentForm.consentVersion || undefined,
+      )
+      .subscribe({
+        next: (res) => {
+          alert(`Đã cấp đồng ý cho ${res.count} thành viên`);
+          this.groupConsentForm = { consentType: '', consentVersion: '' };
+          this.loadGroupConsentStatus(this.consentGroupId);
+          this.loading.set(false);
+        },
+        error: () => this.loading.set(false),
+      });
+  }
+
+  revokeGroupConsent(consentType: string) {
+    if (!this.consentGroupId) return;
+    const groupName =
+      this.groups().find((g) => g.id === this.consentGroupId)?.displayName || 'nhóm';
+    if (!confirm(`Thu hồi đồng ý "${this.getConsentLabel(consentType)}" cho toàn bộ ${groupName}?`))
+      return;
+    this.loading.set(true);
+    this.enterpriseService
+      .revokeGroupConsent(this.consentGroupId, consentType, 'Admin revoked for group')
+      .subscribe({
+        next: (res) => {
+          alert(`Đã thu hồi ${res.count} đồng ý`);
+          this.loadGroupConsentStatus(this.consentGroupId);
+          this.loading.set(false);
+        },
+        error: () => this.loading.set(false),
+      });
+  }
+
+  getGroupConsentProgress(type: string): string {
+    const status = this.groupConsentStatus();
+    if (!status?.consentSummary[type]) return '0/0';
+    const s = status.consentSummary[type];
+    return `${s.grantedCount}/${s.totalMembers}`;
+  }
+
+  getGroupConsentPercent(type: string): number {
+    const status = this.groupConsentStatus();
+    if (!status?.consentSummary[type]) return 0;
+    const s = status.consentSummary[type];
+    return s.totalMembers > 0 ? Math.round((s.grantedCount / s.totalMembers) * 100) : 0;
   }
 
   // ═══════════════════════════════════════════════════

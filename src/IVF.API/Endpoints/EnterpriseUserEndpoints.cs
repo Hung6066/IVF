@@ -1,3 +1,4 @@
+using IVF.Application.Common.Interfaces;
 using IVF.Application.Features.Users.Commands;
 using IVF.Application.Features.Users.Queries;
 using MediatR;
@@ -115,6 +116,27 @@ public static class EnterpriseUserEndpoints
             return Results.Ok(new { message = "Group permissions updated", count = request.Permissions.Count });
         });
 
+        // Group Consent (bulk consent for all members)
+        groups.MapGet("/{groupId}/consents", async (IMediator m, Guid groupId) =>
+        {
+            var result = await m.Send(new GetGroupConsentStatusQuery(groupId));
+            return Results.Ok(result);
+        });
+
+        groups.MapPost("/{groupId}/consents", async (IMediator m, Guid groupId, [FromBody] GrantGroupConsentRequest request) =>
+        {
+            var count = await m.Send(new GrantGroupConsentCommand(
+                groupId, request.ConsentType, request.ConsentVersion,
+                request.IpAddress, request.UserAgent, request.ExpiresAt));
+            return Results.Ok(new { message = $"Consent granted to {count} members", count });
+        });
+
+        groups.MapDelete("/{groupId}/consents/{consentType}", async (IMediator m, Guid groupId, string consentType, [FromQuery] string? reason) =>
+        {
+            var count = await m.Send(new RevokeGroupConsentCommand(groupId, consentType, reason));
+            return Results.Ok(new { message = $"Consent revoked from {count} members", count });
+        });
+
         // ═══════════════════════════════════════════════════
         // LOGIN HISTORY
         // ═══════════════════════════════════════════════════
@@ -130,6 +152,20 @@ public static class EnterpriseUserEndpoints
         // CONSENT MANAGEMENT (GDPR/HIPAA)
         // ═══════════════════════════════════════════════════
         var consent = app.MapGroup("/api/user-consents").WithTags("UserConsents").RequireAuthorization();
+
+        // Current user's valid consent types (for menu/UI consent checking)
+        consent.MapGet("/my-status", async (HttpContext ctx, IConsentValidationService consentService) =>
+        {
+            var userIdClaim = ctx.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            if (!Guid.TryParse(userIdClaim, out var userId))
+                return Results.Unauthorized();
+
+            var allTypes = new[] { "data_processing", "medical_records", "marketing", "analytics",
+                                   "research", "third_party", "biometric_data", "cookies" };
+            var missing = await consentService.GetMissingConsentsAsync(userId, allTypes);
+            var valid = allTypes.Except(missing).ToList();
+            return Results.Ok(new { validConsents = valid, missingConsents = missing });
+        });
 
         consent.MapGet("/{userId}", async (IMediator m, Guid userId) =>
         {
@@ -155,3 +191,4 @@ public static class EnterpriseUserEndpoints
 public record AddGroupMemberRequest(Guid UserId, string? MemberRole, Guid? AddedBy);
 public record UpdateMemberRoleRequest(string MemberRole);
 public record AssignGroupPermissionsRequest(List<string> Permissions, Guid? GrantedBy);
+public record GrantGroupConsentRequest(string ConsentType, string? ConsentVersion, string? IpAddress, string? UserAgent, DateTime? ExpiresAt);

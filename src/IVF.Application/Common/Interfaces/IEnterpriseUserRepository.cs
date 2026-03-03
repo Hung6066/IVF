@@ -16,6 +16,7 @@ public interface IEnterpriseUserRepository
     Task<(List<UserGroup> Items, int Total)> GetGroupsPagedAsync(string? search, string? groupType, int page, int pageSize, CancellationToken ct = default);
     Task<int> GetGroupMemberCountAsync(Guid groupId, CancellationToken ct = default);
     Task<int> GetGroupPermissionCountAsync(Guid groupId, CancellationToken ct = default);
+    Task<int> GetGroupConsentCountAsync(Guid groupId, CancellationToken ct = default);
 
     // Group Members
     Task AddGroupMemberAsync(UserGroupMember member, CancellationToken ct = default);
@@ -36,6 +37,7 @@ public interface IEnterpriseUserRepository
     Task<UserConsent?> GetConsentByIdAsync(Guid id, CancellationToken ct = default);
     Task<List<UserConsent>> GetUserConsentsAsync(Guid userId, CancellationToken ct = default);
     Task SupersedeConsentsAsync(Guid userId, string consentType, CancellationToken ct = default);
+    Task<List<Guid>> GetGroupMemberIdsAsync(Guid groupId, CancellationToken ct = default);
 
     // Analytics
     Task<int> GetTotalUsersAsync(CancellationToken ct = default);

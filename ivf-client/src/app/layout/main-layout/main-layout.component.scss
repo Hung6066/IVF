@@ -71,6 +71,17 @@
   border-left: 3px solid #a78bfa;
 }
 
+.nav-item.consent-blocked {
+  opacity: 0.5;
+  position: relative;
+}
+
+.consent-lock {
+  margin-left: auto;
+  font-size: 0.75rem;
+  opacity: 0.8;
+}
+
 .icon {
   font-size: 1.125rem;
 }
@@ -173,6 +184,70 @@
   font-weight: 600;
   font-size: 0.75rem;
   color: white;
+}
+
+// ── Consent Warning Banner ──
+.consent-banner {
+  background: linear-gradient(90deg, #fef3c7, #fde68a);
+  border-bottom: 2px solid #f59e0b;
+  padding: 0.625rem 1.5rem;
+}
+
+.consent-banner-content {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  max-width: 1200px;
+}
+
+.consent-banner-icon {
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+.consent-banner-text {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.875rem;
+  color: #92400e;
+}
+
+.consent-tag {
+  background: #fff;
+  border: 1px solid #f59e0b;
+  border-radius: 4px;
+  padding: 0.125rem 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #b45309;
+}
+
+.consent-link {
+  color: #d97706;
+  font-weight: 600;
+  text-decoration: none;
+  margin-left: 0.5rem;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+.consent-banner-close {
+  background: none;
+  border: none;
+  font-size: 1rem;
+  color: #92400e;
+  cursor: pointer;
+  padding: 0.25rem;
+  flex-shrink: 0;
+
+  &:hover {
+    color: #78350f;
+  }
 }
 
 .main-content {

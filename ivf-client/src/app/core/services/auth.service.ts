@@ -1,9 +1,10 @@
-import { Injectable, signal, computed } from '@angular/core';
+import { Injectable, signal, computed, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { Observable, tap, catchError, throwError, from, switchMap } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { AuthResponse, LoginRequest, User, MfaVerifyRequest } from '../models/api.models';
+import { ConsentBannerService } from './consent-banner.service';
 
 const TOKEN_KEY = 'ivf_access_token';
 const REFRESH_KEY = 'ivf_refresh_token';
@@ -26,6 +27,7 @@ export class AuthService {
   constructor(
     private http: HttpClient,
     private router: Router,
+    private consentBanner: ConsentBannerService,
   ) {}
 
   login(credentials: LoginRequest): Observable<any> {
@@ -75,6 +77,7 @@ export class AuthService {
     sessionStorage.removeItem('zt_device_fingerprint');
     this._user.set(null);
     this._permissions.set([]);
+    this.consentBanner.clear();
     this.router.navigate(['/login']);
   }
 

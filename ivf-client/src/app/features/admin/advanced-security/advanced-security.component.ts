@@ -6,6 +6,12 @@ import { AdvancedSecurityService } from '../../../core/services/advanced-securit
 import { SecurityService } from '../../../core/services/security.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { UserService } from '../../../core/services/user.service';
+import { EnterpriseUserService } from '../../../core/services/enterprise-user.service';
+import {
+  UserConsent,
+  GrantConsentRequest,
+  CONSENT_TYPES,
+} from '../../../core/models/enterprise-user.model';
 import QRCode from 'qrcode';
 import {
   SecurityScore,
@@ -43,7 +49,8 @@ type TabKey =
   | 'geo-security'
   | 'threats'
   | 'lockouts'
-  | 'ip-whitelist';
+  | 'ip-whitelist'
+  | 'consent';
 
 @Component({
   selector: 'app-advanced-security',
@@ -161,6 +168,13 @@ export class AdvancedSecurityComponent implements OnInit, OnDestroy {
   auditSeverityFilter = '';
   auditEventTypeFilter = '';
 
+  // Consent Management
+  consentUserId = '';
+  userConsentList = signal<UserConsent[]>([]);
+  consentGrantType = '';
+  consentGrantVersion = '';
+  consentTypesList = CONSENT_TYPES;
+
   // Current user
   currentUser = computed(() => this.authService.user());
   currentUserId = computed(() => this.authService.user()?.id ?? '');
@@ -180,6 +194,7 @@ export class AdvancedSecurityComponent implements OnInit, OnDestroy {
     private securityService: SecurityService,
     private authService: AuthService,
     private userService: UserService,
+    private enterpriseUserService: EnterpriseUserService,
     private router: Router,
   ) {}
 
@@ -302,6 +317,9 @@ export class AdvancedSecurityComponent implements OnInit, OnDestroy {
       case 'ip-whitelist':
         this.loadIpWhitelist();
         break;
+      case 'consent':
+        if (this.consentUserId) this.loadConsentData();
+        break;
     }
   }
 
@@ -362,6 +380,84 @@ export class AdvancedSecurityComponent implements OnInit, OnDestroy {
     if (level === 'good') return 'Hệ thống an toàn';
     if (level === 'warning') return 'Cần chú ý';
     return 'Cảnh báo nghiêm trọng';
+  }
+
+  // ─── Consent Management ───
+
+  loadConsentData() {
+    if (!this.consentUserId) return;
+    this.loading.set(true);
+    this.enterpriseUserService.getUserConsents(this.consentUserId).subscribe({
+      next: (data) => {
+        this.userConsentList.set(data);
+        this.loading.set(false);
+      },
+      error: () => {
+        this.userConsentList.set([]);
+        this.loading.set(false);
+      },
+    });
+  }
+
+  grantConsentForUser() {
+    if (!this.consentUserId || !this.consentGrantType) return;
+    const req: GrantConsentRequest = {
+      userId: this.consentUserId,
+      consentType: this.consentGrantType,
+      consentVersion: this.consentGrantVersion || '1.0',
+      ipAddress: this.publicIp(),
+      userAgent: navigator.userAgent,
+    };
+    this.enterpriseUserService.grantConsent(req).subscribe({
+      next: () => {
+        this.showStatus('Cấp đồng ý thành công', 'success');
+        this.consentGrantType = '';
+        this.consentGrantVersion = '';
+        this.loadConsentData();
+      },
+      error: () => this.showStatus('Lỗi khi cấp đồng ý', 'error'),
+    });
+  }
+
+  revokeConsentById(consentId: string) {
+    if (!confirm('Bạn có chắc muốn thu hồi đồng ý này?')) return;
+    this.enterpriseUserService.revokeConsent(consentId, 'Admin revoked').subscribe({
+      next: () => {
+        this.showStatus('Thu hồi đồng ý thành công', 'success');
+        this.loadConsentData();
+      },
+      error: () => this.showStatus('Lỗi khi thu hồi đồng ý', 'error'),
+    });
+  }
+
+  revokeConsentByType(consentType: string) {
+    const consent = this.userConsentList().find(
+      (c) => c.consentType === consentType && c.isGranted,
+    );
+    if (consent) {
+      this.revokeConsentById(consent.id);
+    }
+  }
+
+  getConsentStatus(consentType: string): 'granted' | 'revoked' | 'none' {
+    const consents = this.userConsentList().filter((c) => c.consentType === consentType);
+    if (consents.length === 0) return 'none';
+    const latest = consents.sort(
+      (a, b) => new Date(b.consentedAt).getTime() - new Date(a.consentedAt).getTime(),
+    )[0];
+    return latest.isGranted ? 'granted' : 'revoked';
+  }
+
+  getConsentTypeLabel(type: string): string {
+    return CONSENT_TYPES.find((t) => t.value === type)?.label || type;
+  }
+
+  getConsentTypeIcon(type: string): string {
+    return CONSENT_TYPES.find((t) => t.value === type)?.icon || '📋';
+  }
+
+  formatConsentDate(date: string): string {
+    return new Date(date).toLocaleString('vi-VN');
   }
 
   // ─── Passkeys ───

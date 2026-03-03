@@ -68,6 +68,7 @@ public static class DependencyInjection
 
         // Register Services
         services.AddScoped<INotificationService, Services.NotificationService>();
+        services.AddScoped<IConsentValidationService, Services.ConsentValidationService>();
         services.AddScoped<IFlowSeeder, FlowSeeder>();
 
         // Key Vault & Zero Trust

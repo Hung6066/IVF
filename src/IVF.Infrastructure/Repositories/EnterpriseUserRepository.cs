@@ -69,6 +69,16 @@ public class EnterpriseUserRepository(IvfDbContext db) : IEnterpriseUserReposito
     public async Task<int> GetGroupPermissionCountAsync(Guid groupId, CancellationToken ct)
         => await db.UserGroupPermissions.CountAsync(p => p.GroupId == groupId && !p.IsDeleted, ct);
 
+    public async Task<int> GetGroupConsentCountAsync(Guid groupId, CancellationToken ct)
+    {
+        var memberIds = await db.UserGroupMembers
+            .Where(m => m.GroupId == groupId && !m.IsDeleted)
+            .Select(m => m.UserId)
+            .ToListAsync(ct);
+        return await db.UserConsents
+            .CountAsync(c => memberIds.Contains(c.UserId) && c.IsGranted && !c.IsDeleted, ct);
+    }
+
     // ═══ Group Members ═══
 
     public async Task AddGroupMemberAsync(UserGroupMember member, CancellationToken ct)
@@ -155,6 +165,12 @@ public class EnterpriseUserRepository(IvfDbContext db) : IEnterpriseUserReposito
             .ToListAsync(ct);
         foreach (var c in existing) c.Revoke("Superseded by new consent");
     }
+
+    public async Task<List<Guid>> GetGroupMemberIdsAsync(Guid groupId, CancellationToken ct)
+        => await db.UserGroupMembers
+            .Where(m => m.GroupId == groupId && !m.IsDeleted)
+            .Select(m => m.UserId)
+            .ToListAsync(ct);
 
     // ═══ Analytics ═══
 

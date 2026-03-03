@@ -472,6 +472,7 @@ app.UseVaultTokenAuth(); // Vault token authentication (X-Vault-Token header)
 app.UseApiKeyAuth(); // API key authentication (X-API-Key header or apiKey query param)
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseConsentEnforcement(); // GDPR/HIPAA consent enforcement — block access to sensitive data without consent
 app.UseTokenBinding(); // Token binding enforcement — validate device/session claims (Microsoft CAE)
 app.UseZeroTrust(); // Zero Trust continuous verification (Google BeyondCorp + Microsoft CAE + AWS GuardDuty)
 

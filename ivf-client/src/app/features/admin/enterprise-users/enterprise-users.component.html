@@ -19,6 +19,9 @@
     <button [class.active]="activeTab() === 'login-history'" (click)="switchTab('login-history')">
       📋 Lịch sử đăng nhập
     </button>
+    <button [class.active]="activeTab() === 'consent'" (click)="switchTab('consent')">
+      📝 Đồng ý dữ liệu
+    </button>
   </div>
 
   <!-- ═══════════════════════════════════════════════════ -->
@@ -344,6 +347,7 @@
           <div class="group-footer">
             <span>👤 {{ group.memberCount }} thành viên</span>
             <span>🔑 {{ group.permissionCount }} quyền</span>
+            <span>📝 {{ group.consentCount }} đồng ý</span>
           </div>
           <div class="group-actions" (click)="$event.stopPropagation()">
             <button class="btn-icon" title="Sửa" (click)="openGroupModal(group)">✏️</button>
@@ -471,6 +475,300 @@
       >
         Sau →
       </button>
+    </div>
+  }
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- CONSENT MANAGEMENT TAB -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  @if (activeTab() === 'consent') {
+    <div class="consent-management">
+      <!-- Sub-tabs: Người dùng / Nhóm -->
+      <div class="consent-sub-tabs">
+        <button
+          [class.active]="consentSubTab() === 'user'"
+          (click)="consentSubTab.set('user')"
+        >
+          👤 Người dùng
+        </button>
+        <button
+          [class.active]="consentSubTab() === 'group'"
+          (click)="consentSubTab.set('group')"
+        >
+          👥 Nhóm
+        </button>
+      </div>
+
+      <!-- ─── USER CONSENT SUB-TAB ─── -->
+      @if (consentSubTab() === 'user') {
+        <!-- User Selector -->
+        <div class="consent-header-card">
+          <div class="consent-header-row">
+            <div class="consent-user-select">
+              <label>Chọn người dùng</label>
+              <select
+                class="select-input"
+                [(ngModel)]="consentUserId"
+                (ngModelChange)="loadConsentForUser()"
+              >
+                <option value="">-- Chọn người dùng --</option>
+                @for (u of users(); track u.id) {
+                  <option [value]="u.id">{{ u.fullName || u.username }} ({{ u.role }})</option>
+                }
+              </select>
+            </div>
+            @if (consentUserId) {
+              <div class="consent-quick-grant">
+                <label>Cấp đồng ý mới</label>
+                <div class="consent-grant-inline">
+                  <select class="select-input" [(ngModel)]="consentForm.consentType">
+                    <option value="">-- Chọn loại --</option>
+                    @for (ct of consentTypes; track ct.value) {
+                      <option [value]="ct.value">{{ ct.icon }} {{ ct.label }}</option>
+                    }
+                  </select>
+                  <input
+                    class="search-input"
+                    [(ngModel)]="consentForm.consentVersion"
+                    placeholder="Phiên bản (vd: 1.0)"
+                  />
+                  <button
+                    class="btn btn-primary btn-sm"
+                    (click)="grantConsentFromTab()"
+                    [disabled]="!consentForm.consentType"
+                  >
+                    ✅ Cấp đồng ý
+                  </button>
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+
+        @if (consentUserId) {
+          <!-- Consent Type Overview Grid -->
+          <div class="consent-overview-grid">
+            @for (ct of consentTypes; track ct.value) {
+              @let status = getConsentStatusForType(ct.value);
+              <div
+                class="consent-overview-card"
+                [class.granted]="status === 'granted'"
+                [class.revoked]="status === 'revoked'"
+                [class.none]="status === 'none'"
+              >
+                <div class="consent-card-icon">{{ ct.icon }}</div>
+                <div class="consent-card-body">
+                  <strong>{{ ct.label }}</strong>
+                  @if (status === 'granted') {
+                    <span class="status-badge active">✅ Đã đồng ý</span>
+                  } @else if (status === 'revoked') {
+                    <span class="status-badge inactive">❌ Đã thu hồi</span>
+                  } @else {
+                    <span class="status-badge pending">⏳ Chưa đồng ý</span>
+                  }
+                </div>
+                <div class="consent-card-action">
+                  @if (status === 'granted') {
+                    <button class="btn btn-danger btn-sm" (click)="revokeConsentByType(ct.value)">
+                      Thu hồi
+                    </button>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+
+          <!-- Consent History Table -->
+          @if (consents().length > 0) {
+            <div class="consent-history-section">
+              <h3>
+                📜 Lịch sử đồng ý <span class="count-badge">{{ consents().length }}</span>
+              </h3>
+              <div class="table-container">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Loại</th>
+                      <th>Trạng thái</th>
+                      <th>Phiên bản</th>
+                      <th>Ngày đồng ý</th>
+                      <th>Ngày thu hồi</th>
+                      <th>Hết hạn</th>
+                      <th>Hành động</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (c of consents(); track c.id) {
+                      <tr [class.row-revoked]="!c.isGranted">
+                        <td>
+                          <span
+                            >{{ getConsentIcon(c.consentType) }}
+                            {{ getConsentLabel(c.consentType) }}</span
+                          >
+                        </td>
+                        <td>
+                          @if (c.isGranted) {
+                            <span class="status-badge active">✅ Đã đồng ý</span>
+                          } @else {
+                            <span class="status-badge inactive">❌ Đã thu hồi</span>
+                          }
+                        </td>
+                        <td>{{ c.consentVersion || '-' }}</td>
+                        <td>{{ formatDate(c.consentedAt) }}</td>
+                        <td>{{ c.revokedAt ? formatDate(c.revokedAt) : '-' }}</td>
+                        <td>{{ c.expiresAt ? formatDate(c.expiresAt) : 'Vĩnh viễn' }}</td>
+                        <td>
+                          @if (c.isGranted) {
+                            <button
+                              class="btn btn-danger btn-sm"
+                              (click)="revokeConsentFromTab(c.id)"
+                            >
+                              Thu hồi
+                            </button>
+                          }
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          }
+        } @else {
+          <div class="empty-state">
+            <span class="empty-icon">👤</span>
+            <p>Vui lòng chọn người dùng để quản lý đồng ý dữ liệu</p>
+          </div>
+        }
+      }
+
+      <!-- ─── GROUP CONSENT SUB-TAB ─── -->
+      @if (consentSubTab() === 'group') {
+        <!-- Group Selector + Grant Form -->
+        <div class="consent-header-card">
+          <div class="consent-header-row">
+            <div class="consent-user-select">
+              <label>Chọn nhóm</label>
+              <select
+                class="select-input"
+                [(ngModel)]="consentGroupId"
+                (ngModelChange)="loadGroupConsentFromTab()"
+              >
+                <option value="">-- Chọn nhóm --</option>
+                @for (g of groups(); track g.id) {
+                  <option [value]="g.id">{{ getGroupTypeIcon(g.groupType) }} {{ g.displayName || g.name }} ({{ g.memberCount }} TV)</option>
+                }
+              </select>
+            </div>
+            @if (consentGroupId) {
+              <div class="consent-quick-grant">
+                <label>Cấp đồng ý cho toàn nhóm</label>
+                <div class="consent-grant-inline">
+                  <select class="select-input" [(ngModel)]="groupConsentForm.consentType">
+                    <option value="">-- Chọn loại --</option>
+                    @for (ct of consentTypes; track ct.value) {
+                      <option [value]="ct.value">{{ ct.icon }} {{ ct.label }}</option>
+                    }
+                  </select>
+                  <input
+                    class="search-input"
+                    [(ngModel)]="groupConsentForm.consentVersion"
+                    placeholder="Phiên bản (vd: 1.0)"
+                  />
+                  <button
+                    class="btn btn-primary btn-sm"
+                    (click)="grantGroupConsent()"
+                    [disabled]="!groupConsentForm.consentType || loading()"
+                  >
+                    ✅ Cấp cho toàn nhóm
+                  </button>
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+
+        @if (consentGroupId && groupConsentStatus(); as gcs) {
+          <!-- Group Consent Overview Grid -->
+          <div class="consent-overview-grid">
+            @for (ct of consentTypes; track ct.value) {
+              @let summary = gcs.consentSummary[ct.value];
+              <div
+                class="consent-overview-card"
+                [class.granted]="summary && summary.grantedCount === summary.totalMembers && summary.totalMembers > 0"
+                [class.revoked]="summary && summary.grantedCount === 0"
+                [class.none]="!summary || summary.totalMembers === 0"
+              >
+                <div class="consent-card-icon">{{ ct.icon }}</div>
+                <div class="consent-card-body">
+                  <strong>{{ ct.label }}</strong>
+                  <span class="consent-progress">{{ getGroupConsentProgress(ct.value) }} thành viên</span>
+                  <div class="progress-bar">
+                    <div
+                      class="progress-fill"
+                      [style.width.%]="getGroupConsentPercent(ct.value)"
+                    ></div>
+                  </div>
+                </div>
+                <div class="consent-card-action">
+                  @if (summary && summary.grantedCount > 0) {
+                    <button
+                      class="btn btn-danger btn-sm"
+                      (click)="revokeGroupConsent(ct.value)"
+                    >
+                      Thu hồi
+                    </button>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+
+          <!-- Member consent details -->
+          @if (gcs.members.length > 0) {
+            <div class="consent-history-section">
+              <h3>👤 Chi tiết theo thành viên <span class="count-badge">{{ gcs.members.length }}</span></h3>
+              <div class="table-container">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Thành viên</th>
+                      @for (ct of consentTypes; track ct.value) {
+                        <th class="text-center" [title]="ct.label">{{ ct.icon }}</th>
+                      }
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (member of gcs.members; track member.userId) {
+                      <tr>
+                        <td>
+                          <strong>{{ member.fullName }}</strong>
+                          <br />
+                          <span class="muted">&#64;{{ member.username }}</span>
+                        </td>
+                        @for (ct of consentTypes; track ct.value) {
+                          <td class="text-center">
+                            @if (member.validConsents.includes(ct.value)) {
+                              <span title="Đã đồng ý">✅</span>
+                            } @else {
+                              <span title="Chưa đồng ý">❌</span>
+                            }
+                          </td>
+                        }
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          }
+        } @else if (!consentGroupId) {
+          <div class="empty-state">
+            <span class="empty-icon">👥</span>
+            <p>Vui lòng chọn nhóm để quản lý đồng ý dữ liệu</p>
+          </div>
+        }
+      }
     </div>
   }
 
@@ -733,6 +1031,32 @@
 
           <!-- Consent Tab -->
           @if (userDetailTab() === 'consent') {
+            <!-- Grant Consent Form -->
+            <div class="consent-grant-section">
+              <h4>Cấp đồng ý mới</h4>
+              <div class="consent-grant-form">
+                <select class="input-field" [(ngModel)]="consentForm.consentType">
+                  <option value="">-- Chọn loại đồng ý --</option>
+                  @for (ct of consentTypes; track ct.value) {
+                    <option [value]="ct.value">{{ ct.icon }} {{ ct.label }}</option>
+                  }
+                </select>
+                <input
+                  class="input-field"
+                  [(ngModel)]="consentForm.consentVersion"
+                  placeholder="Phiên bản (vd: 1.0)"
+                />
+                <button
+                  class="btn btn-primary btn-sm"
+                  (click)="grantConsent()"
+                  [disabled]="!consentForm.consentType"
+                >
+                  ✅ Cấp đồng ý
+                </button>
+              </div>
+            </div>
+
+            <!-- Consent List -->
             <div class="consent-list">
               @for (consent of selectedUserConsents(); track consent.id) {
                 <div class="consent-card" [class.revoked]="!consent.isGranted">
@@ -743,15 +1067,26 @@
                       @if (consent.consentVersion) {
                         <span class="muted"> v{{ consent.consentVersion }}</span>
                       }
+                      @if (consent.expiresAt) {
+                        <br />
+                        <small class="muted">Hết hạn: {{ formatDate(consent.expiresAt) }}</small>
+                      }
                     </div>
                   </div>
-                  <div class="consent-status">
+                  <div class="consent-actions">
+                    <div class="consent-status">
+                      @if (consent.isGranted) {
+                        <span class="status-badge active">✅ Đã đồng ý</span>
+                        <small>{{ formatDate(consent.consentedAt) }}</small>
+                      } @else {
+                        <span class="status-badge inactive">❌ Đã thu hồi</span>
+                        <small>{{ formatDate(consent.revokedAt) }}</small>
+                      }
+                    </div>
                     @if (consent.isGranted) {
-                      <span class="status-badge active">Đã đồng ý</span>
-                      <small>{{ formatDate(consent.consentedAt) }}</small>
-                    } @else {
-                      <span class="status-badge inactive">Đã thu hồi</span>
-                      <small>{{ formatDate(consent.revokedAt) }}</small>
+                      <button class="btn btn-danger btn-sm" (click)="revokeConsent(consent.id)">
+                        Thu hồi
+                      </button>
                     }
                   </div>
                 </div>
@@ -827,6 +1162,129 @@
               <p class="muted">Chưa gán quyền cho nhóm</p>
             }
           </div>
+               <!-- Group Consent -->
+          <div class="section-header">
+            <h4>📝 Đồng ý dữ liệu nhóm</h4>
+            <button class="btn btn-secondary btn-sm" (click)="openGroupConsentModal()">
+              Quản lý đồng ý
+            </button>
+        </div>
+      </div>
+    </div>
+    </div>
+  }
+  
+  <!-- GROUP CONSENT MODAL -->
+  @if (showGroupConsentModal && selectedGroupDetail(); as gd) {
+    <div class="modal-overlay" (click)="closeGroupConsentModal()">
+      <div class="modal-content large" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h2>📝 Đồng ý dữ liệu — {{ gd.displayName || gd.name }}</h2>
+          <button class="close-btn" (click)="closeGroupConsentModal()">✕</button>
+        </div>
+        <div class="modal-body">
+          <!-- Grant consent for group -->
+          <div class="consent-header-card">
+            <div class="consent-grant-inline">
+              <select class="select-input" [(ngModel)]="groupConsentForm.consentType">
+                <option value="">-- Chọn loại đồng ý --</option>
+                @for (ct of consentTypes; track ct.value) {
+                  <option [value]="ct.value">{{ ct.icon }} {{ ct.label }}</option>
+                }
+              </select>
+              <input
+                class="search-input"
+                [(ngModel)]="groupConsentForm.consentVersion"
+                placeholder="Phiên bản (vd: 1.0)"
+              />
+              <button
+                class="btn btn-primary btn-sm"
+                (click)="grantGroupConsent()"
+                [disabled]="!groupConsentForm.consentType || loading()"
+              >
+                ✅ Cấp cho toàn nhóm
+              </button>
+            </div>
+          </div>
+
+          <!-- Consent overview grid -->
+          @if (groupConsentStatus(); as gcs) {
+            <div class="consent-overview-grid">
+              @for (ct of consentTypes; track ct.value) {
+                @let summary = gcs.consentSummary[ct.value];
+                <div
+                  class="consent-overview-card"
+                  [class.granted]="summary && summary.grantedCount === summary.totalMembers && summary.totalMembers > 0"
+                  [class.revoked]="summary && summary.grantedCount === 0"
+                  [class.none]="!summary || summary.totalMembers === 0"
+                >
+                  <div class="consent-card-icon">{{ ct.icon }}</div>
+                  <div class="consent-card-body">
+                    <strong>{{ ct.label }}</strong>
+                    <span class="consent-progress">{{ getGroupConsentProgress(ct.value) }} thành viên</span>
+                    <div class="progress-bar">
+                      <div
+                        class="progress-fill"
+                        [style.width.%]="getGroupConsentPercent(ct.value)"
+                      ></div>
+                    </div>
+                  </div>
+                  <div class="consent-card-action">
+                    @if (summary && summary.grantedCount > 0) {
+                      <button
+                        class="btn btn-danger btn-sm"
+                        (click)="revokeGroupConsent(ct.value)"
+                      >
+                        Thu hồi
+                      </button>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+
+            <!-- Member consent details -->
+            @if (gcs.members.length > 0) {
+              <div class="consent-history-section">
+                <h3>👤 Chi tiết theo thành viên</h3>
+                <div class="table-container">
+                  <table class="data-table">
+                    <thead>
+                      <tr>
+                        <th>Thành viên</th>
+                        @for (ct of consentTypes; track ct.value) {
+                          <th class="text-center" [title]="ct.label">{{ ct.icon }}</th>
+                        }
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (member of gcs.members; track member.userId) {
+                        <tr>
+                          <td>
+                            <strong>{{ member.fullName }}</strong>
+                            <br />
+                            <span class="muted">&#64;{{ member.username }}</span>
+                          </td>
+                          @for (ct of consentTypes; track ct.value) {
+                            <td class="text-center">
+                              @if (member.validConsents.includes(ct.value)) {
+                                <span title="Đã đồng ý">✅</span>
+                              } @else {
+                                <span title="Chưa đồng ý">❌</span>
+                              }
+                            </td>
+                          }
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            }
+          }
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" (click)="closeGroupConsentModal()">Đóng</button>
         </div>
       </div>
     </div>

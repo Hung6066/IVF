@@ -64,6 +64,7 @@ export interface UserGroup {
   isActive: boolean;
   memberCount: number;
   permissionCount: number;
+  consentCount: number;
 }
 
 export interface UserGroupMember {
@@ -86,6 +87,24 @@ export interface UserGroupDetail {
   isActive: boolean;
   members: UserGroupMember[];
   permissions: string[];
+}
+
+// ─── Group Consent ───
+export interface GroupConsentStatus {
+  members: GroupMemberConsent[];
+  consentSummary: Record<string, GroupConsentSummary>;
+}
+
+export interface GroupMemberConsent {
+  userId: string;
+  username: string;
+  fullName: string;
+  validConsents: string[];
+}
+
+export interface GroupConsentSummary {
+  grantedCount: number;
+  totalMembers: number;
 }
 
 export interface UserGroupListResponse {

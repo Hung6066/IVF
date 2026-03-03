@@ -12,6 +12,7 @@ import {
   UserLoginHistory,
   LoginHistoryListResponse,
   UserConsent,
+  GroupConsentStatus,
   CreateUserGroupRequest,
   UpdateUserGroupRequest,
   GrantConsentRequest,
@@ -121,6 +122,42 @@ export class EnterpriseUserService {
     return this.http.post<{ message: string; count: number }>(
       `${this.baseUrl}/user-groups/${groupId}/permissions`,
       { permissions, grantedBy },
+    );
+  }
+
+  // Group Consent
+  getGroupConsentStatus(groupId: string): Observable<GroupConsentStatus> {
+    return this.http.get<GroupConsentStatus>(`${this.baseUrl}/user-groups/${groupId}/consents`);
+  }
+
+  grantGroupConsent(
+    groupId: string,
+    consentType: string,
+    consentVersion?: string,
+    expiresAt?: string,
+  ): Observable<{ message: string; count: number }> {
+    return this.http.post<{ message: string; count: number }>(
+      `${this.baseUrl}/user-groups/${groupId}/consents`,
+      {
+        consentType,
+        consentVersion,
+        ipAddress: window.location.hostname,
+        userAgent: navigator.userAgent,
+        expiresAt,
+      },
+    );
+  }
+
+  revokeGroupConsent(
+    groupId: string,
+    consentType: string,
+    reason?: string,
+  ): Observable<{ message: string; count: number }> {
+    let params = new HttpParams();
+    if (reason) params = params.set('reason', reason);
+    return this.http.delete<{ message: string; count: number }>(
+      `${this.baseUrl}/user-groups/${groupId}/consents/${consentType}`,
+      { params },
     );
   }
 

@@ -16,7 +16,7 @@ public record UserSessionDto(
 public record UserGroupDto(
     Guid Id, string Name, string? DisplayName, string? Description,
     string GroupType, Guid? ParentGroupId, bool IsSystem, bool IsActive,
-    int MemberCount, int PermissionCount);
+    int MemberCount, int PermissionCount, int ConsentCount);
 
 public record UserGroupMemberDto(
     Guid Id, Guid UserId, string Username, string FullName, string Role,

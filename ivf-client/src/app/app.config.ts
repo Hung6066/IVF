@@ -5,12 +5,13 @@ import { provideAnimations } from '@angular/platform-browser/animations';
 import { routes } from './app.routes';
 import { authInterceptor } from './core/interceptors/auth.interceptor';
 import { securityInterceptor } from './core/interceptors/security.interceptor';
+import { consentInterceptor } from './core/interceptors/consent.interceptor';
 
 export const appConfig: ApplicationConfig = {
   providers: [
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(routes),
-    provideHttpClient(withInterceptors([securityInterceptor, authInterceptor])),
+    provideHttpClient(withInterceptors([securityInterceptor, authInterceptor, consentInterceptor])),
     provideAnimations(),
   ],
 };

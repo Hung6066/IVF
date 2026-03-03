@@ -18,8 +18,17 @@
           <!-- Menu Items -->
           @for (item of section.items; track item.route) {
             @if (isMenuItemVisible(item)) {
-              <a [routerLink]="item.route" routerLinkActive="active" class="nav-item">
+              <a
+                [routerLink]="item.route"
+                routerLinkActive="active"
+                class="nav-item"
+                [class.consent-blocked]="isMenuConsentBlocked(item)"
+                [title]="getConsentTooltip(item)"
+              >
                 <span class="icon">{{ item.icon }}</span> {{ item.label }}
+                @if (isMenuConsentBlocked(item)) {
+                  <span class="consent-lock">🔒</span>
+                }
               </a>
             }
           }
@@ -49,6 +58,28 @@
         <div class="user-avatar">{{ getUserInitials() }}</div>
       </div>
     </header>
+
+    <!-- Consent Warning Banner -->
+    @if (consentBanner.visible()) {
+      <div class="consent-banner">
+        <div class="consent-banner-content">
+          <span class="consent-banner-icon">⚠️</span>
+          <div class="consent-banner-text">
+            <strong>Thiếu đồng ý dữ liệu:</strong>
+            @for (type of consentBanner.missingConsents(); track type) {
+              <span class="consent-tag">{{ consentBanner.getLabel(type) }}</span>
+            }
+            <a class="consent-link" routerLink="/admin/security" fragment="consent"
+              >Quản lý đồng ý →</a
+            >
+          </div>
+          <button class="consent-banner-close" (click)="consentBanner.dismiss()" title="Đóng">
+            ✕
+          </button>
+        </div>
+      </div>
+    }
+
     <main class="main-content">
       <router-outlet></router-outlet>
     </main>
