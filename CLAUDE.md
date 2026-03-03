@@ -112,10 +112,12 @@ Treatment methods: `QHTN`, `IUI`, `ICSI`, `IVM`.
 Roles: Admin, Doctor, Nurse, LabTech, Embryologist, Receptionist, Cashier, Pharmacist.
 Forms system: `FormTemplate → FormField → FormResponse → FormFieldValue` supports dynamic clinical forms and report templates.
 Enterprise User Management: `UserSession`, `UserGroup`, `UserGroupMember`, `UserGroupPermission`, `UserLoginHistory`, `UserConsent` — enterprise-grade session management, group-based IAM, login analytics, GDPR/HIPAA consent.
+Enterprise Security: `ConditionalAccessPolicy`, `SecurityIncident`, `IncidentResponseRule`, `DataRetentionPolicy`, `ImpersonationRequest`, `PermissionDelegation`, `UserBehaviorProfile`, `NotificationPreference`, `SecurityEvent` — Zero Trust, conditional access, incident response automation, behavioral analytics, impersonation (RFC 8693), permission delegation, data retention (HIPAA/GDPR), security notifications.
 
 ## Additional Docs
 
 - `/docs/advanced_security.md` — advanced security module (Passkeys, MFA, TOTP, SMS OTP, rate limiting, geo-fencing, threats, lockouts, IP whitelist)
+- `/docs/enterprise_security.md` — enterprise security module (conditional access, incident response, data retention, impersonation, permission delegation, behavioral analytics, security notifications, 35 API endpoints)
 - `/docs/enterprise_user_management.md` — enterprise user management (sessions, groups, IAM, login analytics, risk detection, GDPR/HIPAA consent)
 - `/docs/form_report_builder.md` — form/report designer architecture
 - `/docs/digital_signing.md` — signing infrastructure

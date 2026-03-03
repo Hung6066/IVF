@@ -68,7 +68,8 @@ public class ZeroTrustMiddleware
         IThreatDetectionService threatDetection,
         ISecurityEventService securityEvents,
         IDeviceFingerprintService deviceFingerprint,
-        IAdaptiveSessionService sessionService)
+        IAdaptiveSessionService sessionService,
+        IConditionalAccessService conditionalAccess)
     {
         var path = context.Request.Path.Value ?? "";
         var method = context.Request.Method;
@@ -130,7 +131,68 @@ public class ZeroTrustMiddleware
                 })));
         }
 
-        // 5. Session context validation (detect hijacking)
+        // 5. Conditional access policy evaluation
+        var userRole = context.User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
+
+        // DEBUG: log all claims to diagnose amr issue
+        _logger.LogWarning("ZT Claims for user {UserId}: {Claims}, AuthLevel={AuthLevel}",
+            securityContext.UserId,
+            string.Join(", ", context.User.Claims.Select(c => $"{c.Type}={c.Value}")),
+            securityContext.CurrentAuthLevel);
+
+        var deviceFpHeader = context.Request.Headers["X-Device-Fingerprint"].FirstOrDefault();
+        DeviceTrustResult? deviceTrustResult = null;
+        if (securityContext.UserId.HasValue && !string.IsNullOrEmpty(deviceFpHeader))
+        {
+            deviceTrustResult = await deviceFingerprint.CheckDeviceTrustAsync(securityContext.UserId.Value, deviceFpHeader);
+        }
+        var caResult = await conditionalAccess.EvaluateAsync(securityContext, userRole, deviceTrustResult);
+        if (!caResult.IsAllowed)
+        {
+            await securityEvents.LogEventAsync(SecurityEvent.Create(
+                eventType: SecurityEventTypes.ConditionalAccessBlocked,
+                severity: caResult.Action == "Block" ? "High" : "Medium",
+                userId: securityContext.UserId,
+                username: securityContext.Username,
+                ipAddress: securityContext.IpAddress,
+                requestPath: path,
+                requestMethod: method,
+                isBlocked: caResult.Action == "Block",
+                correlationId: correlationId,
+                details: JsonSerializer.Serialize(new
+                {
+                    action = caResult.Action,
+                    policyName = caResult.PolicyName,
+                    policyId = caResult.PolicyId
+                })));
+
+            if (caResult.Action == "Block")
+            {
+                context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                await context.Response.WriteAsJsonAsync(new
+                {
+                    error = caResult.Message ?? "Access denied by security policy",
+                    code = "CONDITIONAL_ACCESS_BLOCKED",
+                    correlationId
+                });
+                return;
+            }
+
+            // For RequireMfa/RequireStepUp — return 401 with code so frontend can handle
+            if (caResult.Action is "RequireMfa" or "RequireStepUp")
+            {
+                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                await context.Response.WriteAsJsonAsync(new
+                {
+                    error = caResult.Message ?? "Additional authentication required",
+                    code = $"CA_{caResult.Action.ToUpperInvariant()}",
+                    correlationId
+                });
+                return;
+            }
+        }
+
+        // 6. Session context validation (detect hijacking)
         if (!string.IsNullOrEmpty(securityContext.SessionId))
         {
             var sessionResult = await sessionService.ValidateSessionAsync(securityContext.SessionId, securityContext);
@@ -198,6 +260,26 @@ public class ZeroTrustMiddleware
         var sessionId = context.Items["TokenSessionId"] as string
             ?? context.Request.Headers["X-Session-Id"].FirstOrDefault();
 
+        // Determine auth level from JWT claims (amr = authentication methods reference, RFC 8176)
+        // .NET maps inbound JWT "amr" → long URI, so check both forms
+        var amrClaim = context.User.FindFirst("amr")?.Value
+            ?? context.User.FindFirst("http://schemas.microsoft.com/claims/authnmethodsreference")?.Value;
+        var authLevel = amrClaim switch
+        {
+            "mfa" => AuthLevel.MFA,
+            "bio" => AuthLevel.Biometric,
+            _ => AuthLevel.Session
+        };
+
+        // Store impersonation context for audit logging downstream
+        var impersonationClaim = context.User.FindFirst("impersonation")?.Value;
+        if (impersonationClaim == "true")
+        {
+            var actSub = context.User.FindFirst("act_sub")?.Value;
+            context.Items["IsImpersonation"] = true;
+            context.Items["ImpersonationActorId"] = actSub;
+        }
+
         return new RequestSecurityContext(
             UserId: userId,
             Username: username,
@@ -210,7 +292,8 @@ public class ZeroTrustMiddleware
             RequestMethod: context.Request.Method,
             SessionId: sessionId,
             CorrelationId: correlationId,
-            Timestamp: DateTime.UtcNow);
+            Timestamp: DateTime.UtcNow,
+            CurrentAuthLevel: authLevel);
     }
 
     private static Guid? GetUserId(HttpContext context)

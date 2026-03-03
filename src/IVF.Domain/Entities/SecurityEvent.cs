@@ -137,4 +137,51 @@ public static class SecurityEventTypes
     public const string ApiKeyAbuse = "API_KEY_ABUSE";
     public const string ApiRateLimited = "API_RATE_LIMITED";
     public const string ApiUnauthorized = "API_UNAUTHORIZED";
+
+    // Adaptive authentication events
+    public const string StepUpRequired = "AUTH_STEP_UP_REQUIRED";
+    public const string StepUpCompleted = "AUTH_STEP_UP_COMPLETED";
+    public const string ConditionalAccessBlocked = "AUTH_CONDITIONAL_ACCESS_BLOCKED";
+    public const string ConditionalAccessMfaRequired = "AUTH_CONDITIONAL_ACCESS_MFA";
+    public const string ContextualAuthTriggered = "AUTH_CONTEXTUAL_TRIGGERED";
+    public const string MfaSuccessful = "AUTH_MFA_SUCCESSFUL";
+
+    // Incident response events
+    public const string IncidentCreated = "INCIDENT_CREATED";
+    public const string IncidentResolved = "INCIDENT_RESOLVED";
+    public const string IncidentAutoAction = "INCIDENT_AUTO_ACTION";
+
+    // Behavioral analytics events
+    public const string BehaviorAnomalyDetected = "BEHAVIOR_ANOMALY";
+    public const string UserProfileUpdated = "BEHAVIOR_PROFILE_UPDATED";
+
+    // Account protection events
+    public const string CredentialStuffingDetected = "AUTH_CREDENTIAL_STUFFING";
+    public const string AccountTakeoverDetected = "AUTH_ACCOUNT_TAKEOVER";
+    public const string RecoveryCodeUsed = "AUTH_RECOVERY_CODE_USED";
+    public const string LoginAnomalyNotification = "AUTH_LOGIN_ANOMALY_NOTIFY";
+
+    // Impersonation events
+    public const string ImpersonationRequested = "AUTH_IMPERSONATION_REQUEST";
+    public const string ImpersonationApproved = "AUTH_IMPERSONATION_APPROVED";
+    public const string ImpersonationStarted = "AUTH_IMPERSONATION_STARTED";
+    public const string ImpersonationEnded = "AUTH_IMPERSONATION_ENDED";
+
+    // Delegation events
+    public const string PermissionDelegated = "AUTHZ_PERMISSION_DELEGATED";
+    public const string DelegationRevoked = "AUTHZ_DELEGATION_REVOKED";
+
+    // Data retention events
+    public const string DataPurged = "DATA_PURGED";
+    public const string DataAnonymized = "DATA_ANONYMIZED";
+    public const string SecretsExposure = "SECURITY_SECRETS_EXPOSURE";
+
+    // External auth events
+    public const string ExternalLoginSuccess = "AUTH_EXTERNAL_LOGIN_SUCCESS";
+    public const string ExternalLoginFailed = "AUTH_EXTERNAL_LOGIN_FAILED";
+    public const string UserAutoProvisioned = "AUTH_USER_AUTO_PROVISIONED";
+
+    // Bot detection events
+    public const string BotDetected = "THREAT_BOT_DETECTED";
+    public const string CaptchaFailed = "THREAT_CAPTCHA_FAILED";
 }

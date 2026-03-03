@@ -1,0 +1,900 @@
+<div class="enterprise-security">
+  <div class="page-header">
+    <h2>Quản lý bảo mật doanh nghiệp</h2>
+    <p class="subtitle">Kiểm soát truy cập, ứng phó sự cố, lưu giữ dữ liệu & ủy quyền</p>
+  </div>
+
+  @if (error()) {
+    <div class="alert alert-error">
+      {{ error() }}
+      <button class="alert-close" (click)="error.set(null)">&times;</button>
+    </div>
+  }
+  @if (successMsg()) {
+    <div class="alert alert-success">{{ successMsg() }}</div>
+  }
+
+  <!-- Tab Navigation -->
+  <div class="tab-bar">
+    @for (tab of tabs; track tab.key) {
+      <button class="tab-btn" [class.active]="activeTab() === tab.key" (click)="switchTab(tab.key)">
+        <span class="tab-icon">{{ tab.icon }}</span>
+        {{ tab.label }}
+      </button>
+    }
+  </div>
+
+  <div class="tab-content">
+    @if (loading()) {
+      <div class="loading">Đang tải...</div>
+    }
+
+    <!-- ═══ Chính sách truy cập có điều kiện ═══ -->
+    @if (activeTab() === 'conditional-access' && !loading()) {
+      <div class="section">
+        <div class="section-header">
+          <h3>Chính sách truy cập có điều kiện</h3>
+          <button class="btn-primary" (click)="openPolicyModal()">+ Thêm chính sách</button>
+        </div>
+
+        @if (showPolicyModal) {
+          <div class="form-card">
+            <h4>{{ editingPolicyId ? 'Cập nhật chính sách' : 'Tạo chính sách mới' }}</h4>
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Tên *</label>
+                <input
+                  type="text"
+                  [(ngModel)]="policyForm.name"
+                  placeholder="VD: Chặn đăng nhập rủi ro cao"
+                />
+              </div>
+              <div class="form-group">
+                <label>Mô tả</label>
+                <input
+                  type="text"
+                  [(ngModel)]="policyForm.description"
+                  placeholder="Mô tả tùy chọn"
+                />
+              </div>
+              <div class="form-group">
+                <label>Độ ưu tiên</label>
+                <input type="number" [(ngModel)]="policyForm.priority" min="1" max="1000" />
+              </div>
+              <div class="form-group">
+                <label>Hành động</label>
+                <select [(ngModel)]="policyForm.action">
+                  <option value="Block">Chặn</option>
+                  <option value="RequireMfa">Yêu cầu MFA</option>
+                  <option value="RequireStepUp">Yêu cầu xác thực nâng cao</option>
+                  <option value="Allow">Cho phép</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Mức rủi ro tối đa (0-100)</label>
+                <input type="number" [(ngModel)]="policyForm.maxRiskLevel" min="0" max="100" />
+              </div>
+              <div class="form-group">
+                <label>Vai trò mục tiêu (phân cách bằng dấu phẩy)</label>
+                <input
+                  type="text"
+                  [(ngModel)]="policyForm.targetRoles"
+                  placeholder="VD: Admin,Doctor"
+                />
+              </div>
+              <div class="form-group">
+                <label>Quốc gia cho phép (phân cách bằng dấu phẩy)</label>
+                <input
+                  type="text"
+                  [(ngModel)]="policyForm.allowedCountries"
+                  placeholder="VD: VN,US"
+                />
+              </div>
+              <div class="form-group">
+                <label>Quốc gia bị chặn (phân cách bằng dấu phẩy)</label>
+                <input
+                  type="text"
+                  [(ngModel)]="policyForm.blockedCountries"
+                  placeholder="VD: RU,CN"
+                />
+              </div>
+              <div class="form-group">
+                <label>Dải IP cho phép (phân cách bằng dấu phẩy)</label>
+                <input
+                  type="text"
+                  [(ngModel)]="policyForm.allowedIpRanges"
+                  placeholder="VD: 10.0.0.0/8,192.168.0.0/16"
+                />
+              </div>
+              <div class="form-row">
+                <label class="checkbox-label"
+                  ><input type="checkbox" [(ngModel)]="policyForm.requireMfa" /> Yêu cầu MFA</label
+                >
+                <label class="checkbox-label"
+                  ><input type="checkbox" [(ngModel)]="policyForm.blockVpnTor" /> Chặn
+                  VPN/Tor</label
+                >
+                <label class="checkbox-label"
+                  ><input type="checkbox" [(ngModel)]="policyForm.requireCompliantDevice" /> Yêu cầu
+                  thiết bị tuân thủ</label
+                >
+              </div>
+            </div>
+            <div class="form-actions">
+              <button class="btn-primary" (click)="savePolicy()" [disabled]="!policyForm.name">
+                {{ editingPolicyId ? 'Cập nhật' : 'Tạo mới' }}
+              </button>
+              <button class="btn-secondary" (click)="closePolicyModal()">Hủy</button>
+            </div>
+          </div>
+        }
+
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Ưu tiên</th>
+              <th>Tên</th>
+              <th>Hành động</th>
+              <th>MFA</th>
+              <th>Chặn VPN/Tor</th>
+              <th>Trạng thái</th>
+              <th>Thao tác</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (policy of policies(); track policy.id) {
+              <tr>
+                <td>{{ policy.priority }}</td>
+                <td>
+                  <strong>{{ policy.name }}</strong>
+                  @if (policy.description) {
+                    <br /><small>{{ policy.description }}</small>
+                  }
+                </td>
+                <td>
+                  <span class="badge">{{ policy.action }}</span>
+                </td>
+                <td>{{ policy.requireMfa ? '✅' : '❌' }}</td>
+                <td>{{ policy.blockVpnTor ? '✅' : '❌' }}</td>
+                <td>
+                  <span [class]="'badge ' + (policy.isEnabled ? 'badge-low' : 'badge-info')">
+                    {{ policy.isEnabled ? 'Đang bật' : 'Đã tắt' }}
+                  </span>
+                </td>
+                <td class="actions">
+                  <button class="btn-sm" (click)="editPolicy(policy)">Sửa</button>
+                  <button class="btn-sm" (click)="togglePolicy(policy)">
+                    {{ policy.isEnabled ? 'Tắt' : 'Bật' }}
+                  </button>
+                  <button class="btn-sm btn-danger" (click)="deletePolicy(policy)">Xóa</button>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="7" class="empty">
+                  Chưa có chính sách truy cập. Nhấn "+ Thêm chính sách" để tạo mới.
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+
+    <!-- ═══ Sự cố bảo mật ═══ -->
+    @if (activeTab() === 'incidents' && !loading()) {
+      <div class="section">
+        <div class="section-header">
+          <h3>Sự cố bảo mật ({{ incidentsTotalCount() }})</h3>
+        </div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Thời gian</th>
+              <th>Loại</th>
+              <th>Mức độ</th>
+              <th>Trạng thái</th>
+              <th>Người dùng</th>
+              <th>IP</th>
+              <th>Thao tác</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (incident of incidents(); track incident.id) {
+              <tr>
+                <td>{{ incident.createdAt | date: 'short' }}</td>
+                <td>{{ incident.incidentType }}</td>
+                <td>
+                  <span class="badge" [class]="getSeverityClass(incident.severity)">{{
+                    incident.severity
+                  }}</span>
+                </td>
+                <td>
+                  <span class="badge" [class]="getStatusClass(incident.status)">{{
+                    incident.status
+                  }}</span>
+                </td>
+                <td>{{ incident.username || '—' }}</td>
+                <td>
+                  <code>{{ incident.ipAddress || '—' }}</code>
+                </td>
+                <td class="actions">
+                  @if (incident.status === 'Open') {
+                    <button class="btn-sm" (click)="investigateIncident(incident)">Điều tra</button>
+                  }
+                  @if (incident.status === 'Investigating') {
+                    <button class="btn-sm" (click)="resolveIncident(incident)">Giải quyết</button>
+                  }
+                  @if (incident.status === 'Resolved') {
+                    <button class="btn-sm" (click)="closeIncident(incident)">Đóng</button>
+                  }
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="7" class="empty">
+                  Chưa có sự cố bảo mật nào. Sự cố được hệ thống tạo tự động khi phát hiện.
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+        @if (incidentsTotalCount() > 20) {
+          <div class="pagination">
+            <button [disabled]="incidentsPage() <= 1" (click)="loadIncidents(incidentsPage() - 1)">
+              ← Trước
+            </button>
+            <span>Trang {{ incidentsPage() }}</span>
+            <button
+              [disabled]="incidents().length < 20"
+              (click)="loadIncidents(incidentsPage() + 1)"
+            >
+              Sau →
+            </button>
+          </div>
+        }
+      </div>
+    }
+
+    <!-- ═══ Quy tắc ứng phó sự cố ═══ -->
+    @if (activeTab() === 'incident-rules' && !loading()) {
+      <div class="section">
+        <div class="section-header">
+          <h3>Quy tắc ứng phó sự cố</h3>
+          <button class="btn-primary" (click)="openRuleModal()">+ Thêm quy tắc</button>
+        </div>
+
+        @if (showRuleModal) {
+          <div class="form-card">
+            <h4>{{ editingRuleId ? 'Cập nhật quy tắc' : 'Tạo quy tắc mới' }}</h4>
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Tên *</label>
+                <input
+                  type="text"
+                  [(ngModel)]="ruleForm.name"
+                  placeholder="VD: Khóa tài khoản khi Brute Force"
+                />
+              </div>
+              <div class="form-group">
+                <label>Mô tả</label>
+                <input
+                  type="text"
+                  [(ngModel)]="ruleForm.description"
+                  placeholder="Mô tả tùy chọn"
+                />
+              </div>
+              <div class="form-group">
+                <label>Độ ưu tiên</label>
+                <input type="number" [(ngModel)]="ruleForm.priority" min="1" max="1000" />
+              </div>
+              <div class="form-group">
+                <label>Mức độ sự cố</label>
+                <select [(ngModel)]="ruleForm.incidentSeverity">
+                  <option value="Critical">Nghiêm trọng</option>
+                  <option value="High">Cao</option>
+                  <option value="Medium">Trung bình</option>
+                  <option value="Low">Thấp</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Loại sự kiện kích hoạt (phân cách bằng dấu phẩy)</label>
+                <input
+                  type="text"
+                  [(ngModel)]="ruleForm.triggerEventTypes"
+                  placeholder="VD: LoginFailed,BruteForce"
+                />
+              </div>
+              <div class="form-group">
+                <label>Mức độ kích hoạt (phân cách bằng dấu phẩy)</label>
+                <input
+                  type="text"
+                  [(ngModel)]="ruleForm.triggerSeverities"
+                  placeholder="VD: High,Critical"
+                />
+              </div>
+              <div class="form-group">
+                <label>Hành động (phân cách bằng dấu phẩy)</label>
+                <input
+                  type="text"
+                  [(ngModel)]="ruleForm.actions"
+                  placeholder="VD: lock_account,notify_admin,block_ip"
+                />
+              </div>
+              <div class="form-group">
+                <label>Ngưỡng kích hoạt</label>
+                <input type="number" [(ngModel)]="ruleForm.triggerThreshold" min="1" />
+              </div>
+              <div class="form-group">
+                <label>Cửa sổ thời gian (phút)</label>
+                <input type="number" [(ngModel)]="ruleForm.triggerWindowMinutes" min="1" />
+              </div>
+            </div>
+            <div class="form-actions">
+              <button
+                class="btn-primary"
+                (click)="saveRule()"
+                [disabled]="!ruleForm.name || !ruleForm.triggerEventTypes"
+              >
+                {{ editingRuleId ? 'Cập nhật' : 'Tạo mới' }}
+              </button>
+              <button class="btn-secondary" (click)="closeRuleModal()">Hủy</button>
+            </div>
+          </div>
+        }
+
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Ưu tiên</th>
+              <th>Tên</th>
+              <th>Kích hoạt</th>
+              <th>Hành động</th>
+              <th>Mức độ</th>
+              <th>Bật</th>
+              <th>Thao tác</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (rule of incidentRules(); track rule.id) {
+              <tr>
+                <td>{{ rule.priority }}</td>
+                <td>
+                  <strong>{{ rule.name }}</strong>
+                  @if (rule.description) {
+                    <br /><small>{{ rule.description }}</small>
+                  }
+                </td>
+                <td>
+                  <code>{{ rule.triggerEventTypes }}</code>
+                </td>
+                <td>
+                  <code>{{ rule.actions }}</code>
+                </td>
+                <td>
+                  <span class="badge" [class]="getSeverityClass(rule.incidentSeverity)">{{
+                    rule.incidentSeverity
+                  }}</span>
+                </td>
+                <td>{{ rule.isEnabled ? '✅' : '❌' }}</td>
+                <td class="actions">
+                  <button class="btn-sm" (click)="editRule(rule)">Sửa</button>
+                  <button class="btn-sm btn-danger" (click)="deleteIncidentRule(rule)">Xóa</button>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="7" class="empty">
+                  Chưa có quy tắc ứng phó. Nhấn "+ Thêm quy tắc" để tạo mới.
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+
+    <!-- ═══ Lưu giữ dữ liệu ═══ -->
+    @if (activeTab() === 'data-retention' && !loading()) {
+      <div class="section">
+        <div class="section-header">
+          <h3>Chính sách lưu giữ dữ liệu</h3>
+          <button class="btn-primary" (click)="openRetentionModal()">+ Thêm chính sách</button>
+        </div>
+
+        @if (showRetentionModal) {
+          <div class="form-card">
+            <h4>
+              {{
+                editingRetentionId ? 'Cập nhật chính sách lưu giữ' : 'Tạo chính sách lưu giữ mới'
+              }}
+            </h4>
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Loại thực thể</label>
+                <select [(ngModel)]="retentionForm.entityType" [disabled]="!!editingRetentionId">
+                  <option value="SecurityEvent">Sự kiện bảo mật</option>
+                  <option value="UserLoginHistory">Lịch sử đăng nhập</option>
+                  <option value="UserSession">Phiên người dùng</option>
+                  <option value="AuditLog">Nhật ký kiểm toán</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Số ngày lưu giữ</label>
+                <input type="number" [(ngModel)]="retentionForm.retentionDays" min="1" max="3650" />
+              </div>
+              <div class="form-group">
+                <label>Hành động</label>
+                <select [(ngModel)]="retentionForm.action">
+                  <option value="Purge">Xóa vĩnh viễn</option>
+                  <option value="Archive">Lưu trữ</option>
+                  <option value="Anonymize">Ẩn danh hóa</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-actions">
+              <button class="btn-primary" (click)="saveRetention()">
+                {{ editingRetentionId ? 'Cập nhật' : 'Tạo mới' }}
+              </button>
+              <button class="btn-secondary" (click)="closeRetentionModal()">Hủy</button>
+            </div>
+          </div>
+        }
+
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Loại thực thể</th>
+              <th>Lưu giữ (ngày)</th>
+              <th>Hành động</th>
+              <th>Lần cuối thực thi</th>
+              <th>Số bản ghi xóa</th>
+              <th>Thao tác</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (policy of retentionPolicies(); track policy.id) {
+              <tr>
+                <td>
+                  <strong>{{ policy.entityType }}</strong>
+                </td>
+                <td>{{ policy.retentionDays }}</td>
+                <td>
+                  <span class="badge">{{ policy.action }}</span>
+                </td>
+                <td>
+                  {{
+                    policy.lastExecutedAt ? (policy.lastExecutedAt | date: 'short') : 'Chưa bao giờ'
+                  }}
+                </td>
+                <td>{{ policy.lastPurgedCount ?? '—' }}</td>
+                <td class="actions">
+                  <button class="btn-sm" (click)="editRetention(policy)">Sửa</button>
+                  <button class="btn-sm btn-danger" (click)="deleteRetentionPolicy(policy)">
+                    Xóa
+                  </button>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="6" class="empty">
+                  Chưa có chính sách lưu giữ. Nhấn "+ Thêm chính sách" để tạo mới.
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+
+    <!-- ═══ Yêu cầu mạo danh ═══ -->
+    @if (activeTab() === 'impersonation' && !loading()) {
+      <div class="section">
+        <div class="section-header">
+          <h3>Yêu cầu mạo danh</h3>
+          <button class="btn-primary" (click)="openImpersonationModal()">+ Tạo yêu cầu</button>
+        </div>
+
+        @if (showImpersonationModal) {
+          <div class="form-card">
+            <h4>Tạo yêu cầu mạo danh mới</h4>
+            <div class="form-grid">
+              <div class="form-group user-search-wrapper">
+                <label>Người dùng mục tiêu *</label>
+                <input
+                  type="text"
+                  [ngModel]="userSearchQuery"
+                  (ngModelChange)="onUserSearch($event, 'impersonation')"
+                  placeholder="Nhập tên đăng nhập để tìm kiếm"
+                  autocomplete="off"
+                />
+                @if (showUserDropdown['impersonation'] && userSearchResults().length) {
+                  <ul class="user-dropdown">
+                    @for (u of userSearchResults(); track u.id) {
+                      <li
+                        (click)="selectUser(u, impersonationForm, 'targetUserId', 'impersonation')"
+                      >
+                        <strong>{{ u.username }}</strong>
+                        <span class="user-meta">{{ u.fullName }} — {{ u.role }}</span>
+                      </li>
+                    }
+                  </ul>
+                }
+                @if (impersonationForm.targetUserId) {
+                  <small class="selected-hint">Đã chọn: {{ impersonationForm.targetUserId }}</small>
+                }
+              </div>
+              <div class="form-group">
+                <label>Lý do *</label>
+                <input
+                  type="text"
+                  [(ngModel)]="impersonationForm.reason"
+                  placeholder="Tại sao cần mạo danh?"
+                />
+              </div>
+            </div>
+            <div class="form-actions">
+              <button
+                class="btn-primary"
+                (click)="saveImpersonation()"
+                [disabled]="!impersonationForm.targetUserId || !impersonationForm.reason"
+              >
+                Tạo mới
+              </button>
+              <button class="btn-secondary" (click)="closeImpersonationModal()">Hủy</button>
+            </div>
+          </div>
+        }
+
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Thời gian</th>
+              <th>Người yêu cầu</th>
+              <th>Mục tiêu</th>
+              <th>Lý do</th>
+              <th>Trạng thái</th>
+              <th>Hết hạn</th>
+              <th>Thao tác</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (req of impersonationRequests(); track req.id) {
+              <tr>
+                <td>{{ req.createdAt | date: 'short' }}</td>
+                <td>
+                  <code>{{ req.requestedBy }}</code>
+                </td>
+                <td>
+                  <code>{{ req.targetUserId }}</code>
+                </td>
+                <td>{{ req.reason }}</td>
+                <td>
+                  <span class="badge" [class]="getStatusClass(req.status)">{{ req.status }}</span>
+                </td>
+                <td>{{ req.expiresAt ? (req.expiresAt | date: 'short') : '—' }}</td>
+                <td class="actions">
+                  @if (req.status === 'Pending') {
+                    <button class="btn-sm btn-success" (click)="approveImpersonation(req)">
+                      Phê duyệt
+                    </button>
+                    <button class="btn-sm btn-danger" (click)="denyImpersonation(req)">
+                      Từ chối
+                    </button>
+                  }
+                  @if (req.status === 'Active') {
+                    <button class="btn-sm btn-danger" (click)="endImpersonation(req)">
+                      Kết thúc
+                    </button>
+                  }
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="7" class="empty">
+                  Chưa có yêu cầu mạo danh. Nhấn "+ Tạo yêu cầu" để tạo mới.
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+
+    <!-- ═══ Ủy quyền ═══ -->
+    @if (activeTab() === 'delegation' && !loading()) {
+      <div class="section">
+        <div class="section-header">
+          <h3>Ủy quyền đang hoạt động</h3>
+          <button class="btn-primary" (click)="openDelegationModal()">+ Tạo ủy quyền</button>
+        </div>
+
+        @if (showDelegationModal) {
+          <div class="form-card">
+            <h4>Tạo ủy quyền mới</h4>
+            <div class="form-grid">
+              <div class="form-group user-search-wrapper">
+                <label>Người được ủy quyền *</label>
+                <input
+                  type="text"
+                  [ngModel]="userSearchQuery"
+                  (ngModelChange)="onUserSearch($event, 'delegation')"
+                  placeholder="Nhập tên đăng nhập để tìm kiếm"
+                  autocomplete="off"
+                />
+                @if (showUserDropdown['delegation'] && userSearchResults().length) {
+                  <ul class="user-dropdown">
+                    @for (u of userSearchResults(); track u.id) {
+                      <li (click)="selectUser(u, delegationForm, 'toUserId', 'delegation')">
+                        <strong>{{ u.username }}</strong>
+                        <span class="user-meta">{{ u.fullName }} — {{ u.role }}</span>
+                      </li>
+                    }
+                  </ul>
+                }
+                @if (delegationForm.toUserId) {
+                  <small class="selected-hint">Đã chọn: {{ delegationForm.toUserId }}</small>
+                }
+              </div>
+              <div class="form-group form-group-full">
+                <label
+                  >Quyền hạn * <small>({{ selectedPermissions.length }} đã chọn)</small></label
+                >
+                <div class="permission-groups">
+                  @for (group of permissionGroups(); track group.groupCode) {
+                    <div class="permission-group">
+                      <h5>{{ group.groupIcon }} {{ group.groupName }}</h5>
+                      <div class="permission-list">
+                        @for (perm of group.permissions; track perm.code) {
+                          <label
+                            class="permission-item"
+                            [class.selected]="isPermissionSelected(perm.code)"
+                          >
+                            <input
+                              type="checkbox"
+                              [checked]="isPermissionSelected(perm.code)"
+                              (change)="togglePermission(perm.code)"
+                            />
+                            {{ perm.displayName }}
+                          </label>
+                        }
+                      </div>
+                    </div>
+                  }
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Có hiệu lực đến *</label>
+                <input type="datetime-local" [(ngModel)]="delegationForm.validUntil" />
+              </div>
+              <div class="form-group">
+                <label>Lý do</label>
+                <input
+                  type="text"
+                  [(ngModel)]="delegationForm.reason"
+                  placeholder="Lý do cần ủy quyền"
+                />
+              </div>
+            </div>
+            <div class="form-actions">
+              <button
+                class="btn-primary"
+                (click)="saveDelegation()"
+                [disabled]="
+                  !delegationForm.toUserId ||
+                  selectedPermissions.length === 0 ||
+                  !delegationForm.validUntil
+                "
+              >
+                Tạo mới
+              </button>
+              <button class="btn-secondary" (click)="closeDelegationModal()">Hủy</button>
+            </div>
+          </div>
+        }
+
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Từ</th>
+              <th>Đến</th>
+              <th>Quyền hạn</th>
+              <th>Có hiệu lực đến</th>
+              <th>Lý do</th>
+              <th>Thao tác</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (d of delegations(); track d.id) {
+              <tr>
+                <td>
+                  <code>{{ d.fromUserId }}</code>
+                </td>
+                <td>
+                  <code>{{ d.toUserId }}</code>
+                </td>
+                <td>
+                  <code>{{ d.permissions }}</code>
+                </td>
+                <td>{{ d.validUntil | date: 'short' }}</td>
+                <td>{{ d.reason || '—' }}</td>
+                <td class="actions">
+                  <button class="btn-sm btn-danger" (click)="revokeDelegation(d)">Thu hồi</button>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="6" class="empty">
+                  Chưa có ủy quyền nào. Nhấn "+ Tạo ủy quyền" để tạo mới.
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+
+    <!-- ═══ Phân tích hành vi ═══ -->
+    @if (activeTab() === 'behavior' && !loading()) {
+      <div class="section">
+        <div class="section-header">
+          <h3>Hồ sơ hành vi người dùng</h3>
+        </div>
+        <p class="info-text">
+          Hồ sơ hành vi được xây dựng tự động từ lịch sử đăng nhập. Nhấn nút Làm mới để tính toán
+          lại.
+        </p>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>ID người dùng</th>
+              <th>Tổng đăng nhập</th>
+              <th>Thất bại</th>
+              <th>Phiên TB (phút)</th>
+              <th>Đăng nhập cuối</th>
+              <th>Thao tác</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (profile of behaviorProfiles(); track profile.id) {
+              <tr>
+                <td>
+                  <code>{{ profile.userId }}</code>
+                </td>
+                <td>{{ profile.totalLogins }}</td>
+                <td>{{ profile.failedLogins }}</td>
+                <td>{{ profile.averageSessionDurationMinutes | number: '1.0-0' }}</td>
+                <td>
+                  {{ profile.lastLoginAt ? (profile.lastLoginAt | date: 'short') : 'Chưa bao giờ' }}
+                </td>
+                <td class="actions">
+                  <button class="btn-sm" (click)="refreshProfile(profile)">Làm mới</button>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="6" class="empty">
+                  Chưa có hồ sơ hành vi. Hồ sơ được tạo tự động khi người dùng đăng nhập.
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+
+    <!-- ═══ Tùy chọn thông báo ═══ -->
+    @if (activeTab() === 'notifications' && !loading()) {
+      <div class="section">
+        <div class="section-header">
+          <h3>Tùy chọn thông báo</h3>
+          <button class="btn-primary" (click)="openNotifModal()">+ Thêm tùy chọn</button>
+        </div>
+
+        @if (showNotifModal) {
+          <div class="form-card">
+            <h4>Tạo tùy chọn thông báo mới</h4>
+            <div class="form-grid">
+              <div class="form-group user-search-wrapper">
+                <label>Người dùng *</label>
+                <input
+                  type="text"
+                  [ngModel]="userSearchQuery"
+                  (ngModelChange)="onUserSearch($event, 'notif')"
+                  placeholder="Nhập tên đăng nhập để tìm kiếm"
+                  autocomplete="off"
+                />
+                @if (showUserDropdown['notif'] && userSearchResults().length) {
+                  <ul class="user-dropdown">
+                    @for (u of userSearchResults(); track u.id) {
+                      <li (click)="selectUser(u, notifForm, 'userId', 'notif')">
+                        <strong>{{ u.username }}</strong>
+                        <span class="user-meta">{{ u.fullName }} — {{ u.role }}</span>
+                      </li>
+                    }
+                  </ul>
+                }
+                @if (notifForm.userId) {
+                  <small class="selected-hint">Đã chọn: {{ notifForm.userId }}</small>
+                }
+              </div>
+              <div class="form-group">
+                <label>Kênh</label>
+                <select [(ngModel)]="notifForm.channel">
+                  <option value="in_app">Trong ứng dụng</option>
+                  <option value="email">Email</option>
+                  <option value="sms">SMS</option>
+                  <option value="push">Push</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Loại sự kiện (phân cách bằng dấu phẩy)</label>
+                <input
+                  type="text"
+                  [(ngModel)]="notifForm.eventTypes"
+                  placeholder="VD: LoginFailed,BruteForce,AccountLocked"
+                />
+              </div>
+            </div>
+            <div class="form-actions">
+              <button class="btn-primary" (click)="saveNotif()" [disabled]="!notifForm.userId">
+                Tạo mới
+              </button>
+              <button class="btn-secondary" (click)="closeNotifModal()">Hủy</button>
+            </div>
+          </div>
+        }
+
+        <div class="lookup-bar user-search-wrapper">
+          <label>Tra cứu tùy chọn theo người dùng:</label>
+          <input
+            type="text"
+            #notifUserInput
+            placeholder="Nhập tên đăng nhập"
+            (input)="onNotifLookupSearch(notifUserInput.value)"
+            autocomplete="off"
+          />
+          @if (showUserDropdown['notifLookup'] && userSearchResults().length) {
+            <ul class="user-dropdown">
+              @for (u of userSearchResults(); track u.id) {
+                <li (click)="selectUserForNotifLookup(u, notifUserInput)">
+                  <strong>{{ u.username }}</strong>
+                  <span class="user-meta">{{ u.fullName }} — {{ u.role }}</span>
+                </li>
+              }
+            </ul>
+          }
+        </div>
+
+        @if (notificationPrefs().length) {
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Kênh</th>
+                <th>Loại sự kiện</th>
+                <th>Bật</th>
+                <th>Thao tác</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (pref of notificationPrefs(); track pref.id) {
+                <tr>
+                  <td>
+                    <span class="badge">{{ pref.channel }}</span>
+                  </td>
+                  <td>
+                    <code>{{ pref.eventTypes }}</code>
+                  </td>
+                  <td>{{ pref.isEnabled ? '✅' : '❌' }}</td>
+                  <td class="actions">
+                    <button class="btn-sm btn-danger" (click)="deleteNotifPref(pref)">Xóa</button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        }
+      </div>
+    }
+  </div>
+</div>

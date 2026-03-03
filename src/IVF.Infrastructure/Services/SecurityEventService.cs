@@ -2,6 +2,7 @@ using IVF.Application.Common.Interfaces;
 using IVF.Domain.Entities;
 using IVF.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace IVF.Infrastructure.Services;
@@ -19,11 +20,16 @@ public sealed class SecurityEventService : ISecurityEventService
 {
     private readonly IvfDbContext _context;
     private readonly ILogger<SecurityEventService> _logger;
+    private readonly IServiceProvider _serviceProvider;
 
-    public SecurityEventService(IvfDbContext context, ILogger<SecurityEventService> logger)
+    // Prevent infinite recursion: incident response → log event → incident response
+    private static readonly AsyncLocal<bool> _processingIncident = new();
+
+    public SecurityEventService(IvfDbContext context, ILogger<SecurityEventService> logger, IServiceProvider serviceProvider)
     {
         _context = context;
         _logger = logger;
+        _serviceProvider = serviceProvider;
     }
 
     public async Task LogEventAsync(SecurityEvent securityEvent, CancellationToken ct = default)
@@ -53,6 +59,41 @@ public sealed class SecurityEventService : ISecurityEventService
                     securityEvent.EventType,
                     securityEvent.UserId,
                     securityEvent.IpAddress);
+            }
+
+            // Route to incident response (skip if already inside incident processing to prevent recursion)
+            if (!_processingIncident.Value && securityEvent.EventType != SecurityEventTypes.IncidentCreated)
+            {
+                _processingIncident.Value = true;
+                try
+                {
+                    var incidentResponse = _serviceProvider.GetService<IIncidentResponseService>();
+                    if (incidentResponse is not null)
+                        await incidentResponse.ProcessEventAsync(securityEvent, ct);
+                }
+                finally
+                {
+                    _processingIncident.Value = false;
+                }
+            }
+
+            // Send security notifications for High/Critical events
+            if (securityEvent.Severity is "High" or "Critical" && securityEvent.UserId.HasValue)
+            {
+                try
+                {
+                    var notificationService = _serviceProvider.GetService<ISecurityNotificationService>();
+                    if (notificationService is not null)
+                        await notificationService.SendSecurityAlertAsync(
+                            securityEvent.UserId.Value,
+                            securityEvent.EventType,
+                            $"[{securityEvent.Severity}] {securityEvent.EventType}: {securityEvent.Details}",
+                            ct);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to send security notification for {EventType}", securityEvent.EventType);
+                }
             }
         }
         catch (Exception ex)

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using IVF.Application.Common.Interfaces;
 using IVF.Domain.Entities;
 using IVF.Infrastructure.Persistence;
@@ -23,8 +24,31 @@ public class UserPermissionRepository : IUserPermissionRepository
 
     public async Task<bool> HasPermissionAsync(Guid userId, string permissionCode, CancellationToken ct = default)
     {
-        return await _context.UserPermissions
+        // Check direct permission
+        var hasDirect = await _context.UserPermissions
             .AnyAsync(p => p.UserId == userId && p.PermissionCode == permissionCode, ct);
+        if (hasDirect) return true;
+
+        // Check delegated permissions
+        var now = DateTime.UtcNow;
+        var delegations = await _context.PermissionDelegations
+            .Where(d => d.ToUserId == userId && !d.IsRevoked && !d.IsDeleted
+                && d.ValidFrom <= now && d.ValidUntil > now)
+            .Select(d => d.Permissions)
+            .ToListAsync(ct);
+
+        foreach (var permissionsJson in delegations)
+        {
+            try
+            {
+                var permissions = JsonSerializer.Deserialize<List<string>>(permissionsJson);
+                if (permissions is not null && permissions.Contains(permissionCode))
+                    return true;
+            }
+            catch { /* Invalid JSON — skip */ }
+        }
+
+        return false;
     }
 
     public async Task AddAsync(UserPermission permission, CancellationToken ct = default)

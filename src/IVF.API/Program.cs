@@ -316,6 +316,19 @@ builder.Services.AddScoped<IVF.Application.Common.Interfaces.IThreatDetectionSer
 builder.Services.AddScoped<IVF.Application.Common.Interfaces.IDeviceFingerprintService, IVF.Infrastructure.Services.DeviceFingerprintService>();
 builder.Services.AddScoped<IVF.Application.Common.Interfaces.IAdaptiveSessionService, IVF.Infrastructure.Services.AdaptiveSessionService>();
 
+// ─── Enterprise Security Services (Adaptive Auth, Threat Detection, Privacy, Delegation) ───
+builder.Services.AddScoped<IVF.Application.Common.Interfaces.IStepUpAuthService, IVF.Infrastructure.Services.StepUpAuthService>();
+builder.Services.AddScoped<IVF.Application.Common.Interfaces.IContextualAuthService, IVF.Infrastructure.Services.ContextualAuthService>();
+builder.Services.AddScoped<IVF.Application.Common.Interfaces.IConditionalAccessService, IVF.Infrastructure.Services.ConditionalAccessService>();
+builder.Services.AddScoped<IVF.Application.Common.Interfaces.IBehavioralAnalyticsService, IVF.Infrastructure.Services.BehavioralAnalyticsService>();
+builder.Services.AddScoped<IVF.Application.Common.Interfaces.IIncidentResponseService, IVF.Infrastructure.Services.IncidentResponseService>();
+builder.Services.AddScoped<IVF.Application.Common.Interfaces.IBotDetectionService, IVF.Infrastructure.Services.BotDetectionService>();
+builder.Services.AddSingleton<IVF.Application.Common.Interfaces.ISecretsScanner, IVF.Infrastructure.Services.SecretsScanner>();
+builder.Services.AddScoped<IVF.Application.Common.Interfaces.IBreachedPasswordService, IVF.Infrastructure.Services.BreachedPasswordService>();
+builder.Services.AddScoped<IVF.Application.Common.Interfaces.IGeoLocationService, IVF.Infrastructure.Services.GeoLocationService>();
+builder.Services.AddScoped<IVF.Application.Common.Interfaces.ISecurityNotificationService, IVF.Infrastructure.Services.SecurityNotificationService>();
+builder.Services.AddHostedService<IVF.Infrastructure.Services.DataRetentionService>();
+
 // ─── Vault Policy Authorization ───
 builder.Services.AddVaultPolicyAuthorization();
 
@@ -524,6 +537,7 @@ app.MapKeyVaultEndpoints();
 app.MapZeroTrustEndpoints();
 app.MapSecurityEventEndpoints(); // Zero Trust security monitoring dashboard
 app.MapAdvancedSecurityEndpoints(); // Advanced security: lockouts, rate-limits, geo, IP whitelist
+app.MapEnterpriseSecurityEndpoints(); // Enterprise: conditional access, incidents, delegation, retention
 
 // ── Config seeders: run in every environment (idempotent, no demo data) ──────
 {
@@ -535,6 +549,7 @@ app.MapAdvancedSecurityEndpoints(); // Advanced security: lockouts, rate-limits,
     await ZTPolicySeeder.SeedAsync(db);              // default Zero Trust policies
     await EncryptionConfigSeeder.SeedAsync(db);      // default encryption configs
     await VaultComplianceSeeder.SeedAsync(db, scope.ServiceProvider);        // vault compliance baseline data
+    await EnterpriseSecuritySeeder.SeedAsync(db);    // default enterprise security config
 
     // Permission definitions must always be present
     var permDefRepo = scope.ServiceProvider.GetRequiredService<IPermissionDefinitionRepository>();

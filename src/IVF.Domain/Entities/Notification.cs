@@ -15,12 +15,12 @@ public class Notification : BaseEntity
     public DateTime? ReadAt { get; private set; }
     public string? EntityType { get; private set; }  // e.g., "Appointment", "QueueTicket"
     public Guid? EntityId { get; private set; }
-    
+
     // Navigation
     public virtual User User { get; private set; } = null!;
-    
+
     private Notification() { }
-    
+
     public static Notification Create(
         Guid userId,
         string title,
@@ -39,7 +39,7 @@ public class Notification : BaseEntity
             EntityId = entityId
         };
     }
-    
+
     public void MarkAsRead()
     {
         if (!IsRead)
@@ -60,5 +60,6 @@ public enum NotificationType
     AppointmentReminder,
     QueueCalled,
     CycleUpdate,
-    PaymentDue
+    PaymentDue,
+    SecurityAlert
 }

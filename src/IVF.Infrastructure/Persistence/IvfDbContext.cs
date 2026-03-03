@@ -117,6 +117,17 @@ public class IvfDbContext : DbContext
     public DbSet<UserLoginHistory> UserLoginHistories => Set<UserLoginHistory>();
     public DbSet<UserConsent> UserConsents => Set<UserConsent>();
 
+    // Enterprise Security — Adaptive Auth, Threat Detection, Privacy, Delegation
+    public DbSet<ConditionalAccessPolicy> ConditionalAccessPolicies => Set<ConditionalAccessPolicy>();
+    public DbSet<UserBehaviorProfile> UserBehaviorProfiles => Set<UserBehaviorProfile>();
+    public DbSet<SecurityIncident> SecurityIncidents => Set<SecurityIncident>();
+    public DbSet<IncidentResponseRule> IncidentResponseRules => Set<IncidentResponseRule>();
+    public DbSet<DataRetentionPolicy> DataRetentionPolicies => Set<DataRetentionPolicy>();
+    public DbSet<UserExternalLogin> UserExternalLogins => Set<UserExternalLogin>();
+    public DbSet<ImpersonationRequest> ImpersonationRequests => Set<ImpersonationRequest>();
+    public DbSet<PermissionDelegation> PermissionDelegations => Set<PermissionDelegation>();
+    public DbSet<NotificationPreference> NotificationPreferences => Set<NotificationPreference>();
+
     // Vault System (self-hosted, Azure KV only for auto-unseal wrap/unwrap)
     public DbSet<VaultSecret> VaultSecrets => Set<VaultSecret>();
     public DbSet<VaultPolicy> VaultPolicies => Set<VaultPolicy>();

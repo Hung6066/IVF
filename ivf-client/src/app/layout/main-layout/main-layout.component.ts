@@ -64,6 +64,7 @@ const FALLBACK_MENU: MenuSection[] = [
       { icon: '🔏', label: 'Ký số', route: '/admin/digital-signing', adminOnly: true },
       { icon: '🗄️', label: 'Sao lưu', route: '/admin/backup-restore', adminOnly: true },
       { icon: '🛡️', label: 'Bảo mật', route: '/admin/security', adminOnly: true },
+      { icon: '🏢', label: 'Bảo mật DN', route: '/admin/enterprise-security', adminOnly: true },
       { icon: '📋', label: 'Sự kiện bảo mật', route: '/admin/security-events', adminOnly: true },
       { icon: '🎨', label: 'UI Library', route: '/ui-library', adminOnly: true },
     ],

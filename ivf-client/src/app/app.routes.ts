@@ -269,6 +269,13 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'admin/enterprise-security',
+        loadComponent: () =>
+          import('./features/admin/enterprise-security/enterprise-security.component').then(
+            (m) => m.EnterpriseSecurityComponent,
+          ),
+      },
+      {
         path: 'admin/security-events',
         loadComponent: () =>
           import('./features/admin/security-events/security-events.component').then(

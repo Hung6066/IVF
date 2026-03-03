@@ -45,6 +45,10 @@ public static class AuthEndpoints
             IThreatDetectionService threatDetection,
             IDeviceFingerprintService deviceFingerprint,
             IAdaptiveSessionService sessionService,
+            IStepUpAuthService stepUpAuth,
+            IContextualAuthService contextualAuth,
+            IBehavioralAnalyticsService behavioralAnalytics,
+            IIncidentResponseService incidentResponse,
             IvfDbContext db,
             HttpContext httpContext) =>
         {
@@ -205,6 +209,93 @@ public static class AuthEndpoints
             // 6. Check device trust
             var deviceTrust = await deviceFingerprint.CheckDeviceTrustAsync(user.Id, fingerprint);
 
+            // 6.1. Step-up authentication — risk-based MFA escalation
+            var stepUpDecision = await stepUpAuth.EvaluateStepUpAsync(user.Id, assessment, deviceTrust);
+            if (stepUpDecision.RequiresStepUp)
+            {
+                if (stepUpDecision.RequiredAction == "block")
+                {
+                    await securityEvents.LogEventAsync(SecurityEvent.Create(
+                        eventType: SecurityEventTypes.StepUpRequired,
+                        severity: "Critical",
+                        userId: user.Id,
+                        username: user.Username,
+                        ipAddress: ipAddress,
+                        correlationId: httpContext.TraceIdentifier,
+                        riskScore: stepUpDecision.RiskScore,
+                        isBlocked: true,
+                        details: $"{{\"action\":\"block\",\"reason\":\"{stepUpDecision.Reason}\"}}"));
+                    return Results.Json(new { error = stepUpDecision.Reason, code = "ZT_STEP_UP_BLOCKED" }, statusCode: 403);
+                }
+
+                // Require MFA step-up even if MFA wasn't originally enabled
+                var mfaToken = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(32));
+                _pendingMfa[mfaToken] = new MfaPendingInfo(
+                    user.Id, user.Username, ipAddress, userAgent,
+                    DateTime.UtcNow.AddMinutes(5), "totp");
+
+                await securityEvents.LogEventAsync(SecurityEvent.Create(
+                    eventType: SecurityEventTypes.StepUpRequired,
+                    severity: "Medium",
+                    userId: user.Id,
+                    username: user.Username,
+                    ipAddress: ipAddress,
+                    correlationId: httpContext.TraceIdentifier,
+                    riskScore: stepUpDecision.RiskScore,
+                    details: $"{{\"action\":\"{stepUpDecision.RequiredAction}\",\"reason\":\"{stepUpDecision.Reason}\"}}"));
+
+                return Results.Json(new
+                {
+                    code = "STEP_UP_REQUIRED",
+                    mfaToken,
+                    requiredAction = stepUpDecision.RequiredAction,
+                    reason = stepUpDecision.Reason,
+                    user = UserDto.FromEntity(user)
+                }, statusCode: 200);
+            }
+
+            // 6.2. Contextual authentication — detect unusual login patterns
+            var contextResult = await contextualAuth.EvaluateContextAsync(user.Id, ipAddress, userAgent, fingerprint, null);
+            if (contextResult.RequiresAdditionalVerification)
+            {
+                await securityEvents.LogEventAsync(SecurityEvent.Create(
+                    eventType: SecurityEventTypes.ContextualAuthTriggered,
+                    severity: "Medium",
+                    userId: user.Id,
+                    username: user.Username,
+                    ipAddress: ipAddress,
+                    correlationId: httpContext.TraceIdentifier,
+                    details: System.Text.Json.JsonSerializer.Serialize(new
+                    {
+                        triggers = contextResult.Triggers,
+                        recommendation = contextResult.RecommendedAction
+                    })));
+            }
+
+            // 6.3. Behavioral analytics — update user profile and detect anomalies
+            await behavioralAnalytics.UpdateProfileAsync(user.Id);
+            var behaviorResult = await behavioralAnalytics.AnalyzeLoginAsync(user.Id, ipAddress, userAgent, null, DateTime.UtcNow);
+            if (behaviorResult.IsAnomalous)
+            {
+                var anomalyEvent = SecurityEvent.Create(
+                    eventType: SecurityEventTypes.BehaviorAnomalyDetected,
+                    severity: behaviorResult.AnomalyScore >= 50 ? "High" : "Medium",
+                    userId: user.Id,
+                    username: user.Username,
+                    ipAddress: ipAddress,
+                    correlationId: httpContext.TraceIdentifier,
+                    riskScore: (int)behaviorResult.AnomalyScore,
+                    details: System.Text.Json.JsonSerializer.Serialize(new
+                    {
+                        anomalies = behaviorResult.AnomalyFactors,
+                        anomalyScore = behaviorResult.AnomalyScore
+                    }));
+                await securityEvents.LogEventAsync(anomalyEvent);
+
+                // Route anomaly to incident response
+                await incidentResponse.ProcessEventAsync(anomalyEvent);
+            }
+
             // 7. Create adaptive session
             var sessionCtx = new RequestSecurityContext(
                 UserId: user.Id,
@@ -320,7 +411,13 @@ public static class AuthEndpoints
                 return Results.Unauthorized();
             }
 
-            var token = GenerateJwtToken(user, config);
+            // Carry forward security claims from the current JWT
+            var currentAmr = httpContext.User.FindFirst("amr")?.Value
+                ?? httpContext.User.FindFirst("http://schemas.microsoft.com/claims/authnmethodsreference")?.Value;
+            var currentDeviceFp = httpContext.User.FindFirst("device_fingerprint")?.Value;
+            var currentSessionId = httpContext.User.FindFirst("session_id")?.Value;
+
+            var token = GenerateJwtToken(user, config, currentDeviceFp, currentSessionId, currentAmr);
             var refreshToken = GenerateRefreshToken();
 
             // Register new token in family (tracks lineage for reuse detection)
@@ -346,16 +443,51 @@ public static class AuthEndpoints
             var userId = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId)) return Results.Unauthorized();
             var user = await userRepo.GetByIdAsync(Guid.Parse(userId));
-            return user == null ? Results.NotFound() : Results.Ok(UserDto.FromEntity(user));
+            if (user == null) return Results.NotFound();
+
+            var dto = UserDto.FromEntity(user);
+
+            // If impersonating, include actor info
+            var isImpersonation = principal.FindFirst("impersonation")?.Value == "true";
+            if (isImpersonation)
+            {
+                var actorId = principal.FindFirst("act_sub")?.Value;
+                return Results.Ok(new { user = dto, isImpersonation = true, actorUserId = actorId });
+            }
+
+            return Results.Ok(dto);
         }).RequireAuthorization();
 
-        // Get current user's permissions
-        group.MapGet("/me/permissions", async (ClaimsPrincipal principal, IUserPermissionRepository permRepo) =>
+        // Get current user's permissions (including delegated)
+        group.MapGet("/me/permissions", async (ClaimsPrincipal principal, IUserPermissionRepository permRepo, IvfDbContext db) =>
         {
             var userId = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId)) return Results.Unauthorized();
-            var permissions = await permRepo.GetByUserIdAsync(Guid.Parse(userId));
-            return Results.Ok(permissions.Select(p => p.PermissionCode));
+
+            var uid = Guid.Parse(userId);
+            var directPermissions = await permRepo.GetByUserIdAsync(uid);
+            var directCodes = directPermissions.Select(p => p.PermissionCode).ToHashSet();
+
+            // Include delegated permissions
+            var now = DateTime.UtcNow;
+            var delegations = await db.PermissionDelegations
+                .Where(d => d.ToUserId == uid && !d.IsRevoked && !d.IsDeleted
+                    && d.ValidFrom <= now && d.ValidUntil > now)
+                .Select(d => d.Permissions)
+                .ToListAsync();
+
+            foreach (var permJson in delegations)
+            {
+                try
+                {
+                    var perms = System.Text.Json.JsonSerializer.Deserialize<List<string>>(permJson);
+                    if (perms is not null)
+                        foreach (var p in perms) directCodes.Add(p);
+                }
+                catch { /* skip invalid JSON */ }
+            }
+
+            return Results.Ok(directCodes);
         }).RequireAuthorization();
 
         // ─── MFA Verify ───
@@ -439,7 +571,7 @@ public static class AuthEndpoints
                 CorrelationId: httpContext.TraceIdentifier, Timestamp: DateTime.UtcNow);
 
             var session = await sessionService.CreateSessionAsync(user.Id, sessionCtx);
-            var token = GenerateJwtToken(user, config, fingerprint, session.SessionId);
+            var token = GenerateJwtToken(user, config, fingerprint, session.SessionId, amr: "mfa");
             var refreshToken = GenerateRefreshToken();
 
             // Register initial token in family for reuse detection
@@ -592,7 +724,7 @@ public static class AuthEndpoints
                 CorrelationId: context.TraceIdentifier, Timestamp: DateTime.UtcNow);
 
             var session = await sessionService.CreateSessionAsync(user.Id, sessionCtx);
-            var token = GenerateJwtToken(user, config, fingerprint, session.SessionId);
+            var token = GenerateJwtToken(user, config, fingerprint, session.SessionId, amr: "mfa");
             var refreshToken = GenerateRefreshToken();
 
             // Register initial token in family for reuse detection
@@ -765,7 +897,7 @@ public static class AuthEndpoints
         return (deviceType, os, browser);
     }
 
-    private static string GenerateJwtToken(User user, IConfiguration config, string? deviceFingerprint = null, string? sessionId = null)
+    private static string GenerateJwtToken(User user, IConfiguration config, string? deviceFingerprint = null, string? sessionId = null, string? amr = null)
     {
         var jwtSettings = config.GetSection("JwtSettings");
         var tokenHandler = new JwtSecurityTokenHandler();
@@ -786,6 +918,9 @@ public static class AuthEndpoints
             claims.Add(new Claim("device_fingerprint", deviceFingerprint));
         if (!string.IsNullOrEmpty(sessionId))
             claims.Add(new Claim("session_id", sessionId));
+        // Authentication Methods Reference (RFC 8176) — indicates completed auth factors
+        if (!string.IsNullOrEmpty(amr))
+            claims.Add(new Claim("amr", amr));
 
         // RS256 asymmetric signing — private key signs, public key verifies
         // Even if the validation key is exposed, tokens cannot be forged

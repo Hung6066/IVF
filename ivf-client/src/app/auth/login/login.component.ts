@@ -491,8 +491,8 @@ export class LoginComponent {
 
     this.authService.login({ username: this.username, password: this.password }).subscribe({
       next: (response: any) => {
-        // Check if MFA is required (server returns code: MFA_REQUIRED with 200)
-        if (response.code === 'MFA_REQUIRED') {
+        // Check if MFA or step-up auth is required (server returns code with 200)
+        if (response.code === 'MFA_REQUIRED' || response.code === 'STEP_UP_REQUIRED') {
           this.mfaToken.set(response.mfaToken);
           this.mfaMethod.set(response.mfaMethod || 'totp');
           this.step.set('mfa');

@@ -28,7 +28,9 @@ public sealed class RefreshTokenFamilyService
     public void RegisterToken(Guid userId, string currentToken, string? previousToken)
     {
         var tokenHash = HashToken(currentToken);
-        var familyId = previousToken != null ? GetFamilyId(HashToken(previousToken)) : Guid.NewGuid().ToString();
+        var familyId = previousToken != null
+            ? GetFamilyId(HashToken(previousToken)) ?? Guid.NewGuid().ToString()
+            : Guid.NewGuid().ToString();
 
         var family = _families.GetOrAdd(familyId, _ => new TokenFamily
         {
