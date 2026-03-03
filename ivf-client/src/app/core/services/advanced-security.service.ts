@@ -29,6 +29,9 @@ import {
   TotpVerifyRequest,
   SmsRegisterRequest,
   SmsVerifyRequest,
+  ComplianceDashboard,
+  SecurityPoliciesResponse,
+  AuditReport,
 } from '../models/advanced-security.model';
 
 @Injectable({ providedIn: 'root' })
@@ -214,5 +217,23 @@ export class AdvancedSecurityService {
 
   disableMfa(userId: string): Observable<{ message: string }> {
     return this.http.post<{ message: string }>(`${this.baseUrl}/mfa/${userId}/disable`, {});
+  }
+
+  // ─── Compliance ───
+  getComplianceDashboard(): Observable<ComplianceDashboard> {
+    return this.http.get<ComplianceDashboard>(`${this.baseUrl}/compliance`);
+  }
+
+  // ─── Security Policies ───
+  getSecurityPolicies(): Observable<SecurityPoliciesResponse> {
+    return this.http.get<SecurityPoliciesResponse>(`${this.baseUrl}/policies`);
+  }
+
+  // ─── Audit Reports ───
+  getAuditReport(hours = 168, severity?: string, eventType?: string): Observable<AuditReport> {
+    let params = new HttpParams().set('hours', hours);
+    if (severity) params = params.set('severity', severity);
+    if (eventType) params = params.set('eventType', eventType);
+    return this.http.get<AuditReport>(`${this.baseUrl}/audit-report`, { params });
   }
 }

@@ -23,11 +23,18 @@ import {
   MfaSettings,
   TotpSetupResponse,
   RISK_FACTOR_LABELS,
+  ComplianceDashboard,
+  SecurityPoliciesResponse,
+  SecurityPolicy,
+  AuditReport,
 } from '../../../core/models/advanced-security.model';
 import { SessionInfo, ThreatAssessment, IpIntelligence } from '../../../core/models/security.model';
 
 type TabKey =
   | 'overview'
+  | 'compliance'
+  | 'policies'
+  | 'audit'
   | 'passkeys'
   | 'devices'
   | 'sessions'
@@ -141,6 +148,19 @@ export class AdvancedSecurityComponent implements OnInit, OnDestroy {
   smsCode = '';
   smsUserId = '';
 
+  // Compliance
+  complianceDashboard = signal<ComplianceDashboard | null>(null);
+
+  // Security Policies
+  securityPolicies = signal<SecurityPolicy[]>([]);
+  expandedPolicy = signal<string | null>(null);
+
+  // Audit Reports
+  auditReport = signal<AuditReport | null>(null);
+  auditHours = 168;
+  auditSeverityFilter = '';
+  auditEventTypeFilter = '';
+
   // Current user
   currentUser = computed(() => this.authService.user());
   currentUserId = computed(() => this.authService.user()?.id ?? '');
@@ -244,6 +264,15 @@ export class AdvancedSecurityComponent implements OnInit, OnDestroy {
     switch (tab) {
       case 'overview':
         this.loadOverview();
+        break;
+      case 'compliance':
+        this.loadCompliance();
+        break;
+      case 'policies':
+        this.loadPolicies();
+        break;
+      case 'audit':
+        this.loadAuditReport();
         break;
       case 'passkeys':
         if (this.passkeyUserId.trim()) this.loadPasskeys();
@@ -575,6 +604,142 @@ export class AdvancedSecurityComponent implements OnInit, OnDestroy {
       next: () => this.showStatus('Đã gửi mã OTP qua SMS', 'success'),
       error: () => this.showStatus('Lỗi gửi SMS OTP', 'error'),
     });
+  }
+
+  // ─── Compliance Dashboard ───
+
+  loadCompliance() {
+    this.loading.set(true);
+    this.advancedSecurityService.getComplianceDashboard().subscribe({
+      next: (data) => {
+        this.complianceDashboard.set(data);
+        this.loading.set(false);
+      },
+      error: () => {
+        this.showStatus('Không thể tải dữ liệu tuân thủ', 'error');
+        this.loading.set(false);
+      },
+    });
+  }
+
+  getComplianceColor(score: number): string {
+    if (score >= 80) return '#22c55e';
+    if (score >= 60) return '#f59e0b';
+    return '#ef4444';
+  }
+
+  getComplianceStatusIcon(status: string): string {
+    if (status === 'pass') return '✅';
+    if (status === 'warning') return '⚠️';
+    return '❌';
+  }
+
+  getComplianceLevelText(level: string): string {
+    if (level === 'compliant') return 'Tuân thủ';
+    if (level === 'partial') return 'Tuân thủ một phần';
+    return 'Chưa tuân thủ';
+  }
+
+  // ─── Security Policies ───
+
+  loadPolicies() {
+    this.loading.set(true);
+    this.advancedSecurityService.getSecurityPolicies().subscribe({
+      next: (data) => {
+        this.securityPolicies.set(data.policies);
+        this.loading.set(false);
+      },
+      error: () => {
+        this.showStatus('Không thể tải chính sách bảo mật', 'error');
+        this.loading.set(false);
+      },
+    });
+  }
+
+  togglePolicyExpand(policyId: string) {
+    this.expandedPolicy.set(this.expandedPolicy() === policyId ? null : policyId);
+  }
+
+  getPolicyCategoryIcon(category: string): string {
+    const icons: Record<string, string> = {
+      authentication: '🔐',
+      session: '🔗',
+      device: '🖥️',
+      access: '🛡️',
+      threat: '⚡',
+      data: '💾',
+    };
+    return icons[category] || '📋';
+  }
+
+  getPolicyCategoryLabel(category: string): string {
+    const labels: Record<string, string> = {
+      authentication: 'Xác thực',
+      session: 'Phiên',
+      device: 'Thiết bị',
+      access: 'Truy cập',
+      threat: 'Phát hiện',
+      data: 'Dữ liệu',
+    };
+    return labels[category] || category;
+  }
+
+  getSettingEntries(settings: Record<string, any>): { key: string; value: any }[] {
+    return Object.entries(settings).map(([key, value]) => ({ key, value }));
+  }
+
+  formatSettingKey(key: string): string {
+    return key.replace(/([A-Z])/g, ' $1').replace(/^./, (s) => s.toUpperCase());
+  }
+
+  formatSettingValue(value: any): string {
+    if (Array.isArray(value)) return value.join(', ');
+    if (typeof value === 'object' && value !== null)
+      return Object.entries(value)
+        .map(([k, v]) => `${k}: ${v}`)
+        .join(', ');
+    if (typeof value === 'boolean') return value ? '✅ Có' : '❌ Không';
+    return String(value);
+  }
+
+  // ─── Audit Reports ───
+
+  loadAuditReport() {
+    this.loading.set(true);
+    this.advancedSecurityService
+      .getAuditReport(
+        this.auditHours,
+        this.auditSeverityFilter || undefined,
+        this.auditEventTypeFilter || undefined,
+      )
+      .subscribe({
+        next: (data) => {
+          this.auditReport.set(data);
+          this.loading.set(false);
+        },
+        error: () => {
+          this.showStatus('Không thể tải báo cáo kiểm toán', 'error');
+          this.loading.set(false);
+        },
+      });
+  }
+
+  getAuditBarWidth(count: number, max: number): number {
+    return max > 0 ? Math.round((count / max) * 100) : 0;
+  }
+
+  getSeverityFromCategory(category: string): string {
+    const map: Record<string, string> = {
+      THREAT: 'critical',
+      AUTH: 'high',
+      ZT: 'warning',
+      DEVICE: 'info',
+      SESSION: 'info',
+      DATA: 'medium',
+      AUTHZ: 'high',
+      API: 'warning',
+    };
+    return map[category] || 'info';
   }
 
   // ─── Login History ───

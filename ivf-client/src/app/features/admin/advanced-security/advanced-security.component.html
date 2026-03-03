@@ -62,6 +62,23 @@
     </button>
     <button
       class="tab-btn"
+      [class.active]="activeTab() === 'compliance'"
+      (click)="setTab('compliance')"
+    >
+      🏥 Tuân thủ
+    </button>
+    <button
+      class="tab-btn"
+      [class.active]="activeTab() === 'policies'"
+      (click)="setTab('policies')"
+    >
+      📜 Chính sách
+    </button>
+    <button class="tab-btn" [class.active]="activeTab() === 'audit'" (click)="setTab('audit')">
+      📑 Kiểm toán
+    </button>
+    <button
+      class="tab-btn"
       [class.active]="activeTab() === 'passkeys'"
       (click)="setTab('passkeys')"
     >
@@ -279,6 +296,433 @@
         <div class="empty-state">
           <span class="empty-icon">🛡️</span>
           <span>Đang tải dữ liệu bảo mật...</span>
+        </div>
+      }
+    </div>
+  }
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- TAB: COMPLIANCE (HIPAA) -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  @if (activeTab() === 'compliance') {
+    <div class="tab-content">
+      @if (complianceDashboard(); as compliance) {
+        <!-- Compliance Hero -->
+        <div class="compliance-hero">
+          <div class="compliance-score-card">
+            <div
+              class="compliance-ring"
+              [style.border-color]="getComplianceColor(compliance.overallScore)"
+            >
+              <span
+                class="compliance-score-value"
+                [style.color]="getComplianceColor(compliance.overallScore)"
+                >{{ compliance.overallScore }}</span
+              >
+              <span class="compliance-score-label">/ 100</span>
+            </div>
+            <p class="compliance-level" [style.color]="getComplianceColor(compliance.overallScore)">
+              {{ getComplianceLevelText(compliance.level) }}
+            </p>
+            <span class="compliance-framework">
+              <span class="badge severity-info">{{ compliance.framework }}</span>
+            </span>
+            <span class="score-updated"
+              >Đánh giá: {{ formatTimeAgo(compliance.lastAssessed) }}</span
+            >
+          </div>
+
+          <div class="compliance-summary-cards">
+            <div class="compliance-summary-card compliance-summary--pass">
+              <span class="compliance-summary-icon">✅</span>
+              <div class="compliance-summary-content">
+                <span class="compliance-summary-value">{{ compliance.summary.passed }}</span>
+                <span class="compliance-summary-label">Đạt</span>
+              </div>
+            </div>
+            <div class="compliance-summary-card compliance-summary--warning">
+              <span class="compliance-summary-icon">⚠️</span>
+              <div class="compliance-summary-content">
+                <span class="compliance-summary-value">{{ compliance.summary.warnings }}</span>
+                <span class="compliance-summary-label">Cần cải thiện</span>
+              </div>
+            </div>
+            <div class="compliance-summary-card compliance-summary--fail">
+              <span class="compliance-summary-icon">❌</span>
+              <div class="compliance-summary-content">
+                <span class="compliance-summary-value">{{ compliance.summary.failed }}</span>
+                <span class="compliance-summary-label">Không đạt</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Compliance Checks -->
+        <div class="compliance-checks">
+          @for (check of compliance.checks; track check.id) {
+            <div
+              class="compliance-check-card"
+              [class.check-pass]="check.status === 'pass'"
+              [class.check-warning]="check.status === 'warning'"
+              [class.check-fail]="check.status === 'fail'"
+            >
+              <div class="check-header">
+                <div class="check-status-icon">{{ getComplianceStatusIcon(check.status) }}</div>
+                <div class="check-info">
+                  <h4 class="check-name">{{ check.name }}</h4>
+                  <span class="check-standard">{{ check.standard }}</span>
+                </div>
+                <div class="check-score-bar">
+                  <div class="check-score-bg">
+                    <div
+                      class="check-score-fill"
+                      [style.width.%]="check.score"
+                      [style.background]="getComplianceColor(check.score)"
+                    ></div>
+                  </div>
+                  <span class="check-score-text" [style.color]="getComplianceColor(check.score)"
+                    >{{ check.score }}%</span
+                  >
+                </div>
+              </div>
+              <p class="check-details">{{ check.details }}</p>
+            </div>
+          }
+        </div>
+      } @else if (!loading()) {
+        <div class="empty-state">
+          <span class="empty-icon">🏥</span>
+          <span>Đang tải dữ liệu tuân thủ...</span>
+        </div>
+      }
+    </div>
+  }
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- TAB: SECURITY POLICIES -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  @if (activeTab() === 'policies') {
+    <div class="tab-content">
+      @if (securityPolicies().length > 0) {
+        <div class="policies-grid">
+          @for (policy of securityPolicies(); track policy.id) {
+            <div class="policy-card" [class.policy-expanded]="expandedPolicy() === policy.id">
+              <div class="policy-header" (click)="togglePolicyExpand(policy.id)">
+                <div class="policy-icon">{{ getPolicyCategoryIcon(policy.category) }}</div>
+                <div class="policy-info">
+                  <h4 class="policy-name">{{ policy.name }}</h4>
+                  <span class="policy-desc">{{ policy.description }}</span>
+                </div>
+                <div class="policy-badges">
+                  <span class="badge" [class]="policy.isEnabled ? 'severity-low' : 'severity-info'">
+                    {{ policy.isEnabled ? '✅ Hoạt động' : '❌ Tắt' }}
+                  </span>
+                  <span class="badge badge-outline">{{
+                    getPolicyCategoryLabel(policy.category)
+                  }}</span>
+                </div>
+                <span class="policy-chevron">{{ expandedPolicy() === policy.id ? '▼' : '▶' }}</span>
+              </div>
+              @if (expandedPolicy() === policy.id) {
+                <div class="policy-settings">
+                  <div class="settings-grid">
+                    @for (entry of getSettingEntries(policy.settings); track entry.key) {
+                      <div class="setting-item">
+                        <span class="setting-key">{{ formatSettingKey(entry.key) }}</span>
+                        <span class="setting-value">{{ formatSettingValue(entry.value) }}</span>
+                      </div>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+          }
+        </div>
+      } @else if (!loading()) {
+        <div class="empty-state">
+          <span class="empty-icon">📜</span>
+          <span>Đang tải chính sách bảo mật...</span>
+        </div>
+      }
+    </div>
+  }
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- TAB: AUDIT REPORTS -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  @if (activeTab() === 'audit') {
+    <div class="tab-content">
+      <!-- Filter Bar -->
+      <div class="audit-filter-bar">
+        <div class="form-group">
+          <label>Khoảng thời gian</label>
+          <select class="input-field" [(ngModel)]="auditHours" (ngModelChange)="loadAuditReport()">
+            <option [value]="24">24 giờ</option>
+            <option [value]="72">3 ngày</option>
+            <option [value]="168">7 ngày</option>
+            <option [value]="720">30 ngày</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Mức độ</label>
+          <select
+            class="input-field"
+            [(ngModel)]="auditSeverityFilter"
+            (ngModelChange)="loadAuditReport()"
+          >
+            <option value="">Tất cả</option>
+            <option value="Critical">Critical</option>
+            <option value="High">High</option>
+            <option value="Medium">Medium</option>
+            <option value="Low">Low</option>
+            <option value="Info">Info</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" (click)="loadAuditReport()" [disabled]="loading()">
+          🔍 Phân tích
+        </button>
+      </div>
+
+      @if (auditReport(); as report) {
+        <!-- Summary Stats -->
+        <div class="stats-grid">
+          <div class="stat-card stat-purple">
+            <div class="stat-icon">📊</div>
+            <div class="stat-info">
+              <span class="stat-value">{{ report.summary.totalEvents }}</span>
+              <span class="stat-label">Tổng sự kiện</span>
+            </div>
+          </div>
+          <div class="stat-card stat-red">
+            <div class="stat-icon">🚨</div>
+            <div class="stat-info">
+              <span class="stat-value">{{ report.summary.criticalEvents }}</span>
+              <span class="stat-label">Critical</span>
+            </div>
+          </div>
+          <div class="stat-card stat-orange">
+            <div class="stat-icon">🔥</div>
+            <div class="stat-info">
+              <span class="stat-value">{{ report.summary.highEvents }}</span>
+              <span class="stat-label">High</span>
+            </div>
+          </div>
+          <div class="stat-card stat-blue">
+            <div class="stat-icon">🛑</div>
+            <div class="stat-info">
+              <span class="stat-value">{{ report.summary.blockedEvents }}</span>
+              <span class="stat-label">Bị chặn</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="content-grid">
+          <!-- By Category -->
+          <div class="card">
+            <div class="card-header">
+              <h3>📁 Sự kiện theo danh mục</h3>
+            </div>
+            <div class="card-body">
+              @for (cat of report.byCategory; track cat.category) {
+                <div class="audit-bar-row">
+                  <span class="audit-bar-label">
+                    <span
+                      class="badge"
+                      [class]="'severity-' + getSeverityFromCategory(cat.category)"
+                      >{{ cat.category }}</span
+                    >
+                  </span>
+                  <div class="audit-bar-bg">
+                    <div
+                      class="audit-bar-fill"
+                      [style.width.%]="getAuditBarWidth(cat.count, report.summary.totalEvents)"
+                    ></div>
+                  </div>
+                  <span class="audit-bar-count">{{ cat.count }}</span>
+                </div>
+              }
+            </div>
+          </div>
+
+          <!-- By Severity -->
+          <div class="card">
+            <div class="card-header">
+              <h3>📊 Sự kiện theo mức độ</h3>
+            </div>
+            <div class="card-body">
+              @for (sev of report.bySeverity; track sev.severity) {
+                <div class="audit-bar-row">
+                  <span class="audit-bar-label">
+                    <span class="badge" [class]="'severity-' + sev.severity.toLowerCase()">{{
+                      sev.severity
+                    }}</span>
+                  </span>
+                  <div class="audit-bar-bg">
+                    <div
+                      class="audit-bar-fill"
+                      [style.width.%]="getAuditBarWidth(sev.count, report.summary.totalEvents)"
+                    ></div>
+                  </div>
+                  <span class="audit-bar-count">{{ sev.count }}</span>
+                </div>
+              }
+            </div>
+          </div>
+        </div>
+
+        <div class="content-grid">
+          <!-- Top IPs -->
+          <div class="card">
+            <div class="card-header">
+              <h3>🌐 Top IP hoạt động</h3>
+            </div>
+            <div class="card-body">
+              @if (report.topIps.length > 0) {
+                <div class="table-wrapper">
+                  <table class="data-table">
+                    <thead>
+                      <tr>
+                        <th>IP Address</th>
+                        <th>Số sự kiện</th>
+                        <th>Bị chặn</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (ip of report.topIps; track ip.ip) {
+                        <tr [class.row-blocked]="ip.blocked > 0">
+                          <td class="ip-cell">{{ ip.ip }}</td>
+                          <td>{{ ip.count }}</td>
+                          <td>
+                            @if (ip.blocked > 0) {
+                              <span class="badge severity-critical">{{ ip.blocked }}</span>
+                            } @else {
+                              <span class="badge severity-low">0</span>
+                            }
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              } @else {
+                <div class="empty-state">
+                  <span class="empty-icon">✅</span>
+                  <span>Không có dữ liệu IP</span>
+                </div>
+              }
+            </div>
+          </div>
+
+          <!-- Top Users -->
+          <div class="card">
+            <div class="card-header">
+              <h3>👤 Top người dùng hoạt động</h3>
+            </div>
+            <div class="card-body">
+              @if (report.topUsers.length > 0) {
+                <div class="table-wrapper">
+                  <table class="data-table">
+                    <thead>
+                      <tr>
+                        <th>Người dùng</th>
+                        <th>Số sự kiện</th>
+                        <th>Đáng ngờ</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (user of report.topUsers; track user.username) {
+                        <tr [class.row-blocked]="user.suspicious > 0">
+                          <td>
+                            <strong>{{ user.username }}</strong>
+                          </td>
+                          <td>{{ user.count }}</td>
+                          <td>
+                            @if (user.suspicious > 0) {
+                              <span class="badge severity-high">{{ user.suspicious }}</span>
+                            } @else {
+                              <span class="badge severity-low">0</span>
+                            }
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              } @else {
+                <div class="empty-state">
+                  <span class="empty-icon">✅</span>
+                  <span>Không có dữ liệu người dùng</span>
+                </div>
+              }
+            </div>
+          </div>
+        </div>
+
+        <!-- Recent Events Table -->
+        @if (report.recentEvents.length > 0) {
+          <div class="card">
+            <div class="card-header">
+              <h3>📋 Sự kiện gần đây</h3>
+              <span class="badge severity-info">{{ report.recentEvents.length }} sự kiện</span>
+            </div>
+            <div class="card-body card-body--flush">
+              <div class="table-wrapper">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Thời gian</th>
+                      <th>Loại</th>
+                      <th>Mức độ</th>
+                      <th>Người dùng</th>
+                      <th>IP</th>
+                      <th>Quốc gia</th>
+                      <th>Risk</th>
+                      <th>Trạng thái</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (event of report.recentEvents; track event.id) {
+                      <tr [class.row-blocked]="event.isBlocked">
+                        <td class="time-cell">{{ formatDate(event.createdAt) }}</td>
+                        <td>{{ formatEventType(event.eventType) }}</td>
+                        <td>
+                          <span
+                            class="badge"
+                            [class]="'severity-' + event.severity.toLowerCase()"
+                            >{{ event.severity }}</span
+                          >
+                        </td>
+                        <td>{{ event.username || '-' }}</td>
+                        <td class="ip-cell">{{ event.ipAddress || '-' }}</td>
+                        <td>{{ event.country || '-' }}</td>
+                        <td>
+                          @if (event.riskScore) {
+                            <span class="badge" [class]="getRiskScoreClass(event.riskScore)">{{
+                              event.riskScore
+                            }}</span>
+                          } @else {
+                            <span>-</span>
+                          }
+                        </td>
+                        <td>
+                          @if (event.isBlocked) {
+                            <span class="badge severity-critical">🛑 Chặn</span>
+                          } @else {
+                            <span class="badge severity-info">📝 Ghi nhận</span>
+                          }
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        }
+      } @else if (!loading()) {
+        <div class="empty-state">
+          <span class="empty-icon">📑</span>
+          <span>Đang tải báo cáo kiểm toán...</span>
         </div>
       }
     </div>

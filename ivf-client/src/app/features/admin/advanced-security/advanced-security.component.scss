@@ -1313,3 +1313,372 @@
 .ip-flags-card {
   margin-top: 1rem;
 }
+
+// ─── Compliance Dashboard ───────────────────────────
+.compliance-hero {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+  align-items: start;
+
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.compliance-score-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 1.5rem 2rem;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+}
+
+.compliance-ring {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  border: 6px solid #22c55e;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.75rem;
+  background: #fff;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+.compliance-score-value {
+  font-size: 2.4rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.compliance-score-label {
+  font-size: 0.82rem;
+  color: #9ca3af;
+  font-weight: 500;
+}
+
+.compliance-level {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 0.25rem 0;
+}
+
+.compliance-framework {
+  margin-top: 0.3rem;
+}
+
+.compliance-summary-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+  align-self: center;
+
+  @media (max-width: 600px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.compliance-summary-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1.25rem;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+
+  &.compliance-summary--pass {
+    border-left: 4px solid #22c55e;
+  }
+  &.compliance-summary--warning {
+    border-left: 4px solid #f59e0b;
+  }
+  &.compliance-summary--fail {
+    border-left: 4px solid #ef4444;
+  }
+}
+
+.compliance-summary-icon {
+  font-size: 1.5rem;
+}
+
+.compliance-summary-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.compliance-summary-value {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: #111827;
+  line-height: 1.2;
+}
+
+.compliance-summary-label {
+  font-size: 0.82rem;
+  color: #6b7280;
+}
+
+// ─── Compliance Checks ──────────────────────────────
+.compliance-checks {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.compliance-check-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+  transition: all 0.2s;
+
+  &:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  }
+
+  &.check-pass {
+    border-left: 4px solid #22c55e;
+  }
+  &.check-warning {
+    border-left: 4px solid #f59e0b;
+  }
+  &.check-fail {
+    border-left: 4px solid #ef4444;
+  }
+}
+
+.check-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.check-status-icon {
+  font-size: 1.3rem;
+  flex-shrink: 0;
+}
+
+.check-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.check-name {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #1e1e2f;
+}
+
+.check-standard {
+  font-size: 0.75rem;
+  color: #9ca3af;
+}
+
+.check-score-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+  width: 160px;
+}
+
+.check-score-bg {
+  flex: 1;
+  height: 8px;
+  background: #f3f4f6;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.check-score-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.5s ease;
+}
+
+.check-score-text {
+  font-size: 0.85rem;
+  font-weight: 700;
+  min-width: 40px;
+  text-align: right;
+}
+
+.check-details {
+  margin: 0.5rem 0 0 2.3rem;
+  font-size: 0.8rem;
+  color: #6b7280;
+  line-height: 1.5;
+}
+
+// ─── Security Policies ──────────────────────────────
+.policies-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.policy-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  overflow: hidden;
+  transition: all 0.2s;
+
+  &:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  }
+
+  &.policy-expanded {
+    border-color: #93c5fd;
+  }
+}
+
+.policy-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.85rem 1.25rem;
+  cursor: pointer;
+  transition: background 0.15s;
+
+  &:hover {
+    background: #f9fafb;
+  }
+}
+
+.policy-icon {
+  font-size: 1.4rem;
+  flex-shrink: 0;
+}
+
+.policy-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.policy-name {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #1e1e2f;
+}
+
+.policy-desc {
+  font-size: 0.78rem;
+  color: #9ca3af;
+}
+
+.policy-badges {
+  display: flex;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.policy-chevron {
+  font-size: 0.75rem;
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+
+.policy-settings {
+  padding: 0 1.25rem 1rem;
+  border-top: 1px solid #f3f4f6;
+  animation: fadeIn 0.2s ease;
+}
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 0.5rem;
+  padding-top: 0.75rem;
+}
+
+.setting-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.45rem 0.75rem;
+  background: #f9fafb;
+  border-radius: 6px;
+  gap: 0.5rem;
+}
+
+.setting-key {
+  font-size: 0.8rem;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.setting-value {
+  font-size: 0.8rem;
+  color: #1e1e2f;
+  font-weight: 600;
+  text-align: right;
+  word-break: break-word;
+}
+
+// ─── Audit Reports ──────────────────────────────────
+.audit-filter-bar {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-end;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+
+  .form-group {
+    min-width: 140px;
+  }
+}
+
+.audit-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #f3f4f6;
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.audit-bar-label {
+  min-width: 100px;
+  flex-shrink: 0;
+}
+
+.audit-bar-bg {
+  flex: 1;
+  height: 8px;
+  background: #f3f4f6;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.audit-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+  border-radius: 4px;
+  transition: width 0.5s ease;
+}
+
+.audit-bar-count {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #374151;
+  min-width: 36px;
+  text-align: right;
+}
+
+.card-body--flush {
+  padding: 0;
+}

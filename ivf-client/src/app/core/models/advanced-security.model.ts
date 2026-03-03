@@ -318,3 +318,78 @@ export const SEVERITY_COLORS: Record<string, string> = {
   low: 'severity-low',
   info: 'severity-info',
 };
+
+// ─── Compliance Dashboard ───
+export interface ComplianceCheck {
+  id: string;
+  name: string;
+  standard: string;
+  score: number;
+  maxScore: number;
+  status: 'pass' | 'warning' | 'fail';
+  details: string;
+}
+
+export interface ComplianceDashboard {
+  overallScore: number;
+  level: 'compliant' | 'partial' | 'non_compliant';
+  framework: string;
+  checks: ComplianceCheck[];
+  summary: {
+    totalChecks: number;
+    passed: number;
+    warnings: number;
+    failed: number;
+  };
+  lastAssessed: string;
+}
+
+// ─── Security Policies ───
+export interface SecurityPolicy {
+  id: string;
+  category: string;
+  name: string;
+  description: string;
+  isEnabled: boolean;
+  settings: Record<string, any>;
+}
+
+export interface SecurityPoliciesResponse {
+  policies: SecurityPolicy[];
+  lastUpdated: string;
+}
+
+// ─── Audit Reports ───
+export interface AuditReportSummary {
+  totalEvents: number;
+  criticalEvents: number;
+  highEvents: number;
+  blockedEvents: number;
+  uniqueIps: number;
+  uniqueUsers: number;
+}
+
+export interface AuditReportEvent {
+  id: string;
+  eventType: string;
+  severity: string;
+  username: string | null;
+  ipAddress: string | null;
+  country: string | null;
+  riskScore: number | null;
+  isBlocked: boolean;
+  details: string | null;
+  createdAt: string;
+}
+
+export interface AuditReport {
+  period: { from: string; to: string; hours: number };
+  summary: AuditReportSummary;
+  byCategory: { category: string; count: number }[];
+  bySeverity: { severity: string; count: number }[];
+  byHour: { hour: string; count: number }[];
+  topIps: { ip: string; count: number; blocked: number }[];
+  topUsers: { username: string; count: number; suspicious: number }[];
+  recentEvents: AuditReportEvent[];
+  generatedAt: string;
+}
