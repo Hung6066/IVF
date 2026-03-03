@@ -111,10 +111,12 @@ Core aggregates: `Patient`, `Couple`, `TreatmentCycle`, `User`, `Doctor`.
 Treatment methods: `QHTN`, `IUI`, `ICSI`, `IVM`.
 Roles: Admin, Doctor, Nurse, LabTech, Embryologist, Receptionist, Cashier, Pharmacist.
 Forms system: `FormTemplate → FormField → FormResponse → FormFieldValue` supports dynamic clinical forms and report templates.
+Enterprise User Management: `UserSession`, `UserGroup`, `UserGroupMember`, `UserGroupPermission`, `UserLoginHistory`, `UserConsent` — enterprise-grade session management, group-based IAM, login analytics, GDPR/HIPAA consent.
 
 ## Additional Docs
 
 - `/docs/advanced_security.md` — advanced security module (Passkeys, MFA, TOTP, SMS OTP, rate limiting, geo-fencing, threats, lockouts, IP whitelist)
+- `/docs/enterprise_user_management.md` — enterprise user management (sessions, groups, IAM, login analytics, risk detection, GDPR/HIPAA consent)
 - `/docs/form_report_builder.md` — form/report designer architecture
 - `/docs/digital_signing.md` — signing infrastructure
 - `/docs/matcher_infrastructure_guide.md` — biometric setup (Windows)

@@ -3,6 +3,7 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Fido2NetLib;
 using Fido2NetLib.Objects;
 using IVF.API.Contracts;
@@ -124,6 +125,10 @@ public static class AuthEndpoints
                         code = "BRUTE_FORCE_LOCKED"
                     }, statusCode: 429);
                 }
+
+                // Record failed login to enterprise history
+                await RecordEnterpriseLoginAsync(httpContext.RequestServices,
+                    user, ipAddress, userAgent, "password", false, failureReason: "invalid_credentials");
 
                 return Results.Json(new
                 {
@@ -250,6 +255,10 @@ public static class AuthEndpoints
                     riskLevel = assessment.RiskLevel.ToString(),
                     isNewDevice = !deviceTrust.IsKnown
                 })));
+
+            // 10. Record enterprise login history & session
+            await RecordEnterpriseLoginAsync(httpContext.RequestServices, user, ipAddress, userAgent, "password", true,
+                assessment.RiskScore, session.SessionId, token);
 
             return Results.Ok(new AuthResponse(token, refreshToken, 3600, UserDto.FromEntity(user)));
         });
@@ -453,6 +462,10 @@ public static class AuthEndpoints
                 sessionId: session.SessionId,
                 details: "{\"mfaVerified\":true}"));
 
+            // Record enterprise login history & session (MFA)
+            await RecordEnterpriseLoginAsync(httpContext.RequestServices, user, ipAddress, userAgent, "mfa", true,
+                sessionId: session.SessionId, jwtToken: token);
+
             return Results.Ok(new AuthResponse(token, refreshToken, 3600, UserDto.FromEntity(user)));
         });
 
@@ -602,8 +615,139 @@ public static class AuthEndpoints
                 sessionId: session.SessionId,
                 details: "{\"method\":\"passkey\"}"));
 
+            // Record enterprise login history & session (passkey)
+            await RecordEnterpriseLoginAsync(context.RequestServices, user, ipAddress, userAgent, "passkey", true,
+                sessionId: session.SessionId, jwtToken: token);
+
             return Results.Ok(new AuthResponse(token, refreshToken, 3600, UserDto.FromEntity(user)));
         });
+
+        // ─── Logout (record enterprise session end) ───
+        group.MapPost("/logout", async (
+            ClaimsPrincipal principal,
+            IEnterpriseUserRepository enterpriseRepo,
+            HttpContext httpContext) =>
+        {
+            var userIdClaim = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
+                return Results.Ok(new { message = "Logged out" });
+
+            // Record logout in login history (find latest active login for this user)
+            var recentLogins = await enterpriseRepo.GetUserRecentLoginsAsync(userId, 1);
+            var lastLogin = recentLogins.FirstOrDefault(h => h.IsSuccess && h.LogoutAt == null);
+            if (lastLogin != null)
+            {
+                lastLogin.RecordLogout();
+                await enterpriseRepo.SaveChangesAsync();
+            }
+
+            // Revoke active enterprise sessions
+            await enterpriseRepo.RevokeAllSessionsAsync(userId, "User logout", "user");
+
+            return Results.Ok(new { message = "Logged out" });
+        }).RequireAuthorization();
+    }
+
+    /// <summary>
+    /// Records login attempt and session in enterprise tables for analytics and audit.
+    /// </summary>
+    private static async Task RecordEnterpriseLoginAsync(
+        IServiceProvider services,
+        User? user,
+        string ipAddress,
+        string? userAgent,
+        string loginMethod,
+        bool isSuccess,
+        decimal? riskScore = null,
+        string? sessionId = null,
+        string? jwtToken = null,
+        string? failureReason = null)
+    {
+        try
+        {
+            var repo = services.GetService<IEnterpriseUserRepository>();
+            if (repo == null) return;
+
+            var (deviceType, os, browser) = ParseUserAgent(userAgent);
+
+            // Record login history
+            var history = UserLoginHistory.Create(
+                userId: user?.Id ?? Guid.Empty,
+                loginMethod: loginMethod,
+                isSuccess: isSuccess,
+                failureReason: failureReason,
+                ipAddress: ipAddress,
+                userAgent: userAgent,
+                country: null,
+                city: null,
+                deviceType: deviceType,
+                operatingSystem: os,
+                browser: browser,
+                riskScore: riskScore,
+                isSuspicious: riskScore > 70);
+            await repo.AddLoginHistoryAsync(history);
+
+            // Create session record on successful login
+            if (isSuccess && user != null)
+            {
+                var session = UserSession.Create(
+                    userId: user.Id,
+                    sessionToken: sessionId ?? Guid.NewGuid().ToString(),
+                    expiresAt: DateTime.UtcNow.AddHours(1),
+                    ipAddress: ipAddress,
+                    userAgent: userAgent,
+                    country: null,
+                    city: null,
+                    deviceType: deviceType,
+                    operatingSystem: os,
+                    browser: browser);
+                await repo.AddSessionAsync(session);
+            }
+
+            await repo.SaveChangesAsync();
+        }
+        catch
+        {
+            // Non-critical — don't break auth flow if enterprise recording fails
+        }
+    }
+
+    /// <summary>
+    /// Simple UA parsing for device type, OS, and browser.
+    /// </summary>
+    private static (string DeviceType, string OS, string Browser) ParseUserAgent(string? ua)
+    {
+        if (string.IsNullOrEmpty(ua))
+            return ("Unknown", "Unknown", "Unknown");
+
+        // Device type
+        string deviceType;
+        if (Regex.IsMatch(ua, @"Mobile|Android.*Mobile|iPhone|iPod", RegexOptions.IgnoreCase))
+            deviceType = "Mobile";
+        else if (Regex.IsMatch(ua, @"iPad|Android(?!.*Mobile)|Tablet", RegexOptions.IgnoreCase))
+            deviceType = "Tablet";
+        else
+            deviceType = "Desktop";
+
+        // OS
+        string os;
+        if (ua.Contains("Windows NT 10", StringComparison.OrdinalIgnoreCase)) os = "Windows";
+        else if (ua.Contains("Mac OS X", StringComparison.OrdinalIgnoreCase)) os = "macOS";
+        else if (ua.Contains("Linux", StringComparison.OrdinalIgnoreCase) && ua.Contains("Android", StringComparison.OrdinalIgnoreCase)) os = "Android";
+        else if (ua.Contains("Linux", StringComparison.OrdinalIgnoreCase)) os = "Linux";
+        else if (ua.Contains("iPhone", StringComparison.OrdinalIgnoreCase) || ua.Contains("iPad", StringComparison.OrdinalIgnoreCase)) os = "iOS";
+        else os = "Other";
+
+        // Browser
+        string browser;
+        if (ua.Contains("Edg/", StringComparison.OrdinalIgnoreCase)) browser = "Edge";
+        else if (ua.Contains("OPR/", StringComparison.OrdinalIgnoreCase) || ua.Contains("Opera", StringComparison.OrdinalIgnoreCase)) browser = "Opera";
+        else if (ua.Contains("Chrome/", StringComparison.OrdinalIgnoreCase) && !ua.Contains("Edg/", StringComparison.OrdinalIgnoreCase)) browser = "Chrome";
+        else if (ua.Contains("Safari/", StringComparison.OrdinalIgnoreCase) && !ua.Contains("Chrome", StringComparison.OrdinalIgnoreCase)) browser = "Safari";
+        else if (ua.Contains("Firefox/", StringComparison.OrdinalIgnoreCase)) browser = "Firefox";
+        else browser = "Other";
+
+        return (deviceType, os, browser);
     }
 
     private static string GenerateJwtToken(User user, IConfiguration config, string? deviceFingerprint = null, string? sessionId = null)

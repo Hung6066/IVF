@@ -159,3 +159,34 @@ public enum AppointmentStatus
     Rescheduled
 }
 
+public enum PatientStatus
+{
+    Active,
+    Inactive,
+    Discharged,
+    Transferred,
+    Deceased,
+    Anonymized,
+    Suspended
+}
+
+public enum PatientPriority
+{
+    Normal,
+    High,
+    VIP,
+    Emergency
+}
+
+public enum BloodType
+{
+    APositive,
+    ANegative,
+    BPositive,
+    BNegative,
+    ABPositive,
+    ABNegative,
+    OPositive,
+    ONegative
+}
+

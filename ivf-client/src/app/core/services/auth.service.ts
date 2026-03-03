@@ -62,6 +62,11 @@ export class AuthService {
   }
 
   logout(): void {
+    // Record logout on server (fire-and-forget)
+    const token = this.getToken();
+    if (token) {
+      this.http.post(`${this.apiUrl}/logout`, {}).subscribe({ error: () => {} });
+    }
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(REFRESH_KEY);
     localStorage.removeItem(USER_KEY);

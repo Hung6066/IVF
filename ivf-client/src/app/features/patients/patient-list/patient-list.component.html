@@ -1,209 +1,295 @@
 <div class="patient-list-container">
-    <header class="page-header">
-        <div class="header-content">
-            <h1>Danh sách bệnh nhân</h1>
-            <p>Quản lý thông tin bệnh nhân</p>
-        </div>
-        <button class="btn btn-primary" (click)="showAddModal = true">➕ Thêm bệnh nhân</button>
-    </header>
-
-    <div class="search-bar">
-        <input type="text" class="form-control" [(ngModel)]="searchQuery" (input)="onSearch()"
-            placeholder="🔍 Tìm kiếm theo tên, mã bệnh nhân, SĐT..." />
+  <header class="page-header">
+    <div class="header-content">
+      <h1>Danh sách bệnh nhân</h1>
+      <p>Quản lý thông tin bệnh nhân</p>
     </div>
-
-    <div class="card table-container">
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>Mã BN</th>
-                    <th>Họ tên</th>
-                    <th>Ngày sinh</th>
-                    <th>Giới tính</th>
-                    <th>SĐT</th>
-                    <th>Loại BN</th>
-                    <th class="text-right">Thao tác</th>
-                </tr>
-            </thead>
-            <tbody>
-                @for (patient of patients(); track patient.id) {
-                <tr>
-                    <td><span class="code-badge">{{ patient.patientCode }}</span></td>
-                    <td class="font-medium">{{ patient.fullName }}</td>
-                    <td>{{ formatDate(patient.dateOfBirth) }}</td>
-                    <td>
-                        <span class="gender-badge" [class.male]="patient.gender === 'Male'"
-                            [class.female]="patient.gender === 'Female'">
-                            {{ patient.gender === 'Male' ? 'Nam' : 'Nữ' }}
-                        </span>
-                    </td>
-                    <td>{{ patient.phone || '-' }}</td>
-                    <td>{{ getPatientType(patient.patientType) }}</td>
-                    <td class="actions-cell">
-                        <button class="btn-icon" title="Xem" (click)="viewPatient(patient)">👁️</button>
-                        <button class="btn-icon" title="Sửa" (click)="editPatient(patient)">✏️</button>
-                    </td>
-                </tr>
-                } @empty {
-                <tr>
-                    <td colspan="7" class="empty-state">
-                        {{ loading() ? 'Đang tải...' : 'Không có dữ liệu' }}
-                    </td>
-                </tr>
-                }
-            </tbody>
-        </table>
+    <div class="header-actions">
+      <a routerLink="/patients/analytics" class="btn btn-outline">📊 Phân tích</a>
+      <button class="btn btn-primary" (click)="showAddModal = true">➕ Thêm bệnh nhân</button>
     </div>
+  </header>
 
-    <div class="pagination">
-        <span>Tổng: {{ total() }} bệnh nhân</span>
-        <div class="page-controls">
-            <button class="btn btn-sm btn-secondary" [disabled]="page() <= 1" (click)="changePage(page() - 1)">←
-                Trước</button>
-            <span class="page-info">Trang {{ page() }}</span>
-            <button class="btn btn-sm btn-secondary" [disabled]="patients().length < pageSize"
-                (click)="changePage(page() + 1)">Sau →</button>
-        </div>
+  <div class="search-bar">
+    <input
+      type="text"
+      class="form-control"
+      [(ngModel)]="searchQuery"
+      (input)="onSearch()"
+      placeholder="🔍 Tìm kiếm theo tên, mã bệnh nhân, SĐT..."
+    />
+  </div>
+
+  <div class="card table-container">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Mã BN</th>
+          <th>Họ tên</th>
+          <th>Ngày sinh</th>
+          <th>Giới tính</th>
+          <th>SĐT</th>
+          <th>Loại BN</th>
+          <th class="text-right">Thao tác</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (patient of patients(); track patient.id) {
+          <tr>
+            <td>
+              <span class="code-badge">{{ patient.patientCode }}</span>
+            </td>
+            <td class="font-medium">{{ patient.fullName }}</td>
+            <td>{{ formatDate(patient.dateOfBirth) }}</td>
+            <td>
+              <span
+                class="gender-badge"
+                [class.male]="patient.gender === 'Male'"
+                [class.female]="patient.gender === 'Female'"
+              >
+                {{ patient.gender === 'Male' ? 'Nam' : 'Nữ' }}
+              </span>
+            </td>
+            <td>{{ patient.phone || '-' }}</td>
+            <td>{{ getPatientType(patient.patientType) }}</td>
+            <td class="actions-cell">
+              <button class="btn-icon" title="Xem" (click)="viewPatient(patient)">👁️</button>
+              <button class="btn-icon" title="Sửa" (click)="editPatient(patient)">✏️</button>
+            </td>
+          </tr>
+        } @empty {
+          <tr>
+            <td colspan="7" class="empty-state">
+              {{ loading() ? 'Đang tải...' : 'Không có dữ liệu' }}
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+
+  <div class="pagination">
+    <span>Tổng: {{ total() }} bệnh nhân</span>
+    <div class="page-controls">
+      <button
+        class="btn btn-sm btn-secondary"
+        [disabled]="page() <= 1"
+        (click)="changePage(page() - 1)"
+      >
+        ← Trước
+      </button>
+      <span class="page-info">Trang {{ page() }}</span>
+      <button
+        class="btn btn-sm btn-secondary"
+        [disabled]="patients().length < pageSize"
+        (click)="changePage(page() + 1)"
+      >
+        Sau →
+      </button>
     </div>
+  </div>
 
-    @if (showAddModal) {
+  @if (showAddModal) {
     <div class="modal-overlay" (click)="showAddModal = false">
-        <div class="modal-content" (click)="$event.stopPropagation()">
-            <div class="modal-header">
-                <h2>➕ Thêm bệnh nhân mới</h2>
-                <button class="close-btn" (click)="showAddModal = false">×</button>
-            </div>
-
-            <form (ngSubmit)="submitNewPatient()">
-                <div class="modal-body">
-                    <div class="form-grid">
-                        <div class="form-group full-width">
-                            <label>Họ và tên *</label>
-                            <input class="form-control" type="text" [(ngModel)]="newPatient.fullName" name="fullName"
-                                required placeholder="Nhập họ tên đầy đủ" />
-                        </div>
-
-                        <div class="form-group">
-                            <label>Ngày sinh</label>
-                            <input class="form-control" type="date" [(ngModel)]="newPatient.dateOfBirth" name="dob" />
-                        </div>
-
-                        <div class="form-group">
-                            <label>Giới tính</label>
-                            <select class="form-control" [(ngModel)]="newPatient.gender" name="gender">
-                                <option value="Female">Nữ</option>
-                                <option value="Male">Nam</option>
-                            </select>
-                        </div>
-
-                        <div class="form-group">
-                            <label>SĐT</label>
-                            <input class="form-control" type="tel" [(ngModel)]="newPatient.phone" name="phone"
-                                placeholder="09xxxx" />
-                        </div>
-
-                        <div class="form-group">
-                            <label>CMND/CCCD</label>
-                            <input class="form-control" type="text" [(ngModel)]="newPatient.idNumber" name="idNumber" />
-                        </div>
-
-                        <div class="form-group full-width">
-                            <label>Loại bệnh nhân</label>
-                            <select class="form-control" [(ngModel)]="newPatient.patientType" name="patientType">
-                                <option value="Infertility">Hiếm muộn</option>
-                                <option value="EggDonor">Cho trứng</option>
-                                <option value="SpermDonor">Cho tinh</option>
-                            </select>
-                        </div>
-
-                        <div class="form-group full-width">
-                            <label>Địa chỉ</label>
-                            <input class="form-control" type="text" [(ngModel)]="newPatient.address" name="address"
-                                placeholder="Địa chỉ liên hệ" />
-                        </div>
-                    </div>
-                </div>
-
-                <div class="modal-footer">
-                    <button type="button" class="btn-secondary" (click)="showAddModal = false">Huỷ</button>
-                    <button type="submit" class="btn-primary">Lưu hồ sơ</button>
-                </div>
-            </form>
+      <div class="modal-content" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h2>➕ Thêm bệnh nhân mới</h2>
+          <button class="close-btn" (click)="showAddModal = false">×</button>
         </div>
-    </div>
-    }
 
-    @if (showEditModal) {
+        <form (ngSubmit)="submitNewPatient()">
+          <div class="modal-body">
+            <div class="form-grid">
+              <div class="form-group full-width">
+                <label>Họ và tên *</label>
+                <input
+                  class="form-control"
+                  type="text"
+                  [(ngModel)]="newPatient.fullName"
+                  name="fullName"
+                  required
+                  placeholder="Nhập họ tên đầy đủ"
+                />
+              </div>
+
+              <div class="form-group">
+                <label>Ngày sinh</label>
+                <input
+                  class="form-control"
+                  type="date"
+                  [(ngModel)]="newPatient.dateOfBirth"
+                  name="dob"
+                />
+              </div>
+
+              <div class="form-group">
+                <label>Giới tính</label>
+                <select class="form-control" [(ngModel)]="newPatient.gender" name="gender">
+                  <option value="Female">Nữ</option>
+                  <option value="Male">Nam</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label>SĐT</label>
+                <input
+                  class="form-control"
+                  type="tel"
+                  [(ngModel)]="newPatient.phone"
+                  name="phone"
+                  placeholder="09xxxx"
+                />
+              </div>
+
+              <div class="form-group">
+                <label>CMND/CCCD</label>
+                <input
+                  class="form-control"
+                  type="text"
+                  [(ngModel)]="newPatient.idNumber"
+                  name="idNumber"
+                />
+              </div>
+
+              <div class="form-group full-width">
+                <label>Loại bệnh nhân</label>
+                <select
+                  class="form-control"
+                  [(ngModel)]="newPatient.patientType"
+                  name="patientType"
+                >
+                  <option value="Infertility">Hiếm muộn</option>
+                  <option value="EggDonor">Cho trứng</option>
+                  <option value="SpermDonor">Cho tinh</option>
+                </select>
+              </div>
+
+              <div class="form-group full-width">
+                <label>Địa chỉ</label>
+                <input
+                  class="form-control"
+                  type="text"
+                  [(ngModel)]="newPatient.address"
+                  name="address"
+                  placeholder="Địa chỉ liên hệ"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div class="modal-footer">
+            <button type="button" class="btn-secondary" (click)="showAddModal = false">Huỷ</button>
+            <button type="submit" class="btn-primary">Lưu hồ sơ</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  }
+
+  @if (showEditModal) {
     <div class="modal-overlay" (click)="showEditModal = false">
-        <div class="modal-content" (click)="$event.stopPropagation()">
-            <div class="modal-header">
-                <h2>✏️ Chỉnh sửa bệnh nhân</h2>
-                <button class="close-btn" (click)="showEditModal = false">×</button>
-            </div>
-
-            <form (ngSubmit)="submitEditPatient()">
-                <div class="modal-body">
-                    <div class="form-grid">
-                        <div class="form-group full-width">
-                            <label>Mã bệnh nhân</label>
-                            <input class="form-control" type="text" [value]="editingPatient?.patientCode" disabled />
-                        </div>
-
-                        <div class="form-group full-width">
-                            <label>Họ và tên *</label>
-                            <input class="form-control" type="text" [(ngModel)]="editingPatient.fullName"
-                                name="fullName" required placeholder="Nhập họ tên đầy đủ" />
-                        </div>
-
-                        <div class="form-group">
-                            <label>Ngày sinh</label>
-                            <input class="form-control" type="date" [(ngModel)]="editingPatient.dateOfBirth"
-                                name="dob" />
-                        </div>
-
-                        <div class="form-group">
-                            <label>Giới tính</label>
-                            <select class="form-control" [(ngModel)]="editingPatient.gender" name="gender">
-                                <option value="Female">Nữ</option>
-                                <option value="Male">Nam</option>
-                            </select>
-                        </div>
-
-                        <div class="form-group">
-                            <label>SĐT</label>
-                            <input class="form-control" type="tel" [(ngModel)]="editingPatient.phone" name="phone"
-                                placeholder="09xxxx" />
-                        </div>
-
-                        <div class="form-group">
-                            <label>CMND/CCCD</label>
-                            <input class="form-control" type="text" [(ngModel)]="editingPatient.idNumber"
-                                name="idNumber" />
-                        </div>
-
-                        <div class="form-group full-width">
-                            <label>Loại bệnh nhân</label>
-                            <select class="form-control" [(ngModel)]="editingPatient.patientType" name="patientType">
-                                <option value="Infertility">Hiếm muộn</option>
-                                <option value="EggDonor">Cho trứng</option>
-                                <option value="SpermDonor">Cho tinh</option>
-                            </select>
-                        </div>
-
-                        <div class="form-group full-width">
-                            <label>Địa chỉ</label>
-                            <input class="form-control" type="text" [(ngModel)]="editingPatient.address" name="address"
-                                placeholder="Địa chỉ liên hệ" />
-                        </div>
-                    </div>
-                </div>
-
-                <div class="modal-footer">
-                    <button type="button" class="btn-secondary" (click)="showEditModal = false">Huỷ</button>
-                    <button type="submit" class="btn-primary">Cập nhật</button>
-                </div>
-            </form>
+      <div class="modal-content" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h2>✏️ Chỉnh sửa bệnh nhân</h2>
+          <button class="close-btn" (click)="showEditModal = false">×</button>
         </div>
+
+        <form (ngSubmit)="submitEditPatient()">
+          <div class="modal-body">
+            <div class="form-grid">
+              <div class="form-group full-width">
+                <label>Mã bệnh nhân</label>
+                <input
+                  class="form-control"
+                  type="text"
+                  [value]="editingPatient?.patientCode"
+                  disabled
+                />
+              </div>
+
+              <div class="form-group full-width">
+                <label>Họ và tên *</label>
+                <input
+                  class="form-control"
+                  type="text"
+                  [(ngModel)]="editingPatient.fullName"
+                  name="fullName"
+                  required
+                  placeholder="Nhập họ tên đầy đủ"
+                />
+              </div>
+
+              <div class="form-group">
+                <label>Ngày sinh</label>
+                <input
+                  class="form-control"
+                  type="date"
+                  [(ngModel)]="editingPatient.dateOfBirth"
+                  name="dob"
+                />
+              </div>
+
+              <div class="form-group">
+                <label>Giới tính</label>
+                <select class="form-control" [(ngModel)]="editingPatient.gender" name="gender">
+                  <option value="Female">Nữ</option>
+                  <option value="Male">Nam</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label>SĐT</label>
+                <input
+                  class="form-control"
+                  type="tel"
+                  [(ngModel)]="editingPatient.phone"
+                  name="phone"
+                  placeholder="09xxxx"
+                />
+              </div>
+
+              <div class="form-group">
+                <label>CMND/CCCD</label>
+                <input
+                  class="form-control"
+                  type="text"
+                  [(ngModel)]="editingPatient.idNumber"
+                  name="idNumber"
+                />
+              </div>
+
+              <div class="form-group full-width">
+                <label>Loại bệnh nhân</label>
+                <select
+                  class="form-control"
+                  [(ngModel)]="editingPatient.patientType"
+                  name="patientType"
+                >
+                  <option value="Infertility">Hiếm muộn</option>
+                  <option value="EggDonor">Cho trứng</option>
+                  <option value="SpermDonor">Cho tinh</option>
+                </select>
+              </div>
+
+              <div class="form-group full-width">
+                <label>Địa chỉ</label>
+                <input
+                  class="form-control"
+                  type="text"
+                  [(ngModel)]="editingPatient.address"
+                  name="address"
+                  placeholder="Địa chỉ liên hệ"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div class="modal-footer">
+            <button type="button" class="btn-secondary" (click)="showEditModal = false">Huỷ</button>
+            <button type="submit" class="btn-primary">Cập nhật</button>
+          </div>
+        </form>
+      </div>
     </div>
-    }
+  }
 </div>

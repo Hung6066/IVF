@@ -109,6 +109,14 @@ public class IvfDbContext : DbContext
     public DbSet<RateLimitConfig> RateLimitConfigs => Set<RateLimitConfig>();
     public DbSet<GeoBlockRule> GeoBlockRules => Set<GeoBlockRule>();
 
+    // Enterprise User Management (Sessions, Groups, Analytics, Consent)
+    public DbSet<UserSession> UserSessions => Set<UserSession>();
+    public DbSet<UserGroup> UserGroups => Set<UserGroup>();
+    public DbSet<UserGroupMember> UserGroupMembers => Set<UserGroupMember>();
+    public DbSet<UserGroupPermission> UserGroupPermissions => Set<UserGroupPermission>();
+    public DbSet<UserLoginHistory> UserLoginHistories => Set<UserLoginHistory>();
+    public DbSet<UserConsent> UserConsents => Set<UserConsent>();
+
     // Vault System (self-hosted, Azure KV only for auto-unseal wrap/unwrap)
     public DbSet<VaultSecret> VaultSecrets => Set<VaultSecret>();
     public DbSet<VaultPolicy> VaultPolicies => Set<VaultPolicy>();

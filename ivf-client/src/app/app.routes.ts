@@ -33,6 +33,13 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'patients/analytics',
+        loadComponent: () =>
+          import('./features/patients/patient-analytics/patient-analytics.component').then(
+            (m) => m.PatientAnalyticsComponent,
+          ),
+      },
+      {
         path: 'patients/:id',
         loadComponent: () =>
           import('./features/patients/patient-detail/patient-detail.component').then(
@@ -51,6 +58,13 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/patients/patient-documents/patient-documents.component').then(
             (m) => m.PatientDocumentsComponent,
+          ),
+      },
+      {
+        path: 'patients/:id/audit-trail',
+        loadComponent: () =>
+          import('./features/patients/patient-audit-trail/patient-audit-trail.component').then(
+            (m) => m.PatientAuditTrailComponent,
           ),
       },
       {
@@ -188,10 +202,8 @@ export const routes: Routes = [
       },
       {
         path: 'admin/users',
-        loadComponent: () =>
-          import('./features/admin/users/user-management.component').then(
-            (m) => m.UserManagementComponent,
-          ),
+        redirectTo: 'admin/enterprise-users',
+        pathMatch: 'full',
       },
       {
         path: 'admin/services',
@@ -261,6 +273,13 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/admin/security-events/security-events.component').then(
             (m) => m.SecurityEventsComponent,
+          ),
+      },
+      {
+        path: 'admin/enterprise-users',
+        loadComponent: () =>
+          import('./features/admin/enterprise-users/enterprise-users.component').then(
+            (m) => m.EnterpriseUsersComponent,
           ),
       },
 

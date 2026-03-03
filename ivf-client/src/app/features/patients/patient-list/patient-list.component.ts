@@ -1,16 +1,16 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router, ActivatedRoute } from '@angular/router';
+import { Router, ActivatedRoute, RouterModule } from '@angular/router';
 import { PatientService } from '../../../core/services/patient.service';
 import { Patient } from '../../../core/models/api.models';
 
 @Component({
   selector: 'app-patient-list',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, RouterModule],
   templateUrl: './patient-list.component.html',
-  styleUrls: ['./patient-list.component.scss']
+  styleUrls: ['./patient-list.component.scss'],
 })
 export class PatientListComponent implements OnInit {
   patients = signal<Patient[]>([]);
@@ -26,25 +26,31 @@ export class PatientListComponent implements OnInit {
 
   private searchTimeout?: ReturnType<typeof setTimeout>;
 
-  constructor(private patientService: PatientService, private router: Router, private route: ActivatedRoute) { }
+  constructor(
+    private patientService: PatientService,
+    private router: Router,
+    private route: ActivatedRoute,
+  ) {}
 
   ngOnInit(): void {
     this.loadPatients();
-    this.route.queryParams.subscribe(params => {
+    this.route.queryParams.subscribe((params) => {
       if (params['action'] === 'new') this.showAddModal = true;
     });
   }
 
   loadPatients(): void {
     this.loading.set(true);
-    this.patientService.searchPatients(this.searchQuery || undefined, this.page(), this.pageSize).subscribe({
-      next: (res) => {
-        this.patients.set(res.items);
-        this.total.set(res.total);
-        this.loading.set(false);
-      },
-      error: () => this.loading.set(false)
-    });
+    this.patientService
+      .searchPatients(this.searchQuery || undefined, this.page(), this.pageSize)
+      .subscribe({
+        next: (res) => {
+          this.patients.set(res.items);
+          this.total.set(res.total);
+          this.loading.set(false);
+        },
+        error: () => this.loading.set(false),
+      });
   }
 
   onSearch(): void {
@@ -67,9 +73,9 @@ export class PatientListComponent implements OnInit {
 
   getPatientType(type: string): string {
     const types: Record<string, string> = {
-      'Infertility': 'Hiếm muộn',
-      'EggDonor': 'Cho trứng',
-      'SpermDonor': 'Cho tinh'
+      Infertility: 'Hiếm muộn',
+      EggDonor: 'Cho trứng',
+      SpermDonor: 'Cho tinh',
     };
     return types[type] || type;
   }
@@ -93,7 +99,7 @@ export class PatientListComponent implements OnInit {
       error: (err) => {
         console.error('Failed to create patient', err);
         alert('Lỗi: ' + (err.error?.message || 'Không thể tạo bệnh nhân'));
-      }
+      },
     });
   }
 
@@ -109,7 +115,7 @@ export class PatientListComponent implements OnInit {
       error: (err) => {
         console.error('Failed to update patient', err);
         alert('Lỗi: ' + (err.error?.message || 'Không thể cập nhật bệnh nhân'));
-      }
+      },
     });
   }
 }

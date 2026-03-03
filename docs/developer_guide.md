@@ -97,7 +97,7 @@ dotnet ef database update --project src/IVF.Infrastructure --startup-project src
 IVF/
 ├── src/
 │   ├── IVF.Domain/              ← Domain layer (entities, enums, no dependencies)
-│   │   ├── Entities/            ← 61 entity classes
+│   │   ├── Entities/            ← 67 entity classes
 │   │   └── Enums/               ← 7 enum files
 │   │
 │   ├── IVF.Application/         ← Application layer (CQRS, validation, interfaces)
@@ -111,7 +111,7 @@ IVF/
 │   │   │   └── ... (16 total)
 │   │   ├── Common/
 │   │   │   ├── Behaviors/       ← MediatR pipeline (ValidationBehavior)
-│   │   │   ├── Interfaces/      ← 35 repository + service contracts
+│   │   │   ├── Interfaces/      ← 36 repository + service contracts
 │   │   │   └── Result.cs        ← Result<T>, Result, PagedResult<T>
 │   │   └── DependencyInjection.cs
 │   │
@@ -121,12 +121,12 @@ IVF/
 │   │   │   ├── Configurations/  ← 60 entity configurations
 │   │   │   ├── Migrations/      ← 24+ migrations
 │   │   │   └── *Seeder.cs       ← Database seeders
-│   │   ├── Repositories/        ← 29 repository implementations
+│   │   ├── Repositories/        ← 30 repository implementations
 │   │   ├── Services/            ← 28 service implementations
 │   │   └── DependencyInjection.cs
 │   │
 │   ├── IVF.API/                 ← API layer (endpoints, hubs, middleware)
-│   │   ├── Endpoints/           ← 36 endpoint files (Minimal API)
+│   │   ├── Endpoints/           ← 37 endpoint files (Minimal API)
 │   │   ├── Hubs/                ← 4 SignalR hubs + auth filter
 │   │   ├── Services/            ← API-level services (backup, CA, PDF)
 │   │   ├── Program.cs           ← Application bootstrap (~400 lines)
@@ -141,13 +141,13 @@ IVF/
 │       ├── core/
 │       │   ├── guards/          ← authGuard, guestGuard
 │       │   ├── interceptors/    ← JWT auth interceptor
-│       │   ├── models/          ← 16 TypeScript interface files
-│       │   └── services/        ← 31 service files
+│       │   ├── models/          ← 17 TypeScript interface files
+│       │   └── services/        ← 32 service files
 │       ├── features/            ← 19 lazy-loaded feature modules
 │       │   ├── patients/
 │       │   ├── cycles/
 │       │   ├── forms/           ← Dynamic form/report builder
-│       │   ├── admin/           ← Admin panel (10 sub-features)
+│       │   ├── admin/           ← Admin panel (11 sub-features)
 │       │   ├── queue/           ← Real-time queue (SignalR)
 │       │   └── ... (19 total)
 │       ├── layout/              ← Main layout with navigation
@@ -664,22 +664,23 @@ export const guestGuard: CanActivateFn = () => {
 
 ### 5.6 Feature Modules Summary
 
-| Feature     | Path           | Description                                               |
-| ----------- | -------------- | --------------------------------------------------------- |
-| Dashboard   | `/dashboard`   | Overview with stats & quick actions                       |
-| Patients    | `/patients`    | Patient registration, search, biometrics, documents       |
-| Couples     | `/couples`     | Couple management (wife + husband linkage)                |
-| Cycles      | `/cycles/:id`  | Treatment cycle tracking (phases, outcomes)               |
-| Queue       | `/queue/:dept` | Real-time reception queue (SignalR)                       |
-| Forms       | `/forms/*`     | Dynamic form builder, renderer, reports (12 sub-routes)   |
-| Billing     | `/billing`     | Invoices, payments, prescriptions                         |
-| Ultrasounds | `/ultrasounds` | Ultrasound imaging & follicle tracking                    |
-| Andrology   | `/andrology`   | Semen analysis & sperm processing                         |
-| Sperm Bank  | `/sperm-bank`  | Donor management, sample inventory                        |
-| Lab         | `/lab`         | Lab test results                                          |
-| Reports     | `/reports`     | Clinical report generation                                |
-| Pharmacy    | `/pharmacy`    | Drug inventory & dispensing                               |
-| Admin       | `/admin`       | Users, permissions, backup, certificates, digital signing |
+| Feature          | Path                      | Description                                                           |
+| ---------------- | ------------------------- | --------------------------------------------------------------------- |
+| Dashboard        | `/dashboard`              | Overview with stats & quick actions                                   |
+| Patients         | `/patients`               | Patient registration, search, biometrics, documents                   |
+| Couples          | `/couples`                | Couple management (wife + husband linkage)                            |
+| Cycles           | `/cycles/:id`             | Treatment cycle tracking (phases, outcomes)                           |
+| Queue            | `/queue/:dept`            | Real-time reception queue (SignalR)                                   |
+| Forms            | `/forms/*`                | Dynamic form builder, renderer, reports (12 sub-routes)               |
+| Billing          | `/billing`                | Invoices, payments, prescriptions                                     |
+| Ultrasounds      | `/ultrasounds`            | Ultrasound imaging & follicle tracking                                |
+| Andrology        | `/andrology`              | Semen analysis & sperm processing                                     |
+| Sperm Bank       | `/sperm-bank`             | Donor management, sample inventory                                    |
+| Lab              | `/lab`                    | Lab test results                                                      |
+| Reports          | `/reports`                | Clinical report generation                                            |
+| Pharmacy         | `/pharmacy`               | Drug inventory & dispensing                                           |
+| Admin            | `/admin`                  | Users, permissions, backup, certificates, digital signing             |
+| Enterprise Users | `/admin/enterprise-users` | Enterprise user management: sessions, groups, IAM, analytics, consent |
 
 ---
 
@@ -771,6 +772,25 @@ ReportTemplate → FormTemplate with report-specific rendering config
 ```
 
 Supports 20+ field types including text, number, date, dropdown, checkbox, radio, table, image, rich text, concept lookup, and linked fields.
+
+### Enterprise User Management
+
+6 entity classes for enterprise-grade user management (sessions, groups, IAM, analytics, consent):
+
+```
+User ──── UserSession           (persistent session tracking, revocation)
+  │
+  ├──── UserGroupMember ──── UserGroup (team/department/role-group/custom)
+  │                               └── UserGroupPermission (group-level IAM)
+  │
+  ├──── UserLoginHistory        (login forensics, risk scoring)
+  │
+  └──── UserConsent             (GDPR/HIPAA compliance, 8 consent types)
+```
+
+Repository: `IEnterpriseUserRepository` (65+ methods). CQRS: 14 commands + 7 queries.
+
+> **Full documentation:** See [Enterprise User Management](enterprise_user_management.md)
 
 ---
 

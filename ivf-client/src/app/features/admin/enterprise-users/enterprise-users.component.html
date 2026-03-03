@@ -1,0 +1,1164 @@
+<div class="enterprise-users">
+  <!-- ═══ HEADER ═══ -->
+  <div class="page-header">
+    <div class="header-left">
+      <h1>🏢 Quản lý người dùng Enterprise</h1>
+      <p class="subtitle">Quản lý, phân tích, bảo mật toàn diện — Enterprise-grade</p>
+    </div>
+  </div>
+
+  <!-- ═══ TABS ═══ -->
+  <div class="tab-nav">
+    <button [class.active]="activeTab() === 'analytics'" (click)="switchTab('analytics')">
+      📊 Phân tích
+    </button>
+    <button [class.active]="activeTab() === 'users'" (click)="switchTab('users')">
+      👤 Người dùng
+    </button>
+    <button [class.active]="activeTab() === 'groups'" (click)="switchTab('groups')">👥 Nhóm</button>
+    <button [class.active]="activeTab() === 'login-history'" (click)="switchTab('login-history')">
+      📋 Lịch sử đăng nhập
+    </button>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- ANALYTICS TAB -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  @if (activeTab() === 'analytics') {
+    @if (analytics(); as a) {
+      <!-- KPI Cards -->
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-icon">👥</div>
+          <div class="kpi-info">
+            <span class="kpi-value">{{ a.totalUsers }}</span>
+            <span class="kpi-label">Tổng người dùng</span>
+          </div>
+          <div class="kpi-footer">
+            <span class="kpi-badge active">{{ a.activeUsers }} hoạt động</span>
+            <span class="kpi-badge inactive">{{ a.inactiveUsers }} khóa</span>
+          </div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-icon">🔐</div>
+          <div class="kpi-info">
+            <span class="kpi-value">{{ mfaRate() }}%</span>
+            <span class="kpi-label">Tỷ lệ MFA</span>
+          </div>
+          <div class="kpi-footer">
+            <span class="kpi-badge">{{ a.mfaEnabledCount }} MFA</span>
+            <span class="kpi-badge">{{ a.passkeyCount }} Passkey</span>
+          </div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-icon">🔑</div>
+          <div class="kpi-info">
+            <span class="kpi-value">{{ a.totalLogins24h }}</span>
+            <span class="kpi-label">Đăng nhập 24h</span>
+          </div>
+          <div class="kpi-footer">
+            <span class="kpi-badge success">{{ loginSuccessRate() }}% thành công</span>
+            <span class="kpi-badge danger">{{ a.failedLogins24h }} thất bại</span>
+          </div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-icon">⚠️</div>
+          <div class="kpi-info">
+            <span class="kpi-value">{{ a.suspiciousLogins24h }}</span>
+            <span class="kpi-label">Đáng ngờ 24h</span>
+          </div>
+          <div class="kpi-footer">
+            <span class="kpi-badge">{{ a.activeSessions }} phiên hoạt động</span>
+            <span class="kpi-badge">{{ a.totalGroups }} nhóm</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Charts Row -->
+      <div class="charts-row">
+        <!-- Login Trend -->
+        <div class="chart-card">
+          <h3>📈 Xu hướng đăng nhập 7 ngày</h3>
+          <div class="bar-chart">
+            @for (trend of a.loginTrend7Days; track trend.date) {
+              <div class="bar-group">
+                <div class="bar-container">
+                  <div
+                    class="bar success"
+                    [style.height.%]="getBarWidth(trend.successCount, getMaxLoginTrend())"
+                  ></div>
+                  <div
+                    class="bar danger"
+                    [style.height.%]="getBarWidth(trend.failedCount, getMaxLoginTrend())"
+                  ></div>
+                  @if (trend.suspiciousCount > 0) {
+                    <div
+                      class="bar warning"
+                      [style.height.%]="getBarWidth(trend.suspiciousCount, getMaxLoginTrend())"
+                    ></div>
+                  }
+                </div>
+                <span class="bar-label">{{ trend.date | date: 'dd/MM' }}</span>
+              </div>
+            }
+          </div>
+          <div class="chart-legend">
+            <span class="legend-item"><span class="legend-color success"></span> Thành công</span>
+            <span class="legend-item"><span class="legend-color danger"></span> Thất bại</span>
+            <span class="legend-item"><span class="legend-color warning"></span> Đáng ngờ</span>
+          </div>
+        </div>
+
+        <!-- Users by Role -->
+        <div class="chart-card">
+          <h3>👤 Phân bố theo vai trò</h3>
+          <div class="role-distribution">
+            @for (entry of getRoleEntries(); track entry[0]) {
+              <div class="role-row">
+                <span class="role-name">{{ entry[0] }}</span>
+                <div class="role-bar-container">
+                  <div
+                    class="role-bar"
+                    [style.width.%]="getBarWidth(entry[1], a.activeUsers)"
+                  ></div>
+                </div>
+                <span class="role-count">{{ entry[1] }}</span>
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+
+      <!-- Active Users & Risk Users -->
+      <div class="charts-row">
+        <div class="chart-card">
+          <h3>🏆 Người dùng hoạt động nhiều nhất</h3>
+          <div class="user-list-mini">
+            @for (user of a.mostActiveUsers; track user.userId) {
+              <div class="user-row-mini" (click)="openUserDetail(user)">
+                <div class="avatar-mini" [style.background-color]="getAvatarColor(user.fullName)">
+                  {{ getInitials(user.fullName) }}
+                </div>
+                <div class="user-info-mini">
+                  <span class="user-name">{{ user.fullName }}</span>
+                  <span class="user-meta"
+                    >{{ user.username }} · {{ user.loginCount }} đăng nhập</span
+                  >
+                </div>
+                <span class="user-time">{{ formatDate(user.lastLogin) }}</span>
+              </div>
+            }
+            @if (a.mostActiveUsers.length === 0) {
+              <p class="empty-text">Chưa có dữ liệu đăng nhập</p>
+            }
+          </div>
+        </div>
+
+        <div class="chart-card">
+          <h3>🚨 Người dùng rủi ro cao</h3>
+          <div class="user-list-mini">
+            @for (user of a.highRiskUsers; track user.userId) {
+              <div class="user-row-mini risk" (click)="openUserDetail(user)">
+                <div
+                  class="avatar-mini risk"
+                  [style.background-color]="getAvatarColor(user.fullName)"
+                >
+                  {{ getInitials(user.fullName) }}
+                </div>
+                <div class="user-info-mini">
+                  <span class="user-name">{{ user.fullName }}</span>
+                  <span class="user-meta"
+                    >{{ user.username }} · {{ user.suspiciousCount }} đáng ngờ</span
+                  >
+                </div>
+                <span class="risk-score" [class]="getRiskClass(user.avgRiskScore)">
+                  {{ user.avgRiskScore | number: '1.0-0' }}
+                </span>
+              </div>
+            }
+            @if (a.highRiskUsers.length === 0) {
+              <p class="empty-text">Không có người dùng rủi ro cao</p>
+            }
+          </div>
+        </div>
+      </div>
+    } @else if (loading()) {
+      <div class="loading-container">
+        <div class="spinner"></div>
+        <p>Đang tải phân tích...</p>
+      </div>
+    }
+  }
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- USERS TAB -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  @if (activeTab() === 'users') {
+    <div class="toolbar">
+      <div class="toolbar-left">
+        <input
+          type="text"
+          [(ngModel)]="userSearch"
+          placeholder="🔍 Tìm kiếm..."
+          (keyup.enter)="loadUsers()"
+          class="search-input"
+        />
+        <select [(ngModel)]="userRoleFilter" (change)="loadUsers()" class="select-input">
+          <option value="">Tất cả vai trò</option>
+          @for (role of roles(); track role) {
+            <option [value]="role">{{ role }}</option>
+          }
+        </select>
+        <select [(ngModel)]="userStatusFilter" (change)="loadUsers()" class="select-input">
+          <option [ngValue]="undefined">Tất cả trạng thái</option>
+          <option [ngValue]="true">Hoạt động</option>
+          <option [ngValue]="false">Đã khóa</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" (click)="openUserModal()">+ Thêm người dùng</button>
+    </div>
+
+    <div class="table-container">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Người dùng</th>
+            <th>Vai trò</th>
+            <th>Phòng ban</th>
+            <th>Trạng thái</th>
+            <th>Thao tác</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (user of users(); track user.id) {
+            <tr>
+              <td>
+                <div class="user-cell">
+                  <div class="avatar" [style.background-color]="getAvatarColor(user.fullName)">
+                    {{ getInitials(user.fullName) }}
+                  </div>
+                  <div>
+                    <div class="user-name">{{ user.fullName }}</div>
+                    <div class="user-username">&#64;{{ user.username }}</div>
+                  </div>
+                </div>
+              </td>
+              <td>
+                <span class="role-badge" [class]="getRoleClass(user.role)">{{ user.role }}</span>
+              </td>
+              <td>{{ user.department || '—' }}</td>
+              <td>
+                <span class="status-badge" [class]="getStatusClass(user.isActive)">{{
+                  user.isActive ? 'Hoạt động' : 'Đã khóa'
+                }}</span>
+              </td>
+              <td>
+                <div class="action-buttons">
+                  <button class="btn-icon" title="Xem chi tiết" (click)="openUserDetail(user)">
+                    🔍
+                  </button>
+                  @if (user.role === 'Doctor') {
+                    <button
+                      class="btn-icon"
+                      title="Thông tin bác sĩ"
+                      (click)="openDoctorModal(user)"
+                    >
+                      🩺
+                    </button>
+                  }
+                  <button class="btn-icon" title="Phân quyền" (click)="openPermissionsModal(user)">
+                    🔐
+                  </button>
+                  <button class="btn-icon" title="Sửa" (click)="openUserModal(user)">✏️</button>
+                  <button
+                    class="btn-icon"
+                    title="{{ user.isActive ? 'Khóa' : 'Mở khóa' }}"
+                    (click)="toggleUserStatus(user)"
+                  >
+                    {{ user.isActive ? '🔒' : '🔓' }}
+                  </button>
+                </div>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <div class="pagination">
+      <button [disabled]="userPage <= 1" (click)="userPage = userPage - 1; loadUsers()">
+        ← Trước
+      </button>
+      <span>Trang {{ userPage }} · {{ userTotal }} kết quả</span>
+      <button
+        [disabled]="users().length < userPageSize"
+        (click)="userPage = userPage + 1; loadUsers()"
+      >
+        Sau →
+      </button>
+    </div>
+  }
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- GROUPS TAB -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  @if (activeTab() === 'groups') {
+    <div class="toolbar">
+      <div class="toolbar-left">
+        <input
+          type="text"
+          [(ngModel)]="groupSearch"
+          placeholder="🔍 Tìm nhóm..."
+          (keyup.enter)="loadGroups()"
+          class="search-input"
+        />
+        <select [(ngModel)]="groupTypeFilter" (change)="loadGroups()" class="select-input">
+          <option value="">Tất cả loại</option>
+          @for (gt of groupTypes; track gt.value) {
+            <option [value]="gt.value">{{ gt.icon }} {{ gt.label }}</option>
+          }
+        </select>
+      </div>
+      <button class="btn btn-primary" (click)="openGroupModal()">+ Tạo nhóm</button>
+    </div>
+
+    <div class="group-grid">
+      @for (group of groups(); track group.id) {
+        <div class="group-card" (click)="openGroupDetail(group)">
+          <div class="group-header">
+            <span class="group-icon">{{ getGroupTypeIcon(group.groupType) }}</span>
+            <div class="group-info">
+              <h4>{{ group.displayName || group.name }}</h4>
+              <span class="group-type">{{ getGroupTypeLabel(group.groupType) }}</span>
+            </div>
+            @if (group.isSystem) {
+              <span class="system-badge">Hệ thống</span>
+            }
+          </div>
+          @if (group.description) {
+            <p class="group-desc">{{ group.description }}</p>
+          }
+          <div class="group-footer">
+            <span>👤 {{ group.memberCount }} thành viên</span>
+            <span>🔑 {{ group.permissionCount }} quyền</span>
+          </div>
+          <div class="group-actions" (click)="$event.stopPropagation()">
+            <button class="btn-icon" title="Sửa" (click)="openGroupModal(group)">✏️</button>
+            <button
+              class="btn-icon danger"
+              title="Xóa"
+              (click)="deleteGroup(group)"
+              [disabled]="group.isSystem"
+            >
+              🗑️
+            </button>
+          </div>
+        </div>
+      }
+      @if (groups().length === 0 && !loading()) {
+        <div class="empty-state">
+          <div class="empty-icon">👥</div>
+          <h3>Chưa có nhóm nào</h3>
+          <p>Tạo nhóm để quản lý quyền hạn theo tổ chức</p>
+          <button class="btn btn-primary" (click)="openGroupModal()">+ Tạo nhóm đầu tiên</button>
+        </div>
+      }
+    </div>
+  }
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- LOGIN HISTORY TAB -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  @if (activeTab() === 'login-history') {
+    <div class="toolbar">
+      <div class="toolbar-left">
+        <input
+          type="text"
+          [(ngModel)]="loginSearch"
+          placeholder="🔍 User ID..."
+          class="search-input"
+        />
+        <select [(ngModel)]="loginSuccessFilter" (change)="loadLoginHistory()" class="select-input">
+          <option [ngValue]="undefined">Tất cả kết quả</option>
+          <option [ngValue]="true">Thành công</option>
+          <option [ngValue]="false">Thất bại</option>
+        </select>
+        <select
+          [(ngModel)]="loginSuspiciousFilter"
+          (change)="loadLoginHistory()"
+          class="select-input"
+        >
+          <option [ngValue]="undefined">Tất cả mức độ</option>
+          <option [ngValue]="true">Đáng ngờ</option>
+          <option [ngValue]="false">Bình thường</option>
+        </select>
+      </div>
+      <button class="btn btn-secondary" (click)="loadLoginHistory()">🔄 Tải lại</button>
+    </div>
+
+    <div class="table-container">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Thời gian</th>
+            <th>Phương thức</th>
+            <th>Kết quả</th>
+            <th>IP / Vị trí</th>
+            <th>Thiết bị</th>
+            <th>Rủi ro</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (entry of loginHistory(); track entry.id) {
+            <tr [class]="getSeverityClass(entry.isSuspicious, entry.isSuccess)">
+              <td>{{ formatDate(entry.loginAt) }}</td>
+              <td>
+                <span class="method-badge">{{
+                  loginMethodLabels[entry.loginMethod] || entry.loginMethod
+                }}</span>
+              </td>
+              <td>
+                @if (entry.isSuccess) {
+                  <span class="status-badge active">✓ Thành công</span>
+                } @else {
+                  <span class="status-badge inactive">✗ Thất bại</span>
+                }
+                @if (entry.isSuspicious) {
+                  <span class="suspicious-badge">⚠️ Đáng ngờ</span>
+                }
+              </td>
+              <td>
+                <div>{{ entry.ipAddress || '—' }}</div>
+                @if (entry.country || entry.city) {
+                  <small class="muted"
+                    >{{ entry.city ? entry.city + ', ' : '' }}{{ entry.country }}</small
+                  >
+                }
+              </td>
+              <td>
+                <span>{{ deviceTypeIcons[entry.deviceType || ''] || '💻' }}</span>
+                {{ entry.browser || '—' }}
+                @if (entry.operatingSystem) {
+                  <small class="muted">{{ entry.operatingSystem }}</small>
+                }
+              </td>
+              <td>
+                @if (entry.riskScore !== null) {
+                  <span class="risk-score" [class]="getRiskClass(entry.riskScore)">
+                    {{ entry.riskScore | number: '1.0-0' }}
+                  </span>
+                } @else {
+                  <span class="muted">—</span>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <div class="pagination">
+      <button [disabled]="loginPage <= 1" (click)="loginPage = loginPage - 1; loadLoginHistory()">
+        ← Trước
+      </button>
+      <span>Trang {{ loginPage }} · {{ loginTotal }} kết quả</span>
+      <button
+        [disabled]="loginHistory().length < 50"
+        (click)="loginPage = loginPage + 1; loadLoginHistory()"
+      >
+        Sau →
+      </button>
+    </div>
+  }
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- USER DETAIL MODAL -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  @if (showUserDetail && selectedUserDetail(); as detail) {
+    <div class="modal-overlay" (click)="closeUserDetail()">
+      <div class="modal-content large" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <div class="user-detail-header">
+            <div class="avatar large" [style.background-color]="getAvatarColor(detail.fullName)">
+              {{ getInitials(detail.fullName) }}
+            </div>
+            <div>
+              <h2>{{ detail.fullName }}</h2>
+              <p>
+                &#64;{{ detail.username }} · {{ detail.role }} ·
+                {{ detail.department || 'Không có phòng ban' }}
+              </p>
+              <div class="user-badges">
+                <span class="status-badge" [class]="getStatusClass(detail.isActive)">{{
+                  detail.isActive ? 'Hoạt động' : 'Đã khóa'
+                }}</span>
+                @if (detail.mfaEnabled) {
+                  <span class="badge mfa">🔐 MFA: {{ detail.mfaMethod }}</span>
+                }
+                @if (detail.passkeyCount > 0) {
+                  <span class="badge passkey">🔑 {{ detail.passkeyCount }} Passkey</span>
+                }
+                <span class="badge sessions"
+                  >💻 {{ detail.activeSessionCount }} phiên hoạt động</span
+                >
+              </div>
+            </div>
+          </div>
+          <button class="close-btn" (click)="closeUserDetail()">✕</button>
+        </div>
+
+        <!-- Detail Tabs -->
+        <div class="detail-tabs">
+          <button
+            [class.active]="userDetailTab() === 'overview'"
+            (click)="userDetailTab.set('overview')"
+          >
+            Tổng quan
+          </button>
+          <button
+            [class.active]="userDetailTab() === 'sessions'"
+            (click)="userDetailTab.set('sessions')"
+          >
+            Phiên đăng nhập
+          </button>
+          <button
+            [class.active]="userDetailTab() === 'permissions'"
+            (click)="userDetailTab.set('permissions')"
+          >
+            Quyền hạn
+          </button>
+          <button
+            [class.active]="userDetailTab() === 'login-history'"
+            (click)="userDetailTab.set('login-history')"
+          >
+            Lịch sử
+          </button>
+          <button
+            [class.active]="userDetailTab() === 'consent'"
+            (click)="userDetailTab.set('consent')"
+          >
+            Đồng ý dữ liệu
+          </button>
+        </div>
+
+        <div class="modal-body">
+          <!-- Overview Tab -->
+          @if (userDetailTab() === 'overview') {
+            <div class="detail-grid">
+              <div class="detail-section">
+                <h4>📊 Thống kê đăng nhập (30 ngày)</h4>
+                <div class="stat-grid">
+                  <div class="stat-item">
+                    <span class="stat-value">{{ detail.loginSummary.totalLogins }}</span>
+                    <span class="stat-label">Tổng đăng nhập</span>
+                  </div>
+                  <div class="stat-item">
+                    <span class="stat-value danger">{{ detail.loginSummary.failedLogins }}</span>
+                    <span class="stat-label">Thất bại</span>
+                  </div>
+                  <div class="stat-item">
+                    <span class="stat-value warning">{{
+                      detail.loginSummary.suspiciousLogins
+                    }}</span>
+                    <span class="stat-label">Đáng ngờ</span>
+                  </div>
+                  <div class="stat-item">
+                    <span
+                      class="stat-value"
+                      [class]="getRiskClass(detail.loginSummary.avgRiskScore)"
+                    >
+                      {{ detail.loginSummary.avgRiskScore | number: '1.0-0' }}
+                    </span>
+                    <span class="stat-label">Điểm rủi ro TB</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="detail-section">
+                <h4>🕐 Hoạt động gần nhất</h4>
+                <div class="info-rows">
+                  <div class="info-row">
+                    <span class="info-label">Đăng nhập cuối</span>
+                    <span>{{ formatDate(detail.loginSummary.lastLoginAt) }}</span>
+                  </div>
+                  <div class="info-row">
+                    <span class="info-label">IP cuối</span>
+                    <span>{{ detail.loginSummary.lastLoginIp || '—' }}</span>
+                  </div>
+                  <div class="info-row">
+                    <span class="info-label">Vị trí cuối</span>
+                    <span>{{ detail.loginSummary.lastLoginCountry || '—' }}</span>
+                  </div>
+                  <div class="info-row">
+                    <span class="info-label">Thất bại cuối</span>
+                    <span>{{ formatDate(detail.loginSummary.lastFailedAt) }}</span>
+                  </div>
+                  <div class="info-row">
+                    <span class="info-label">Tạo lúc</span>
+                    <span>{{ formatDate(detail.createdAt) }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="detail-section">
+                <h4>👥 Nhóm</h4>
+                @if (detail.groups.length > 0) {
+                  <div class="tag-list">
+                    @for (group of detail.groups; track group) {
+                      <span class="tag">{{ group }}</span>
+                    }
+                  </div>
+                } @else {
+                  <p class="muted">Chưa thuộc nhóm nào</p>
+                }
+              </div>
+            </div>
+          }
+
+          <!-- Sessions Tab -->
+          @if (userDetailTab() === 'sessions') {
+            <div class="section-header">
+              <h4>💻 Phiên đăng nhập</h4>
+              <button class="btn btn-danger btn-sm" (click)="revokeAllSessions(detail.id)">
+                Thu hồi tất cả
+              </button>
+            </div>
+            <div class="session-list">
+              @for (session of selectedUserSessions(); track session.id) {
+                <div class="session-card" [class.revoked]="session.isRevoked">
+                  <div class="session-info">
+                    <div class="session-device">
+                      <span>{{ deviceTypeIcons[session.deviceType || ''] || '💻' }}</span>
+                      <strong>{{ session.browser || 'Unknown' }}</strong>
+                      @if (session.operatingSystem) {
+                        <span class="muted">trên {{ session.operatingSystem }}</span>
+                      }
+                    </div>
+                    <div class="session-meta">
+                      <span
+                        >📍 {{ session.ipAddress || '—'
+                        }}{{ session.country ? ' · ' + session.country : ''
+                        }}{{ session.city ? ', ' + session.city : '' }}</span
+                      >
+                    </div>
+                    <div class="session-times">
+                      <span>Bắt đầu: {{ formatDate(session.startedAt) }}</span>
+                      <span>Hoạt động cuối: {{ formatDate(session.lastActivityAt) }}</span>
+                    </div>
+                  </div>
+                  <div class="session-status">
+                    @if (session.isRevoked) {
+                      <span class="status-badge inactive">Đã thu hồi</span>
+                      <small class="muted">{{ session.revokedReason }}</small>
+                    } @else {
+                      <span class="status-badge active">Hoạt động</span>
+                      <button class="btn btn-danger btn-sm" (click)="revokeSession(session.id)">
+                        Thu hồi
+                      </button>
+                    }
+                  </div>
+                </div>
+              }
+              @if (selectedUserSessions().length === 0) {
+                <p class="empty-text">Không có phiên đăng nhập</p>
+              }
+            </div>
+          }
+
+          <!-- Permissions Tab -->
+          @if (userDetailTab() === 'permissions') {
+            <div class="permissions-detail">
+              <div class="detail-section">
+                <h4>🔑 Quyền trực tiếp ({{ detail.permissions.length }})</h4>
+                <div class="tag-list">
+                  @for (perm of detail.permissions; track perm) {
+                    <span class="tag permission">{{ formatPermission(perm) }}</span>
+                  }
+                  @if (detail.permissions.length === 0) {
+                    <p class="muted">Không có quyền trực tiếp</p>
+                  }
+                </div>
+              </div>
+              <div class="detail-section">
+                <h4>👥 Quyền từ nhóm ({{ detail.groupPermissions.length }})</h4>
+                <div class="tag-list">
+                  @for (perm of detail.groupPermissions; track perm) {
+                    <span class="tag group-permission">{{ formatPermission(perm) }}</span>
+                  }
+                  @if (detail.groupPermissions.length === 0) {
+                    <p class="muted">Không có quyền từ nhóm</p>
+                  }
+                </div>
+              </div>
+            </div>
+          }
+
+          <!-- Login History Tab -->
+          @if (userDetailTab() === 'login-history') {
+            <div class="login-history-list">
+              @for (entry of userDetailLoginHistory(); track entry.id) {
+                <div
+                  class="history-row"
+                  [class]="getSeverityClass(entry.isSuspicious, entry.isSuccess)"
+                >
+                  <div class="history-time">{{ formatDate(entry.loginAt) }}</div>
+                  <div class="history-info">
+                    <span class="method-badge">{{
+                      loginMethodLabels[entry.loginMethod] || entry.loginMethod
+                    }}</span>
+                    @if (entry.isSuccess) {
+                      <span class="status-badge active">✓</span>
+                    } @else {
+                      <span class="status-badge inactive">✗ {{ entry.failureReason }}</span>
+                    }
+                    @if (entry.isSuspicious) {
+                      <span class="suspicious-badge">⚠️</span>
+                    }
+                  </div>
+                  <div class="history-location">
+                    {{ entry.ipAddress }}{{ entry.country ? ' · ' + entry.country : '' }}
+                  </div>
+                  @if (entry.riskScore !== null) {
+                    <span class="risk-score" [class]="getRiskClass(entry.riskScore)">{{
+                      entry.riskScore | number: '1.0-0'
+                    }}</span>
+                  }
+                </div>
+              }
+            </div>
+          }
+
+          <!-- Consent Tab -->
+          @if (userDetailTab() === 'consent') {
+            <div class="consent-list">
+              @for (consent of selectedUserConsents(); track consent.id) {
+                <div class="consent-card" [class.revoked]="!consent.isGranted">
+                  <div class="consent-info">
+                    <span class="consent-icon">{{ getConsentIcon(consent.consentType) }}</span>
+                    <div>
+                      <strong>{{ getConsentLabel(consent.consentType) }}</strong>
+                      @if (consent.consentVersion) {
+                        <span class="muted"> v{{ consent.consentVersion }}</span>
+                      }
+                    </div>
+                  </div>
+                  <div class="consent-status">
+                    @if (consent.isGranted) {
+                      <span class="status-badge active">Đã đồng ý</span>
+                      <small>{{ formatDate(consent.consentedAt) }}</small>
+                    } @else {
+                      <span class="status-badge inactive">Đã thu hồi</span>
+                      <small>{{ formatDate(consent.revokedAt) }}</small>
+                    }
+                  </div>
+                </div>
+              }
+              @if (selectedUserConsents().length === 0) {
+                <p class="empty-text">Chưa có thông tin đồng ý dữ liệu</p>
+              }
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- GROUP DETAIL MODAL -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  @if (showGroupDetail && selectedGroupDetail(); as gd) {
+    <div class="modal-overlay" (click)="closeGroupDetail()">
+      <div class="modal-content large" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <div class="group-detail-header">
+            <span class="group-icon large">{{ getGroupTypeIcon(gd.groupType) }}</span>
+            <div>
+              <h2>{{ gd.displayName || gd.name }}</h2>
+              <p>{{ getGroupTypeLabel(gd.groupType) }}{{ gd.isSystem ? ' · Hệ thống' : '' }}</p>
+              @if (gd.description) {
+                <p class="muted">{{ gd.description }}</p>
+              }
+            </div>
+          </div>
+          <button class="close-btn" (click)="closeGroupDetail()">✕</button>
+        </div>
+
+        <div class="modal-body">
+          <!-- Members -->
+          <div class="section-header">
+            <h4>👤 Thành viên ({{ gd.members.length }})</h4>
+            <button class="btn btn-primary btn-sm" (click)="openAddMemberModal()">
+              + Thêm thành viên
+            </button>
+          </div>
+          <div class="member-list">
+            @for (member of gd.members; track member.id) {
+              <div class="member-row">
+                <div class="avatar-mini" [style.background-color]="getAvatarColor(member.fullName)">
+                  {{ getInitials(member.fullName) }}
+                </div>
+                <div class="member-info">
+                  <strong>{{ member.fullName }}</strong>
+                  <span class="muted">&#64;{{ member.username }} · {{ member.role }}</span>
+                </div>
+                <span class="member-role-badge">{{ member.memberRole }}</span>
+                <div class="member-actions">
+                  <button class="btn-icon danger" (click)="removeMember(member.userId)">✕</button>
+                </div>
+              </div>
+            }
+          </div>
+
+          <!-- Permissions -->
+          <div class="section-header">
+            <h4>🔑 Quyền nhóm ({{ gd.permissions.length }})</h4>
+            <button class="btn btn-secondary btn-sm" (click)="openGroupPermissionsModal()">
+              Chỉnh sửa quyền
+            </button>
+          </div>
+          <div class="tag-list">
+            @for (perm of gd.permissions; track perm) {
+              <span class="tag permission">{{ formatPermission(perm) }}</span>
+            }
+            @if (gd.permissions.length === 0) {
+              <p class="muted">Chưa gán quyền cho nhóm</p>
+            }
+          </div>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- CREATE/EDIT USER MODAL -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  @if (showUserModal) {
+    <div class="modal-overlay" (click)="closeUserModal()">
+      <div class="modal-content" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h2>{{ editingUser ? 'Sửa người dùng' : 'Thêm người dùng' }}</h2>
+          <button class="close-btn" (click)="closeUserModal()">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Tên đăng nhập</label>
+            <input
+              type="text"
+              [(ngModel)]="userFormData.username"
+              [disabled]="!!editingUser"
+              class="form-input"
+            />
+          </div>
+          @if (!editingUser || changePassword) {
+            <div class="form-group">
+              <label>Mật khẩu</label>
+              <input type="password" [(ngModel)]="userFormData.password" class="form-input" />
+            </div>
+          }
+          @if (editingUser) {
+            <div class="form-group">
+              <label class="checkbox-label">
+                <input type="checkbox" [(ngModel)]="changePassword" /> Đổi mật khẩu
+              </label>
+            </div>
+          }
+          <div class="form-group">
+            <label>Họ tên</label>
+            <input type="text" [(ngModel)]="userFormData.fullName" class="form-input" />
+          </div>
+          <div class="form-group">
+            <label>Vai trò</label>
+            <select [(ngModel)]="userFormData.role" class="form-input">
+              @for (role of roles(); track role) {
+                <option [value]="role">{{ role }}</option>
+              }
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Phòng ban</label>
+            <input type="text" [(ngModel)]="userFormData.department" class="form-input" />
+          </div>
+          @if (editingUser) {
+            <div class="form-group">
+              <label class="checkbox-label">
+                <input type="checkbox" [(ngModel)]="userFormData.isActive" /> Hoạt động
+              </label>
+            </div>
+          }
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" (click)="closeUserModal()">Hủy</button>
+          <button class="btn btn-primary" (click)="saveUser()" [disabled]="loading()">
+            {{ editingUser ? 'Cập nhật' : 'Tạo mới' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- CREATE/EDIT GROUP MODAL -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  @if (showGroupModal) {
+    <div class="modal-overlay" (click)="closeGroupModal()">
+      <div class="modal-content" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h2>{{ editingGroup ? 'Sửa nhóm' : 'Tạo nhóm mới' }}</h2>
+          <button class="close-btn" (click)="closeGroupModal()">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Tên nhóm (code)</label>
+            <input
+              type="text"
+              [(ngModel)]="groupFormData.name"
+              class="form-input"
+              placeholder="vd: team-bac-si"
+            />
+          </div>
+          <div class="form-group">
+            <label>Tên hiển thị</label>
+            <input
+              type="text"
+              [(ngModel)]="groupFormData.displayName"
+              class="form-input"
+              placeholder="vd: Nhóm Bác sĩ"
+            />
+          </div>
+          <div class="form-group">
+            <label>Mô tả</label>
+            <textarea
+              [(ngModel)]="groupFormData.description"
+              class="form-input"
+              rows="3"
+            ></textarea>
+          </div>
+          <div class="form-group">
+            <label>Loại nhóm</label>
+            <select [(ngModel)]="groupFormData.groupType" class="form-input">
+              @for (gt of groupTypes; track gt.value) {
+                <option [value]="gt.value">{{ gt.icon }} {{ gt.label }}</option>
+              }
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" (click)="closeGroupModal()">Hủy</button>
+          <button class="btn btn-primary" (click)="saveGroup()" [disabled]="loading()">
+            {{ editingGroup ? 'Cập nhật' : 'Tạo nhóm' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ═══ ADD MEMBER MODAL ═══ -->
+  @if (showAddMemberModal) {
+    <div class="modal-overlay" (click)="showAddMemberModal = false">
+      <div class="modal-content small" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h2>Thêm thành viên</h2>
+          <button class="close-btn" (click)="showAddMemberModal = false">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Tìm người dùng</label>
+            @if (selectedMemberUser) {
+              <div class="selected-user-chip">
+                <span
+                  >{{ selectedMemberUser.fullName }} ({{ selectedMemberUser.username }}) —
+                  {{ selectedMemberUser.role }}</span
+                >
+                <button type="button" class="chip-remove" (click)="clearSelectedMember()">✕</button>
+              </div>
+            } @else {
+              <div class="search-autocomplete">
+                <input
+                  type="text"
+                  [(ngModel)]="memberSearchQuery"
+                  (input)="searchMemberUsers()"
+                  class="form-input"
+                  placeholder="Nhập tên hoặc username..."
+                  autocomplete="off"
+                />
+                @if (memberSearchResults.length > 0) {
+                  <ul class="autocomplete-dropdown">
+                    @for (u of memberSearchResults; track u.id) {
+                      <li (click)="selectMemberUser(u)">
+                        <strong>{{ u.fullName }}</strong>
+                        <span class="muted">({{ u.username }})</span> —
+                        <span class="badge">{{ u.role }}</span>
+                      </li>
+                    }
+                  </ul>
+                }
+              </div>
+            }
+          </div>
+          <div class="form-group">
+            <label>Vai trò trong nhóm</label>
+            <select [(ngModel)]="newMemberRole" class="form-input">
+              @for (mr of memberRoles; track mr.value) {
+                <option [value]="mr.value">{{ mr.label }}</option>
+              }
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" (click)="showAddMemberModal = false">Hủy</button>
+          <button class="btn btn-primary" (click)="addMember()" [disabled]="!newMemberUserId">
+            Thêm
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ═══ GROUP PERMISSIONS MODAL ═══ -->
+  @if (showGroupPermissionsModal) {
+    <div class="modal-overlay" (click)="showGroupPermissionsModal = false">
+      <div class="modal-content" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h2>Quyền nhóm</h2>
+          <button class="close-btn" (click)="showGroupPermissionsModal = false">✕</button>
+        </div>
+        <div class="modal-body permissions-grid">
+          @for (group of permissionGroups; track group.name) {
+            <div class="permission-group">
+              <h5>{{ group.name }}</h5>
+              @for (perm of group.permissions; track perm) {
+                <label class="checkbox-label">
+                  <input
+                    type="checkbox"
+                    [checked]="groupPermissions.includes(perm)"
+                    (change)="toggleGroupPermission(perm)"
+                  />
+                  {{ formatPermission(perm) }}
+                </label>
+              }
+            </div>
+          }
+        </div>
+        <div class="modal-footer">
+          <span class="muted">{{ groupPermissions.length }} quyền đã chọn</span>
+          <button class="btn btn-secondary" (click)="showGroupPermissionsModal = false">Hủy</button>
+          <button class="btn btn-primary" (click)="saveGroupPermissions()">Lưu quyền</button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ═══ DOCTOR INFO MODAL ═══ -->
+  @if (showDoctorModal) {
+    <div class="modal-overlay" (click)="closeDoctorModal()">
+      <div class="modal-content" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h2>🩺 Cập nhật thông tin bác sĩ</h2>
+          <button class="close-btn" (click)="closeDoctorModal()">✕</button>
+        </div>
+        <div class="modal-body">
+          <p class="text-muted">
+            Cập nhật thông tin chuyên môn cho tài khoản
+            <strong>{{ selectedDoctorUser?.fullName }}</strong>
+          </p>
+          <form (ngSubmit)="saveDoctorProfile()">
+            <div class="form-group">
+              <label>Chuyên khoa <span class="required">*</span></label>
+              <select
+                class="form-input"
+                [(ngModel)]="doctorFormData.specialty"
+                name="specialty"
+                required
+              >
+                <option value="IVF">IVF (Hiếm muộn)</option>
+                <option value="Andrology">Nam khoa</option>
+                <option value="Gynecology">Phụ sản</option>
+                <option value="Embryology">Phôi học</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Số chứng chỉ hành nghề</label>
+              <input
+                class="form-input"
+                [(ngModel)]="doctorFormData.licenseNumber"
+                name="license"
+                placeholder="VD: 00123/BYT-CCHN"
+              />
+            </div>
+            <div class="form-group">
+              <label>Phòng khám mặc định</label>
+              <input
+                class="form-input"
+                [(ngModel)]="doctorFormData.roomNumber"
+                name="room"
+                placeholder="VD: P.201"
+              />
+            </div>
+            <div class="form-group">
+              <label>Số ca tối đa/ngày</label>
+              <input
+                class="form-input"
+                type="number"
+                [(ngModel)]="doctorFormData.maxPatientsPerDay"
+                name="maxPatients"
+                min="1"
+              />
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" (click)="closeDoctorModal()">
+                Hủy
+              </button>
+              <button type="submit" class="btn btn-primary" [disabled]="loading()">
+                {{ loading() ? 'Đang lưu...' : 'Lưu thông tin' }}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ═══ USER PERMISSIONS MODAL ═══ -->
+  @if (showPermissionsModal) {
+    <div class="modal-overlay" (click)="closePermissionsModal()">
+      <div class="modal-content" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h2>🔐 Phân quyền cho {{ selectedPermissionUser?.fullName }}</h2>
+          <button class="close-btn" (click)="closePermissionsModal()">✕</button>
+        </div>
+        <div class="modal-body permissions-grid">
+          @for (group of permissionGroups; track group.name) {
+            <div class="permission-group">
+              <h5>{{ group.name }}</h5>
+              @for (perm of group.permissions; track perm) {
+                <label class="checkbox-label">
+                  <input
+                    type="checkbox"
+                    [checked]="userPermissions.includes(perm)"
+                    (change)="toggleUserPermission(perm)"
+                  />
+                  {{ formatPermission(perm) }}
+                </label>
+              }
+            </div>
+          }
+        </div>
+        <div class="modal-footer">
+          <span class="muted">{{ userPermissions.length }} quyền đã chọn</span>
+          <button class="btn btn-secondary" (click)="closePermissionsModal()">Hủy</button>
+          <button class="btn btn-primary" [disabled]="loading()" (click)="saveUserPermissions()">
+            {{ loading() ? 'Đang lưu...' : 'Lưu phân quyền' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ═══ LOADING ═══ -->
+  @if (loading()) {
+    <div class="loading-overlay"><div class="spinner"></div></div>
+  }
+</div>

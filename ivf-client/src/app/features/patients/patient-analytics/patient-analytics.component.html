@@ -1,0 +1,279 @@
+<div class="analytics-container">
+  <!-- Header -->
+  <div class="analytics-header">
+    <div class="header-left">
+      <a routerLink="/patients" class="back-link">← Danh sách bệnh nhân</a>
+      <h2>📊 Phân tích bệnh nhân</h2>
+      <p class="subtitle">Tổng quan hệ thống quản lý bệnh nhân enterprise</p>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-outline" (click)="loadAnalytics()">
+        <i class="icon-refresh"></i> Làm mới
+      </button>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tab-bar">
+    <button [class.active]="activeTab() === 'overview'" (click)="setTab('overview')">
+      Tổng quan
+    </button>
+    <button [class.active]="activeTab() === 'demographics'" (click)="setTab('demographics')">
+      Nhân khẩu học
+    </button>
+    <button [class.active]="activeTab() === 'compliance'" (click)="setTab('compliance')">
+      Tuân thủ & Rủi ro
+    </button>
+    <button [class.active]="activeTab() === 'followup'" (click)="setTab('followup')">
+      Theo dõi & Lưu trữ
+    </button>
+  </div>
+
+  @if (loading()) {
+    <div class="loading-state">
+      <div class="spinner"></div>
+      <p>Đang tải dữ liệu phân tích...</p>
+    </div>
+  } @else if (analytics(); as data) {
+    <!-- OVERVIEW TAB -->
+    @if (activeTab() === 'overview') {
+      <!-- Summary Cards -->
+      <div class="summary-grid">
+        <div class="summary-card primary">
+          <div class="card-icon">👥</div>
+          <div class="card-content">
+            <span class="card-value">{{ data.totalPatients }}</span>
+            <span class="card-label">Tổng bệnh nhân</span>
+          </div>
+        </div>
+        <div class="summary-card success">
+          <div class="card-icon">✅</div>
+          <div class="card-content">
+            <span class="card-value">{{ data.activePatients }}</span>
+            <span class="card-label">Đang theo dõi</span>
+          </div>
+        </div>
+        <div class="summary-card warning">
+          <div class="card-icon">⏸️</div>
+          <div class="card-content">
+            <span class="card-value">{{ data.inactivePatients }}</span>
+            <span class="card-label">Không hoạt động</span>
+          </div>
+        </div>
+        <div class="summary-card info">
+          <div class="card-icon">🔔</div>
+          <div class="card-content">
+            <span class="card-value">{{ followUpPatients().length }}</span>
+            <span class="card-label">Cần theo dõi lại</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Charts Row -->
+      <div class="charts-row">
+        <!-- Registration Trend -->
+        <div class="chart-card">
+          <h3>📈 Xu hướng đăng ký (12 tháng)</h3>
+          <div class="bar-chart">
+            @for (entry of objectEntries(data.registrationTrend); track entry[0]) {
+              <div class="bar-row">
+                <span class="bar-label">{{ entry[0] }}</span>
+                <div class="bar-container">
+                  <div
+                    class="bar"
+                    [style.width.%]="getBarWidth(entry[1], getMaxValue(data.registrationTrend))"
+                    style="background: linear-gradient(90deg, #3b82f6, #8b5cf6)"
+                  ></div>
+                </div>
+                <span class="bar-value">{{ entry[1] }}</span>
+              </div>
+            }
+          </div>
+        </div>
+
+        <!-- Gender Distribution -->
+        <div class="chart-card">
+          <h3>⚧ Phân bố giới tính</h3>
+          <div class="donut-chart-container">
+            @for (entry of objectEntries(data.byGender); track entry[0]) {
+              <div class="stat-row">
+                <span
+                  class="stat-dot"
+                  [style.backgroundColor]="entry[0] === 'Male' ? '#3b82f6' : '#ec4899'"
+                ></span>
+                <span class="stat-label">{{ entry[0] === 'Male' ? 'Nam' : 'Nữ' }}</span>
+                <span class="stat-value">{{ entry[1] }}</span>
+                <span class="stat-pct">({{ getPercentage(entry[1], data.totalPatients) }}%)</span>
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent Patients -->
+      <div class="chart-card">
+        <h3>🆕 Bệnh nhân đăng ký gần đây</h3>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Mã BN</th>
+              <th>Họ tên</th>
+              <th>Ngày sinh</th>
+              <th>Loại</th>
+              <th>Trạng thái</th>
+              <th>Ngày đăng ký</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (p of data.recentPatients; track p.id) {
+              <tr>
+                <td>
+                  <a [routerLink]="['/patients', p.id]" class="code-link">{{ p.patientCode }}</a>
+                </td>
+                <td>{{ p.fullName }}</td>
+                <td>{{ p.dateOfBirth | date: 'dd/MM/yyyy' }}</td>
+                <td>
+                  <span class="badge type">{{ typeLabels[p.patientType] || p.patientType }}</span>
+                </td>
+                <td>
+                  <span class="badge status" [attr.data-status]="p.status">{{
+                    statusLabels[p.status] || p.status
+                  }}</span>
+                </td>
+                <td>{{ p.createdAt | date: 'dd/MM/yyyy HH:mm' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+
+    <!-- DEMOGRAPHICS TAB -->
+    @if (activeTab() === 'demographics') {
+      <div class="charts-row">
+        <!-- By Type -->
+        <div class="chart-card">
+          <h3>🏥 Phân loại bệnh nhân</h3>
+          <div class="bar-chart">
+            @for (entry of objectEntries(data.byType); track entry[0]) {
+              <div class="bar-row">
+                <span class="bar-label">{{ typeLabels[entry[0]] || entry[0] }}</span>
+                <div class="bar-container">
+                  <div
+                    class="bar"
+                    [style.width.%]="getBarWidth(entry[1], getMaxValue(data.byType))"
+                    style="background: linear-gradient(90deg, #10b981, #34d399)"
+                  ></div>
+                </div>
+                <span class="bar-value"
+                  >{{ entry[1] }} ({{ getPercentage(entry[1], data.totalPatients) }}%)</span
+                >
+              </div>
+            }
+          </div>
+        </div>
+
+        <!-- By Age Group -->
+        <div class="chart-card">
+          <h3>📅 Phân bố độ tuổi</h3>
+          <div class="bar-chart">
+            @for (entry of objectEntries(data.byAgeGroup); track entry[0]) {
+              <div class="bar-row">
+                <span class="bar-label">{{ entry[0] }} tuổi</span>
+                <div class="bar-container">
+                  <div
+                    class="bar"
+                    [style.width.%]="getBarWidth(entry[1], getMaxValue(data.byAgeGroup))"
+                    style="background: linear-gradient(90deg, #f59e0b, #fbbf24)"
+                  ></div>
+                </div>
+                <span class="bar-value">{{ entry[1] }}</span>
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- COMPLIANCE TAB -->
+    @if (activeTab() === 'compliance') {
+      <div class="charts-row">
+        <!-- Risk Level Distribution -->
+        <div class="chart-card">
+          <h3>⚠️ Phân bố mức rủi ro</h3>
+          <div class="risk-grid">
+            @for (entry of objectEntries(data.byRiskLevel); track entry[0]) {
+              <div class="risk-card" [style.borderLeftColor]="riskColors[entry[0]] || '#6b7280'">
+                <span class="risk-level">{{ riskLabels[entry[0]] || entry[0] }}</span>
+                <span class="risk-count">{{ entry[1] }}</span>
+                <span class="risk-pct">{{ getPercentage(entry[1], data.totalPatients) }}%</span>
+              </div>
+            }
+          </div>
+        </div>
+
+        <!-- Data Retention -->
+        <div class="chart-card">
+          <h3>🔒 Tuân thủ dữ liệu (GDPR)</h3>
+          <div class="compliance-stats">
+            <div class="compliance-item">
+              <span class="compliance-label">Dữ liệu hết hạn lưu trữ</span>
+              <span class="compliance-value" [class.alert]="expiredRetention().length > 0">
+                {{ expiredRetention().length }} bệnh nhân
+              </span>
+            </div>
+          </div>
+          @if (expiredRetention().length > 0) {
+            <div class="alert-banner">
+              ⚠️ Có {{ expiredRetention().length }} hồ sơ bệnh nhân cần được ẩn danh hóa theo chính
+              sách lưu trữ dữ liệu.
+            </div>
+          }
+        </div>
+      </div>
+    }
+
+    <!-- FOLLOW-UP TAB -->
+    @if (activeTab() === 'followup') {
+      <div class="chart-card">
+        <h3>🔔 Bệnh nhân cần theo dõi lại (>90 ngày)</h3>
+        @if (followUpPatients().length === 0) {
+          <div class="empty-state">
+            <p>✅ Không có bệnh nhân nào cần theo dõi lại.</p>
+          </div>
+        } @else {
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Mã BN</th>
+                <th>Họ tên</th>
+                <th>SĐT</th>
+                <th>Lần khám cuối</th>
+                <th>Tổng lượt khám</th>
+                <th>Mức rủi ro</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (p of followUpPatients(); track p.id) {
+                <tr>
+                  <td>
+                    <a [routerLink]="['/patients', p.id]" class="code-link">{{ p.patientCode }}</a>
+                  </td>
+                  <td>{{ p.fullName }}</td>
+                  <td>{{ p.phone || '—' }}</td>
+                  <td>{{ p.lastVisitDate ? (p.lastVisitDate | date: 'dd/MM/yyyy') : '—' }}</td>
+                  <td>{{ p.totalVisits }}</td>
+                  <td>
+                    <span class="badge risk" [style.backgroundColor]="riskColors[p.riskLevel]">
+                      {{ riskLabels[p.riskLevel] || p.riskLevel }}
+                    </span>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        }
+      </div>
+    }
+  }
+</div>

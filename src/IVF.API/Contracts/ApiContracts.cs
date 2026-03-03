@@ -15,6 +15,11 @@ public record UserDto(Guid Id, string Username, string FullName, string Role, st
     public static UserDto FromEntity(IVF.Domain.Entities.User u) => new(u.Id, u.Username, u.FullName, u.Role, u.Department);
 }
 public record UpdatePatientRequest(string FullName, string? Phone, string? Address);
+public record UpdateEmergencyContactRequest(string? Name, string? Phone, string? Relation);
+public record UpdateConsentRequest(bool ConsentDataProcessing, bool ConsentResearch, bool ConsentMarketing);
+public record SetRiskRequest(RiskLevel RiskLevel, string? RiskNotes);
+public record ChangeStatusRequest(PatientStatus Status);
+public record UpdateMedicalNotesRequest(string? MedicalNotes);
 public record UpdateCoupleRequest(DateTime? MarriageDate, int? InfertilityYears);
 public record SetDonorRequest(Guid DonorId);
 public record AdvancePhaseRequest(CyclePhase Phase);

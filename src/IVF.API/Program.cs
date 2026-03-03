@@ -138,6 +138,7 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(options =
     options.SerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
     options.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
     options.SerializerOptions.Converters.Add(new IVF.API.Converters.UtcDateTimeConverter());
+    options.SerializerOptions.Converters.Add(new IVF.API.Converters.NullableGuidConverter());
 });
 
 // ─── Enterprise Security Services ───
@@ -499,6 +500,7 @@ app.MapNotificationEndpoints();
 app.MapAuditEndpoints();
 app.MapDoctorEndpoints();
 app.MapUserEndpoints();
+app.MapEnterpriseUserEndpoints();
 app.MapServiceCatalogEndpoints();
 app.MapMenuEndpoints();
 app.MapPermissionDefinitionEndpoints();

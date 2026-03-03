@@ -29,6 +29,12 @@ const FALLBACK_MENU: MenuSection[] = [
       { icon: '📊', label: 'Dashboard', route: '/dashboard' },
       { icon: '🏥', label: 'Tiếp đón', route: '/reception', permission: 'ViewPatients' },
       { icon: '👥', label: 'Bệnh nhân', route: '/patients', permission: 'ViewPatients' },
+      {
+        icon: '📊',
+        label: 'Phân tích BN',
+        route: '/patients/analytics',
+        permission: 'ViewPatients',
+      },
       { icon: '💑', label: 'Cặp đôi', route: '/couples', permission: 'ViewCouples' },
       { icon: '🎫', label: 'Hàng đợi', route: '/queue/all', permission: 'ViewQueue' },
       { icon: '🗣️', label: 'Tư vấn', route: '/consultation', permission: 'ViewCycles' },

@@ -1,0 +1,92 @@
+<div class="audit-container">
+  <div class="audit-header">
+    <div class="audit-header-left">
+      <a [routerLink]="['/patients', patientId]" class="back-link">← Chi tiết bệnh nhân</a>
+      <h3>📋 Nhật ký thay đổi</h3>
+    </div>
+    @if (auditTrail(); as trail) {
+      <span class="total-count">{{ trail.totalCount }} thay đổi</span>
+    }
+  </div>
+
+  @if (loading()) {
+    <div class="loading-state">
+      <div class="spinner"></div>
+      <p>Đang tải nhật ký...</p>
+    </div>
+  } @else if (auditTrail(); as trail) {
+    @if (trail.entries.length === 0) {
+      <div class="empty-state">
+        <p>📭 Chưa có nhật ký thay đổi nào.</p>
+      </div>
+    } @else {
+      <div class="timeline">
+        @for (entry of trail.entries; track entry.id) {
+          <div class="timeline-item" [class.expanded]="expandedEntry() === entry.id">
+            <div class="timeline-dot" [attr.data-action]="entry.action"></div>
+            <div class="timeline-content" (click)="toggleEntry(entry.id)">
+              <div class="timeline-header">
+                <span class="action-badge" [attr.data-action]="entry.action">
+                  {{ getActionIcon(entry.action) }} {{ getActionLabel(entry.action) }}
+                </span>
+                <span class="timeline-user">{{ entry.username || 'Hệ thống' }}</span>
+                <span class="timeline-time">{{
+                  entry.createdAt | date: 'dd/MM/yyyy HH:mm:ss'
+                }}</span>
+                @if (entry.ipAddress) {
+                  <span class="timeline-ip">📍 {{ entry.ipAddress }}</span>
+                }
+              </div>
+
+              @if (entry.changedColumns) {
+                <div class="changed-fields">Thay đổi: {{ entry.changedColumns }}</div>
+              }
+
+              @if (expandedEntry() === entry.id) {
+                <div class="timeline-details">
+                  @if (parseJson(entry.oldValues); as oldVals) {
+                    <div class="detail-section">
+                      <h4>Giá trị cũ:</h4>
+                      <div class="value-grid">
+                        @for (kv of objectEntries(oldVals); track kv[0]) {
+                          <div class="value-row old">
+                            <span class="key">{{ kv[0] }}</span>
+                            <span class="value">{{ kv[1] }}</span>
+                          </div>
+                        }
+                      </div>
+                    </div>
+                  }
+                  @if (parseJson(entry.newValues); as newVals) {
+                    <div class="detail-section">
+                      <h4>Giá trị mới:</h4>
+                      <div class="value-grid">
+                        @for (kv of objectEntries(newVals); track kv[0]) {
+                          <div class="value-row new">
+                            <span class="key">{{ kv[0] }}</span>
+                            <span class="value">{{ kv[1] }}</span>
+                          </div>
+                        }
+                      </div>
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+          </div>
+        }
+      </div>
+
+      <!-- Pagination -->
+      @if (trail.totalCount > pageSize) {
+        <div class="pagination">
+          <button (click)="prevPage()" [disabled]="page() <= 1">← Trước</button>
+          <span>Trang {{ page() }} / {{ getTotalPages() }}</span>
+          <button (click)="nextPage()" [disabled]="page() * pageSize >= trail.totalCount">
+            Sau →
+          </button>
+        </div>
+      }
+    }
+  }
+</div>
