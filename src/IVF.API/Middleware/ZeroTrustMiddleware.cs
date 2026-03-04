@@ -37,10 +37,16 @@ public class ZeroTrustMiddleware
         "/api/auth/mfa-verify",
         "/api/auth/mfa-send-sms",
         "/api/auth/passkey-login",
+        "/api/auth/login-biometric",
+        "/api/auth/me",
+        "/api/menu",
+        "/api/permission-definitions",
+        "/api/notifications",
+        "/api/dashboard",
+        "/api/compliance",
         "/health",
         "/healthz",
-        "/swagger",
-        "/api/auth/login-biometric"
+        "/swagger"
     };
 
     // Sensitive paths that require elevated verification
@@ -263,7 +269,7 @@ public class ZeroTrustMiddleware
         // Determine auth level from JWT claims (amr = authentication methods reference, RFC 8176)
         // .NET maps inbound JWT "amr" → long URI, so check both forms
         var amrClaim = context.User.FindFirst("amr")?.Value
-            ?? context.User.FindFirst("http://schemas.microsoft.com/claims/authnmethodsreference")?.Value;
+            ?? context.User.FindFirst("http://schemas.microsoft.com/claims/authnmethodsreferences")?.Value;
         var authLevel = amrClaim switch
         {
             "mfa" => AuthLevel.MFA,

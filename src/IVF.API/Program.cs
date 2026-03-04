@@ -288,6 +288,10 @@ builder.Services.AddSingleton<IVF.API.Services.WalBackupService>();
 builder.Services.AddSingleton<IVF.API.Services.ReplicationMonitorService>();
 builder.Services.AddSingleton<IVF.API.Services.BackupComplianceService>();
 builder.Services.AddSingleton<IVF.API.Services.WalBackupSchedulerService>();
+
+// ─── Evidence Collection ───
+builder.Services.AddSingleton<IVF.API.Services.EvidenceCollectorService>();
+builder.Services.AddSingleton<IVF.API.Services.ComplianceAuditorService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<IVF.API.Services.WalBackupSchedulerService>());
 
 // ─── Cloud Backup Provider Factory (dynamic, DB-backed) ───
@@ -494,6 +498,7 @@ app.MapHub<IVF.API.Hubs.QueueHub>("/hubs/queue");
 app.MapHub<IVF.API.Hubs.NotificationHub>("/hubs/notifications");
 app.MapHub<IVF.API.Hubs.FingerprintHub>("/hubs/fingerprint");
 app.MapHub<IVF.API.Hubs.BackupHub>("/hubs/backup");
+app.MapHub<IVF.API.Hubs.EvidenceHub>("/hubs/evidence");
 
 // Register Endpoints
 app.MapAuthEndpoints();

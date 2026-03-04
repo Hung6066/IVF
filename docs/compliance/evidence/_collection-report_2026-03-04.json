@@ -1,0 +1,13 @@
+{
+  "Categories": {
+    "Collected": [
+      "@(access_control,incident_response,training,change_management,encryption,backup,vendor,policy_versions)"
+    ],
+    "Failed": []
+  },
+  "Duration": "00:00",
+  "ApiUrl": "http://localhost:5000",
+  "ApiSkipped": false,
+  "CollectionDate": "2026-03-04",
+  "OutputDirectory": "D:\\Pr.Net\\IVF\\docs\\compliance\\evidence"
+}

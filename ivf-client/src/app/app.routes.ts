@@ -338,6 +338,20 @@ export const routes: Routes = [
             (m) => m.TrainingManagementComponent,
           ),
       },
+      {
+        path: 'compliance/evidence',
+        loadComponent: () =>
+          import('./features/compliance/evidence-collection/evidence-collection.component').then(
+            (m) => m.EvidenceCollectionComponent,
+          ),
+      },
+      {
+        path: 'compliance/audit',
+        loadComponent: () =>
+          import('./features/compliance/compliance-audit/compliance-audit.component').then(
+            (m) => m.ComplianceAuditComponent,
+          ),
+      },
     ],
   },
   { path: '**', redirectTo: 'login' },

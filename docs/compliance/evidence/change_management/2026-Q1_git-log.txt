@@ -1,0 +1,66 @@
+fb39575 Add migration for pending model changes including new tables and patient columns
+1c1e07c Implement security services for conditional access, contextual authentication, data retention, geo-location, incident response, PII masking, secrets scanning, and notification handling
+4e3dbd2 feat: Implement group consent management and consent enforcement
+b889768 feat(security): Enhance enterprise user management with session, login, and consent statistics
+7250605 feat: Add PendingModelSync migration and EnterpriseUserRepository implementation
+57f4193 feat: add compliance dashboard, security policies, and audit reports to advanced security module
+891b6d6 feat(security): Enhance advanced security dashboard with updated metrics, passkey management, and MFA features
+009e166 feat(security): Enhance security middleware and implement token binding
+f3f7f86 feat(migrations): add advanced security entities for account lockouts, geo-block rules, IP whitelisting, passkey credentials, rate limiting, and MFA settings
+4f8542e feat: Enterprise vault features - security events, compliance, rotation, DR, SIEM, metrics
+bfc2e34 feat: Implement VaultSecretService, encryption configs, field access policies, zero trust, and vault manager UI
+f5c00dd feat(migrations): add enterprise CA features including revocation and audit logs
+26b819a Add PostgreSQL Point-in-Time Recovery (PITR) script
+faa327f feat: add data backup strategies and seeder
+11fd088 Add cloud backup configuration and related entities
+acc768d feat: Enhance EJBCA integration with certificate management features
+bb92243 feat(report-designer): add rulers and zoom functionality to report designer feat(main-layout): add UI Library link to admin menu refactor(styles): restructure global styles for Tailwind CSS integration chore(carbon-icons): remove unused carbon icons type declaration chore(object-browser): remove openmaxio-object-browser subproject docs: add CLAUDE.md for project guidance and setup instructions chore(postcss): add PostCSS configuration for Tailwind CSS chore(tailwind): create Tailwind CSS entry file
+a4e1cb2 feat: update dependencies and improve code formatting
+df28ec2 feat(report-designer): enhance control selection and manipulation features
+fe5310e feat: Add UserSignature configuration and seeding functionality
+61abf43 feat: Improve PDF rendering for signature zones and band containers with precise padding
+7d20348 feat: Refactor button elements for PDF export in form response and report viewer components
+c202f1e Add signed PDF file with digital signature and metadata
+2e57a15 feat: add form actions bar and review components
+8eca2ef feat: Enhance patient context handling in forms
+323073a feat(migrations): Normalize database schema by creating new child tables and migrating existing data
+dddc486 feat: Implement cross-form linked data functionality
+659959c Add migration to include LayoutJson in FormFields and seed initial form templates
+c11a767 feat: Implement a comprehensive forms management system, introduce a service catalog, and add database table partitioning.
+a0c2174 feat: Implement detailed form field value storage and display for form responses.
+68f9235 feat: Implement form rendering and response detail views with new backend entities, configurations, API endpoints, and database migrations.
+986ff2d feat: Implement a new form builder with drag-and-drop field management, a properties panel for field configuration, and medical concept linking.
+c0f32e9 feat: Implement concept management and integrate concept linking into form fields.
+b688250 feat: Implement full-stack forms management with integrated concept library and reporting features.
+5422dbe added form and report builder into system
+4ad9fe5 update logic for andrology
+4c763f4 feat: Implement core IVF features including Andrology (Sperm Washing), Patient, and Cycle management across API, application, infrastructure, and client layers.
+714f725 feat: Implement a comprehensive queue management system with ticket notes and dedicated departmental dashboards.
+f4a728f feat: Introduce Lab Dashboard for managing schedules, embryos, and cryo, alongside new service catalog administration.
+e385bf6 Remove `/api` from the client's lab service URL and disable HTTPS redirection in the API.
+95472f2 ignore bimeotric from mac os or linux
+b983ba3 updarte flow couple and lab crud
+39be453 feat: Implement comprehensive IVF cycle detail management with client-side phase tabs, backend APIs, data seeding, and a fingerprint client.
+76a8ae0 feat: Implement IVF.Gateway service with Yarp.ReverseProxy, integrate Redis caching, and establish biometric matching infrastructure.
+cb3bccc finished done verify fingerprint for small patient
+aaee98f success fingerprint for patient
+b2f1d37 fixed warnings
+60add10 added notification global for UI
+fe0ceae added skills int project
+165a70e feat: Implement core admin features including service catalog, notification, user, and audit log management, alongside an appointments dashboard and new UI styling.
+b5db0dc refactor extract class for service and model in frontend
+9b75213 added new treatment cycles relationship
+3ea2eec feat: Implement comprehensive patient queue management system with dedicated API endpoints, services, and UI components.
+c4051af feat: Implement core user management, service catalog, reception dashboard, billing invoice list, and patient list features.
+1c7ae07 update notfications
+7c94e3c feat: Implement initial project setup including API endpoints, application logic, infrastructure services, and a comprehensive Angular client application.
+2160e80 feat: Implement core user management functionality across client and server, alongside initial UI components for couples, appointments, billing, and shared search features.`
+34199af fixed layout audit and appointment
+82013eb added new features for system
+ffed755 refactor repositories and configurations
+bd31cc6 feat: Initialize API with JWT authentication, rate limiting, global validation, and client-side role-based access control.
+61726ea update separate for endpoints
+12f0e35 refactor UI component
+9f221ed feat: Initialize IVF.API project with QueueHub and install client dependencies.
+7f7f763 done some frontend and backend
+d0786bd init ivf project

@@ -18,6 +18,9 @@ public static class ComplianceEndpoints
         MapComplianceTraining(group);
         MapPasswordPolicy(group);
         MapComplianceDashboard(group);
+        MapEvidenceExport(group);
+        MapEvidenceCollector(group);
+        MapComplianceAuditor(group);
     }
 
     // ─── Breach Notification Management ─────────────────────────────────
@@ -460,6 +463,357 @@ public static class ComplianceEndpoints
             return Results.Ok(dashboard);
         }).WithName("ComplianceDashboard");
     }
+
+    // ─── Evidence Export ──────────────────────────────────────────────────
+
+    private static void MapEvidenceExport(RouteGroupBuilder group)
+    {
+        group.MapGet("/evidence/access-control", async (IvfDbContext db) =>
+        {
+            var users = await db.Users
+                .Where(u => !u.IsDeleted)
+                .Select(u => new
+                {
+                    u.Id,
+                    u.Username,
+                    u.FullName,
+                    Role = u.Role.ToString(),
+                    u.Department,
+                    u.IsActive,
+                    u.CreatedAt
+                })
+                .OrderBy(u => u.Username)
+                .ToListAsync();
+
+            var roles = await db.Users
+                .Where(u => !u.IsDeleted && u.IsActive)
+                .GroupBy(u => u.Role)
+                .Select(g => new { role = g.Key.ToString(), count = g.Count() })
+                .ToListAsync();
+
+            var privilegedUsers = users.Where(u => u.Role == "Admin").ToList();
+
+            return Results.Ok(new
+            {
+                exportedAt = DateTime.UtcNow,
+                totalUsers = users.Count,
+                activeUsers = users.Count(u => u.IsActive),
+                privilegedCount = privilegedUsers.Count,
+                roleDistribution = roles,
+                users,
+                privilegedUsers
+            });
+        }).WithName("EvidenceAccessControl");
+
+        group.MapGet("/evidence/training", async (IvfDbContext db) =>
+        {
+            var trainings = await db.ComplianceTrainings
+                .Where(t => !t.IsDeleted)
+                .OrderByDescending(t => t.AssignedAt)
+                .ToListAsync();
+
+            var byType = trainings
+                .GroupBy(t => t.TrainingType)
+                .Select(g => new
+                {
+                    type = g.Key,
+                    total = g.Count(),
+                    completed = g.Count(t => t.IsCompleted),
+                    passed = g.Count(t => t.IsPassed),
+                    overdue = g.Count(t => t.IsOverdue()),
+                    completionRate = g.Count() > 0
+                        ? Math.Round(g.Count(t => t.IsCompleted) * 100.0 / g.Count(), 1) : 0
+                });
+
+            return Results.Ok(new
+            {
+                exportedAt = DateTime.UtcNow,
+                totalAssigned = trainings.Count,
+                completed = trainings.Count(t => t.IsCompleted),
+                overdue = trainings.Count(t => t.IsOverdue()),
+                byType,
+                records = trainings.Select(t => new
+                {
+                    t.Id,
+                    t.UserId,
+                    t.TrainingType,
+                    t.TrainingName,
+                    t.AssignedAt,
+                    t.DueDate,
+                    t.IsCompleted,
+                    t.CompletedAt,
+                    t.ScorePercent,
+                    t.IsPassed,
+                    isOverdue = t.IsOverdue()
+                })
+            });
+        }).WithName("EvidenceTraining");
+
+        group.MapGet("/evidence/incidents", async (IvfDbContext db) =>
+        {
+            var incidents = await db.SecurityIncidents
+                .Where(i => !i.IsDeleted)
+                .OrderByDescending(i => i.CreatedAt)
+                .ToListAsync();
+
+            var breaches = await db.BreachNotifications
+                .Where(b => !b.IsDeleted)
+                .OrderByDescending(b => b.DetectedAt)
+                .ToListAsync();
+
+            return Results.Ok(new
+            {
+                exportedAt = DateTime.UtcNow,
+                incidents = new
+                {
+                    total = incidents.Count,
+                    open = incidents.Count(i => i.Status == "Open" || i.Status == "Investigating"),
+                    resolved = incidents.Count(i => i.Status == "Resolved"),
+                    bySeverity = incidents.GroupBy(i => i.Severity)
+                        .Select(g => new { severity = g.Key, count = g.Count() }),
+                    records = incidents.Select(i => new
+                    {
+                        i.Id,
+                        i.IncidentType,
+                        i.Severity,
+                        i.Status,
+                        DetectedAt = i.CreatedAt,
+                        i.ResolvedAt,
+                        i.Description,
+                        i.Username
+                    })
+                },
+                breaches = new
+                {
+                    total = breaches.Count,
+                    records = breaches.Select(b => new
+                    {
+                        b.Id,
+                        b.BreachType,
+                        b.Severity,
+                        b.Status,
+                        b.DetectedAt,
+                        b.AffectedRecordCount,
+                        b.DpaNotified,
+                        b.SubjectsNotified,
+                        deadlineAtRisk = b.IsDeadlineAtRisk()
+                    })
+                }
+            });
+        }).WithName("EvidenceIncidents");
+
+        group.MapGet("/evidence/backup", async (IvfDbContext db) =>
+        {
+            var retentionPolicies = await db.DataRetentionPolicies
+                .Where(p => !p.IsDeleted)
+                .ToListAsync();
+
+            return Results.Ok(new
+            {
+                exportedAt = DateTime.UtcNow,
+                retentionPolicies = retentionPolicies.Select(p => new
+                {
+                    p.Id,
+                    p.EntityType,
+                    p.RetentionDays,
+                    p.IsEnabled,
+                    p.LastExecutedAt
+                })
+            });
+        }).WithName("EvidenceBackup");
+
+        group.MapGet("/evidence/assets", async (IvfDbContext db) =>
+        {
+            var assets = await db.AssetInventories
+                .Where(a => !a.IsDeleted)
+                .OrderBy(a => a.AssetName)
+                .ToListAsync();
+
+            return Results.Ok(new
+            {
+                exportedAt = DateTime.UtcNow,
+                totalAssets = assets.Count,
+                active = assets.Count(a => a.Status == AssetStatus.Active),
+                containingPhi = assets.Count(a => a.ContainsPhi),
+                containingPii = assets.Count(a => a.ContainsPii),
+                records = assets.Select(a => new
+                {
+                    a.Id,
+                    a.AssetName,
+                    a.AssetType,
+                    status = a.Status.ToString(),
+                    a.Owner,
+                    a.Department,
+                    a.ContainsPhi,
+                    a.ContainsPii,
+                    riskScore = a.CalculateRiskScore(),
+                    a.LastAuditedAt,
+                    a.NextAuditDueAt,
+                    overdue = a.IsOverdueForAudit()
+                })
+            });
+        }).WithName("EvidenceAssets");
+
+        group.MapGet("/evidence/summary", async (
+            IvfDbContext db,
+            Application.Common.Interfaces.IComplianceScoringEngine engine) =>
+        {
+            var report = await engine.EvaluateAsync();
+
+            return Results.Ok(new
+            {
+                exportedAt = DateTime.UtcNow,
+                type = "Compliance Evidence Summary",
+                compliance = new
+                {
+                    report.OverallScore,
+                    report.MaxScore,
+                    report.Percentage,
+                    report.Grade,
+                    frameworks = report.Frameworks.Select(f => new
+                    {
+                        f.Name,
+                        f.Score,
+                        f.MaxScore,
+                        f.Percentage,
+                        controls = f.Controls.Select(c => new
+                        {
+                            c.ControlId,
+                            c.Name,
+                            status = c.Status.ToString(),
+                            c.Score,
+                            c.MaxScore,
+                            c.Finding,
+                            c.Remediation
+                        })
+                    })
+                }
+            });
+        }).WithName("EvidenceSummary");
+    }
+
+    // ─── Evidence Collection Script Runner ────────────────────────────────
+
+    private static void MapEvidenceCollector(RouteGroupBuilder group)
+    {
+        group.MapPost("/evidence/collect", async (
+            IVF.API.Services.EvidenceCollectorService collector,
+            HttpContext httpContext,
+            EvidenceCollectRequest request) =>
+        {
+            // Pass the user's JWT so the script can call API endpoints
+            var jwtToken = httpContext.Request.Headers["Authorization"]
+                .FirstOrDefault()?.Replace("Bearer ", "");
+
+            var result = await collector.StartCollectionAsync(
+                new IVF.API.Services.EvidenceCollectorService.CollectRequest(
+                    request.Categories ?? ["access_control", "incident_response", "training", "change_management", "encryption", "backup", "vendor", "policy_versions"],
+                    request.SkipApi),
+                jwtToken);
+
+            return Results.Ok(new { result.OperationId, result.Status, result.TotalCategories });
+        }).WithName("StartEvidenceCollection");
+
+        group.MapGet("/evidence/collect/{operationId}/progress", (
+            string operationId,
+            IVF.API.Services.EvidenceCollectorService collector) =>
+        {
+            var progress = collector.GetProgress(operationId);
+            if (progress == null)
+                return Results.NotFound(new { message = "Operation not found" });
+
+            return Results.Ok(new
+            {
+                operationId,
+                progress.Completed,
+                progress.Total,
+                percentage = progress.Total > 0 ? (int)Math.Round(100.0 * progress.Completed / progress.Total) : 0,
+                progress.CurrentCategory,
+                progress.CompletedCategories,
+            });
+        }).WithName("GetEvidenceCollectionProgress");
+
+        group.MapPost("/evidence/collect/{operationId}/cancel", (
+            string operationId,
+            IVF.API.Services.EvidenceCollectorService collector) =>
+        {
+            var cancelled = collector.CancelCollection(operationId);
+            return cancelled
+                ? Results.Ok(new { message = "Collection cancelled" })
+                : Results.NotFound(new { message = "Operation not found or already completed" });
+        }).WithName("CancelEvidenceCollection");
+
+        group.MapGet("/evidence/collect/running", (
+            IVF.API.Services.EvidenceCollectorService collector) =>
+        {
+            return Results.Ok(new { operations = collector.GetRunningOperations() });
+        }).WithName("GetRunningCollections");
+
+        group.MapGet("/evidence/files", (IWebHostEnvironment env) =>
+        {
+            var projectDir = Path.GetFullPath(Path.Combine(env.ContentRootPath, "..", ".."));
+            var evidenceDir = Path.Combine(projectDir, "docs", "compliance", "evidence");
+
+            if (!Directory.Exists(evidenceDir))
+                return Results.Ok(new { files = Array.Empty<object>() });
+
+            var files = Directory.GetFiles(evidenceDir, "*.*", SearchOption.AllDirectories)
+                .Where(f => !f.EndsWith("README.md", StringComparison.OrdinalIgnoreCase))
+                .Select(f =>
+                {
+                    var info = new FileInfo(f);
+                    var relative = Path.GetRelativePath(evidenceDir, f).Replace("\\", "/");
+                    return new
+                    {
+                        path = relative,
+                        category = relative.Split('/').FirstOrDefault() ?? "",
+                        name = info.Name,
+                        size = info.Length,
+                        lastModified = info.LastWriteTimeUtc
+                    };
+                })
+                .OrderByDescending(f => f.lastModified)
+                .ToList();
+
+            return Results.Ok(new { files, totalCount = files.Count });
+        }).WithName("ListEvidenceFiles");
+    }
+
+    // ─── Compliance Auditor (Vanta-style) ────────────────────────────────
+
+    private static void MapComplianceAuditor(RouteGroupBuilder group)
+    {
+        group.MapGet("/audit/dashboard", async (
+            IVF.API.Services.ComplianceAuditorService auditor) =>
+        {
+            var dashboard = await auditor.GetDashboardAsync();
+            return Results.Ok(dashboard);
+        }).WithName("AuditDashboard");
+
+        group.MapPost("/audit/scan", async (
+            IVF.API.Services.ComplianceAuditorService auditor) =>
+        {
+            var scan = await auditor.RunScanAsync();
+            return Results.Ok(scan);
+        }).WithName("RunAuditScan");
+
+        group.MapGet("/audit/scan/{scanId}", (
+            string scanId,
+            IVF.API.Services.ComplianceAuditorService auditor) =>
+        {
+            var scan = auditor.GetScan(scanId);
+            return scan is null
+                ? Results.NotFound(new { message = "Scan not found" })
+                : Results.Ok(scan);
+        }).WithName("GetAuditScan");
+
+        group.MapGet("/audit/history", (
+            IVF.API.Services.ComplianceAuditorService auditor) =>
+        {
+            var history = auditor.GetScanHistory();
+            return Results.Ok(new { scans = history });
+        }).WithName("AuditScanHistory");
+    }
 }
 
 // ─── Request DTOs ────────────────────────────────────────────────────
@@ -515,3 +869,7 @@ public record CompleteTrainingRequest(
 public record ValidatePasswordRequest(
     string Password,
     string? Username = null);
+
+public record EvidenceCollectRequest(
+    string[]? Categories = null,
+    bool SkipApi = false);

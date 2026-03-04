@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, Subject } from 'rxjs';
+import * as signalR from '@microsoft/signalr';
 import { environment } from '../../../environments/environment';
 import {
   ComplianceHealthDashboard,
@@ -22,6 +23,20 @@ import {
   SecurityTrend,
   AuditReadiness,
   PagedResult,
+  EvidenceAccessControl,
+  EvidenceTraining,
+  EvidenceIncidents,
+  EvidenceBackup,
+  EvidenceAssets,
+  EvidenceSummary,
+  EvidenceCategory,
+  EvidenceCollectRequest,
+  EvidenceCollectResult,
+  EvidenceProgress,
+  EvidenceLogLine,
+  EvidenceFile,
+  AuditDashboard,
+  AuditScan,
 } from '../models/compliance.model';
 
 @Injectable({ providedIn: 'root' })
@@ -247,23 +262,23 @@ export class ComplianceService {
     if (filters?.type) params = params.set('type', filters.type);
     if (filters?.classification) params = params.set('classification', filters.classification);
     if (filters?.owner) params = params.set('owner', filters.owner);
-    return this.http.get<PagedResult<AssetInventory>>(`${this.baseUrl}/assets`, { params });
+    return this.http.get<PagedResult<AssetInventory>>(`${this.baseUrl}/compliance/assets`, { params });
   }
 
   getAsset(id: string): Observable<AssetInventory> {
-    return this.http.get<AssetInventory>(`${this.baseUrl}/assets/${id}`);
+    return this.http.get<AssetInventory>(`${this.baseUrl}/compliance/assets/${id}`);
   }
 
   createAsset(request: CreateAssetRequest): Observable<any> {
-    return this.http.post(`${this.baseUrl}/assets`, request);
+    return this.http.post(`${this.baseUrl}/compliance/assets`, request);
   }
 
   updateAsset(id: string, request: CreateAssetRequest): Observable<any> {
-    return this.http.put(`${this.baseUrl}/assets/${id}`, request);
+    return this.http.put(`${this.baseUrl}/compliance/assets/${id}`, request);
   }
 
   deleteAsset(id: string): Observable<any> {
-    return this.http.delete(`${this.baseUrl}/assets/${id}`);
+    return this.http.delete(`${this.baseUrl}/compliance/assets/${id}`);
   }
 
   // ─── AI Governance ───
@@ -317,5 +332,125 @@ export class ComplianceService {
 
   getComplianceDashboard(): Observable<any> {
     return this.http.get(`${this.baseUrl}/compliance/dashboard`);
+  }
+
+  // ─── Evidence Export ───
+
+  getEvidenceAccessControl(): Observable<EvidenceAccessControl> {
+    return this.http.get<EvidenceAccessControl>(
+      `${this.baseUrl}/compliance/evidence/access-control`,
+    );
+  }
+
+  getEvidenceTraining(): Observable<EvidenceTraining> {
+    return this.http.get<EvidenceTraining>(`${this.baseUrl}/compliance/evidence/training`);
+  }
+
+  getEvidenceIncidents(): Observable<EvidenceIncidents> {
+    return this.http.get<EvidenceIncidents>(`${this.baseUrl}/compliance/evidence/incidents`);
+  }
+
+  getEvidenceBackup(): Observable<EvidenceBackup> {
+    return this.http.get<EvidenceBackup>(`${this.baseUrl}/compliance/evidence/backup`);
+  }
+
+  getEvidenceAssets(): Observable<EvidenceAssets> {
+    return this.http.get<EvidenceAssets>(`${this.baseUrl}/compliance/evidence/assets`);
+  }
+
+  getEvidenceSummary(): Observable<EvidenceSummary> {
+    return this.http.get<EvidenceSummary>(`${this.baseUrl}/compliance/evidence/summary`);
+  }
+
+  // ─── Compliance Auditor (Vanta-style) ───
+
+  getAuditDashboard(): Observable<AuditDashboard> {
+    return this.http.get<AuditDashboard>(`${this.baseUrl}/compliance/audit/dashboard`);
+  }
+
+  runAuditScan(): Observable<AuditScan> {
+    return this.http.post<AuditScan>(`${this.baseUrl}/compliance/audit/scan`, {});
+  }
+
+  getAuditScan(scanId: string): Observable<AuditScan> {
+    return this.http.get<AuditScan>(`${this.baseUrl}/compliance/audit/scan/${scanId}`);
+  }
+
+  getAuditHistory(): Observable<{ scans: AuditScan[] }> {
+    return this.http.get<{ scans: AuditScan[] }>(`${this.baseUrl}/compliance/audit/history`);
+  }
+
+  // ─── Evidence Collection Script Runner ───
+
+  private hubConnection?: signalR.HubConnection;
+  private readonly hubUrl = environment.apiUrl.replace('/api', '/hubs/evidence');
+  private logLineSubject = new Subject<EvidenceLogLine>();
+  private statusSubject = new Subject<{ operationId: string; status: string }>();
+  private progressSubject = new Subject<EvidenceProgress>();
+
+  logLine$ = this.logLineSubject.asObservable();
+  statusChanged$ = this.statusSubject.asObservable();
+  progressChanged$ = this.progressSubject.asObservable();
+
+  startEvidenceCollection(request: EvidenceCollectRequest): Observable<EvidenceCollectResult> {
+    return this.http.post<EvidenceCollectResult>(
+      `${this.baseUrl}/compliance/evidence/collect`,
+      request,
+    );
+  }
+
+  cancelEvidenceCollection(operationId: string): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(
+      `${this.baseUrl}/compliance/evidence/collect/${operationId}/cancel`,
+      {},
+    );
+  }
+
+  getRunningCollections(): Observable<{ operations: string[] }> {
+    return this.http.get<{ operations: string[] }>(
+      `${this.baseUrl}/compliance/evidence/collect/running`,
+    );
+  }
+
+  getEvidenceFiles(): Observable<{ files: EvidenceFile[]; totalCount: number }> {
+    return this.http.get<{ files: EvidenceFile[]; totalCount: number }>(
+      `${this.baseUrl}/compliance/evidence/files`,
+    );
+  }
+
+  async connectEvidenceHub(operationId: string): Promise<void> {
+    await this.disconnectEvidenceHub();
+
+    const token = localStorage.getItem('ivf_access_token') ?? '';
+    this.hubConnection = new signalR.HubConnectionBuilder()
+      .withUrl(this.hubUrl, {
+        accessTokenFactory: () => token,
+        transport: signalR.HttpTransportType.WebSockets | signalR.HttpTransportType.LongPolling,
+      })
+      .withAutomaticReconnect()
+      .configureLogging(signalR.LogLevel.Warning)
+      .build();
+
+    this.hubConnection.on('LogLine', (data: EvidenceLogLine) => {
+      this.logLineSubject.next(data);
+    });
+
+    this.hubConnection.on('StatusChanged', (data: { operationId: string; status: string }) => {
+      this.statusSubject.next(data);
+    });
+
+    this.hubConnection.on('ProgressChanged', (data: EvidenceProgress) => {
+      this.progressSubject.next(data);
+    });
+
+    await this.hubConnection.start();
+    await this.hubConnection.invoke('JoinOperation', operationId);
+  }
+
+  async disconnectEvidenceHub(): Promise<void> {
+    if (this.hubConnection) {
+      await this.hubConnection.stop();
+      this.hubConnection = undefined;
+    }
   }
 }

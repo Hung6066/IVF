@@ -88,11 +88,11 @@ public static class ComplianceMonitoringEndpoints
 
         // Continuous monitoring — security event trends
         group.MapGet("/security-trends", async (
-            [FromQuery] int days,
+            [FromQuery] int? months,
             IvfDbContext db) =>
         {
-            if (days < 1 || days > 365) days = 30;
-            var since = DateTime.UtcNow.AddDays(-days);
+            var effectiveMonths = months is > 0 and <= 24 ? months.Value : 6;
+            var since = DateTime.UtcNow.AddMonths(-effectiveMonths);
 
             var events = await db.SecurityEvents
                 .Where(e => e.CreatedAt >= since && !e.IsDeleted)
@@ -108,7 +108,7 @@ public static class ComplianceMonitoringEndpoints
                 .OrderBy(g => g.date)
                 .ToListAsync();
 
-            return Results.Ok(new { period = days, securityEvents = events, securityIncidents = incidents });
+            return Results.Ok(new { period = effectiveMonths, securityEvents = events, securityIncidents = incidents });
         });
 
         // AI model performance monitoring — post-deployment alerts

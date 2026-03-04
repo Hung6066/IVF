@@ -79,6 +79,8 @@ const FALLBACK_MENU: MenuSection[] = [
       { icon: '🗃️', label: 'Tài sản dữ liệu', route: '/compliance/assets', adminOnly: true },
       { icon: '🤖', label: 'Quản trị AI', route: '/compliance/ai', adminOnly: true },
       { icon: '📚', label: 'Đào tạo', route: '/compliance/training', adminOnly: true },
+      { icon: '📦', label: 'Bằng chứng', route: '/compliance/evidence', adminOnly: true },
+      { icon: '🛡️', label: 'Audit Center', route: '/compliance/audit', adminOnly: true },
     ],
   },
 ];
@@ -117,7 +119,7 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
       this.consentBanner.loadConsentStatus();
     }
 
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('ivf_access_token');
     if (token) {
       await this.initializeSignalR(token);
     }

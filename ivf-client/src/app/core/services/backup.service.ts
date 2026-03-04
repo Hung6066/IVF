@@ -421,9 +421,7 @@ export class BackupService {
 
   // ─── Intermediate CA ───────────────────────────────────
 
-  createIntermediateCA(
-    req: any,
-  ): Observable<{
+  createIntermediateCA(req: any): Observable<{
     id: string;
     name: string;
     fingerprint: string;
@@ -441,9 +439,7 @@ export class BackupService {
 
   // ─── CRL (Certificate Revocation List) ────────────────
 
-  generateCrl(
-    caId: string,
-  ): Observable<{
+  generateCrl(caId: string): Observable<{
     id: string;
     crlNumber: number;
     thisUpdate: string;
@@ -535,7 +531,7 @@ export class BackupService {
   async connectDeployHub(operationId: string): Promise<void> {
     await this.disconnectHub();
 
-    const token = localStorage.getItem('token') ?? '';
+    const token = localStorage.getItem('ivf_access_token') ?? '';
     this.hubConnection = new signalR.HubConnectionBuilder()
       .withUrl(this.hubUrl, {
         accessTokenFactory: () => token,
@@ -569,7 +565,7 @@ export class BackupService {
   async connectHub(operationId: string): Promise<void> {
     await this.disconnectHub();
 
-    const token = localStorage.getItem('token') ?? '';
+    const token = localStorage.getItem('ivf_access_token') ?? '';
     this.hubConnection = new signalR.HubConnectionBuilder()
       .withUrl(this.hubUrl, {
         accessTokenFactory: () => token,

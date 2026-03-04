@@ -1,0 +1,396 @@
+<div class="audit-container">
+  <!-- Header -->
+  <div class="audit-header">
+    <div class="header-left">
+      <h1>🛡️ Compliance Audit Center</h1>
+      <p class="subtitle">Hệ thống đánh giá tuân thủ tự động — Vanta-style</p>
+    </div>
+    <div class="header-actions">
+      <button class="btn-scan" (click)="runScan()" [disabled]="scanning()">
+        @if (scanning()) {
+          <span class="spinner"></span> Đang quét...
+        } @else {
+          🔍 Chạy đánh giá
+        }
+      </button>
+      <button class="btn-refresh" (click)="loadDashboard()" [disabled]="loading()">
+        🔄 Làm mới
+      </button>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  @if (loading()) {
+    <div class="loading-overlay">
+      <div class="loading-spinner"></div>
+      <p>Đang đánh giá hệ thống...</p>
+    </div>
+  }
+
+  <!-- Error -->
+  @if (error()) {
+    <div class="error-banner">
+      ⚠️ {{ error() }}
+      <button (click)="loadDashboard()">Thử lại</button>
+    </div>
+  }
+
+  @if (dashboard(); as d) {
+    <!-- Score Hero -->
+    <div class="score-hero">
+      <div class="score-circle" [style.--score-color]="getScoreColor(d.overallScore)">
+        <div class="score-value">{{ d.overallScore | number: '1.0-0' }}%</div>
+        <div class="score-grade" [class]="getGradeClass(d.grade)">{{ d.grade }}</div>
+      </div>
+      <div class="score-stats">
+        <div class="stat-card stat-total">
+          <div class="stat-number">{{ d.totalControls }}</div>
+          <div class="stat-label">Tổng controls</div>
+        </div>
+        <div class="stat-card stat-passed">
+          <div class="stat-number">{{ d.passedControls }}</div>
+          <div class="stat-label">✅ Đạt</div>
+        </div>
+        <div class="stat-card stat-failed">
+          <div class="stat-number">{{ d.failedControls }}</div>
+          <div class="stat-label">❌ Không đạt</div>
+        </div>
+        <div class="stat-card stat-warning">
+          <div class="stat-number">{{ d.warningControls }}</div>
+          <div class="stat-label">⚠️ Cảnh báo</div>
+        </div>
+      </div>
+      <div class="scan-time">Quét lúc: {{ formatDate(d.lastScanAt) }}</div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="tab-nav">
+      <button [class.active]="activeTab() === 'overview'" (click)="setTab('overview')">
+        📊 Tổng quan
+      </button>
+      <button [class.active]="activeTab() === 'frameworks'" (click)="setTab('frameworks')">
+        🏗️ Frameworks
+      </button>
+      <button [class.active]="activeTab() === 'controls'" (click)="setTab('controls')">
+        🎛️ Controls
+      </button>
+      <button [class.active]="activeTab() === 'alerts'" (click)="setTab('alerts')">
+        🚨 Cảnh báo
+        @if (d.alerts.length > 0) {
+          <span class="badge-alert">{{ d.alerts.length }}</span>
+        }
+      </button>
+      <button [class.active]="activeTab() === 'history'" (click)="setTab('history')">
+        📜 Lịch sử
+      </button>
+    </div>
+
+    <!-- Tab: Overview -->
+    @if (activeTab() === 'overview') {
+      <div class="tab-content">
+        <!-- Framework Cards -->
+        <h2 class="section-title">Đánh giá theo Framework</h2>
+        <div class="framework-grid">
+          @for (fw of d.frameworks; track trackByFramework($index, fw)) {
+            <div
+              class="fw-card"
+              (click)="selectFramework(findFramework(fw.id))"
+              [class.clickable]="true"
+            >
+              <div class="fw-header">
+                <span class="fw-icon">{{ fw.icon }}</span>
+                <span class="fw-name">{{ fw.name }}</span>
+              </div>
+              <div class="fw-score-bar">
+                <div
+                  class="fw-score-fill"
+                  [style.width.%]="fw.score"
+                  [style.background]="getScoreColor(fw.score)"
+                ></div>
+              </div>
+              <div class="fw-score-text" [style.color]="getScoreColor(fw.score)">
+                {{ fw.score | number: '1.0-0' }}%
+              </div>
+              <div class="fw-breakdown">
+                <span class="fw-stat passed">✅ {{ fw.passed }}</span>
+                <span class="fw-stat failed">❌ {{ fw.failed }}</span>
+                <span class="fw-stat warning">⚠️ {{ fw.warning }}</span>
+              </div>
+            </div>
+          }
+        </div>
+
+        <!-- System Health -->
+        <h2 class="section-title">Sức khỏe hệ thống</h2>
+        <div class="health-grid">
+          <div class="health-item">
+            <span class="health-icon">{{ getHealthIcon(d.systemHealth.databaseOnline) }}</span>
+            <span>PostgreSQL</span>
+          </div>
+          <div class="health-item">
+            <span class="health-icon">{{ getHealthIcon(d.systemHealth.cacheOnline) }}</span>
+            <span>Redis Cache</span>
+          </div>
+          <div class="health-item">
+            <span class="health-icon">{{ getHealthIcon(d.systemHealth.storageOnline) }}</span>
+            <span>MinIO Storage</span>
+          </div>
+          <div class="health-item">
+            <span class="health-icon">{{ getHealthIcon(d.systemHealth.authConfigured) }}</span>
+            <span>Authentication</span>
+          </div>
+          <div class="health-item">
+            <span class="health-icon">{{
+              getHealthIcon(d.systemHealth.encryptionConfigured)
+            }}</span>
+            <span>Encryption</span>
+          </div>
+          <div class="health-item">
+            <span class="health-icon">{{ getHealthIcon(d.systemHealth.auditLoggingEnabled) }}</span>
+            <span>Audit Logging</span>
+          </div>
+          <div class="health-item info">
+            <span class="health-icon">👥</span>
+            <span>{{ d.systemHealth.activeUsers }} users</span>
+          </div>
+          <div class="health-item info">
+            <span class="health-icon">🏥</span>
+            <span>{{ d.systemHealth.totalPatients }} bệnh nhân</span>
+          </div>
+        </div>
+
+        <!-- Critical Alerts Preview -->
+        @if (criticalAlerts().length > 0) {
+          <h2 class="section-title">⚡ Cảnh báo nghiêm trọng</h2>
+          <div class="alerts-preview">
+            @for (alert of criticalAlerts(); track trackByAlert($index)) {
+              <div class="alert-item alert-critical">
+                <div class="alert-header">
+                  <span class="alert-severity">🔴 {{ alert.severity }}</span>
+                  <span class="alert-fw">{{ alert.framework }}</span>
+                </div>
+                <div class="alert-title">{{ alert.title }}</div>
+                <div class="alert-message">{{ alert.message }}</div>
+              </div>
+            }
+          </div>
+        }
+      </div>
+    }
+
+    <!-- Tab: Frameworks -->
+    @if (activeTab() === 'frameworks') {
+      <div class="tab-content">
+        <div class="frameworks-detail">
+          @for (fw of d.frameworks; track trackByFramework($index, fw)) {
+            <div class="fw-detail-card" (click)="selectFramework(findFramework(fw.id))">
+              <div class="fw-detail-header">
+                <div class="fw-detail-icon">{{ fw.icon }}</div>
+                <div class="fw-detail-info">
+                  <h3>{{ fw.name }}</h3>
+                  <p>{{ fw.total }} controls</p>
+                </div>
+                <div class="fw-detail-score" [style.color]="getScoreColor(fw.score)">
+                  {{ fw.score | number: '1.0-0' }}%
+                </div>
+              </div>
+              <div class="fw-detail-bar">
+                <div
+                  class="bar-segment passed"
+                  [style.width.%]="fw.total > 0 ? (fw.passed / fw.total) * 100 : 0"
+                ></div>
+                <div
+                  class="bar-segment warning"
+                  [style.width.%]="fw.total > 0 ? (fw.warning / fw.total) * 100 : 0"
+                ></div>
+                <div
+                  class="bar-segment failed"
+                  [style.width.%]="fw.total > 0 ? (fw.failed / fw.total) * 100 : 0"
+                ></div>
+              </div>
+              <div class="fw-detail-legend">
+                <span>✅ Đạt: {{ fw.passed }}</span>
+                <span>⚠️ Cảnh báo: {{ fw.warning }}</span>
+                <span>❌ Không đạt: {{ fw.failed }}</span>
+              </div>
+            </div>
+          }
+        </div>
+      </div>
+    }
+
+    <!-- Tab: Controls -->
+    @if (activeTab() === 'controls') {
+      <div class="tab-content">
+        @if (selectedFramework(); as fw) {
+          <div class="controls-header">
+            <button class="btn-back" (click)="selectFramework(null); setTab('frameworks')">
+              ← Quay lại
+            </button>
+            <h2>{{ fw.icon }} {{ fw.name }}</h2>
+            <span class="fw-score-badge" [style.background]="getScoreColor(fw.score)"
+              >{{ fw.score | number: '1.0-0' }}%</span
+            >
+          </div>
+
+          <!-- Control Filters -->
+          <div class="control-filters">
+            <button [class.active]="controlFilter() === 'all'" (click)="controlFilter.set('all')">
+              Tất cả ({{ fw.controls.length }})
+            </button>
+            <button
+              [class.active]="controlFilter() === 'passed'"
+              (click)="controlFilter.set('passed')"
+            >
+              ✅ Đạt ({{ fw.passedControls }})
+            </button>
+            <button
+              [class.active]="controlFilter() === 'failed'"
+              (click)="controlFilter.set('failed')"
+            >
+              ❌ Không đạt ({{ fw.failedControls }})
+            </button>
+            <button
+              [class.active]="controlFilter() === 'warning'"
+              (click)="controlFilter.set('warning')"
+            >
+              ⚠️ Cảnh báo ({{ fw.warningControls }})
+            </button>
+          </div>
+
+          <!-- Controls List -->
+          <div class="controls-list">
+            @for (ctl of filteredControls(); track trackByControl($index, ctl)) {
+              <div class="control-card" [class]="'control-' + ctl.status.toLowerCase()">
+                <div class="control-top">
+                  <span class="control-status">{{ getStatusIcon(ctl.status) }}</span>
+                  <div class="control-info">
+                    <div class="control-id-name">
+                      <span class="control-id">{{ ctl.id }}</span>
+                      <span class="control-name">{{ ctl.name }}</span>
+                    </div>
+                    <div class="control-desc">{{ ctl.description }}</div>
+                  </div>
+                  <span class="control-severity" [class]="getSeverityClass(ctl.severity)">{{
+                    ctl.severity
+                  }}</span>
+                </div>
+                @if (ctl.finding) {
+                  <div class="control-finding">
+                    <strong>📋 Phát hiện:</strong> {{ ctl.finding }}
+                  </div>
+                }
+                @if (ctl.remediation) {
+                  <div class="control-remediation">
+                    <strong>🔧 Khắc phục:</strong> {{ ctl.remediation }}
+                  </div>
+                }
+                @if (ctl.evidence) {
+                  <div class="control-evidence">
+                    <strong>📎 Bằng chứng:</strong> {{ ctl.evidence }}
+                  </div>
+                }
+                <div class="control-meta">
+                  <span>⏱️ {{ ctl.durationMs }}ms</span>
+                  <span>🕐 {{ formatDate(ctl.testedAt) }}</span>
+                </div>
+              </div>
+            }
+          </div>
+        } @else {
+          <div class="no-framework">
+            <p>👈 Chọn một framework để xem chi tiết controls</p>
+            <div class="fw-select-grid">
+              @for (fw of d.frameworks; track trackByFramework($index, fw)) {
+                <button class="fw-select-btn" (click)="selectFramework(findFramework(fw.id))">
+                  {{ fw.icon }} {{ fw.name }}
+                  <span class="fw-select-score" [style.color]="getScoreColor(fw.score)"
+                    >{{ fw.score | number: '1.0-0' }}%</span
+                  >
+                </button>
+              }
+            </div>
+          </div>
+        }
+      </div>
+    }
+
+    <!-- Tab: Alerts -->
+    @if (activeTab() === 'alerts') {
+      <div class="tab-content">
+        @if (d.alerts.length === 0) {
+          <div class="empty-state">
+            <span class="empty-icon">🎉</span>
+            <p>Không có cảnh báo nào — Hệ thống tuân thủ tốt!</p>
+          </div>
+        } @else {
+          <div class="alerts-list">
+            @for (alert of d.alerts; track trackByAlert($index)) {
+              <div class="alert-item" [class]="'alert-' + alert.severity.toLowerCase()">
+                <div class="alert-header">
+                  <span
+                    class="alert-severity-badge"
+                    [class]="'badge-' + alert.severity.toLowerCase()"
+                  >
+                    {{ alert.severity }}
+                  </span>
+                  <span class="alert-fw-badge">{{ alert.framework }}</span>
+                  <span class="alert-control-id">{{ alert.controlId }}</span>
+                </div>
+                <div class="alert-title">{{ alert.title }}</div>
+                <div class="alert-message">{{ alert.message }}</div>
+              </div>
+            }
+          </div>
+        }
+      </div>
+    }
+
+    <!-- Tab: History -->
+    @if (activeTab() === 'history') {
+      <div class="tab-content">
+        @if (scanHistory().length === 0) {
+          <div class="empty-state">
+            <span class="empty-icon">📜</span>
+            <p>Chưa có lịch sử quét. Chạy đánh giá đầu tiên!</p>
+          </div>
+        } @else {
+          <div class="history-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>Scan ID</th>
+                  <th>Thời gian</th>
+                  <th>Trạng thái</th>
+                  <th>Điểm</th>
+                  <th>Đạt</th>
+                  <th>Không đạt</th>
+                  <th>Cảnh báo</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (scan of scanHistory(); track trackByScan($index, scan)) {
+                  <tr>
+                    <td class="scan-id">{{ scan.scanId }}</td>
+                    <td>{{ formatDate(scan.startedAt) }}</td>
+                    <td>
+                      <span class="status-badge" [class]="'status-' + scan.status.toLowerCase()">
+                        {{ scan.status }}
+                      </span>
+                    </td>
+                    <td [style.color]="getScoreColor(scan.overallScore)">
+                      <strong>{{ scan.overallScore | number: '1.0-0' }}%</strong>
+                    </td>
+                    <td class="td-passed">{{ scan.passedControls }}</td>
+                    <td class="td-failed">{{ scan.failedControls }}</td>
+                    <td class="td-warning">{{ scan.warningControls }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+    }
+  }
+</div>

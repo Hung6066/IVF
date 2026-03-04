@@ -1,0 +1,7 @@
+{
+  "MinioEndpoint": "localhost:9000",
+  "SignServerUrl": "https://localhost:9443/signserver",
+  "JwtAlgorithm": "HMAC-SHA256",
+  "Date": "2026-03-04",
+  "DatabaseSsl": "Not configured"
+}

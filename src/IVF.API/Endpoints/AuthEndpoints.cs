@@ -459,12 +459,21 @@ public static class AuthEndpoints
         }).RequireAuthorization();
 
         // Get current user's permissions (including delegated)
-        group.MapGet("/me/permissions", async (ClaimsPrincipal principal, IUserPermissionRepository permRepo, IvfDbContext db) =>
+        group.MapGet("/me/permissions", async (ClaimsPrincipal principal, IUserPermissionRepository permRepo, IPermissionDefinitionRepository permDefRepo, IvfDbContext db) =>
         {
             var userId = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId)) return Results.Unauthorized();
 
             var uid = Guid.Parse(userId);
+
+            // Admin role gets all permissions automatically
+            var role = principal.FindFirst(ClaimTypes.Role)?.Value;
+            if (string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase))
+            {
+                var allDefs = await permDefRepo.GetActiveAsync();
+                return Results.Ok(allDefs.Select(d => d.Code).ToHashSet());
+            }
+
             var directPermissions = await permRepo.GetByUserIdAsync(uid);
             var directCodes = directPermissions.Select(p => p.PermissionCode).ToHashSet();
 

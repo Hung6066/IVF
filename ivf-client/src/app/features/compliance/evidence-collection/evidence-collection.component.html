@@ -1,0 +1,762 @@
+<div class="evidence-collection">
+  <div class="page-header">
+    <div class="header-left">
+      <h1>📦 Thu thập bằng chứng kiểm toán</h1>
+      <p class="subtitle">Export evidence cho SOC 2, ISO 27001, HIPAA, GDPR audit</p>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-outline" (click)="exportAllJson()" [disabled]="exporting()">
+        @if (exporting() === 'all') {
+          ⏳ Đang xuất...
+        } @else {
+          📥 Xuất tất cả (JSON)
+        }
+      </button>
+    </div>
+  </div>
+
+  <!-- Category Tabs -->
+  <div class="tabs">
+    <button class="tab" [class.active]="activeTab() === 'overview'" (click)="setTab('overview')">
+      📊 Tổng quan
+    </button>
+    <button
+      class="tab runner-tab"
+      [class.active]="activeTab() === 'runner'"
+      (click)="setTab('runner')"
+    >
+      ⚡ Chạy Script
+      @if (scriptRunning()) {
+        <span class="running-dot"></span>
+      }
+    </button>
+    @for (cat of categories; track cat.key) {
+      <button class="tab" [class.active]="activeTab() === cat.key" (click)="setTab(cat.key)">
+        {{ cat.icon }} {{ cat.label }}
+      </button>
+    }
+  </div>
+
+  @if (loading()) {
+    <div class="loading">
+      <div class="spinner"></div>
+      <p>Đang tải dữ liệu...</p>
+    </div>
+  }
+
+  <!-- Script Runner Tab -->
+  @if (activeTab() === 'runner') {
+    <div class="runner-section">
+      <!-- Config Panel -->
+      <div class="runner-config">
+        <div class="config-header">
+          <h2>⚡ Cấu hình thu thập</h2>
+          <div class="config-actions">
+            @if (scriptRunning()) {
+              <button class="btn btn-danger" (click)="cancelCollection()">⏹ Hủy</button>
+            } @else {
+              <button
+                class="btn btn-primary btn-lg"
+                (click)="startCollection()"
+                [disabled]="selectedCategoryCount === 0"
+              >
+                ▶️ Chạy thu thập ({{ selectedCategoryCount }}/{{ allScriptCategories.length }})
+              </button>
+            }
+          </div>
+        </div>
+
+        <div class="config-body">
+          <div class="category-checkboxes">
+            <div class="checkbox-header">
+              <label class="checkbox-label">
+                <input
+                  type="checkbox"
+                  [checked]="selectedCategoryCount === allScriptCategories.length"
+                  (change)="toggleAllCategories($any($event.target).checked)"
+                />
+                <strong>Chọn tất cả</strong>
+              </label>
+            </div>
+            <div class="checkbox-grid">
+              @for (cat of allScriptCategories; track cat.key) {
+                <label class="checkbox-label">
+                  <input type="checkbox" [(ngModel)]="selectedCategories[cat.key]" />
+                  <span>{{ cat.icon }} {{ cat.label }}</span>
+                </label>
+              }
+            </div>
+          </div>
+
+          <div class="config-options">
+            <label class="checkbox-label">
+              <input type="checkbox" [(ngModel)]="skipApi" />
+              <span>⏭ Bỏ qua API (chế độ offline — chỉ thu thập từ Git, files, configs)</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Status Bar -->
+      @if (operationId()) {
+        <div class="status-bar" [class]="'status-' + scriptStatus().toLowerCase()">
+          <div class="status-info">
+            <span class="status-icon">
+              @switch (scriptStatus()) {
+                @case ('Running') {
+                  🔄
+                }
+                @case ('Completed') {
+                  ✅
+                }
+                @case ('Failed') {
+                  ❌
+                }
+                @case ('Cancelled') {
+                  ⏹
+                }
+                @default {
+                  ⏳
+                }
+              }
+            </span>
+            <span class="status-text">{{ scriptStatus() }}</span>
+            @if (progress()) {
+              <span class="status-progress"
+                >{{ progress()!.completed }}/{{ progress()!.total }}</span
+              >
+            }
+            <span class="status-opid">{{ operationId() }}</span>
+          </div>
+          @if (logLines().length > 0) {
+            <button class="btn btn-sm btn-outline" (click)="clearLog()">🗑 Xóa log</button>
+          }
+        </div>
+
+        <!-- Progress Section -->
+        @if (progress()) {
+          <div class="progress-section">
+            <div class="progress-header">
+              <span class="progress-label">
+                @if (progress()!.currentCategory) {
+                  Đang chạy: {{ getCategoryIcon(progress()!.currentCategory!) }}
+                  {{ getCategoryLabel(progress()!.currentCategory!) }}
+                } @else {
+                  Đang chuẩn bị...
+                }
+              </span>
+              <span class="progress-pct">{{ progress()!.percentage }}%</span>
+            </div>
+            <div class="progress-bar-lg">
+              <div
+                class="progress-fill-lg"
+                [style.width.%]="progress()!.percentage"
+                [class.completed]="progress()!.percentage === 100"
+              ></div>
+            </div>
+            <div class="category-progress-grid">
+              @for (cat of allScriptCategories; track cat.key) {
+                @if (selectedCategories[cat.key]) {
+                  <div
+                    class="cat-progress-item"
+                    [class.done]="progress()!.completedCategories.includes(cat.key)"
+                    [class.active]="progress()!.currentCategory === cat.key"
+                    [class.pending]="
+                      !progress()!.completedCategories.includes(cat.key) &&
+                      progress()!.currentCategory !== cat.key
+                    "
+                  >
+                    <span class="cat-status-icon">
+                      @if (progress()!.completedCategories.includes(cat.key)) {
+                        ✅
+                      } @else if (progress()!.currentCategory === cat.key) {
+                        🔄
+                      } @else {
+                        ⏳
+                      }
+                    </span>
+                    <span class="cat-progress-label">{{ cat.icon }} {{ cat.label }}</span>
+                  </div>
+                }
+              }
+            </div>
+          </div>
+        }
+      }
+
+      <!-- Terminal Output -->
+      @if (logLines().length > 0) {
+        <div class="terminal" #logContainer>
+          @for (line of logLines(); track $index) {
+            <div class="log-line" [class]="getLogLevelClass(line.level)">
+              <span class="log-time">{{ line.timestamp | date: 'HH:mm:ss' }}</span>
+              <span class="log-level">{{ line.level }}</span>
+              <span class="log-msg">{{ line.message }}</span>
+            </div>
+          }
+        </div>
+      }
+
+      <!-- Evidence Files -->
+      <div class="files-section">
+        <div class="files-header">
+          <h3>📁 Files đã thu thập</h3>
+          <button
+            class="btn btn-sm btn-outline"
+            (click)="loadEvidenceFiles()"
+            [disabled]="filesLoading()"
+          >
+            🔄 Refresh
+          </button>
+        </div>
+
+        @if (filesLoading()) {
+          <div class="loading"><div class="spinner"></div></div>
+        } @else if (evidenceFiles().length === 0) {
+          <p class="empty-state">Chưa có file nào. Chạy script để thu thập bằng chứng.</p>
+        } @else {
+          <table class="data-table files-table">
+            <thead>
+              <tr>
+                <th>Danh mục</th>
+                <th>Tên file</th>
+                <th>Kích thước</th>
+                <th>Ngày</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (f of evidenceFiles(); track f.path) {
+                <tr>
+                  <td>
+                    <span class="file-category">{{ f.category }}</span>
+                  </td>
+                  <td>{{ f.name }}</td>
+                  <td>{{ formatFileSize(f.size) }}</td>
+                  <td>{{ f.lastModified | date: 'dd/MM/yyyy HH:mm' }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        }
+      </div>
+    </div>
+  }
+
+  <!-- Overview Tab -->
+  @if (activeTab() === 'overview') {
+    <div class="overview-section">
+      <!-- Category Cards -->
+      <div class="category-grid">
+        @for (cat of categories; track cat.key) {
+          <div class="category-card" (click)="setTab(cat.key)">
+            <div class="card-icon">{{ cat.icon }}</div>
+            <div class="card-info">
+              <h3>{{ cat.label }}</h3>
+              <p>{{ cat.desc }}</p>
+            </div>
+            <div class="card-actions">
+              <button
+                class="btn btn-sm btn-primary"
+                (click)="exportCsv(cat.key); $event.stopPropagation()"
+                [disabled]="exporting() === cat.key"
+              >
+                @if (exporting() === cat.key) {
+                  ⏳
+                } @else {
+                  📥 CSV
+                }
+              </button>
+            </div>
+          </div>
+        }
+      </div>
+
+      <!-- Compliance Summary -->
+      @if (summary()) {
+        <div class="summary-section">
+          <h2>🏆 Điểm tuân thủ tổng hợp</h2>
+          <div class="score-overview">
+            <div class="score-circle" [class]="getGradeClass(summary()!.compliance.grade)">
+              <span class="score-value">{{ summary()!.compliance.percentage }}%</span>
+              <span class="score-grade">{{ summary()!.compliance.grade }}</span>
+            </div>
+            <div class="score-detail">
+              <p>
+                {{ summary()!.compliance.overallScore }} / {{ summary()!.compliance.maxScore }} điểm
+              </p>
+              <p class="export-time">
+                Xuất lúc: {{ summary()!.exportedAt | date: 'dd/MM/yyyy HH:mm' }}
+              </p>
+            </div>
+          </div>
+
+          <div class="frameworks-grid">
+            @for (fw of summary()!.compliance.frameworks; track fw.name) {
+              <div class="framework-card">
+                <div class="fw-header">
+                  <h4>{{ fw.name }}</h4>
+                  <span class="fw-score">{{ fw.percentage }}%</span>
+                </div>
+                <div class="progress-bar">
+                  <div
+                    class="progress-fill"
+                    [style.width.%]="fw.percentage"
+                    [class.high]="fw.percentage >= 80"
+                    [class.medium]="fw.percentage >= 50 && fw.percentage < 80"
+                    [class.low]="fw.percentage < 50"
+                  ></div>
+                </div>
+                <div class="fw-stats">
+                  <span>{{ fw.score }}/{{ fw.maxScore }}</span>
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+      }
+    </div>
+  }
+
+  <!-- Access Control Tab -->
+  @if (activeTab() === 'access-control' && accessControl()) {
+    <div class="evidence-section">
+      <div class="section-header">
+        <h2>🔐 Kiểm soát truy cập</h2>
+        <div class="section-actions">
+          <button class="btn btn-sm btn-outline" (click)="reloadCategory('access-control')">
+            🔄 Tải lại
+          </button>
+          <button
+            class="btn btn-sm btn-primary"
+            (click)="exportCsv('access-control')"
+            [disabled]="exporting() === 'access-control'"
+          >
+            📥 Xuất CSV
+          </button>
+        </div>
+      </div>
+      <p class="export-time">
+        Xuất lúc: {{ accessControl()!.exportedAt | date: 'dd/MM/yyyy HH:mm' }}
+      </p>
+
+      <div class="stats-row">
+        <div class="stat-card">
+          <span class="stat-value">{{ accessControl()!.totalUsers }}</span>
+          <span class="stat-label">Tổng users</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-value success">{{ accessControl()!.activeUsers }}</span>
+          <span class="stat-label">Active</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-value warn">{{ accessControl()!.privilegedCount }}</span>
+          <span class="stat-label">Admin</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-value">{{
+            accessControl()!.totalUsers - accessControl()!.activeUsers
+          }}</span>
+          <span class="stat-label">Inactive</span>
+        </div>
+      </div>
+
+      <h3>Phân bố vai trò</h3>
+      <div class="role-bars">
+        @for (role of accessControl()!.roleDistribution; track role.role) {
+          <div class="role-bar">
+            <span class="role-name">{{ role.role }}</span>
+            <div class="bar-track">
+              <div
+                class="bar-fill"
+                [style.width.%]="(role.count / accessControl()!.totalUsers) * 100"
+              ></div>
+            </div>
+            <span class="role-count">{{ role.count }}</span>
+          </div>
+        }
+      </div>
+
+      <h3>Danh sách Admin ({{ accessControl()!.privilegedCount }})</h3>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Username</th>
+            <th>Họ tên</th>
+            <th>Phòng ban</th>
+            <th>Trạng thái</th>
+            <th>Ngày tạo</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (u of accessControl()!.privilegedUsers; track u.id) {
+            <tr>
+              <td>
+                <strong>{{ u.username }}</strong>
+              </td>
+              <td>{{ u.fullName }}</td>
+              <td>{{ u.department || '—' }}</td>
+              <td>
+                <span class="badge" [class.active]="u.isActive" [class.inactive]="!u.isActive">{{
+                  u.isActive ? 'Active' : 'Inactive'
+                }}</span>
+              </td>
+              <td>{{ u.createdAt | date: 'dd/MM/yyyy' }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+
+  <!-- Training Tab -->
+  @if (activeTab() === 'training' && training()) {
+    <div class="evidence-section">
+      <div class="section-header">
+        <h2>📚 Đào tạo tuân thủ</h2>
+        <div class="section-actions">
+          <button class="btn btn-sm btn-outline" (click)="reloadCategory('training')">
+            🔄 Tải lại
+          </button>
+          <button
+            class="btn btn-sm btn-primary"
+            (click)="exportCsv('training')"
+            [disabled]="exporting() === 'training'"
+          >
+            📥 Xuất CSV
+          </button>
+        </div>
+      </div>
+      <p class="export-time">Xuất lúc: {{ training()!.exportedAt | date: 'dd/MM/yyyy HH:mm' }}</p>
+
+      <div class="stats-row">
+        <div class="stat-card">
+          <span class="stat-value">{{ training()!.totalAssigned }}</span>
+          <span class="stat-label">Tổng giao</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-value success">{{ training()!.completed }}</span>
+          <span class="stat-label">Hoàn thành</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-value danger">{{ training()!.overdue }}</span>
+          <span class="stat-label">Quá hạn</span>
+        </div>
+      </div>
+
+      <h3>Theo loại đào tạo</h3>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Loại</th>
+            <th>Tổng</th>
+            <th>Hoàn thành</th>
+            <th>Đạt</th>
+            <th>Quá hạn</th>
+            <th>Tỷ lệ</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (t of training()!.byType; track t.type) {
+            <tr>
+              <td>
+                <strong>{{ t.type }}</strong>
+              </td>
+              <td>{{ t.total }}</td>
+              <td class="success">{{ t.completed }}</td>
+              <td>{{ t.passed }}</td>
+              <td [class.danger]="t.overdue > 0">{{ t.overdue }}</td>
+              <td>
+                <div class="inline-progress">
+                  <div class="progress-bar-sm">
+                    <div
+                      class="progress-fill"
+                      [style.width.%]="t.completionRate"
+                      [class.high]="t.completionRate >= 80"
+                      [class.medium]="t.completionRate >= 50 && t.completionRate < 80"
+                      [class.low]="t.completionRate < 50"
+                    ></div>
+                  </div>
+                  <span>{{ t.completionRate }}%</span>
+                </div>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+
+  <!-- Incidents Tab -->
+  @if (activeTab() === 'incidents' && incidents()) {
+    <div class="evidence-section">
+      <div class="section-header">
+        <h2>🚨 Sự cố & Breach</h2>
+        <div class="section-actions">
+          <button class="btn btn-sm btn-outline" (click)="reloadCategory('incidents')">
+            🔄 Tải lại
+          </button>
+          <button
+            class="btn btn-sm btn-primary"
+            (click)="exportCsv('incidents')"
+            [disabled]="exporting() === 'incidents'"
+          >
+            📥 Xuất CSV
+          </button>
+        </div>
+      </div>
+      <p class="export-time">Xuất lúc: {{ incidents()!.exportedAt | date: 'dd/MM/yyyy HH:mm' }}</p>
+
+      <div class="stats-row">
+        <div class="stat-card">
+          <span class="stat-value">{{ incidents()!.incidents.total }}</span>
+          <span class="stat-label">Tổng sự cố</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-value warn">{{ incidents()!.incidents.open }}</span>
+          <span class="stat-label">Đang mở</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-value success">{{ incidents()!.incidents.resolved }}</span>
+          <span class="stat-label">Đã giải quyết</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-value" [class.danger]="incidents()!.breaches.total > 0">{{
+            incidents()!.breaches.total
+          }}</span>
+          <span class="stat-label">Breaches</span>
+        </div>
+      </div>
+
+      @if (incidents()!.incidents.bySeverity.length) {
+        <h3>Phân bố mức độ</h3>
+        <div class="severity-bars">
+          @for (s of incidents()!.incidents.bySeverity; track s.severity) {
+            <div class="severity-item">
+              <span class="severity-badge" [attr.data-severity]="s.severity">{{ s.severity }}</span>
+              <span class="severity-count">{{ s.count }}</span>
+            </div>
+          }
+        </div>
+      }
+
+      @if (incidents()!.incidents.records.length) {
+        <h3>Chi tiết sự cố</h3>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Loại</th>
+              <th>Mức độ</th>
+              <th>Trạng thái</th>
+              <th>Phát hiện</th>
+              <th>Giải quyết</th>
+              <th>Mô tả</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (i of incidents()!.incidents.records; track i.id) {
+              <tr>
+                <td>{{ i.incidentType }}</td>
+                <td>
+                  <span class="severity-badge" [attr.data-severity]="i.severity">{{
+                    i.severity
+                  }}</span>
+                </td>
+                <td>{{ i.status }}</td>
+                <td>{{ i.detectedAt | date: 'dd/MM/yyyy HH:mm' }}</td>
+                <td>{{ i.resolvedAt ? (i.resolvedAt | date: 'dd/MM/yyyy HH:mm') : '—' }}</td>
+                <td class="desc-col">{{ i.description || '—' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+    </div>
+  }
+
+  <!-- Backup Tab -->
+  @if (activeTab() === 'backup' && backup()) {
+    <div class="evidence-section">
+      <div class="section-header">
+        <h2>💾 Sao lưu & Lưu trữ dữ liệu</h2>
+        <div class="section-actions">
+          <button class="btn btn-sm btn-outline" (click)="reloadCategory('backup')">
+            🔄 Tải lại
+          </button>
+        </div>
+      </div>
+      <p class="export-time">Xuất lúc: {{ backup()!.exportedAt | date: 'dd/MM/yyyy HH:mm' }}</p>
+
+      <h3>Chính sách lưu trữ dữ liệu</h3>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Loại dữ liệu</th>
+            <th>Thời hạn (ngày)</th>
+            <th>Trạng thái</th>
+            <th>Lần chạy cuối</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (p of backup()!.retentionPolicies; track p.id) {
+            <tr>
+              <td>
+                <strong>{{ p.entityType }}</strong>
+              </td>
+              <td>{{ p.retentionDays }}</td>
+              <td>
+                <span class="badge" [class.active]="p.isEnabled" [class.inactive]="!p.isEnabled">{{
+                  p.isEnabled ? 'Bật' : 'Tắt'
+                }}</span>
+              </td>
+              <td>
+                {{ p.lastExecutedAt ? (p.lastExecutedAt | date: 'dd/MM/yyyy HH:mm') : 'Chưa chạy' }}
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+
+  <!-- Assets Tab -->
+  @if (activeTab() === 'assets' && assets()) {
+    <div class="evidence-section">
+      <div class="section-header">
+        <h2>🗃️ Kiểm kê tài sản dữ liệu</h2>
+        <div class="section-actions">
+          <button class="btn btn-sm btn-outline" (click)="reloadCategory('assets')">
+            🔄 Tải lại
+          </button>
+          <button
+            class="btn btn-sm btn-primary"
+            (click)="exportCsv('assets')"
+            [disabled]="exporting() === 'assets'"
+          >
+            📥 Xuất CSV
+          </button>
+        </div>
+      </div>
+      <p class="export-time">Xuất lúc: {{ assets()!.exportedAt | date: 'dd/MM/yyyy HH:mm' }}</p>
+
+      <div class="stats-row">
+        <div class="stat-card">
+          <span class="stat-value">{{ assets()!.totalAssets }}</span>
+          <span class="stat-label">Tổng tài sản</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-value success">{{ assets()!.active }}</span>
+          <span class="stat-label">Active</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-value warn">{{ assets()!.containingPhi }}</span>
+          <span class="stat-label">Chứa PHI</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-value">{{ assets()!.containingPii }}</span>
+          <span class="stat-label">Chứa PII</span>
+        </div>
+      </div>
+
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Tài sản</th>
+            <th>Loại</th>
+            <th>Chủ sở hữu</th>
+            <th>PHI</th>
+            <th>PII</th>
+            <th>Rủi ro</th>
+            <th>Kiểm tra kế tiếp</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (a of assets()!.records; track a.id) {
+            <tr>
+              <td>
+                <strong>{{ a.assetName }}</strong>
+              </td>
+              <td>{{ a.assetType }}</td>
+              <td>{{ a.owner }}</td>
+              <td>{{ a.containsPhi ? '✅' : '—' }}</td>
+              <td>{{ a.containsPii ? '✅' : '—' }}</td>
+              <td>
+                <span class="risk-badge" [class]="getRiskClass(a.riskScore)">{{
+                  a.riskScore
+                }}</span>
+              </td>
+              <td [class.danger]="a.overdue">
+                {{ a.nextAuditDueAt ? (a.nextAuditDueAt | date: 'dd/MM/yyyy') : '—' }}
+                @if (a.overdue) {
+                  ⚠️
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+
+  <!-- Summary Tab -->
+  @if (activeTab() === 'summary' && summary()) {
+    <div class="evidence-section">
+      <div class="section-header">
+        <h2>📊 Tổng hợp Compliance</h2>
+        <div class="section-actions">
+          <button class="btn btn-sm btn-outline" (click)="reloadCategory('summary')">
+            🔄 Tải lại
+          </button>
+          <button
+            class="btn btn-sm btn-primary"
+            (click)="exportCsv('summary')"
+            [disabled]="exporting() === 'summary'"
+          >
+            📥 Xuất CSV
+          </button>
+        </div>
+      </div>
+      <p class="export-time">Xuất lúc: {{ summary()!.exportedAt | date: 'dd/MM/yyyy HH:mm' }}</p>
+
+      @for (fw of summary()!.compliance.frameworks; track fw.name) {
+        <div class="framework-detail">
+          <div class="fw-detail-header">
+            <h3>{{ fw.name }}</h3>
+            <span class="fw-percentage"
+              >{{ fw.percentage }}% ({{ fw.score }}/{{ fw.maxScore }})</span
+            >
+          </div>
+          <table class="data-table controls-table">
+            <thead>
+              <tr>
+                <th>Control ID</th>
+                <th>Tên</th>
+                <th>Trạng thái</th>
+                <th>Điểm</th>
+                <th>Findings</th>
+                <th>Đề xuất</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (c of fw.controls; track c.controlId) {
+                <tr>
+                  <td>
+                    <code>{{ c.controlId }}</code>
+                  </td>
+                  <td>{{ c.name }}</td>
+                  <td>
+                    <span class="control-status" [class]="getStatusClass(c.status)">{{
+                      c.status
+                    }}</span>
+                  </td>
+                  <td>{{ c.score }}/{{ c.maxScore }}</td>
+                  <td class="desc-col">{{ c.finding || '—' }}</td>
+                  <td class="desc-col">{{ c.remediation || '—' }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+  }
+</div>

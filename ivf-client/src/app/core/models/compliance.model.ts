@@ -235,26 +235,44 @@ export interface AssignTrainingRequest {
 
 export interface AssetInventory {
   id: string;
-  name: string;
-  type: string;
+  assetName: string;
+  assetType: string;
   classification: string;
   owner: string;
-  description?: string;
+  criticalityLevel: string;
+  containsPhi: boolean;
+  containsPii: boolean;
+  department?: string;
   location?: string;
+  environment?: string;
+  version?: string;
+  hasEncryption: boolean;
+  hasBackup: boolean;
+  hasAccessControl: boolean;
+  hasMonitoring: boolean;
   status: string;
-  riskLevel?: string;
-  lastReviewedAt?: string;
-  nextReviewDate?: string;
+  lastAuditedAt?: string;
+  nextAuditDueAt?: string;
+  decommissionedAt?: string;
   createdAt: string;
 }
 
 export interface CreateAssetRequest {
-  name: string;
-  type: string;
+  assetName: string;
+  assetType: string;
   classification: string;
   owner: string;
-  description?: string;
+  criticalityLevel: string;
+  containsPhi: boolean;
+  containsPii: boolean;
+  department?: string;
   location?: string;
+  environment?: string;
+  version?: string;
+  hasEncryption?: boolean;
+  hasBackup?: boolean;
+  hasAccessControl?: boolean;
+  hasMonitoring?: boolean;
 }
 
 // ==================== AI GOVERNANCE ====================
@@ -379,4 +397,299 @@ export interface PagedResult<T> {
   totalCount: number;
   page: number;
   pageSize: number;
+}
+
+// ==================== EVIDENCE EXPORT ====================
+
+export interface EvidenceAccessControl {
+  exportedAt: string;
+  totalUsers: number;
+  activeUsers: number;
+  privilegedCount: number;
+  roleDistribution: { role: string; count: number }[];
+  users: EvidenceUser[];
+  privilegedUsers: EvidenceUser[];
+}
+
+export interface EvidenceUser {
+  id: string;
+  username: string;
+  fullName: string;
+  role: string;
+  department: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface EvidenceTraining {
+  exportedAt: string;
+  totalAssigned: number;
+  completed: number;
+  overdue: number;
+  byType: EvidenceTrainingType[];
+  records: EvidenceTrainingRecord[];
+}
+
+export interface EvidenceTrainingType {
+  type: string;
+  total: number;
+  completed: number;
+  passed: number;
+  overdue: number;
+  completionRate: number;
+}
+
+export interface EvidenceTrainingRecord {
+  id: string;
+  userId: string;
+  trainingType: string;
+  trainingName: string;
+  assignedAt: string;
+  dueDate: string;
+  isCompleted: boolean;
+  completedAt: string | null;
+  scorePercent: number;
+  isPassed: boolean;
+  isOverdue: boolean;
+}
+
+export interface EvidenceIncidents {
+  exportedAt: string;
+  incidents: {
+    total: number;
+    open: number;
+    resolved: number;
+    bySeverity: { severity: string; count: number }[];
+    records: EvidenceIncidentRecord[];
+  };
+  breaches: {
+    total: number;
+    records: EvidenceBreachRecord[];
+  };
+}
+
+export interface EvidenceIncidentRecord {
+  id: string;
+  incidentType: string;
+  severity: string;
+  status: string;
+  detectedAt: string;
+  resolvedAt: string | null;
+  description: string;
+  username: string;
+}
+
+export interface EvidenceBreachRecord {
+  id: string;
+  breachType: string;
+  severity: string;
+  status: string;
+  detectedAt: string;
+  affectedRecordCount: number;
+  dpaNotified: boolean;
+  subjectsNotified: boolean;
+  deadlineAtRisk: boolean;
+}
+
+export interface EvidenceBackup {
+  exportedAt: string;
+  retentionPolicies: {
+    id: string;
+    entityType: string;
+    retentionDays: number;
+    isEnabled: boolean;
+    lastExecutedAt: string | null;
+  }[];
+}
+
+export interface EvidenceAssets {
+  exportedAt: string;
+  totalAssets: number;
+  active: number;
+  containingPhi: number;
+  containingPii: number;
+  records: {
+    id: string;
+    assetName: string;
+    assetType: string;
+    status: string;
+    owner: string;
+    department: string;
+    containsPhi: boolean;
+    containsPii: boolean;
+    riskScore: number;
+    lastAuditedAt: string | null;
+    nextAuditDueAt: string | null;
+    overdue: boolean;
+  }[];
+}
+
+export interface EvidenceSummary {
+  exportedAt: string;
+  type: string;
+  compliance: {
+    overallScore: number;
+    maxScore: number;
+    percentage: number;
+    grade: string;
+    frameworks: EvidenceFramework[];
+  };
+}
+
+export interface EvidenceFramework {
+  name: string;
+  score: number;
+  maxScore: number;
+  percentage: number;
+  controls: {
+    controlId: string;
+    name: string;
+    status: string;
+    score: number;
+    maxScore: number;
+    finding: string;
+    remediation: string;
+  }[];
+}
+
+export type EvidenceCategory =
+  | 'access-control'
+  | 'training'
+  | 'incidents'
+  | 'backup'
+  | 'assets'
+  | 'summary';
+
+// ─── Evidence Collection Script Runner ───
+
+export interface EvidenceCollectRequest {
+  categories?: string[];
+  skipApi?: boolean;
+}
+
+export interface EvidenceCollectResult {
+  operationId: string;
+  status: string;
+  totalCategories: number;
+}
+
+export interface EvidenceProgress {
+  operationId: string;
+  completed: number;
+  total: number;
+  percentage: number;
+  currentCategory: string | null;
+  completedCategories: string[];
+}
+
+export interface EvidenceLogLine {
+  operationId: string;
+  timestamp: string;
+  level: 'INFO' | 'OK' | 'WARN' | 'ERROR' | 'HEADER';
+  message: string;
+}
+
+export interface EvidenceFile {
+  path: string;
+  category: string;
+  name: string;
+  size: number;
+  lastModified: string;
+}
+
+// ==================== COMPLIANCE AUDITOR (Vanta-style) ====================
+
+export interface AuditDashboard {
+  lastScanAt: string;
+  overallScore: number;
+  grade: string;
+  totalControls: number;
+  passedControls: number;
+  failedControls: number;
+  warningControls: number;
+  frameworks: AuditFrameworkSummary[];
+  alerts: AuditAlert[];
+  trends: AuditTrend[];
+  systemHealth: SystemHealth;
+  lastScan: AuditScan;
+}
+
+export interface AuditFrameworkSummary {
+  id: string;
+  name: string;
+  icon: string;
+  score: number;
+  passed: number;
+  failed: number;
+  warning: number;
+  total: number;
+}
+
+export interface AuditAlert {
+  severity: string;
+  title: string;
+  message: string;
+  controlId: string;
+  framework: string;
+}
+
+export interface AuditTrend {
+  date: string;
+  score: number;
+  passed: number;
+  failed: number;
+}
+
+export interface SystemHealth {
+  databaseOnline: boolean;
+  cacheOnline: boolean;
+  storageOnline: boolean;
+  authConfigured: boolean;
+  encryptionConfigured: boolean;
+  auditLoggingEnabled: boolean;
+  backupConfigured: boolean;
+  activeUsers: number;
+  totalPatients: number;
+  serverTime: string;
+}
+
+export interface AuditScan {
+  scanId: string;
+  startedAt: string;
+  completedAt: string | null;
+  status: string;
+  overallScore: number;
+  totalControls: number;
+  passedControls: number;
+  failedControls: number;
+  warningControls: number;
+  frameworks: AuditFramework[];
+}
+
+export interface AuditFramework {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  score: number;
+  totalControls: number;
+  passedControls: number;
+  failedControls: number;
+  warningControls: number;
+  controls: AuditControl[];
+}
+
+export interface AuditControl {
+  id: string;
+  frameworkId: string;
+  category: string;
+  name: string;
+  description: string;
+  severity: string;
+  status: string;
+  finding: string | null;
+  remediation: string | null;
+  evidence: string | null;
+  testedAt: string;
+  durationMs: number;
 }
