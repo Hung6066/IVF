@@ -29,4 +29,22 @@ public class CurrentUserService : ICurrentUserService
 
     public string? IpAddress =>
         _httpContextAccessor.HttpContext?.Connection.RemoteIpAddress?.ToString();
+
+    public Guid? TenantId
+    {
+        get
+        {
+            var claim = _httpContextAccessor.HttpContext?.User.FindFirst("tenant_id")?.Value;
+            return Guid.TryParse(claim, out var id) ? id : null;
+        }
+    }
+
+    public bool IsPlatformAdmin
+    {
+        get
+        {
+            var claim = _httpContextAccessor.HttpContext?.User.FindFirst("platform_admin")?.Value;
+            return claim == "true";
+        }
+    }
 }

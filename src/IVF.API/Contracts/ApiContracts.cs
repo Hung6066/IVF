@@ -10,9 +10,9 @@ public record MfaSendSmsRequest(string MfaToken);
 public record PasskeyLoginBeginRequest(string Username);
 public record PasskeyLoginCompleteRequest(Guid UserId, Fido2NetLib.AuthenticatorAssertionRawResponse AssertionResponse);
 public record AuthResponse(string AccessToken, string RefreshToken, int ExpiresIn, UserDto User);
-public record UserDto(Guid Id, string Username, string FullName, string Role, string? Department)
+public record UserDto(Guid Id, string Username, string FullName, string Role, string? Department, bool IsPlatformAdmin = false, Guid? TenantId = null)
 {
-    public static UserDto FromEntity(IVF.Domain.Entities.User u) => new(u.Id, u.Username, u.FullName, u.Role, u.Department);
+    public static UserDto FromEntity(IVF.Domain.Entities.User u) => new(u.Id, u.Username, u.FullName, u.Role, u.Department, u.IsPlatformAdmin, u.TenantId);
 }
 public record UpdatePatientRequest(string FullName, string? Phone, string? Address);
 public record UpdateEmergencyContactRequest(string? Name, string? Phone, string? Relation);

@@ -5,7 +5,7 @@ namespace IVF.Domain.Entities;
 /// <summary>
 /// Doctor entity - extends User with medical-specific properties
 /// </summary>
-public class Doctor : BaseEntity
+public class Doctor : BaseEntity, ITenantEntity
 {
     public Guid UserId { get; private set; }
     public string Specialty { get; private set; } = string.Empty;  // IVF, Andrology, Gynecology
@@ -14,12 +14,14 @@ public class Doctor : BaseEntity
     public string? Schedule { get; private set; }  // JSON schedule data
     public bool IsAvailable { get; private set; } = true;
     public int MaxPatientsPerDay { get; private set; } = 20;
-    
+    public Guid TenantId { get; private set; }
+    public void SetTenantId(Guid tenantId) { TenantId = tenantId; SetUpdated(); }
+
     // Navigation
     public virtual User User { get; private set; } = null!;
-    
+
     private Doctor() { }
-    
+
     public static Doctor Create(
         Guid userId,
         string specialty,
@@ -36,25 +38,25 @@ public class Doctor : BaseEntity
             MaxPatientsPerDay = maxPatientsPerDay
         };
     }
-    
+
     public void UpdateSchedule(string schedule)
     {
         Schedule = schedule;
         SetUpdated();
     }
-    
+
     public void UpdateRoom(string roomNumber)
     {
         RoomNumber = roomNumber;
         SetUpdated();
     }
-    
+
     public void SetAvailable(bool available)
     {
         IsAvailable = available;
         SetUpdated();
     }
-    
+
     public void UpdateMaxPatients(int max)
     {
         MaxPatientsPerDay = max;

@@ -2,7 +2,7 @@ using IVF.Domain.Common;
 
 namespace IVF.Domain.Entities;
 
-public class User : BaseEntity
+public class User : BaseEntity, ITenantEntity
 {
     public string Username { get; private set; } = string.Empty;
     public string PasswordHash { get; private set; } = string.Empty;
@@ -13,6 +13,13 @@ public class User : BaseEntity
     public string? RefreshToken { get; private set; }
     public DateTime? RefreshTokenExpiryTime { get; private set; }
 
+    // Multi-tenancy
+    public Guid TenantId { get; private set; }
+    public bool IsPlatformAdmin { get; private set; } // Super admin across all tenants
+
+    // Navigation
+    public Tenant? Tenant { get; private set; }
+
     private User() { }
 
     public static User Create(
@@ -20,7 +27,8 @@ public class User : BaseEntity
         string passwordHash,
         string fullName,
         string role,
-        string? department = null)
+        string? department = null,
+        Guid? tenantId = null)
     {
         return new User
         {
@@ -28,8 +36,21 @@ public class User : BaseEntity
             PasswordHash = passwordHash,
             FullName = fullName,
             Role = role,
-            Department = department
+            Department = department,
+            TenantId = tenantId ?? Guid.Empty
         };
+    }
+
+    public void SetTenantId(Guid tenantId)
+    {
+        TenantId = tenantId;
+        SetUpdated();
+    }
+
+    public void SetPlatformAdmin(bool isPlatformAdmin)
+    {
+        IsPlatformAdmin = isPlatformAdmin;
+        SetUpdated();
     }
 
     public void UpdateRefreshToken(string refreshToken, DateTime expiryTime)

@@ -1,3 +1,4 @@
+using IVF.Domain.Common;
 using IVF.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 
@@ -5,9 +6,19 @@ namespace IVF.Infrastructure.Persistence;
 
 public class IvfDbContext : DbContext
 {
+    private Guid? _currentTenantId;
+
     public IvfDbContext(DbContextOptions<IvfDbContext> options) : base(options)
     {
     }
+
+    public void SetCurrentTenant(Guid tenantId) => _currentTenantId = tenantId;
+    public Guid? CurrentTenantId => _currentTenantId;
+
+    // Multi-tenancy
+    public DbSet<Tenant> Tenants => Set<Tenant>();
+    public DbSet<TenantSubscription> TenantSubscriptions => Set<TenantSubscription>();
+    public DbSet<TenantUsageRecord> TenantUsageRecords => Set<TenantUsageRecord>();
 
     public DbSet<User> Users => Set<User>();
     public DbSet<Patient> Patients => Set<Patient>();
@@ -164,6 +175,25 @@ public class IvfDbContext : DbContext
 
         // Apply all configurations from this assembly
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(IvfDbContext).Assembly);
+
+        // Apply tenant query filters to all ITenantEntity implementations
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+        {
+            if (typeof(ITenantEntity).IsAssignableFrom(entityType.ClrType))
+            {
+                var method = typeof(IvfDbContext)
+                    .GetMethod(nameof(ApplyTenantFilter), System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
+                    .MakeGenericMethod(entityType.ClrType);
+                method.Invoke(this, [modelBuilder]);
+            }
+        }
+    }
+
+    private void ApplyTenantFilter<T>(ModelBuilder modelBuilder) where T : class, ITenantEntity
+    {
+        modelBuilder.Entity<T>().HasIndex(e => e.TenantId);
+        modelBuilder.Entity<T>().HasQueryFilter(e => !EF.Property<bool>(e, "IsDeleted")
+            && (_currentTenantId == null || e.TenantId == _currentTenantId));
     }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
@@ -174,6 +204,15 @@ public class IvfDbContext : DbContext
                 && entry.Metadata.FindProperty("UpdatedAt") is not null)
             {
                 entry.Property("UpdatedAt").CurrentValue = DateTime.UtcNow;
+            }
+
+            // Auto-set TenantId for new tenant entities
+            if (entry.State == EntityState.Added
+                && entry.Entity is ITenantEntity tenantEntity
+                && tenantEntity.TenantId == Guid.Empty
+                && _currentTenantId.HasValue)
+            {
+                tenantEntity.SetTenantId(_currentTenantId.Value);
             }
         }
 

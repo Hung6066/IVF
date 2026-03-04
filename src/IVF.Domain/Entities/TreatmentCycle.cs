@@ -3,10 +3,12 @@ using IVF.Domain.Enums;
 
 namespace IVF.Domain.Entities;
 
-public class TreatmentCycle : BaseEntity
+public class TreatmentCycle : BaseEntity, ITenantEntity
 {
     public Guid CoupleId { get; private set; }
     public string CycleCode { get; private set; } = string.Empty;
+    public Guid TenantId { get; private set; }
+    public void SetTenantId(Guid tenantId) { TenantId = tenantId; SetUpdated(); }
     public TreatmentMethod Method { get; private set; }
     public CyclePhase CurrentPhase { get; private set; }
     public DateTime StartDate { get; private set; }

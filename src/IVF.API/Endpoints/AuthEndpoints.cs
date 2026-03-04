@@ -918,9 +918,14 @@ public static class AuthEndpoints
             new(ClaimTypes.GivenName, user.FullName),
             new(ClaimTypes.Role, user.Role),
             new("department", user.Department ?? ""),
+            new("tenant_id", user.TenantId.ToString()),
             new("jti", Guid.NewGuid().ToString()), // Unique token ID for revocation tracking
             new("iat", DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
         };
+
+        // Platform admin flag
+        if (user.IsPlatformAdmin)
+            claims.Add(new Claim("platform_admin", "true"));
 
         // Zero Trust: Bind token to device and session
         if (!string.IsNullOrEmpty(deviceFingerprint))

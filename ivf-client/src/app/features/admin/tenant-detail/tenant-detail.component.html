@@ -1,0 +1,414 @@
+<div class="tenant-detail">
+  @if (loading()) {
+    <div class="loading">
+      <div class="spinner"></div>
+      <p>Đang tải...</p>
+    </div>
+  } @else if (tenant(); as t) {
+    <!-- Header -->
+    <div class="page-header">
+      <div class="header-left">
+        <button class="btn-back" (click)="goBack()"><i class="fas fa-arrow-left"></i></button>
+        <div>
+          <h1>{{ t.name }}</h1>
+          <div class="header-meta">
+            <code>{{ t.slug }}</code>
+            <span class="status-badge" [class]="getStatusClass(t.status)">{{
+              getStatusLabel(t.status)
+            }}</span>
+            @if (t.subscription) {
+              <span class="plan-badge">{{ getPlanLabel(t.subscription.plan) }}</span>
+            }
+          </div>
+        </div>
+      </div>
+      <div class="header-actions">
+        @if (t.status === 'Suspended' || t.status === 'PendingSetup') {
+          <button class="btn btn-success" (click)="activateTenant()">
+            <i class="fas fa-play"></i> Kích hoạt
+          </button>
+        }
+        @if (t.status === 'Active' || t.status === 'Trial') {
+          <button class="btn btn-warning" (click)="suspendTenant()">
+            <i class="fas fa-pause"></i> Tạm ngưng
+          </button>
+        }
+        @if (t.status !== 'Cancelled') {
+          <button class="btn btn-danger" (click)="cancelTenant()">
+            <i class="fas fa-times"></i> Hủy
+          </button>
+        }
+      </div>
+    </div>
+
+    <!-- Usage Overview Cards -->
+    @if (t.currentUsage; as u) {
+      <div class="usage-cards">
+        <div class="usage-card">
+          <div class="usage-header">
+            <span>Người dùng</span>
+            <span class="usage-fraction">{{ u.activeUsers }} / {{ t.maxUsers }}</span>
+          </div>
+          <div class="progress-bar">
+            <div
+              class="progress-fill"
+              [style.width.%]="getUsagePercent(u.activeUsers, t.maxUsers)"
+            ></div>
+          </div>
+        </div>
+        <div class="usage-card">
+          <div class="usage-header">
+            <span>Bệnh nhân mới</span>
+            <span class="usage-fraction">{{ u.newPatients }} / {{ t.maxPatientsPerMonth }}</span>
+          </div>
+          <div class="progress-bar">
+            <div
+              class="progress-fill"
+              [style.width.%]="getUsagePercent(u.newPatients, t.maxPatientsPerMonth)"
+            ></div>
+          </div>
+        </div>
+        <div class="usage-card">
+          <div class="usage-header">
+            <span>Lưu trữ</span>
+            <span class="usage-fraction"
+              >{{ formatStorage(u.storageUsedMb) }} / {{ formatStorage(t.storageLimitMb) }}</span
+            >
+          </div>
+          <div class="progress-bar">
+            <div
+              class="progress-fill"
+              [style.width.%]="getUsagePercent(u.storageUsedMb, t.storageLimitMb)"
+            ></div>
+          </div>
+        </div>
+        <div class="usage-card">
+          <div class="usage-header">
+            <span>Chu kỳ điều trị</span><span class="usage-value">{{ u.treatmentCycles }}</span>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button [class.active]="activeTab() === 'info'" (click)="activeTab.set('info')">
+        Thông tin
+      </button>
+      <button
+        [class.active]="activeTab() === 'subscription'"
+        (click)="activeTab.set('subscription')"
+      >
+        Gói dịch vụ
+      </button>
+      <button [class.active]="activeTab() === 'usage'" (click)="activeTab.set('usage')">
+        Sử dụng
+      </button>
+      <button [class.active]="activeTab() === 'branding'" (click)="activeTab.set('branding')">
+        Thương hiệu
+      </button>
+      <button [class.active]="activeTab() === 'limits'" (click)="activeTab.set('limits')">
+        Giới hạn
+      </button>
+      <button [class.active]="activeTab() === 'isolation'" (click)="activeTab.set('isolation')">
+        Cô lập dữ liệu
+      </button>
+    </div>
+
+    <!-- Info Tab -->
+    @if (activeTab() === 'info') {
+      <div class="tab-content card">
+        <h3>Thông tin Trung tâm</h3>
+        <div class="form-row">
+          <div class="form-group"><label>Tên</label><input [(ngModel)]="editInfo.name" /></div>
+          <div class="form-group"><label>Email</label><input [(ngModel)]="editInfo.email" /></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Điện thoại</label><input [(ngModel)]="editInfo.phone" />
+          </div>
+          <div class="form-group">
+            <label>Website</label><input [(ngModel)]="editInfo.website" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Mã số thuế</label><input [(ngModel)]="editInfo.taxId" />
+          </div>
+          <div class="form-group">
+            <label>Địa chỉ</label><input [(ngModel)]="editInfo.address" />
+          </div>
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-primary" (click)="saveInfo()" [disabled]="saving()">
+            @if (saving()) {
+              <i class="fas fa-spinner fa-spin"></i>
+            }
+            Lưu thay đổi
+          </button>
+        </div>
+      </div>
+    }
+
+    <!-- Subscription Tab -->
+    @if (activeTab() === 'subscription') {
+      <div class="tab-content card">
+        <h3>Gói dịch vụ & Thanh toán</h3>
+        @if (t.subscription; as sub) {
+          <div class="detail-grid">
+            <div class="detail-item">
+              <label>Gói</label><span class="plan-badge">{{ getPlanLabel(sub.plan) }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Trạng thái</label
+              ><span class="status-badge" [class]="getStatusClass(sub.status)">{{
+                sub.status
+              }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Chu kỳ</label><span>{{ sub.billingCycle }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Giá hàng tháng</label><span>{{ formatCurrency(sub.monthlyPrice) }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Giá thực tế</label
+              ><span class="highlight">{{ formatCurrency(sub.effectivePrice) }}</span>
+            </div>
+            @if (sub.discountPercent) {
+              <div class="detail-item">
+                <label>Giảm giá</label><span>{{ sub.discountPercent }}%</span>
+              </div>
+            }
+            <div class="detail-item">
+              <label>Ngày bắt đầu</label><span>{{ sub.startDate | date: 'dd/MM/yyyy' }}</span>
+            </div>
+            @if (sub.nextBillingDate) {
+              <div class="detail-item">
+                <label>Thanh toán kế tiếp</label
+                ><span>{{ sub.nextBillingDate | date: 'dd/MM/yyyy' }}</span>
+              </div>
+            }
+            @if (sub.trialEndDate) {
+              <div class="detail-item">
+                <label>Hết dùng thử</label><span>{{ sub.trialEndDate | date: 'dd/MM/yyyy' }}</span>
+              </div>
+            }
+            <div class="detail-item">
+              <label>Tự động gia hạn</label><span>{{ sub.autoRenew ? 'Có' : 'Không' }}</span>
+            </div>
+          </div>
+        } @else {
+          <div class="empty-state"><p>Chưa có gói dịch vụ</p></div>
+        }
+      </div>
+    }
+
+    <!-- Usage Tab -->
+    @if (activeTab() === 'usage') {
+      <div class="tab-content card">
+        <h3>Thống kê sử dụng — Tháng {{ t.currentUsage?.month }}/{{ t.currentUsage?.year }}</h3>
+        @if (t.currentUsage; as u) {
+          <div class="usage-grid">
+            <div class="usage-stat">
+              <i class="fas fa-users"></i><span class="value">{{ u.activeUsers }}</span
+              ><span class="label">Người dùng hoạt động</span>
+            </div>
+            <div class="usage-stat">
+              <i class="fas fa-user-plus"></i><span class="value">{{ u.newPatients }}</span
+              ><span class="label">Bệnh nhân mới</span>
+            </div>
+            <div class="usage-stat">
+              <i class="fas fa-heartbeat"></i><span class="value">{{ u.treatmentCycles }}</span
+              ><span class="label">Chu kỳ điều trị</span>
+            </div>
+            <div class="usage-stat">
+              <i class="fas fa-file-alt"></i><span class="value">{{ u.formResponses }}</span
+              ><span class="label">Biểu mẫu</span>
+            </div>
+            <div class="usage-stat">
+              <i class="fas fa-file-signature"></i><span class="value">{{ u.signedDocuments }}</span
+              ><span class="label">Tài liệu ký</span>
+            </div>
+            <div class="usage-stat">
+              <i class="fas fa-database"></i
+              ><span class="value">{{ formatStorage(u.storageUsedMb) }}</span
+              ><span class="label">Lưu trữ</span>
+            </div>
+            <div class="usage-stat">
+              <i class="fas fa-exchange-alt"></i><span class="value">{{ u.apiCalls | number }}</span
+              ><span class="label">API Calls</span>
+            </div>
+          </div>
+        } @else {
+          <div class="empty-state"><p>Chưa có dữ liệu sử dụng</p></div>
+        }
+      </div>
+    }
+
+    <!-- Branding Tab -->
+    @if (activeTab() === 'branding') {
+      <div class="tab-content card">
+        <h3>Thương hiệu & Tùy chỉnh</h3>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Logo URL</label
+            ><input [(ngModel)]="editBranding.logoUrl" placeholder="https://..." />
+          </div>
+          <div class="form-group">
+            <label>Màu chủ đạo</label>
+            <div class="color-input">
+              <input type="color" [(ngModel)]="editBranding.primaryColor" />
+              <input type="text" [(ngModel)]="editBranding.primaryColor" placeholder="#4361ee" />
+            </div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Custom Domain</label>
+          <input [(ngModel)]="editBranding.customDomain" placeholder="ivf.your-domain.com" />
+        </div>
+        <div class="info-box">
+          <i class="fas fa-info-circle"></i>
+          <span>Locale: {{ t.locale }} | Timezone: {{ t.timeZone }}</span>
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-primary" (click)="saveBranding()" [disabled]="saving()">
+            @if (saving()) {
+              <i class="fas fa-spinner fa-spin"></i>
+            }
+            Lưu thương hiệu
+          </button>
+        </div>
+      </div>
+    }
+
+    <!-- Limits Tab -->
+    @if (activeTab() === 'limits') {
+      <div class="tab-content card">
+        <h3>Giới hạn & Tính năng</h3>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Max Users</label><input type="number" [(ngModel)]="editLimits.maxUsers" />
+          </div>
+          <div class="form-group">
+            <label>Max Patients/Month</label
+            ><input type="number" [(ngModel)]="editLimits.maxPatientsPerMonth" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Storage Limit (MB)</label>
+          <input type="number" [(ngModel)]="editLimits.storageLimitMb" />
+        </div>
+        <h4>Tính năng</h4>
+        <div class="feature-toggles">
+          <label class="toggle"
+            ><input type="checkbox" [(ngModel)]="editLimits.aiEnabled" /><span
+              >AI hỗ trợ</span
+            ></label
+          >
+          <label class="toggle"
+            ><input type="checkbox" [(ngModel)]="editLimits.digitalSigningEnabled" /><span
+              >Ký số</span
+            ></label
+          >
+          <label class="toggle"
+            ><input type="checkbox" [(ngModel)]="editLimits.biometricsEnabled" /><span
+              >Sinh trắc học</span
+            ></label
+          >
+          <label class="toggle"
+            ><input type="checkbox" [(ngModel)]="editLimits.advancedReportingEnabled" /><span
+              >Báo cáo nâng cao</span
+            ></label
+          >
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-primary" (click)="saveLimits()" [disabled]="saving()">
+            @if (saving()) {
+              <i class="fas fa-spinner fa-spin"></i>
+            }
+            Cập nhật giới hạn
+          </button>
+        </div>
+      </div>
+    }
+
+    <!-- Isolation Tab -->
+    @if (activeTab() === 'isolation') {
+      <div class="tab-content card">
+        <h3>Chiến lược cô lập dữ liệu</h3>
+        <div class="info-box">
+          <i class="fas fa-shield-alt"></i>
+          <span
+            >Chiến lược cô lập xác định cách dữ liệu tenant được tách biệt. Thay đổi chiến lược yêu
+            cầu migration dữ liệu.</span
+          >
+        </div>
+        <div class="detail-grid">
+          <div class="detail-item">
+            <label>Trạng thái hiện tại</label>
+            <span class="isolation-badge" [class]="getIsolationClass(t.isolationStrategy)">{{
+              getIsolationLabel(t.isolationStrategy)
+            }}</span>
+          </div>
+          @if (t.isRootTenant) {
+            <div class="detail-item">
+              <label>Root Tenant</label>
+              <span class="plan-badge">Platform Admin</span>
+            </div>
+          }
+          @if (t.databaseSchema) {
+            <div class="detail-item">
+              <label>Schema</label><span>{{ t.databaseSchema }}</span>
+            </div>
+          }
+          @if (t.connectionString) {
+            <div class="detail-item"><label>Connection String</label><span>••••••••</span></div>
+          }
+        </div>
+        <h4>Thay đổi chiến lược</h4>
+        <div class="form-group">
+          <label>Chiến lược mới</label>
+          <select [(ngModel)]="editIsolation.isolationStrategy">
+            <option value="SharedDatabase">Dùng chung Database (Row-level)</option>
+            <option value="SeparateSchema">Schema riêng</option>
+            <option value="SeparateDatabase">Database riêng</option>
+          </select>
+        </div>
+        @switch (editIsolation.isolationStrategy) {
+          @case ('SeparateSchema') {
+            <div class="info-box">
+              <i class="fas fa-info-circle"></i>
+              <span
+                >Schema riêng: Mỗi tenant có schema riêng trong cùng database. Cân bằng giữa cô lập
+                và hiệu suất.</span
+              >
+            </div>
+          }
+          @case ('SeparateDatabase') {
+            <div class="info-box warning">
+              <i class="fas fa-exclamation-triangle"></i>
+              <span
+                >Database riêng: Mỗi tenant có database riêng biệt. Cô lập cao nhất nhưng chi phí
+                vận hành cao hơn.</span
+              >
+            </div>
+          }
+        }
+        <div class="form-actions">
+          <button class="btn btn-primary" (click)="saveIsolation()" [disabled]="saving()">
+            @if (saving()) {
+              <i class="fas fa-spinner fa-spin"></i>
+            }
+            Cập nhật cô lập
+          </button>
+        </div>
+      </div>
+    }
+  } @else {
+    <div class="empty-state">
+      <h2>Không tìm thấy trung tâm</h2>
+      <button class="btn btn-primary" (click)="goBack()">Quay lại</button>
+    </div>
+  }
+</div>

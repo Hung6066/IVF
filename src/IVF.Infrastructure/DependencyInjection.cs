@@ -64,11 +64,13 @@ public static class DependencyInjection
         services.AddScoped<IFormRepository, FormRepository>();
         services.AddScoped<IConceptRepository, ConceptRepository>();
         services.AddScoped<IPatientDocumentRepository, PatientDocumentRepository>();
+        services.AddScoped<ITenantRepository, TenantRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 
         // Register Services
         services.AddScoped<INotificationService, Services.NotificationService>();
         services.AddScoped<IConsentValidationService, Services.ConsentValidationService>();
+        services.AddScoped<ITenantProvisioningService, Services.TenantProvisioningService>();
         services.AddScoped<IFlowSeeder, FlowSeeder>();
 
         // Key Vault & Zero Trust

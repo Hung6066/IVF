@@ -36,4 +36,6 @@ export interface User {
   fullName: string;
   role: string;
   department?: string;
+  isPlatformAdmin?: boolean;
+  tenantId?: string;
 }

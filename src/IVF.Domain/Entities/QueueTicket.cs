@@ -3,10 +3,12 @@ using IVF.Domain.Enums;
 
 namespace IVF.Domain.Entities;
 
-public class QueueTicket : BaseEntity
+public class QueueTicket : BaseEntity, ITenantEntity
 {
     public string TicketNumber { get; private set; } = string.Empty;
     public QueueType QueueType { get; private set; }
+    public Guid TenantId { get; private set; }
+    public void SetTenantId(Guid tenantId) { TenantId = tenantId; SetUpdated(); }
     public TicketPriority Priority { get; private set; }
     public Guid PatientId { get; private set; }
     public Guid? CycleId { get; private set; }
@@ -16,7 +18,7 @@ public class QueueTicket : BaseEntity
     public DateTime? CalledAt { get; private set; }
     public DateTime? CompletedAt { get; private set; }
     public Guid? CalledByUserId { get; private set; }
-    
+
     // Notes from service completion (e.g., consultation notes)
     public string? Notes { get; set; }
 

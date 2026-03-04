@@ -47,6 +47,7 @@ public class ZeroTrustMiddleware
         "/api/ai",
         "/api/admin/certificates",
         "/api/trust",
+        "/api/tenants",
         "/health",
         "/healthz",
         "/swagger"

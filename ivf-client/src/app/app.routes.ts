@@ -300,6 +300,27 @@ export const routes: Routes = [
         loadChildren: () => import('./features/forms/forms.routes').then((m) => m.FORMS_ROUTES),
       },
 
+      // ─── Multi-tenant Management ───
+      {
+        path: 'admin/tenants',
+        loadComponent: () =>
+          import('./features/admin/tenant-management/tenant-management.component').then(
+            (m) => m.TenantManagementComponent,
+          ),
+      },
+      {
+        path: 'admin/tenants/:id',
+        loadComponent: () =>
+          import('./features/admin/tenant-detail/tenant-detail.component').then(
+            (m) => m.TenantDetailComponent,
+          ),
+      },
+      {
+        path: 'pricing',
+        loadComponent: () =>
+          import('./features/pricing/pricing.component').then((m) => m.PricingComponent),
+      },
+
       // ─── Compliance ───
       {
         path: 'compliance',

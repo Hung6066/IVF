@@ -434,6 +434,9 @@ namespace IVF.Infrastructure.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasMaxLength(30)
@@ -451,6 +454,8 @@ namespace IVF.Infrastructure.Migrations
                     b.HasIndex("PatientId");
 
                     b.HasIndex("ScheduledAt");
+
+                    b.HasIndex("TenantId");
 
                     b.HasIndex("DoctorId", "ScheduledAt");
 
@@ -1761,6 +1766,9 @@ namespace IVF.Infrastructure.Migrations
                     b.Property<Guid?>("SpermDonorId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -1772,6 +1780,8 @@ namespace IVF.Infrastructure.Migrations
                     b.HasIndex("HusbandId");
 
                     b.HasIndex("SpermDonorId");
+
+                    b.HasIndex("TenantId");
 
                     b.HasIndex("WifeId");
 
@@ -2180,6 +2190,9 @@ namespace IVF.Infrastructure.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -2191,6 +2204,8 @@ namespace IVF.Infrastructure.Migrations
                     b.HasIndex("IsAvailable");
 
                     b.HasIndex("Specialty");
+
+                    b.HasIndex("TenantId");
 
                     b.HasIndex("UserId")
                         .IsUnique();
@@ -2698,6 +2713,9 @@ namespace IVF.Infrastructure.Migrations
                     b.Property<Guid?>("SubmittedByUserId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -2712,6 +2730,8 @@ namespace IVF.Infrastructure.Migrations
                     b.HasIndex("SubmittedAt");
 
                     b.HasIndex("SubmittedByUserId");
+
+                    b.HasIndex("TenantId");
 
                     b.HasIndex("PatientId", "FormTemplateId");
 
@@ -2755,6 +2775,9 @@ namespace IVF.Infrastructure.Migrations
                         .HasMaxLength(300)
                         .HasColumnType("character varying(300)");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -2775,6 +2798,8 @@ namespace IVF.Infrastructure.Migrations
                         .HasFilter("\"IsDeleted\" = false");
 
                     b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("TenantId");
 
                     b.ToTable("form_templates", (string)null);
                 });
@@ -3004,6 +3029,9 @@ namespace IVF.Infrastructure.Migrations
                         .HasPrecision(5, 2)
                         .HasColumnType("numeric(5,2)");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.Property<decimal>("TotalAmount")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
@@ -3023,6 +3051,8 @@ namespace IVF.Infrastructure.Migrations
                     b.HasIndex("PatientId");
 
                     b.HasIndex("Status");
+
+                    b.HasIndex("TenantId");
 
                     b.ToTable("invoices", (string)null);
                 });
@@ -3441,6 +3471,9 @@ namespace IVF.Infrastructure.Migrations
                     b.Property<DateTime?>("ReadAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -3460,6 +3493,8 @@ namespace IVF.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("CreatedAt");
+
+                    b.HasIndex("TenantId");
 
                     b.HasIndex("UserId");
 
@@ -3735,6 +3770,9 @@ namespace IVF.Infrastructure.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.Property<int>("TotalVisits")
                         .HasColumnType("integer");
 
@@ -3767,6 +3805,8 @@ namespace IVF.Infrastructure.Migrations
                     b.HasIndex("RiskLevel");
 
                     b.HasIndex("Status");
+
+                    b.HasIndex("TenantId");
 
                     b.HasIndex("DataRetentionExpiryDate", "IsAnonymized");
 
@@ -4534,6 +4574,9 @@ namespace IVF.Infrastructure.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("TicketNumber")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -4551,6 +4594,8 @@ namespace IVF.Infrastructure.Migrations
                     b.HasIndex("PatientId");
 
                     b.HasIndex("Status");
+
+                    b.HasIndex("TenantId");
 
                     b.HasIndex("DepartmentCode", "IssuedAt");
 
@@ -5054,6 +5099,9 @@ namespace IVF.Infrastructure.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Unit")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
@@ -5076,6 +5124,8 @@ namespace IVF.Infrastructure.Migrations
                         .IsUnique();
 
                     b.HasIndex("IsActive");
+
+                    b.HasIndex("TenantId");
 
                     b.ToTable("service_catalogs", (string)null);
                 });
@@ -5441,6 +5491,244 @@ namespace IVF.Infrastructure.Migrations
                     b.ToTable("stimulation_drugs", (string)null);
                 });
 
+            modelBuilder.Entity("IVF.Domain.Entities.Tenant", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Address")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<bool>("AdvancedReportingEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("AiEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("BiometricsEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("ConnectionString")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CustomDomain")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("DatabaseSchema")
+                        .HasMaxLength(63)
+                        .HasColumnType("character varying(63)");
+
+                    b.Property<bool>("DigitalSigningEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsRootTenant")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("IsolationStrategy")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasDefaultValue("SharedDatabase");
+
+                    b.Property<string>("Locale")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("LogoUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int>("MaxPatientsPerMonth")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("MaxUsers")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Phone")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("PrimaryColor")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Slug")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<long>("StorageLimitMb")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("TaxId")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("TimeZone")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Website")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Slug")
+                        .IsUnique();
+
+                    b.ToTable("tenants", (string)null);
+                });
+
+            modelBuilder.Entity("IVF.Domain.Entities.TenantSubscription", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("AutoRenew")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("BillingCycle")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
+
+                    b.Property<decimal?>("DiscountPercent")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)");
+
+                    b.Property<DateTime?>("EndDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<decimal>("MonthlyPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateTime?>("NextBillingDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Plan")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime>("StartDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("TrialEndDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId");
+
+                    b.ToTable("tenant_subscriptions", (string)null);
+                });
+
+            modelBuilder.Entity("IVF.Domain.Entities.TenantUsageRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("ActiveUsers")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ApiCalls")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("FormResponses")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("Month")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("NewPatients")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SignedDocuments")
+                        .HasColumnType("integer");
+
+                    b.Property<long>("StorageUsedMb")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("TreatmentCycles")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Year")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Year", "Month")
+                        .IsUnique();
+
+                    b.ToTable("tenant_usage_records", (string)null);
+                });
+
             modelBuilder.Entity("IVF.Domain.Entities.TransferData", b =>
                 {
                     b.Property<Guid>("Id")
@@ -5553,6 +5841,9 @@ namespace IVF.Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.Property<int?>("TransferNo")
                         .HasColumnType("integer");
 
@@ -5572,6 +5863,8 @@ namespace IVF.Infrastructure.Migrations
                         .IsUnique();
 
                     b.HasIndex("StartDate");
+
+                    b.HasIndex("TenantId");
 
                     b.ToTable("treatment_cycles", (string)null);
                 });
@@ -5769,6 +6062,9 @@ namespace IVF.Infrastructure.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("IsPlatformAdmin")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasMaxLength(255)
@@ -5785,6 +6081,9 @@ namespace IVF.Infrastructure.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -5794,6 +6093,8 @@ namespace IVF.Infrastructure.Migrations
                         .HasColumnType("character varying(50)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("TenantId");
 
                     b.HasIndex("Username")
                         .IsUnique();
@@ -7636,6 +7937,28 @@ namespace IVF.Infrastructure.Migrations
                     b.Navigation("StimulationData");
                 });
 
+            modelBuilder.Entity("IVF.Domain.Entities.TenantSubscription", b =>
+                {
+                    b.HasOne("IVF.Domain.Entities.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Tenant");
+                });
+
+            modelBuilder.Entity("IVF.Domain.Entities.TenantUsageRecord", b =>
+                {
+                    b.HasOne("IVF.Domain.Entities.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Tenant");
+                });
+
             modelBuilder.Entity("IVF.Domain.Entities.TransferData", b =>
                 {
                     b.HasOne("IVF.Domain.Entities.TreatmentCycle", "Cycle")
@@ -7685,6 +8008,17 @@ namespace IVF.Infrastructure.Migrations
                     b.Navigation("Cycle");
 
                     b.Navigation("Doctor");
+                });
+
+            modelBuilder.Entity("IVF.Domain.Entities.User", b =>
+                {
+                    b.HasOne("IVF.Domain.Entities.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Tenant");
                 });
 
             modelBuilder.Entity("IVF.Domain.Entities.UserPermission", b =>

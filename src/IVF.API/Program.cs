@@ -489,6 +489,7 @@ app.UseVaultTokenAuth(); // Vault token authentication (X-Vault-Token header)
 app.UseApiKeyAuth(); // API key authentication (X-API-Key header or apiKey query param)
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseTenantResolution(); // Multi-tenant row-level isolation — resolve tenant from JWT claims
 app.UseConsentEnforcement(); // GDPR/HIPAA consent enforcement — block access to sensitive data without consent
 app.UseTokenBinding(); // Token binding enforcement — validate device/session claims (Microsoft CAE)
 app.UseZeroTrust(); // Zero Trust continuous verification (Google BeyondCorp + Microsoft CAE + AWS GuardDuty)
@@ -552,6 +553,7 @@ app.MapDataSubjectRequestEndpoints(); // Phase 4: GDPR DSR tracking (Art. 12-23)
 app.MapComplianceScheduleEndpoints(); // Phase 4: Ongoing compliance task scheduler
 app.MapComplianceMonitoringEndpoints(); // Phase 4: Continuous monitoring, health dashboard, AI alerts
 app.MapTrustPageEndpoints(); // Public trust/security page — no auth required
+app.MapTenantEndpoints(); // Multi-tenant management — platform admin
 
 // ── Config seeders: run in every environment (idempotent, no demo data) ──────
 {
@@ -564,6 +566,7 @@ app.MapTrustPageEndpoints(); // Public trust/security page — no auth required
     await EncryptionConfigSeeder.SeedAsync(db);      // default encryption configs
     await VaultComplianceSeeder.SeedAsync(db, scope.ServiceProvider);        // vault compliance baseline data
     await EnterpriseSecuritySeeder.SeedAsync(db);    // default enterprise security config
+    await TenantSeeder.SeedAsync(scope.ServiceProvider);  // default tenant + migrate existing data
 
     // Permission definitions must always be present
     var permDefRepo = scope.ServiceProvider.GetRequiredService<IPermissionDefinitionRepository>();

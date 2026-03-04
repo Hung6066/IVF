@@ -33,6 +33,12 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.Department)
             .HasMaxLength(50);
 
-        builder.HasQueryFilter(u => !u.IsDeleted);
+        builder.HasOne(u => u.Tenant)
+            .WithMany()
+            .HasForeignKey(u => u.TenantId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // Note: tenant query filter is applied globally via IvfDbContext.ApplyTenantFilter
+        // Do NOT add HasQueryFilter here — it would override the global tenant filter
     }
 }

@@ -6,4 +6,6 @@ public interface ICurrentUserService
     string? Username { get; }
     string? Role { get; }
     string? IpAddress { get; }
+    Guid? TenantId { get; }
+    bool IsPlatformAdmin { get; }
 }

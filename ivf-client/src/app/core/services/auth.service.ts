@@ -89,6 +89,10 @@ export class AuthService {
     return this._user()?.role === role;
   }
 
+  isPlatformAdmin(): boolean {
+    return this._user()?.isPlatformAdmin === true;
+  }
+
   hasPermission(permission: string): boolean {
     // Admin has all permissions
     if (this._user()?.role === 'Admin') return true;

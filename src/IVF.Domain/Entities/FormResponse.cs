@@ -6,10 +6,12 @@ namespace IVF.Domain.Entities;
 /// <summary>
 /// A submitted form response containing field values
 /// </summary>
-public class FormResponse : BaseEntity
+public class FormResponse : BaseEntity, ITenantEntity
 {
     public Guid FormTemplateId { get; private set; }
     public Guid? PatientId { get; private set; }
+    public Guid TenantId { get; private set; }
+    public void SetTenantId(Guid tenantId) { TenantId = tenantId; SetUpdated(); }
     public Guid? CycleId { get; private set; }
     public Guid? SubmittedByUserId { get; private set; }  // Made nullable
     public DateTime? SubmittedAt { get; private set; }

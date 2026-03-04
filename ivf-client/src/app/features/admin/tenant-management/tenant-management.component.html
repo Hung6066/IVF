@@ -1,0 +1,372 @@
+<div class="tenant-management">
+  <!-- Header -->
+  <div class="page-header">
+    <div class="header-left">
+      <h1>🏢 Quản lý Trung tâm IVF</h1>
+      <p class="subtitle">Quản lý đa trung tâm — Multi-tenant Platform</p>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-primary" (click)="openCreateModal()">
+        <i class="fas fa-plus"></i> Thêm Trung tâm
+      </button>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button [class.active]="activeTab() === 'overview'" (click)="activeTab.set('overview')">
+      Tổng quan Platform
+    </button>
+    <button [class.active]="activeTab() === 'tenants'" (click)="activeTab.set('tenants')">
+      Danh sách Trung tâm
+    </button>
+  </div>
+
+  <!-- Overview Tab -->
+  @if (activeTab() === 'overview') {
+    <div class="stats-grid">
+      @if (stats(); as s) {
+        <div class="stat-card primary">
+          <div class="stat-icon"><i class="fas fa-building"></i></div>
+          <div class="stat-content">
+            <span class="stat-value">{{ s.totalTenants }}</span>
+            <span class="stat-label">Tổng trung tâm</span>
+          </div>
+        </div>
+        <div class="stat-card success">
+          <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
+          <div class="stat-content">
+            <span class="stat-value">{{ s.activeTenants }}</span>
+            <span class="stat-label">Đang hoạt động</span>
+          </div>
+        </div>
+        <div class="stat-card info">
+          <div class="stat-icon"><i class="fas fa-flask"></i></div>
+          <div class="stat-content">
+            <span class="stat-value">{{ s.trialTenants }}</span>
+            <span class="stat-label">Dùng thử</span>
+          </div>
+        </div>
+        <div class="stat-card warning">
+          <div class="stat-icon"><i class="fas fa-pause-circle"></i></div>
+          <div class="stat-content">
+            <span class="stat-value">{{ s.suspendedTenants }}</span>
+            <span class="stat-label">Tạm ngưng</span>
+          </div>
+        </div>
+        <div class="stat-card revenue">
+          <div class="stat-icon"><i class="fas fa-coins"></i></div>
+          <div class="stat-content">
+            <span class="stat-value">{{ formatCurrency(s.monthlyRevenue) }}</span>
+            <span class="stat-label">Doanh thu/tháng</span>
+          </div>
+        </div>
+        <div class="stat-card users">
+          <div class="stat-icon"><i class="fas fa-users"></i></div>
+          <div class="stat-content">
+            <span class="stat-value">{{ s.totalUsers }}</span>
+            <span class="stat-label">Tổng người dùng</span>
+          </div>
+        </div>
+        <div class="stat-card patients">
+          <div class="stat-icon"><i class="fas fa-user-injured"></i></div>
+          <div class="stat-content">
+            <span class="stat-value">{{ s.totalPatients }}</span>
+            <span class="stat-label">Bệnh nhân tháng này</span>
+          </div>
+        </div>
+        <div class="stat-card storage">
+          <div class="stat-icon"><i class="fas fa-database"></i></div>
+          <div class="stat-content">
+            <span class="stat-value">{{ formatStorage(s.totalStorageMb) }}</span>
+            <span class="stat-label">Tổng lưu trữ</span>
+          </div>
+        </div>
+      }
+    </div>
+  }
+
+  <!-- Tenants List Tab -->
+  @if (activeTab() === 'tenants') {
+    <!-- Search & Filter Bar -->
+    <div class="toolbar">
+      <div class="search-box">
+        <i class="fas fa-search"></i>
+        <input
+          type="text"
+          placeholder="Tìm kiếm trung tâm..."
+          [ngModel]="searchQuery()"
+          (ngModelChange)="searchQuery.set($event)"
+          (keyup.enter)="onSearch()"
+        />
+      </div>
+      <div class="status-filters">
+        <button [class.active]="statusFilter() === ''" (click)="onStatusFilter('')">Tất cả</button>
+        <button [class.active]="statusFilter() === 'Active'" (click)="onStatusFilter('Active')">
+          Hoạt động
+        </button>
+        <button [class.active]="statusFilter() === 'Trial'" (click)="onStatusFilter('Trial')">
+          Dùng thử
+        </button>
+        <button
+          [class.active]="statusFilter() === 'Suspended'"
+          (click)="onStatusFilter('Suspended')"
+        >
+          Tạm ngưng
+        </button>
+      </div>
+    </div>
+
+    <!-- Tenant Table -->
+    <div class="table-container">
+      @if (loading()) {
+        <div class="loading-overlay">
+          <div class="spinner"></div>
+          <p>Đang tải...</p>
+        </div>
+      }
+
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Trung tâm</th>
+            <th>Slug</th>
+            <th>Trạng thái</th>
+            <th>Cô lập dữ liệu</th>
+            <th>Gói dịch vụ</th>
+            <th>Người dùng</th>
+            <th>Bệnh nhân</th>
+            <th>Ngày tạo</th>
+            <th>Thao tác</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (tenant of tenants(); track tenant.id) {
+            <tr (click)="viewTenant(tenant.id)" class="clickable-row">
+              <td class="tenant-name">
+                <strong>{{ tenant.name }}</strong>
+              </td>
+              <td>
+                <code>{{ tenant.slug }}</code>
+              </td>
+              <td>
+                <span class="status-badge" [class]="getStatusClass(tenant.status)">
+                  {{ getStatusLabel(tenant.status) }}
+                </span>
+              </td>
+              <td>
+                <span class="isolation-badge" [class]="'isolation-' + tenant.isolationStrategy">
+                  {{ getIsolationLabel(tenant.isolationStrategy) }}
+                </span>
+              </td>
+              <td>{{ getPlanLabel(tenant.plan) }}</td>
+              <td>{{ tenant.userCount }}</td>
+              <td>{{ tenant.patientCount }}</td>
+              <td>{{ tenant.createdAt | date: 'dd/MM/yyyy' }}</td>
+              <td class="actions">
+                @if (tenant.status === 'Suspended' || tenant.status === 'PendingSetup') {
+                  <button
+                    class="btn-icon btn-success"
+                    title="Kích hoạt"
+                    (click)="activateTenant(tenant.id, $event)"
+                  >
+                    <i class="fas fa-play"></i>
+                  </button>
+                }
+                @if (tenant.status === 'Active' || tenant.status === 'Trial') {
+                  <button
+                    class="btn-icon btn-warning"
+                    title="Tạm ngưng"
+                    (click)="suspendTenant(tenant.id, $event)"
+                  >
+                    <i class="fas fa-pause"></i>
+                  </button>
+                }
+                <button
+                  class="btn-icon btn-info"
+                  title="Chi tiết"
+                  (click)="viewTenant(tenant.id); $event.stopPropagation()"
+                >
+                  <i class="fas fa-eye"></i>
+                </button>
+              </td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="9" class="empty-state">
+                <i class="fas fa-building"></i>
+                <p>Chưa có trung tâm nào</p>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+
+      <!-- Pagination -->
+      @if (totalPages() > 1) {
+        <div class="pagination">
+          <button [disabled]="currentPage() === 1" (click)="onPageChange(currentPage() - 1)">
+            <i class="fas fa-chevron-left"></i>
+          </button>
+          <span>Trang {{ currentPage() }} / {{ totalPages() }}</span>
+          <button
+            [disabled]="currentPage() === totalPages()"
+            (click)="onPageChange(currentPage() + 1)"
+          >
+            <i class="fas fa-chevron-right"></i>
+          </button>
+        </div>
+      }
+    </div>
+  }
+
+  <!-- Create Modal -->
+  @if (showCreateModal()) {
+    <div class="modal-overlay" (click)="showCreateModal.set(false)">
+      <div class="modal" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h2>Thêm Trung tâm IVF mới</h2>
+          <button class="btn-close" (click)="showCreateModal.set(false)">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-section">
+            <h3>Thông tin Trung tâm</h3>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Tên trung tâm *</label>
+                <input
+                  type="text"
+                  [(ngModel)]="newTenant.name"
+                  (ngModelChange)="generateSlug()"
+                  placeholder="VD: Trung tâm IVF Hà Nội"
+                />
+              </div>
+              <div class="form-group">
+                <label>Slug (định danh) *</label>
+                <input type="text" [(ngModel)]="newTenant.slug" placeholder="VD: ivf-ha-noi" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Email</label>
+                <input
+                  type="email"
+                  [(ngModel)]="newTenant.email"
+                  placeholder="info@ivf-center.vn"
+                />
+              </div>
+              <div class="form-group">
+                <label>Điện thoại</label>
+                <input type="tel" [(ngModel)]="newTenant.phone" placeholder="0123 456 789" />
+              </div>
+            </div>
+            <div class="form-group full-width">
+              <label>Địa chỉ</label>
+              <input
+                type="text"
+                [(ngModel)]="newTenant.address"
+                placeholder="Số X, Đường Y, Quận Z"
+              />
+            </div>
+          </div>
+
+          <div class="form-section">
+            <h3>Gói dịch vụ</h3>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Gói *</label>
+                <select [(ngModel)]="newTenant.plan">
+                  <option value="Trial">Dùng thử (Miễn phí 30 ngày)</option>
+                  <option value="Starter">Cơ bản — 5,000,000₫/tháng</option>
+                  <option value="Professional">Chuyên nghiệp — 15,000,000₫/tháng</option>
+                  <option value="Enterprise">Doanh nghiệp — 35,000,000₫/tháng</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Chu kỳ thanh toán</label>
+                <select [(ngModel)]="newTenant.billingCycle">
+                  <option value="Monthly">Hàng tháng</option>
+                  <option value="Quarterly">Quý (giảm 5%)</option>
+                  <option value="Annually">Năm (giảm 15%)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <h3>Cô lập dữ liệu</h3>
+            <div class="form-group full-width">
+              <label>Chiến lược cô lập *</label>
+              <select [(ngModel)]="newTenant.isolationStrategy">
+                <option value="SharedDatabase">
+                  Chung Database (Row-level) — Tiết kiệm, phù hợp hầu hết
+                </option>
+                <option value="SeparateSchema">
+                  Riêng Schema — Mỗi tenant 1 schema PostgreSQL
+                </option>
+                <option value="SeparateDatabase">
+                  Riêng Database — Hoàn toàn tách biệt, bảo mật cao nhất
+                </option>
+              </select>
+              <small class="help-text">
+                @switch (newTenant.isolationStrategy) {
+                  @case ('SharedDatabase') {
+                    🟢 Dùng chung database, cô lập bằng query filter. Chi phí thấp nhất, phù hợp
+                    Trial & Starter.
+                  }
+                  @case ('SeparateSchema') {
+                    🟡 Mỗi tenant có schema riêng trong cùng database. Cân bằng giữa bảo mật và chi
+                    phí.
+                  }
+                  @case ('SeparateDatabase') {
+                    🔴 Mỗi tenant có database riêng. Bảo mật cao nhất, phù hợp Enterprise & quy định
+                    nghiêm ngặt.
+                  }
+                }
+              </small>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <h3>Tài khoản Admin</h3>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Tên đăng nhập *</label>
+                <input
+                  type="text"
+                  [(ngModel)]="newTenant.adminUsername"
+                  placeholder="admin_center"
+                />
+              </div>
+              <div class="form-group">
+                <label>Họ tên *</label>
+                <input
+                  type="text"
+                  [(ngModel)]="newTenant.adminFullName"
+                  placeholder="Nguyễn Văn A"
+                />
+              </div>
+            </div>
+            <div class="form-group full-width">
+              <label>Mật khẩu *</label>
+              <input
+                type="password"
+                [(ngModel)]="newTenant.adminPassword"
+                placeholder="Tối thiểu 8 ký tự"
+              />
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" (click)="showCreateModal.set(false)">Hủy</button>
+          <button class="btn btn-primary" (click)="createTenant()" [disabled]="loading()">
+            @if (loading()) {
+              <i class="fas fa-spinner fa-spin"></i>
+            }
+            Tạo Trung tâm
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+</div>

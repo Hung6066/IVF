@@ -6,14 +6,16 @@ namespace IVF.Domain.Entities;
 /// <summary>
 /// Invoice for billing module
 /// </summary>
-public class Invoice : BaseEntity
+public class Invoice : BaseEntity, ITenantEntity
 {
     public string InvoiceNumber { get; private set; } = string.Empty;
     public Guid PatientId { get; private set; }
+    public Guid TenantId { get; private set; }
+    public void SetTenantId(Guid tenantId) { TenantId = tenantId; SetUpdated(); }
     public Guid? CycleId { get; private set; }
     public DateTime InvoiceDate { get; private set; }
     public DateTime? DueDate { get; private set; }
-    
+
     public decimal SubTotal { get; private set; }
     public decimal DiscountPercent { get; private set; }
     public decimal DiscountAmount { get; private set; }
@@ -22,11 +24,11 @@ public class Invoice : BaseEntity
     public decimal TotalAmount { get; private set; }
     public decimal PaidAmount { get; private set; }
     public decimal BalanceDue => TotalAmount - PaidAmount;
-    
+
     public InvoiceStatus Status { get; private set; }
     public string? Notes { get; private set; }
     public Guid? CreatedByUserId { get; private set; }
-    
+
     // Navigation
     public Patient Patient { get; private set; } = null!;
     public TreatmentCycle? Cycle { get; private set; }
@@ -132,7 +134,7 @@ public class InvoiceItem : BaseEntity
     public int Quantity { get; private set; }
     public decimal UnitPrice { get; private set; }
     public decimal Amount => Quantity * UnitPrice;
-    
+
     // Navigation
     public Invoice Invoice { get; private set; } = null!;
 
@@ -173,7 +175,7 @@ public class Payment : BaseEntity
     public string? TransactionReference { get; private set; }
     public string? Notes { get; private set; }
     public Guid? ReceivedByUserId { get; private set; }
-    
+
     // Navigation
     public Invoice Invoice { get; private set; } = null!;
 

@@ -4,6 +4,8 @@ import { RouterModule, Router } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
 import { SignalRService } from '../../core/services/signalr.service';
 import { MenuService, MenuSectionDto } from '../../core/services/menu.service';
+import { TenantService } from '../../core/services/tenant.service';
+import { TenantFeatures } from '../../core/models/tenant.model';
 import { ConsentBannerService } from '../../core/services/consent-banner.service';
 import { NotificationBellComponent } from '../../shared/components/notification-bell/notification-bell.component';
 import { GlobalToastComponent } from '../../shared/components/global-toast/global-toast.component';
@@ -15,11 +17,13 @@ export interface MenuItem {
   route: string;
   permission?: string;
   adminOnly?: boolean;
+  platformAdminOnly?: boolean;
 }
 
 export interface MenuSection {
   header?: string;
   adminOnly?: boolean;
+  platformAdminOnly?: boolean;
   items: MenuItem[];
 }
 
@@ -62,25 +66,53 @@ const FALLBACK_MENU: MenuSection[] = [
       { icon: '📝', label: 'Nhật ký', route: '/admin/audit-logs', permission: 'ViewAuditLog' },
       { icon: '🔔', label: 'Thông báo', route: '/admin/notifications', adminOnly: true },
       { icon: '🔏', label: 'Ký số', route: '/admin/digital-signing', adminOnly: true },
-      { icon: '🗄️', label: 'Sao lưu', route: '/admin/backup-restore', adminOnly: true },
-      { icon: '🛡️', label: 'Bảo mật', route: '/admin/security', adminOnly: true },
-      { icon: '🏢', label: 'Bảo mật DN', route: '/admin/enterprise-security', adminOnly: true },
-      { icon: '📋', label: 'Sự kiện bảo mật', route: '/admin/security-events', adminOnly: true },
-      { icon: '🎨', label: 'UI Library', route: '/ui-library', adminOnly: true },
+    ],
+  },
+  {
+    header: 'Nền tảng (Super Admin)',
+    platformAdminOnly: true,
+    items: [
+      { icon: '🏢', label: 'Quản lý Trung tâm', route: '/admin/tenants', platformAdminOnly: true },
+      { icon: '💰', label: 'Bảng giá', route: '/pricing', platformAdminOnly: true },
+      { icon: '🗄️', label: 'Sao lưu', route: '/admin/backup-restore', platformAdminOnly: true },
+      { icon: '🛡️', label: 'Bảo mật', route: '/admin/security', platformAdminOnly: true },
+      {
+        icon: '🏢',
+        label: 'Bảo mật DN',
+        route: '/admin/enterprise-security',
+        platformAdminOnly: true,
+      },
+      {
+        icon: '📋',
+        label: 'Sự kiện bảo mật',
+        route: '/admin/security-events',
+        platformAdminOnly: true,
+      },
+      { icon: '🎨', label: 'UI Library', route: '/ui-library', platformAdminOnly: true },
     ],
   },
   {
     header: 'Tuân thủ',
-    adminOnly: true,
+    platformAdminOnly: true,
     items: [
-      { icon: '📊', label: 'Tổng quan', route: '/compliance', adminOnly: true },
-      { icon: '📋', label: 'Yêu cầu DSR', route: '/compliance/dsr', adminOnly: true },
-      { icon: '📅', label: 'Lịch tuân thủ', route: '/compliance/schedule', adminOnly: true },
-      { icon: '🗃️', label: 'Tài sản dữ liệu', route: '/compliance/assets', adminOnly: true },
-      { icon: '🤖', label: 'Quản trị AI', route: '/compliance/ai', adminOnly: true },
-      { icon: '📚', label: 'Đào tạo', route: '/compliance/training', adminOnly: true },
-      { icon: '📦', label: 'Bằng chứng', route: '/compliance/evidence', adminOnly: true },
-      { icon: '🛡️', label: 'Audit Center', route: '/compliance/audit', adminOnly: true },
+      { icon: '📊', label: 'Tổng quan', route: '/compliance', platformAdminOnly: true },
+      { icon: '📋', label: 'Yêu cầu DSR', route: '/compliance/dsr', platformAdminOnly: true },
+      {
+        icon: '📅',
+        label: 'Lịch tuân thủ',
+        route: '/compliance/schedule',
+        platformAdminOnly: true,
+      },
+      {
+        icon: '🗃️',
+        label: 'Tài sản dữ liệu',
+        route: '/compliance/assets',
+        platformAdminOnly: true,
+      },
+      { icon: '🤖', label: 'Quản trị AI', route: '/compliance/ai', platformAdminOnly: true },
+      { icon: '📚', label: 'Đào tạo', route: '/compliance/training', platformAdminOnly: true },
+      { icon: '📦', label: 'Bằng chứng', route: '/compliance/evidence', platformAdminOnly: true },
+      { icon: '🛡️', label: 'Audit Center', route: '/compliance/audit', platformAdminOnly: true },
     ],
   },
 ];
@@ -101,11 +133,13 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
 
   /** Data-driven menu sections — loaded from API, fallback to static config */
   menuSections: MenuSection[] = FALLBACK_MENU;
+  tenantFeatures: TenantFeatures | null = null;
 
   constructor(
     public authService: AuthService,
     private signalRService: SignalRService,
     private menuService: MenuService,
+    private tenantService: TenantService,
     private router: Router,
     public consentBanner: ConsentBannerService,
   ) {}
@@ -113,6 +147,9 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   async ngOnInit() {
     // Load menu from database
     this.loadMenuFromApi();
+
+    // Load tenant features to determine menu visibility
+    this.loadTenantFeatures();
 
     // Load consent status for menu lock indicators
     if (this.authService.isAuthenticated()) {
@@ -145,6 +182,16 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
         // else: keep FALLBACK_MENU
       },
     });
+  }
+
+  /** Load tenant feature flags from API */
+  private loadTenantFeatures() {
+    if (this.authService.isAuthenticated()) {
+      this.tenantService.getMyFeatures().subscribe({
+        next: (features) => (this.tenantFeatures = features),
+        error: () => (this.tenantFeatures = null),
+      });
+    }
   }
 
   async ngOnDestroy() {
@@ -226,12 +273,14 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   // ── Menu visibility helpers ─────────────────────────
   /** Whether a section header + its items should be shown at all */
   isSectionVisible(section: MenuSection): boolean {
+    if (section.platformAdminOnly && !this.authService.isPlatformAdmin()) return false;
     if (section.adminOnly && !this.isAdmin()) return false;
     return section.items.some((item) => this.isMenuItemVisible(item));
   }
 
   /** Whether a single menu item should be visible */
   isMenuItemVisible(item: MenuItem): boolean {
+    if (item.platformAdminOnly) return this.authService.isPlatformAdmin();
     if (item.adminOnly) return this.isAdmin();
     if (item.permission) return this.canView(item.permission);
     return true; // no restriction

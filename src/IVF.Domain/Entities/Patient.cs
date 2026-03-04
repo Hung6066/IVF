@@ -3,7 +3,7 @@ using IVF.Domain.Enums;
 
 namespace IVF.Domain.Entities;
 
-public class Patient : BaseEntity
+public class Patient : BaseEntity, ITenantEntity
 {
     public string PatientCode { get; private set; } = string.Empty;
     public string FullName { get; private set; } = string.Empty;
@@ -15,6 +15,9 @@ public class Patient : BaseEntity
     public string? Address { get; private set; }
     public PatientType PatientType { get; private set; }
     public PatientStatus Status { get; private set; } = PatientStatus.Active;
+
+    // Multi-tenancy
+    public Guid TenantId { get; private set; }
 
     // Enterprise fields — demographics & compliance
     public string? Ethnicity { get; private set; }
@@ -276,6 +279,12 @@ public class Patient : BaseEntity
         var age = today.Year - DateOfBirth.Year;
         if (DateOfBirth.Date > today.AddYears(-age)) age--;
         return age;
+    }
+
+    public void SetTenantId(Guid tenantId)
+    {
+        TenantId = tenantId;
+        SetUpdated();
     }
 }
 

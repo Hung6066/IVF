@@ -8,9 +8,11 @@ namespace IVF.Domain.Entities;
 /// <summary>
 /// Template for a dynamic form (similar to Google Forms)
 /// </summary>
-public class FormTemplate : BaseEntity
+public class FormTemplate : BaseEntity, ITenantEntity
 {
     public Guid CategoryId { get; private set; }
+    public Guid TenantId { get; private set; }
+    public void SetTenantId(Guid tenantId) { TenantId = tenantId; SetUpdated(); }
     public string Name { get; private set; } = string.Empty;
 
     /// <summary>

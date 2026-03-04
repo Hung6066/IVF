@@ -5,10 +5,12 @@ namespace IVF.Domain.Entities;
 /// <summary>
 /// Notification entity for user notifications
 /// </summary>
-public class Notification : BaseEntity
+public class Notification : BaseEntity, ITenantEntity
 {
     public Guid UserId { get; private set; }
     public string Title { get; private set; } = string.Empty;
+    public Guid TenantId { get; private set; }
+    public void SetTenantId(Guid tenantId) { TenantId = tenantId; SetUpdated(); }
     public string Message { get; private set; } = string.Empty;
     public NotificationType Type { get; private set; }
     public bool IsRead { get; private set; }

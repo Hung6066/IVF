@@ -1,0 +1,128 @@
+<div class="pricing-page">
+  <div class="pricing-header">
+    <h1>Bảng giá IVF Platform</h1>
+    <p>Giải pháp quản lý trung tâm IVF hàng đầu Việt Nam</p>
+    <div class="billing-toggle">
+      <button [class.active]="billingCycle() === 'monthly'" (click)="billingCycle.set('monthly')">
+        Hàng tháng
+      </button>
+      <button
+        [class.active]="billingCycle() === 'quarterly'"
+        (click)="billingCycle.set('quarterly')"
+      >
+        Hàng quý <span class="discount">-5%</span>
+      </button>
+      <button [class.active]="billingCycle() === 'annually'" (click)="billingCycle.set('annually')">
+        Hàng năm <span class="discount">-15%</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="pricing-grid">
+    @for (plan of plans(); track plan.plan) {
+      <div class="pricing-card" [class.featured]="isPrimary(plan.plan)">
+        @if (isPrimary(plan.plan)) {
+          <div class="featured-badge">Phổ biến nhất</div>
+        }
+        <div class="card-header">
+          <h2>{{ plan.plan }}</h2>
+          <div class="price">
+            @if (plan.price === 0) {
+              <span class="amount">Miễn phí</span>
+            } @else {
+              <span class="amount">{{ formatCurrency(getAdjustedPrice(plan.price)) }}₫</span>
+              <span class="period">/tháng</span>
+            }
+          </div>
+          <p class="duration">{{ plan.duration }}</p>
+        </div>
+
+        <div class="card-specs">
+          <div class="spec">
+            <i class="fas fa-users"></i>
+            <span
+              ><strong>{{ plan.maxUsers }}</strong> người dùng</span
+            >
+          </div>
+          <div class="spec">
+            <i class="fas fa-user-injured"></i>
+            <span
+              ><strong>{{ plan.maxPatients }}</strong> bệnh nhân/tháng</span
+            >
+          </div>
+          <div class="spec">
+            <i class="fas fa-database"></i>
+            <span
+              ><strong>{{ plan.storageGb }} GB</strong> lưu trữ</span
+            >
+          </div>
+        </div>
+
+        <ul class="feature-list">
+          @for (feature of plan.features; track feature) {
+            <li><i class="fas fa-check"></i> {{ feature }}</li>
+          }
+        </ul>
+
+        <button class="btn-select" [class.btn-featured]="isPrimary(plan.plan)">
+          @if (plan.price === 0) {
+            Bắt đầu dùng thử
+          } @else {
+            Chọn gói {{ plan.plan }}
+          }
+        </button>
+      </div>
+    }
+  </div>
+
+  <!-- Benefits Section -->
+  <div class="benefits-section">
+    <h2>Tại sao chọn IVF Platform?</h2>
+    <div class="benefits-grid">
+      <div class="benefit">
+        <i class="fas fa-shield-alt"></i>
+        <h3>Bảo mật cấp doanh nghiệp</h3>
+        <p>Tuân thủ HIPAA, GDPR. Mã hóa AES-256, xác thực MFA, Zero Trust Architecture.</p>
+      </div>
+      <div class="benefit">
+        <i class="fas fa-lock"></i>
+        <h3>Dữ liệu cách ly hoàn toàn</h3>
+        <p>
+          Mỗi trung tâm có dữ liệu riêng biệt. Row-level isolation đảm bảo không bao giờ lẫn lộn.
+        </p>
+      </div>
+      <div class="benefit">
+        <i class="fas fa-bolt"></i>
+        <h3>Hiệu suất tối ưu</h3>
+        <p>Redis caching, database indexing, lazy loading. Tốc độ tải trang dưới 2 giây.</p>
+      </div>
+      <div class="benefit">
+        <i class="fas fa-file-signature"></i>
+        <h3>Ký số & PKI</h3>
+        <p>Tích hợp chữ ký số chuyên nghiệp với EJBCA/SignServer. Hợp pháp theo luật VN.</p>
+      </div>
+      <div class="benefit">
+        <i class="fas fa-fingerprint"></i>
+        <h3>Sinh trắc học</h3>
+        <p>Xác minh bệnh nhân bằng vân tay. Tránh nhầm lẫn hồ sơ y tế.</p>
+      </div>
+      <div class="benefit">
+        <i class="fas fa-chart-line"></i>
+        <h3>Báo cáo & Phân tích</h3>
+        <p>Dashboard thời gian thực, xuất PDF chuyên nghiệp, biểu đồ thống kê chi tiết.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Compliance badges -->
+  <div class="compliance-section">
+    <h2>Chứng nhận & Tuân thủ</h2>
+    <div class="badges">
+      <div class="badge"><i class="fas fa-certificate"></i><span>HIPAA</span></div>
+      <div class="badge"><i class="fas fa-certificate"></i><span>GDPR</span></div>
+      <div class="badge"><i class="fas fa-certificate"></i><span>ISO 27001</span></div>
+      <div class="badge"><i class="fas fa-certificate"></i><span>SOC 2</span></div>
+      <div class="badge"><i class="fas fa-certificate"></i><span>NIST CSF</span></div>
+    </div>
+  </div>
+</div>

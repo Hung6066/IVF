@@ -2,10 +2,12 @@ using IVF.Domain.Common;
 
 namespace IVF.Domain.Entities;
 
-public class Couple : BaseEntity
+public class Couple : BaseEntity, ITenantEntity
 {
     public Guid WifeId { get; private set; }
     public Guid HusbandId { get; private set; }
+    public Guid TenantId { get; private set; }
+    public void SetTenantId(Guid tenantId) { TenantId = tenantId; SetUpdated(); }
     public Guid? SpermDonorId { get; private set; }
     public DateTime? MarriageDate { get; private set; }
     public int? InfertilityYears { get; private set; }

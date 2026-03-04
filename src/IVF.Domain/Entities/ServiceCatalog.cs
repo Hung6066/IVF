@@ -6,10 +6,12 @@ namespace IVF.Domain.Entities;
 /// <summary>
 /// Service catalog for patient indications and invoice pricing
 /// </summary>
-public class ServiceCatalog : BaseEntity
+public class ServiceCatalog : BaseEntity, ITenantEntity
 {
     public string Code { get; private set; } = string.Empty;
     public string Name { get; private set; } = string.Empty;
+    public Guid TenantId { get; private set; }
+    public void SetTenantId(Guid tenantId) { TenantId = tenantId; SetUpdated(); }
     public ServiceCategory Category { get; private set; }
     public decimal UnitPrice { get; private set; }
     public string Unit { get; private set; } = "lần"; // lần, viên, ml, etc.

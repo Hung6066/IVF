@@ -1,0 +1,312 @@
+.pricing-page {
+  padding: 40px 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.pricing-header {
+  text-align: center;
+  margin-bottom: 48px;
+
+  h1 {
+    font-size: 36px;
+    color: #1a1a2e;
+    margin: 0 0 8px;
+  }
+  p {
+    color: #666;
+    font-size: 16px;
+    margin: 0 0 24px;
+  }
+}
+
+.billing-toggle {
+  display: inline-flex;
+  gap: 4px;
+  background: #f0f0f0;
+  padding: 4px;
+  border-radius: 10px;
+
+  button {
+    padding: 10px 24px;
+    border: none;
+    background: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    color: #666;
+    transition: all 0.2s;
+
+    &.active {
+      background: white;
+      color: #4361ee;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .discount {
+      font-size: 11px;
+      background: #e6f7f0;
+      color: #27ae60;
+      padding: 2px 6px;
+      border-radius: 4px;
+      margin-left: 4px;
+    }
+  }
+}
+
+// ═══ Pricing Grid ═══
+.pricing-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 24px;
+  margin-bottom: 64px;
+}
+
+.pricing-card {
+  background: white;
+  border-radius: 16px;
+  padding: 32px 24px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  transition:
+    transform 0.3s,
+    box-shadow 0.3s;
+
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  }
+
+  &.featured {
+    border: 2px solid #4361ee;
+    box-shadow: 0 8px 32px rgba(67, 97, 238, 0.15);
+    transform: scale(1.02);
+
+    &:hover {
+      transform: scale(1.02) translateY(-4px);
+    }
+  }
+}
+
+.featured-badge {
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #4361ee;
+  color: white;
+  padding: 4px 16px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.card-header {
+  text-align: center;
+  margin-bottom: 24px;
+
+  h2 {
+    font-size: 22px;
+    color: #1a1a2e;
+    margin: 0 0 12px;
+  }
+
+  .price {
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 4px;
+
+    .amount {
+      font-size: 32px;
+      font-weight: 800;
+      color: #4361ee;
+    }
+    .period {
+      font-size: 14px;
+      color: #999;
+    }
+  }
+
+  .duration {
+    font-size: 13px;
+    color: #999;
+    margin: 4px 0 0;
+  }
+}
+
+.card-specs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 0;
+  border-top: 1px solid #f0f0f0;
+  border-bottom: 1px solid #f0f0f0;
+
+  .spec {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+    color: #555;
+
+    i {
+      width: 20px;
+      color: #4361ee;
+      text-align: center;
+    }
+  }
+}
+
+.feature-list {
+  list-style: none;
+  padding: 0;
+  margin: 20px 0;
+  flex: 1;
+
+  li {
+    padding: 6px 0;
+    font-size: 13px;
+    color: #555;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    i {
+      color: #27ae60;
+      font-size: 12px;
+    }
+  }
+}
+
+.btn-select {
+  width: 100%;
+  padding: 14px;
+  border: 2px solid #4361ee;
+  background: white;
+  color: #4361ee;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    background: #4361ee;
+    color: white;
+  }
+
+  &.btn-featured {
+    background: #4361ee;
+    color: white;
+    &:hover {
+      background: #3a56d4;
+    }
+  }
+}
+
+// ═══ Benefits ═══
+.benefits-section {
+  margin-bottom: 64px;
+
+  h2 {
+    text-align: center;
+    font-size: 28px;
+    color: #1a1a2e;
+    margin-bottom: 36px;
+  }
+}
+
+.benefits-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+
+.benefit {
+  background: white;
+  border-radius: 14px;
+  padding: 28px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
+  text-align: center;
+
+  i {
+    font-size: 36px;
+    color: #4361ee;
+    margin-bottom: 16px;
+    display: block;
+  }
+
+  h3 {
+    font-size: 16px;
+    color: #1a1a2e;
+    margin: 0 0 8px;
+  }
+  p {
+    font-size: 13px;
+    color: #666;
+    margin: 0;
+    line-height: 1.6;
+  }
+}
+
+// ═══ Compliance ═══
+.compliance-section {
+  text-align: center;
+
+  h2 {
+    font-size: 24px;
+    color: #1a1a2e;
+    margin-bottom: 24px;
+  }
+}
+
+.badges {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 20px 28px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+
+  i {
+    font-size: 28px;
+    color: #f39c12;
+  }
+  span {
+    font-size: 14px;
+    font-weight: 700;
+    color: #333;
+  }
+}
+
+// ═══ Responsive ═══
+@media (max-width: 1100px) {
+  .pricing-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .pricing-grid {
+    grid-template-columns: 1fr;
+  }
+  .benefits-grid {
+    grid-template-columns: 1fr;
+  }
+  .pricing-header h1 {
+    font-size: 28px;
+  }
+}
