@@ -91,6 +91,16 @@ public static class AiBiasEndpoints
             return Results.Ok(result);
         }).WithName("SetBiasTestRemediation");
 
+        // Delete bias test (soft)
+        group.MapDelete("/bias-tests/{id:guid}", async (Guid id, IvfDbContext db) =>
+        {
+            var result = await db.AiBiasTestResults.FirstOrDefaultAsync(t => t.Id == id && !t.IsDeleted);
+            if (result is null) return Results.NotFound();
+            result.MarkAsDeleted();
+            await db.SaveChangesAsync();
+            return Results.NoContent();
+        }).WithName("DeleteBiasTest");
+
         // Bias test summary by AI system
         group.MapGet("/bias-tests/summary", async (IvfDbContext db) =>
         {

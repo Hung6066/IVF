@@ -35,26 +35,31 @@
       @for (asset of assets(); track asset.id) {
         <div class="asset-card">
           <div class="asset-header">
-            <span class="asset-type">{{ asset.type }}</span>
+            <span class="asset-type">{{ asset.assetType }}</span>
             <span class="classification-badge" [attr.data-cls]="asset.classification">
               {{ getClassificationIcon(asset.classification) }} {{ asset.classification }}
             </span>
           </div>
-          <h3 class="asset-name">{{ asset.name }}</h3>
-          @if (asset.description) {
-            <p class="asset-desc">{{ asset.description }}</p>
-          }
+          <h3 class="asset-name">{{ asset.assetName }}</h3>
           <div class="asset-meta">
             <span>👤 {{ asset.owner }}</span>
             @if (asset.location) {
               <span>📍 {{ asset.location }}</span>
             }
+            @if (asset.criticalityLevel) {
+              <span class="criticality" [attr.data-level]="asset.criticalityLevel">
+                ⚡ {{ asset.criticalityLevel }}
+              </span>
+            }
           </div>
-          @if (asset.riskLevel) {
-            <div class="asset-risk" [attr.data-risk]="asset.riskLevel">
-              Rủi ro: {{ asset.riskLevel }}
-            </div>
-          }
+          <div class="asset-flags">
+            @if (asset.containsPhi) {
+              <span class="flag phi">PHI</span>
+            }
+            @if (asset.containsPii) {
+              <span class="flag pii">PII</span>
+            }
+          </div>
           <div class="asset-footer">
             <span class="asset-date">Tạo: {{ asset.createdAt | date: 'dd/MM/yyyy' }}</span>
             <div class="asset-actions">
@@ -76,11 +81,11 @@
         <div class="form-row">
           <div class="form-group">
             <label>Tên tài sản *</label>
-            <input type="text" [(ngModel)]="form.name" placeholder="VD: PostgreSQL Primary" />
+            <input type="text" [(ngModel)]="form.assetName" placeholder="VD: PostgreSQL Primary" />
           </div>
           <div class="form-group">
             <label>Loại *</label>
-            <select [(ngModel)]="form.type">
+            <select [(ngModel)]="form.assetType">
               @for (t of assetTypes; track t) {
                 <option [value]="t">{{ t }}</option>
               }
@@ -105,20 +110,46 @@
           <label>Vị trí</label>
           <input type="text" [(ngModel)]="form.location" placeholder="VD: AWS eu-west-1" />
         </div>
-        <div class="form-group">
-          <label>Mô tả</label>
-          <textarea
-            [(ngModel)]="form.description"
-            rows="2"
-            placeholder="Mô tả tài sản..."
-          ></textarea>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Mức độ quan trọng *</label>
+            <select [(ngModel)]="form.criticalityLevel">
+              <option value="Low">Low</option>
+              <option value="Medium">Medium</option>
+              <option value="High">High</option>
+              <option value="Critical">Critical</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Phòng ban</label>
+            <input type="text" [(ngModel)]="form.department" placeholder="VD: IT" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Môi trường</label>
+            <select [(ngModel)]="form.environment">
+              <option value="">-- Chọn --</option>
+              <option value="production">Production</option>
+              <option value="staging">Staging</option>
+              <option value="development">Development</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <label class="checkbox-label"
+            ><input type="checkbox" [(ngModel)]="form.containsPhi" /> Chứa PHI</label
+          >
+          <label class="checkbox-label"
+            ><input type="checkbox" [(ngModel)]="form.containsPii" /> Chứa PII</label
+          >
         </div>
         <div class="modal-actions">
           <button class="btn btn-outline" (click)="showModal = false">Huỷ</button>
           <button
             class="btn btn-primary"
             (click)="submitForm()"
-            [disabled]="!form.name || !form.owner"
+            [disabled]="!form.assetName || !form.owner"
           >
             {{ editingId ? 'Lưu' : 'Tạo' }}
           </button>

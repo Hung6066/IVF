@@ -157,13 +157,36 @@ public static class ComplianceEndpoints
 
     private static void MapComplianceTraining(RouteGroupBuilder group)
     {
-        group.MapGet("/training", async (IvfDbContext db) =>
+        group.MapGet("/training", async (
+            IvfDbContext db,
+            string? userId,
+            string? type,
+            bool? completed,
+            bool? overdue,
+            int page = 1,
+            int pageSize = 20) =>
         {
-            var trainings = await db.ComplianceTrainings
+            var query = db.ComplianceTrainings
                 .Where(t => !t.IsDeleted)
+                .AsQueryable();
+
+            if (!string.IsNullOrEmpty(userId) && Guid.TryParse(userId, out var uid))
+                query = query.Where(t => t.UserId == uid);
+            if (!string.IsNullOrEmpty(type))
+                query = query.Where(t => t.TrainingType == type);
+            if (completed.HasValue)
+                query = query.Where(t => t.IsCompleted == completed.Value);
+            if (overdue == true)
+                query = query.Where(t => !t.IsCompleted && t.DueDate < DateTime.UtcNow);
+
+            var totalCount = await query.CountAsync();
+            var items = await query
                 .OrderByDescending(t => t.AssignedAt)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
                 .ToListAsync();
-            return Results.Ok(trainings);
+
+            return Results.Ok(new { items, totalCount, page, pageSize });
         }).WithName("ListTrainings");
 
         group.MapGet("/training/user/{userId:guid}", async (Guid userId, IvfDbContext db) =>

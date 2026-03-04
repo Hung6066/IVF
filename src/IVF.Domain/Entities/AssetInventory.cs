@@ -78,6 +78,26 @@ public class AssetInventory : BaseEntity
         SetUpdated();
     }
 
+    public void Update(
+        string assetName, string assetType, string classification,
+        string owner, string criticalityLevel,
+        bool containsPhi, bool containsPii,
+        string? department, string? location, string? environment, string? version)
+    {
+        AssetName = assetName;
+        AssetType = assetType;
+        Classification = classification;
+        Owner = owner;
+        CriticalityLevel = criticalityLevel;
+        ContainsPhi = containsPhi;
+        ContainsPii = containsPii;
+        Department = department;
+        Location = location;
+        Environment = environment;
+        Version = version;
+        SetUpdated();
+    }
+
     public void MarkAudited(DateTime? nextAuditDue = null)
     {
         LastAuditedAt = DateTime.UtcNow;

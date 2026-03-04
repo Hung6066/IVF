@@ -1681,7 +1681,7 @@
                     <tr>
                       <td class="path-cell">{{ session.sessionId.substring(0, 12) }}...</td>
                       <td class="ip-cell">{{ session.ipAddress || '-' }}</td>
-                      <td>{{ session.deviceFingerprint?.substring(0, 8) || '-' }}...</td>
+                      <td>{{ session.deviceFingerprint.substring(0, 8) || '-' }}...</td>
                       <td>{{ session.country || '-' }}</td>
                       <td class="time-cell">{{ formatDate(session.createdAt) }}</td>
                       <td class="time-cell">{{ formatTimeAgo(session.lastActivityAt) }}</td>

@@ -26,12 +26,16 @@ export class AssetInventoryComponent implements OnInit {
   showModal = false;
   editingId = '';
   form = {
-    name: '',
-    type: 'Server',
+    assetName: '',
+    assetType: 'Server',
     classification: 'Confidential',
     owner: '',
-    description: '',
+    criticalityLevel: 'Medium',
+    containsPhi: false,
+    containsPii: false,
+    department: '',
     location: '',
+    environment: '',
   };
 
   assetTypes = [
@@ -78,12 +82,16 @@ export class AssetInventoryComponent implements OnInit {
   openCreate() {
     this.editingId = '';
     this.form = {
-      name: '',
-      type: 'Server',
+      assetName: '',
+      assetType: 'Server',
       classification: 'Confidential',
       owner: '',
-      description: '',
+      criticalityLevel: 'Medium',
+      containsPhi: false,
+      containsPii: false,
+      department: '',
       location: '',
+      environment: '',
     };
     this.showModal = true;
   }
@@ -91,18 +99,22 @@ export class AssetInventoryComponent implements OnInit {
   openEdit(asset: AssetInventory) {
     this.editingId = asset.id;
     this.form = {
-      name: asset.name,
-      type: asset.type,
+      assetName: asset.assetName,
+      assetType: asset.assetType,
       classification: asset.classification,
       owner: asset.owner,
-      description: asset.description || '',
+      criticalityLevel: asset.criticalityLevel,
+      containsPhi: asset.containsPhi,
+      containsPii: asset.containsPii,
+      department: asset.department || '',
       location: asset.location || '',
+      environment: asset.environment || '',
     };
     this.showModal = true;
   }
 
   submitForm() {
-    if (!this.form.name || !this.form.owner) return;
+    if (!this.form.assetName || !this.form.owner) return;
     const obs = this.editingId
       ? this.complianceService.updateAsset(this.editingId, this.form)
       : this.complianceService.createAsset(this.form);
@@ -115,7 +127,7 @@ export class AssetInventoryComponent implements OnInit {
   }
 
   deleteAsset(asset: AssetInventory) {
-    if (!confirm(`Xoá tài sản "${asset.name}"?`)) return;
+    if (!confirm(`Xoá tài sản "${asset.assetName}"?`)) return;
     this.complianceService.deleteAsset(asset.id).subscribe(() => this.loadAssets());
   }
 

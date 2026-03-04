@@ -1724,7 +1724,7 @@
                 }
 
                 <!-- Styles node -->
-                @if (design.styles?.length) {
+                @if (design.styles.length) {
                   <div class="explorer-node explorer-section-node">
                     <span class="explorer-toggle">▶</span>
                     <span class="explorer-icon">🎨</span>
@@ -2167,7 +2167,7 @@
                             {{
                               renderControlPreview(
                                 ctrl,
-                                previewData!.data[0] ?? {},
+                                previewData!.data[0],
                                 previewData!.data
                               )
                             }}

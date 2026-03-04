@@ -19,6 +19,9 @@ import {
   AiModelVersion,
   AiBiasTestResult,
   AiPerformanceDashboard,
+  CreateModelVersionRequest,
+  SetMetricsRequest,
+  CreateBiasTestRequest,
   ProcessingActivity,
   SecurityTrend,
   AuditReadiness,
@@ -237,7 +240,7 @@ export class ComplianceService {
   }
 
   assignTraining(request: AssignTrainingRequest): Observable<any> {
-    return this.http.post(`${this.baseUrl}/compliance/training`, request);
+    return this.http.post(`${this.baseUrl}/compliance/training/assign`, request);
   }
 
   completeTraining(id: string, score: number, evidence?: string): Observable<any> {
@@ -262,7 +265,9 @@ export class ComplianceService {
     if (filters?.type) params = params.set('type', filters.type);
     if (filters?.classification) params = params.set('classification', filters.classification);
     if (filters?.owner) params = params.set('owner', filters.owner);
-    return this.http.get<PagedResult<AssetInventory>>(`${this.baseUrl}/compliance/assets`, { params });
+    return this.http.get<PagedResult<AssetInventory>>(`${this.baseUrl}/compliance/assets`, {
+      params,
+    });
   }
 
   getAsset(id: string): Observable<AssetInventory> {
@@ -292,40 +297,63 @@ export class ComplianceService {
     let params = new HttpParams()
       .set('page', filters?.page ?? 1)
       .set('pageSize', filters?.pageSize ?? 20);
-    if (filters?.system) params = params.set('system', filters.system);
+    if (filters?.system) params = params.set('aiSystem', filters.system);
     if (filters?.status) params = params.set('status', filters.status);
-    return this.http.get<PagedResult<AiModelVersion>>(`${this.baseUrl}/ai/models`, { params });
+    return this.http.get<PagedResult<AiModelVersion>>(`${this.baseUrl}/ai/model-versions`, {
+      params,
+    });
   }
 
   getAiModel(id: string): Observable<AiModelVersion> {
-    return this.http.get<AiModelVersion>(`${this.baseUrl}/ai/models/${id}`);
+    return this.http.get<AiModelVersion>(`${this.baseUrl}/ai/model-versions/${id}`);
+  }
+
+  createAiModel(request: CreateModelVersionRequest): Observable<AiModelVersion> {
+    return this.http.post<AiModelVersion>(`${this.baseUrl}/ai/model-versions`, request);
+  }
+
+  deleteAiModel(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/ai/model-versions/${id}`);
+  }
+
+  setModelMetrics(id: string, metrics: SetMetricsRequest): Observable<AiModelVersion> {
+    return this.http.put<AiModelVersion>(
+      `${this.baseUrl}/ai/model-versions/${id}/metrics`,
+      metrics,
+    );
   }
 
   getBiasTests(filters?: {
     system?: string;
     page?: number;
     pageSize?: number;
-  }): Observable<PagedResult<AiBiasTestResult>> {
-    let params = new HttpParams()
-      .set('page', filters?.page ?? 1)
-      .set('pageSize', filters?.pageSize ?? 20);
-    if (filters?.system) params = params.set('system', filters.system);
-    return this.http.get<PagedResult<AiBiasTestResult>>(`${this.baseUrl}/ai/bias-tests`, {
+  }): Observable<AiBiasTestResult[]> {
+    let params = new HttpParams();
+    if (filters?.system) params = params.set('aiSystem', filters.system);
+    return this.http.get<AiBiasTestResult[]>(`${this.baseUrl}/ai/bias-tests`, {
       params,
     });
   }
 
+  createBiasTest(request: CreateBiasTestRequest): Observable<AiBiasTestResult> {
+    return this.http.post<AiBiasTestResult>(`${this.baseUrl}/ai/bias-tests`, request);
+  }
+
+  deleteBiasTest(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/ai/bias-tests/${id}`);
+  }
+
   // ─── Processing Activities (ROPA) ───
 
-  getProcessingActivities(page = 1, pageSize = 20): Observable<PagedResult<ProcessingActivity>> {
-    const params = new HttpParams().set('page', page).set('pageSize', pageSize);
-    return this.http.get<PagedResult<ProcessingActivity>>(`${this.baseUrl}/processing-activities`, {
+  getProcessingActivities(page = 1, pageSize = 20): Observable<ProcessingActivity[]> {
+    let params = new HttpParams();
+    return this.http.get<ProcessingActivity[]>(`${this.baseUrl}/compliance/ropa`, {
       params,
     });
   }
 
   createProcessingActivity(request: any): Observable<any> {
-    return this.http.post(`${this.baseUrl}/processing-activities`, request);
+    return this.http.post(`${this.baseUrl}/compliance/ropa`, request);
   }
 
   // ─── Compliance Scoring ───

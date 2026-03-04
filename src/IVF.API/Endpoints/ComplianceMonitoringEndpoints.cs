@@ -163,39 +163,32 @@ public static class ComplianceMonitoringEndpoints
             var dsrs = await db.DataSubjectRequests.Where(r => !r.IsDeleted).ToListAsync();
             var trainings = await db.ComplianceTrainings.Where(t => !t.IsDeleted).ToListAsync();
 
-            var frameworks = new[] { "SOC2", "ISO27001", "HIPAA", "GDPR", "HITRUST", "NIST_AI_RMF", "ISO42001" };
-            var readiness = frameworks.Select(fw =>
+            var frameworkNames = new[] { "SOC2", "ISO27001", "HIPAA", "GDPR", "HITRUST", "NIST_AI_RMF", "ISO42001" };
+            var frameworks = frameworkNames.Select(fw =>
             {
                 var fwTasks = schedule.Where(s => s.Framework == fw || s.Framework == "ALL").ToList();
                 var overdue = fwTasks.Count(s => s.IsOverdue);
                 var total = fwTasks.Count;
+                var met = fwTasks.Count(s => !s.IsOverdue && s.Status == ScheduleStatus.Active);
+                var partial = total - met - overdue;
+                if (partial < 0) partial = 0;
                 return new
                 {
                     framework = fw,
-                    totalTasks = total,
-                    completedOnTime = total - overdue,
-                    overdue,
-                    readinessScore = total == 0 ? 100.0 : Math.Round((double)(total - overdue) / total * 100, 1)
+                    readinessScore = total == 0 ? 100.0 : Math.Round((double)(total - overdue) / total * 100, 1),
+                    controlsTotal = total,
+                    controlsMet = met,
+                    controlsPartial = partial,
+                    controlsGaps = overdue
                 };
-            });
+            }).ToList();
 
             return Results.Ok(new
             {
-                readinessByFramework = readiness,
-                overallReadiness = Math.Round(readiness.Average(r => r.readinessScore), 1),
-                dsrCompliance = new
-                {
-                    totalDsrs = dsrs.Count,
-                    completedWithinDeadline = dsrs.Count(r => r.CompletedAt.HasValue && r.CompletedAt <= (r.ExtendedDeadline ?? r.Deadline)),
-                    overdue = dsrs.Count(r => r.IsOverdue)
-                },
-                trainingCompliance = new
-                {
-                    totalPrograms = trainings.Count,
-                    completed = trainings.Count(t => t.IsCompleted),
-                    rate = trainings.Count == 0 ? 100.0 :
-                        Math.Round((double)trainings.Count(t => t.IsCompleted) / trainings.Count * 100, 1)
-                }
+                frameworks,
+                overallScore = frameworks.Count > 0
+                    ? Math.Round(frameworks.Average(r => r.readinessScore), 1)
+                    : 100.0
             });
         });
     }

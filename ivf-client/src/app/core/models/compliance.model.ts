@@ -321,6 +321,47 @@ export interface AiBiasTestResult {
   createdAt: string;
 }
 
+export interface CreateModelVersionRequest {
+  aiSystemName: string;
+  modelVersion: string;
+  changeDescription: string;
+  configurationJson: string;
+  thresholdsJson: string;
+  previousVersion?: string;
+  featureSetJson?: string;
+  gitCommitHash?: string;
+  gitTag?: string;
+}
+
+export interface SetMetricsRequest {
+  accuracy: number;
+  precision: number;
+  recall: number;
+  f1: number;
+  fpr: number;
+  fnr: number;
+}
+
+export interface CreateBiasTestRequest {
+  aiSystemName: string;
+  testType: string;
+  protectedAttribute: string;
+  protectedGroupValue: string;
+  sampleSize: number;
+  truePositives: number;
+  falsePositives: number;
+  trueNegatives: number;
+  falseNegatives: number;
+  baselineFpr: number;
+  baselineFnr: number;
+  testPeriodStart: string;
+  testPeriodEnd: string;
+  testRunBy?: string;
+  fairnessThreshold?: number;
+  explanation?: string;
+  featureImportance?: string;
+}
+
 export interface AiPerformanceDashboard {
   deployedModels: AiModelPerformance[];
   alerts: AiPerformanceAlert[];

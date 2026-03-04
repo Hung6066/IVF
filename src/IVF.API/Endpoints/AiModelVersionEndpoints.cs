@@ -194,6 +194,16 @@ public static class AiModelVersionEndpoints
             });
         });
 
+        // Delete (soft)
+        group.MapDelete("/{id:guid}", async (IvfDbContext db, Guid id) =>
+        {
+            var version = await db.AiModelVersions.FirstOrDefaultAsync(v => v.Id == id && !v.IsDeleted);
+            if (version is null) return Results.NotFound();
+            version.MarkAsDeleted();
+            await db.SaveChangesAsync();
+            return Results.NoContent();
+        });
+
         // Dashboard — all AI systems version status
         group.MapGet("/dashboard", async (IvfDbContext db) =>
         {

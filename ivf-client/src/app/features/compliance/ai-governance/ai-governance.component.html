@@ -6,6 +6,13 @@
         NIST AI RMF & ISO 42001 — Versioning, Bias Testing, Fairness Monitoring
       </p>
     </div>
+    <div class="header-actions">
+      @if (activeTab() === 'models') {
+        <button class="btn-primary" (click)="openModelModal()">➕ Thêm Model</button>
+      } @else {
+        <button class="btn-primary" (click)="openBiasModal()">➕ Thêm Bias Test</button>
+      }
+    </div>
   </div>
 
   <div class="tab-nav">
@@ -54,6 +61,7 @@
               <th>FNR</th>
               <th>Bias</th>
               <th>Ngày tạo</th>
+              <th>Thao tác</th>
             </tr>
           </thead>
           <tbody>
@@ -92,10 +100,15 @@
                   }
                 </td>
                 <td class="date">{{ model.createdAt | date: 'dd/MM/yyyy' }}</td>
+                <td>
+                  <button class="btn-icon btn-delete" (click)="deleteModel(model.id)" title="Xóa">
+                    🗑️
+                  </button>
+                </td>
               </tr>
             } @empty {
               <tr>
-                <td colspan="11" class="empty-state">Chưa có model nào</td>
+                <td colspan="12" class="empty-state">Chưa có model nào</td>
               </tr>
             }
           </tbody>
@@ -129,6 +142,7 @@
               <th>Disparity FPR</th>
               <th>Kết quả</th>
               <th>Ngày test</th>
+              <th>Thao tác</th>
             </tr>
           </thead>
           <tbody>
@@ -158,10 +172,15 @@
                   }
                 </td>
                 <td class="date">{{ test.createdAt | date: 'dd/MM/yyyy' }}</td>
+                <td>
+                  <button class="btn-icon btn-delete" (click)="deleteBiasTest(test.id)" title="Xóa">
+                    🗑️
+                  </button>
+                </td>
               </tr>
             } @empty {
               <tr>
-                <td colspan="12" class="empty-state">Chưa có bias test nào</td>
+                <td colspan="13" class="empty-state">Chưa có bias test nào</td>
               </tr>
             }
           </tbody>
@@ -170,3 +189,160 @@
     }
   }
 </div>
+
+<!-- Create Model Modal -->
+@if (showModelModal) {
+  <div class="modal-overlay" (click)="showModelModal = false">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <h2>➕ Thêm AI Model Version</h2>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Hệ thống AI *</label>
+          <input type="text" [(ngModel)]="modelForm.aiSystemName" placeholder="VD: PatientRisk" />
+        </div>
+        <div class="form-group">
+          <label>Version *</label>
+          <input type="text" [(ngModel)]="modelForm.modelVersion" placeholder="VD: 1.2.0" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Mô tả thay đổi</label>
+        <textarea
+          [(ngModel)]="modelForm.changeDescription"
+          rows="3"
+          placeholder="Nội dung thay đổi..."
+        ></textarea>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Version trước</label>
+          <input type="text" [(ngModel)]="modelForm.previousVersion" placeholder="VD: 1.1.0" />
+        </div>
+        <div class="form-group">
+          <label>Git Commit</label>
+          <input type="text" [(ngModel)]="modelForm.gitCommitHash" placeholder="abc123..." />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Git Tag</label>
+          <input type="text" [(ngModel)]="modelForm.gitTag" placeholder="v1.2.0" />
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-secondary" (click)="showModelModal = false">Hủy</button>
+        <button
+          class="btn-primary"
+          (click)="submitModel()"
+          [disabled]="!modelForm.aiSystemName || !modelForm.modelVersion"
+        >
+          Tạo Model
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Create Bias Test Modal -->
+@if (showBiasModal) {
+  <div class="modal-overlay" (click)="showBiasModal = false">
+    <div class="modal modal-wide" (click)="$event.stopPropagation()">
+      <h2>➕ Thêm Bias Test</h2>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Hệ thống AI *</label>
+          <input type="text" [(ngModel)]="biasForm.aiSystemName" placeholder="VD: PatientRisk" />
+        </div>
+        <div class="form-group">
+          <label>Loại test *</label>
+          <select [(ngModel)]="biasForm.testType">
+            @for (t of biasTestTypes; track t) {
+              <option [value]="t">{{ t }}</option>
+            }
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Thuộc tính bảo vệ *</label>
+          <input
+            type="text"
+            [(ngModel)]="biasForm.protectedAttribute"
+            placeholder="VD: Gender, Age, Ethnicity"
+          />
+        </div>
+        <div class="form-group">
+          <label>Nhóm *</label>
+          <input
+            type="text"
+            [(ngModel)]="biasForm.protectedGroupValue"
+            placeholder="VD: Female, >60"
+          />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Cỡ mẫu</label>
+          <input type="number" [(ngModel)]="biasForm.sampleSize" />
+        </div>
+        <div class="form-group">
+          <label>Ngưỡng fairness</label>
+          <input type="number" [(ngModel)]="biasForm.fairnessThreshold" step="0.01" />
+        </div>
+      </div>
+
+      <h3 class="section-label">Confusion Matrix</h3>
+      <div class="form-row">
+        <div class="form-group">
+          <label>True Positives</label>
+          <input type="number" [(ngModel)]="biasForm.truePositives" />
+        </div>
+        <div class="form-group">
+          <label>False Positives</label>
+          <input type="number" [(ngModel)]="biasForm.falsePositives" />
+        </div>
+        <div class="form-group">
+          <label>True Negatives</label>
+          <input type="number" [(ngModel)]="biasForm.trueNegatives" />
+        </div>
+        <div class="form-group">
+          <label>False Negatives</label>
+          <input type="number" [(ngModel)]="biasForm.falseNegatives" />
+        </div>
+      </div>
+
+      <h3 class="section-label">Baseline</h3>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Baseline FPR</label>
+          <input type="number" [(ngModel)]="biasForm.baselineFpr" step="0.001" />
+        </div>
+        <div class="form-group">
+          <label>Baseline FNR</label>
+          <input type="number" [(ngModel)]="biasForm.baselineFnr" step="0.001" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Bắt đầu</label>
+          <input type="date" [(ngModel)]="biasForm.testPeriodStart" />
+        </div>
+        <div class="form-group">
+          <label>Kết thúc</label>
+          <input type="date" [(ngModel)]="biasForm.testPeriodEnd" />
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-secondary" (click)="showBiasModal = false">Hủy</button>
+        <button
+          class="btn-primary"
+          (click)="submitBiasTest()"
+          [disabled]="!biasForm.aiSystemName || !biasForm.protectedAttribute"
+        >
+          Tạo Bias Test
+        </button>
+      </div>
+    </div>
+  </div>
+}

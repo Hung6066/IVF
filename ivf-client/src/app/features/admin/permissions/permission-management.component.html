@@ -46,7 +46,7 @@
           <!-- User Row -->
           <div class="user-row" (click)="toggleUserExpand(user)">
             <div class="user-info">
-              <span class="user-avatar">{{ user.fullName?.charAt(0) || '?' }}</span>
+              <span class="user-avatar">{{ user.fullName.charAt(0) || '?' }}</span>
               <div class="user-details">
                 <strong>{{ user.fullName }}</strong>
                 <small>{{ user.username }}</small>

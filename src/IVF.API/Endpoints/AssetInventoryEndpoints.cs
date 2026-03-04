@@ -13,7 +13,7 @@ public static class AssetInventoryEndpoints
             .RequireAuthorization("AdminOnly");
 
         // List all assets
-        group.MapGet("/", async (IvfDbContext db, string? type, string? classification, string? status) =>
+        group.MapGet("/", async (IvfDbContext db, string? type, string? classification, string? status, int page = 1, int pageSize = 20) =>
         {
             var query = db.AssetInventories.Where(a => !a.IsDeleted).AsQueryable();
 
@@ -24,8 +24,12 @@ public static class AssetInventoryEndpoints
             if (!string.IsNullOrEmpty(status))
                 query = query.Where(a => a.Status == status);
 
-            var assets = await query.OrderBy(a => a.AssetName).ToListAsync();
-            return Results.Ok(assets);
+            var totalCount = await query.CountAsync();
+            var assets = await query.OrderBy(a => a.AssetName)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+            return Results.Ok(new { items = assets, totalCount, page, pageSize });
         }).WithName("ListAssets");
 
         // Get single asset
@@ -51,6 +55,32 @@ public static class AssetInventoryEndpoints
             await db.SaveChangesAsync();
             return Results.Created($"/api/compliance/assets/{asset.Id}", asset);
         }).WithName("CreateAsset");
+
+        // Update asset
+        group.MapPut("/{id:guid}", async (Guid id, CreateAssetRequest req, IvfDbContext db) =>
+        {
+            var asset = await db.AssetInventories.FirstOrDefaultAsync(a => a.Id == id && !a.IsDeleted);
+            if (asset is null) return Results.NotFound();
+            asset.Update(
+                req.AssetName, req.AssetType, req.Classification,
+                req.Owner, req.CriticalityLevel,
+                req.ContainsPhi, req.ContainsPii,
+                req.Department, req.Location, req.Environment, req.Version);
+            if (req.HasEncryption || req.HasBackup || req.HasAccessControl || req.HasMonitoring)
+                asset.UpdateSecurityPosture(req.HasEncryption, req.HasBackup, req.HasAccessControl, req.HasMonitoring);
+            await db.SaveChangesAsync();
+            return Results.Ok(asset);
+        }).WithName("UpdateAsset");
+
+        // Delete asset (soft delete)
+        group.MapDelete("/{id:guid}", async (Guid id, IvfDbContext db) =>
+        {
+            var asset = await db.AssetInventories.FirstOrDefaultAsync(a => a.Id == id && !a.IsDeleted);
+            if (asset is null) return Results.NotFound();
+            asset.MarkAsDeleted();
+            await db.SaveChangesAsync();
+            return Results.NoContent();
+        }).WithName("DeleteAsset");
 
         // Update security posture
         group.MapPut("/{id:guid}/security", async (Guid id, UpdateAssetSecurityRequest req, IvfDbContext db) =>
