@@ -1,0 +1,129 @@
+<div class="asset-page">
+  <div class="page-header">
+    <div class="header-left">
+      <h1>🖥️ Kho tài sản CNTT</h1>
+      <p class="subtitle">ISO 27001 A.5.9 — Quản lý tài sản thông tin (CMDB)</p>
+    </div>
+    <button class="btn btn-primary" (click)="openCreate()">➕ Thêm tài sản</button>
+  </div>
+
+  <div class="filters">
+    <select [(ngModel)]="filterType" (ngModelChange)="onFilterChange()">
+      <option value="">Tất cả loại</option>
+      @for (t of assetTypes; track t) {
+        <option [value]="t">{{ t }}</option>
+      }
+    </select>
+    <select [(ngModel)]="filterClassification" (ngModelChange)="onFilterChange()">
+      <option value="">Tất cả phân loại</option>
+      @for (c of classifications; track c) {
+        <option [value]="c">{{ getClassificationIcon(c) }} {{ c }}</option>
+      }
+    </select>
+    <input
+      type="text"
+      [(ngModel)]="filterOwner"
+      (input)="onFilterChange()"
+      placeholder="🔍 Chủ sở hữu..."
+    />
+  </div>
+
+  @if (loading()) {
+    <div class="loading-state"><div class="spinner"></div></div>
+  } @else {
+    <div class="asset-grid">
+      @for (asset of assets(); track asset.id) {
+        <div class="asset-card">
+          <div class="asset-header">
+            <span class="asset-type">{{ asset.type }}</span>
+            <span class="classification-badge" [attr.data-cls]="asset.classification">
+              {{ getClassificationIcon(asset.classification) }} {{ asset.classification }}
+            </span>
+          </div>
+          <h3 class="asset-name">{{ asset.name }}</h3>
+          @if (asset.description) {
+            <p class="asset-desc">{{ asset.description }}</p>
+          }
+          <div class="asset-meta">
+            <span>👤 {{ asset.owner }}</span>
+            @if (asset.location) {
+              <span>📍 {{ asset.location }}</span>
+            }
+          </div>
+          @if (asset.riskLevel) {
+            <div class="asset-risk" [attr.data-risk]="asset.riskLevel">
+              Rủi ro: {{ asset.riskLevel }}
+            </div>
+          }
+          <div class="asset-footer">
+            <span class="asset-date">Tạo: {{ asset.createdAt | date: 'dd/MM/yyyy' }}</span>
+            <div class="asset-actions">
+              <button class="btn-sm" (click)="openEdit(asset)">✏️</button>
+              <button class="btn-sm btn-danger" (click)="deleteAsset(asset)">🗑️</button>
+            </div>
+          </div>
+        </div>
+      } @empty {
+        <div class="empty-state">Chưa có tài sản nào</div>
+      }
+    </div>
+  }
+
+  @if (showModal) {
+    <div class="modal-overlay" (click)="showModal = false">
+      <div class="modal" (click)="$event.stopPropagation()">
+        <h2>{{ editingId ? '✏️ Sửa tài sản' : '➕ Thêm tài sản' }}</h2>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Tên tài sản *</label>
+            <input type="text" [(ngModel)]="form.name" placeholder="VD: PostgreSQL Primary" />
+          </div>
+          <div class="form-group">
+            <label>Loại *</label>
+            <select [(ngModel)]="form.type">
+              @for (t of assetTypes; track t) {
+                <option [value]="t">{{ t }}</option>
+              }
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Phân loại *</label>
+            <select [(ngModel)]="form.classification">
+              @for (c of classifications; track c) {
+                <option [value]="c">{{ getClassificationIcon(c) }} {{ c }}</option>
+              }
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Chủ sở hữu *</label>
+            <input type="text" [(ngModel)]="form.owner" placeholder="VD: DevOps Team" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Vị trí</label>
+          <input type="text" [(ngModel)]="form.location" placeholder="VD: AWS eu-west-1" />
+        </div>
+        <div class="form-group">
+          <label>Mô tả</label>
+          <textarea
+            [(ngModel)]="form.description"
+            rows="2"
+            placeholder="Mô tả tài sản..."
+          ></textarea>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-outline" (click)="showModal = false">Huỷ</button>
+          <button
+            class="btn btn-primary"
+            (click)="submitForm()"
+            [disabled]="!form.name || !form.owner"
+          >
+            {{ editingId ? 'Lưu' : 'Tạo' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+</div>

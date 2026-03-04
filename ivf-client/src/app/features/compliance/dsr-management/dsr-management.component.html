@@ -1,0 +1,426 @@
+<div class="dsr-management">
+  <div class="page-header">
+    <div class="header-left">
+      <h1>📝 Yêu cầu chủ thể dữ liệu (DSR)</h1>
+      <p class="subtitle">
+        GDPR Art. 12-23 — Quản lý quyền truy cập, chỉnh sửa, xoá, hạn chế, di chuyển, phản đối
+      </p>
+    </div>
+    <button class="btn btn-primary" (click)="openCreateModal()">➕ Tạo DSR mới</button>
+  </div>
+
+  <!-- Dashboard Stats -->
+  @if (dashboard()) {
+    <div class="stats-row">
+      <div class="stat-card">
+        <span class="stat-value">{{ dashboard()!.total }}</span>
+        <span class="stat-label">Tổng DSR</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-value warn">{{ dashboard()!.pending }}</span>
+        <span class="stat-label">Đang chờ</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-value" [class.danger]="dashboard()!.overdue > 0">{{
+          dashboard()!.overdue
+        }}</span>
+        <span class="stat-label">Quá hạn</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-value success">{{ dashboard()!.completedLast30Days }}</span>
+        <span class="stat-label">Hoàn thành 30 ngày</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-value">{{ dashboard()!.avgResponseDays }}</span>
+        <span class="stat-label">TB ngày phản hồi</span>
+      </div>
+    </div>
+  }
+
+  <div class="content-layout">
+    <!-- Left: List -->
+    <div class="list-panel" [class.collapsed]="selectedDsr()">
+      <!-- Filters -->
+      <div class="filters">
+        <input
+          type="text"
+          [(ngModel)]="filterSearch"
+          (input)="onFilterChange()"
+          placeholder="🔍 Tìm theo tên..."
+          class="search-input"
+        />
+        <select [(ngModel)]="filterStatus" (ngModelChange)="onFilterChange()">
+          <option value="">Tất cả trạng thái</option>
+          @for (s of dsrStatuses; track s) {
+            <option [value]="s">{{ getStatusLabel(s) }}</option>
+          }
+        </select>
+        <select [(ngModel)]="filterType" (ngModelChange)="onFilterChange()">
+          <option value="">Tất cả loại</option>
+          @for (t of dsrTypes; track t) {
+            <option [value]="t">{{ getTypeLabel(t) }}</option>
+          }
+        </select>
+        <label class="checkbox-label">
+          <input type="checkbox" [(ngModel)]="filterOverdue" (ngModelChange)="onFilterChange()" />
+          Chỉ quá hạn
+        </label>
+      </div>
+
+      <!-- DSR List -->
+      @if (loading()) {
+        <div class="loading-state"><div class="spinner"></div></div>
+      } @else {
+        <div class="dsr-list">
+          @for (dsr of dsrs(); track dsr.id) {
+            <div
+              class="dsr-card"
+              [class.active]="selectedDsr()?.id === dsr.id"
+              [class.overdue]="dsr.isOverdue"
+              (click)="selectDsr(dsr)"
+            >
+              <div class="dsr-header">
+                <span class="dsr-ref">{{ dsr.requestReference }}</span>
+                <span class="status-badge" [attr.data-status]="dsr.status">{{
+                  getStatusLabel(dsr.status)
+                }}</span>
+              </div>
+              <div class="dsr-body">
+                <span class="dsr-type"
+                  >{{ getTypeIcon(dsr.requestType) }} {{ getTypeLabel(dsr.requestType) }}</span
+                >
+                <span class="dsr-name">{{ dsr.dataSubjectName }}</span>
+              </div>
+              <div class="dsr-footer">
+                <span class="dsr-date">{{ dsr.receivedAt | date: 'dd/MM/yyyy' }}</span>
+                @if (dsr.isOverdue) {
+                  <span class="overdue-badge">⏰ Quá hạn</span>
+                } @else {
+                  <span class="days-left">{{ dsr.daysRemaining }} ngày còn lại</span>
+                }
+              </div>
+            </div>
+          } @empty {
+            <div class="empty-state">Không có DSR nào</div>
+          }
+        </div>
+
+        <!-- Pagination -->
+        @if (totalCount() > pageSize) {
+          <div class="pagination">
+            <button (click)="prevPage()" [disabled]="page <= 1">← Trước</button>
+            <span>Trang {{ page }} / {{ totalPages }}</span>
+            <button (click)="nextPage()" [disabled]="page * pageSize >= totalCount()">Sau →</button>
+          </div>
+        }
+      }
+    </div>
+
+    <!-- Right: Detail Panel -->
+    @if (selectedDsr()) {
+      <div class="detail-panel">
+        <div class="detail-header">
+          <h2>{{ selectedDsr()!.requestReference }}</h2>
+          <button class="btn-close" (click)="closeDetail()">✕</button>
+        </div>
+
+        <div class="detail-status">
+          <span class="status-badge large" [attr.data-status]="selectedDsr()!.status">
+            {{ getStatusLabel(selectedDsr()!.status) }}
+          </span>
+          @if (selectedDsr()!.isOverdue) {
+            <span class="overdue-badge">⏰ QUÁ HẠN</span>
+          }
+        </div>
+
+        <div class="detail-grid">
+          <div class="detail-row">
+            <span class="label">Loại yêu cầu</span>
+            <span class="value"
+              >{{ getTypeIcon(selectedDsr()!.requestType) }}
+              {{ getTypeLabel(selectedDsr()!.requestType) }}</span
+            >
+          </div>
+          <div class="detail-row">
+            <span class="label">Chủ thể dữ liệu</span>
+            <span class="value">{{ selectedDsr()!.dataSubjectName }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="label">Email</span>
+            <span class="value">{{ selectedDsr()!.dataSubjectEmail }}</span>
+          </div>
+          @if (selectedDsr()!.patientId) {
+            <div class="detail-row">
+              <span class="label">Mã bệnh nhân</span>
+              <span class="value">{{ selectedDsr()!.patientId }}</span>
+            </div>
+          }
+          <div class="detail-row">
+            <span class="label">Ngày nhận</span>
+            <span class="value">{{ selectedDsr()!.receivedAt | date: 'dd/MM/yyyy HH:mm' }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="label">Hạn chót</span>
+            <span class="value" [class.danger]="selectedDsr()!.isOverdue">{{
+              selectedDsr()!.deadline | date: 'dd/MM/yyyy'
+            }}</span>
+          </div>
+          @if (selectedDsr()!.extendedDeadline) {
+            <div class="detail-row">
+              <span class="label">Gia hạn đến</span>
+              <span class="value">{{ selectedDsr()!.extendedDeadline | date: 'dd/MM/yyyy' }}</span>
+            </div>
+          }
+          <div class="detail-row">
+            <span class="label">Xác minh danh tính</span>
+            <span class="value">{{
+              selectedDsr()!.identityVerified ? '✅ Đã xác minh' : '❌ Chưa xác minh'
+            }}</span>
+          </div>
+          @if (selectedDsr()!.assignedTo) {
+            <div class="detail-row">
+              <span class="label">Người xử lý</span>
+              <span class="value">{{ getUserDisplay(selectedDsr()!.assignedTo!) }}</span>
+            </div>
+          }
+          @if (selectedDsr()!.escalatedToDpo) {
+            <div class="detail-row">
+              <span class="label">Chuyển DPO</span>
+              <span class="value">✅ {{ selectedDsr()!.escalatedAt | date: 'dd/MM/yyyy' }}</span>
+            </div>
+          }
+          @if (selectedDsr()!.responseSummary) {
+            <div class="detail-row full">
+              <span class="label">Tóm tắt phản hồi</span>
+              <span class="value">{{ selectedDsr()!.responseSummary }}</span>
+            </div>
+          }
+          @if (selectedDsr()!.rejectionReason) {
+            <div class="detail-row full">
+              <span class="label">Lý do từ chối</span>
+              <span class="value danger">{{ selectedDsr()!.rejectionReason }}</span>
+            </div>
+          }
+          @if (selectedDsr()!.notes) {
+            <div class="detail-row full">
+              <span class="label">Ghi chú</span>
+              <span class="value">{{ selectedDsr()!.notes }}</span>
+            </div>
+          }
+        </div>
+
+        <!-- Actions -->
+        @if (selectedDsr()!.status !== 'Completed' && selectedDsr()!.status !== 'Rejected') {
+          <div class="detail-actions">
+            <h3>Thao tác</h3>
+            <div class="action-buttons">
+              @if (!selectedDsr()!.identityVerified) {
+                <button class="btn btn-outline" (click)="openAction('verify')">🔍 Xác minh</button>
+              }
+              @if (!selectedDsr()!.assignedTo) {
+                <button class="btn btn-outline" (click)="openAction('assign')">👤 Giao việc</button>
+              }
+              <button class="btn btn-outline" (click)="openAction('extend')">⏰ Gia hạn</button>
+              <button class="btn btn-outline" (click)="openAction('note')">📝 Ghi chú</button>
+              @if (!selectedDsr()!.escalatedToDpo) {
+                <button class="btn btn-outline" (click)="openAction('escalate')">
+                  ⬆️ Chuyển DPO
+                </button>
+              }
+              @if (!selectedDsr()!.notifiedDataSubject) {
+                <button class="btn btn-outline" (click)="openAction('notify')">📧 Thông báo</button>
+              }
+              <button class="btn btn-primary" (click)="openAction('complete')">
+                ✅ Hoàn thành
+              </button>
+              <button class="btn btn-danger" (click)="openAction('reject')">❌ Từ chối</button>
+            </div>
+          </div>
+        }
+      </div>
+    }
+  </div>
+
+  <!-- Create Modal -->
+  @if (showCreateModal) {
+    <div class="modal-overlay" (click)="showCreateModal = false">
+      <div class="modal" (click)="$event.stopPropagation()">
+        <h2>➕ Tạo yêu cầu DSR mới</h2>
+        <div class="form-group">
+          <label>Loại yêu cầu *</label>
+          <select [(ngModel)]="createForm.requestType">
+            @for (t of dsrTypes; track t) {
+              <option [value]="t">{{ getTypeIcon(t) }} {{ getTypeLabel(t) }} ({{ t }})</option>
+            }
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Họ tên chủ thể *</label>
+          <input
+            type="text"
+            [(ngModel)]="createForm.dataSubjectName"
+            placeholder="Nhập họ tên..."
+          />
+        </div>
+        <div class="form-group">
+          <label>Email *</label>
+          <input
+            type="email"
+            [(ngModel)]="createForm.dataSubjectEmail"
+            placeholder="Nhập email..."
+          />
+        </div>
+        <div class="form-group">
+          <label>Mã bệnh nhân (nếu có)</label>
+          <input type="text" [(ngModel)]="createForm.patientId" placeholder="ID bệnh nhân..." />
+        </div>
+        <div class="form-group">
+          <label>Mô tả</label>
+          <textarea
+            [(ngModel)]="createForm.description"
+            rows="3"
+            placeholder="Mô tả yêu cầu..."
+          ></textarea>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-outline" (click)="showCreateModal = false">Huỷ</button>
+          <button
+            class="btn btn-primary"
+            (click)="submitCreate()"
+            [disabled]="!createForm.dataSubjectName || !createForm.dataSubjectEmail"
+          >
+            Tạo DSR
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- Action Modal -->
+  @if (showActionModal) {
+    <div class="modal-overlay" (click)="showActionModal = false">
+      <div class="modal" (click)="$event.stopPropagation()">
+        <h2>{{ getActionTitle() }}</h2>
+
+        @switch (actionType) {
+          @case ('verify') {
+            <div class="form-group">
+              <label>Phương pháp xác minh</label>
+              <select [(ngModel)]="actionForm.method">
+                <option value="ID Document">CMND/CCCD</option>
+                <option value="Email Verification">Email</option>
+                <option value="Phone Verification">Điện thoại</option>
+                <option value="In-Person">Trực tiếp</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Người xác minh</label>
+              <input
+                type="text"
+                [(ngModel)]="userSearchQuery"
+                (input)="onUserSearch($any($event.target).value)"
+                placeholder="🔍 Tìm nhân viên..."
+                class="search-input"
+              />
+              <select [(ngModel)]="actionForm.verifiedBy" class="user-select">
+                <option value="">-- Chọn nhân viên --</option>
+                @for (u of users(); track u.id) {
+                  <option [value]="u.username">{{ u.fullName }} ({{ u.username }})</option>
+                }
+              </select>
+            </div>
+          }
+          @case ('assign') {
+            <div class="form-group">
+              <label>Giao cho</label>
+              <input
+                type="text"
+                [(ngModel)]="userSearchQuery"
+                (input)="onUserSearch($any($event.target).value)"
+                placeholder="🔍 Tìm nhân viên..."
+                class="search-input"
+              />
+              <select [(ngModel)]="actionForm.assignedTo" class="user-select">
+                <option value="">-- Chọn nhân viên --</option>
+                @for (u of users(); track u.id) {
+                  <option [value]="u.username">
+                    {{ u.fullName }} ({{ u.username }}) — {{ u.role }}
+                  </option>
+                }
+              </select>
+            </div>
+          }
+          @case ('extend') {
+            <div class="form-group">
+              <label>Số ngày gia hạn</label>
+              <input
+                type="number"
+                [(ngModel)]="actionForm.additionalDays"
+                placeholder="30"
+                min="1"
+                max="60"
+              />
+            </div>
+            <div class="form-group">
+              <label>Lý do</label>
+              <textarea
+                [(ngModel)]="actionForm.reason"
+                rows="2"
+                placeholder="Lý do gia hạn..."
+              ></textarea>
+            </div>
+          }
+          @case ('complete') {
+            <div class="form-group">
+              <label>Tóm tắt phản hồi *</label>
+              <textarea
+                [(ngModel)]="actionForm.responseSummary"
+                rows="3"
+                placeholder="Mô tả kết quả xử lý..."
+              ></textarea>
+            </div>
+          }
+          @case ('reject') {
+            <div class="form-group">
+              <label>Lý do từ chối *</label>
+              <textarea
+                [(ngModel)]="actionForm.rejectionReason"
+                rows="2"
+                placeholder="Lý do từ chối..."
+              ></textarea>
+            </div>
+            <div class="form-group">
+              <label>Cơ sở pháp lý</label>
+              <input
+                type="text"
+                [(ngModel)]="actionForm.legalBasis"
+                placeholder="Art. 17(3)(b)..."
+              />
+            </div>
+          }
+          @case ('note') {
+            <div class="form-group">
+              <label>Ghi chú</label>
+              <textarea
+                [(ngModel)]="actionForm.note"
+                rows="3"
+                placeholder="Nhập ghi chú..."
+              ></textarea>
+            </div>
+          }
+          @case ('escalate') {
+            <p>Bạn có chắc muốn chuyển yêu cầu này cho DPO (Data Protection Officer)?</p>
+          }
+          @case ('notify') {
+            <p>Gửi thông báo cho chủ thể dữ liệu về tiến trình xử lý yêu cầu?</p>
+          }
+        }
+
+        <div class="modal-actions">
+          <button class="btn btn-outline" (click)="showActionModal = false">Huỷ</button>
+          <button class="btn btn-primary" (click)="submitAction()">Xác nhận</button>
+        </div>
+      </div>
+    </div>
+  }
+</div>

@@ -1,0 +1,251 @@
+name: Security Scanning (SAST/DAST/SCA)
+
+on:
+    push:
+        branches: [main, develop]
+    pull_request:
+        branches: [main]
+    schedule:
+        # Run weekly on Monday at 6 AM UTC
+        - cron: "0 6 * * 1"
+
+permissions:
+    contents: read
+    security-events: write
+    actions: read
+
+env:
+    DOTNET_VERSION: "10.0.x"
+    NODE_VERSION: "20"
+
+jobs:
+    # ==================== SAST — Static Application Security Testing ====================
+    sast-dotnet:
+        name: SAST — .NET (Security CodeQL)
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Initialize CodeQL
+              uses: github/codeql-action/init@v3
+              with:
+                  languages: csharp
+                  queries: security-extended
+
+            - name: Setup .NET
+              uses: actions/setup-dotnet@v4
+              with:
+                  dotnet-version: ${{ env.DOTNET_VERSION }}
+
+            - name: Restore & Build
+              run: |
+                  dotnet restore
+                  dotnet build --no-restore --configuration Release
+
+            - name: Perform CodeQL Analysis
+              uses: github/codeql-action/analyze@v3
+              with:
+                  category: "/language:csharp"
+
+    sast-javascript:
+        name: SAST — JavaScript/TypeScript (CodeQL)
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Initialize CodeQL
+              uses: github/codeql-action/init@v3
+              with:
+                  languages: javascript-typescript
+                  queries: security-extended
+
+            - name: Perform CodeQL Analysis
+              uses: github/codeql-action/analyze@v3
+              with:
+                  category: "/language:javascript-typescript"
+
+    # ==================== SCA — Software Composition Analysis ====================
+    sca-dotnet:
+        name: SCA — .NET Dependencies
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Setup .NET
+              uses: actions/setup-dotnet@v4
+              with:
+                  dotnet-version: ${{ env.DOTNET_VERSION }}
+
+            - name: Restore dependencies
+              run: dotnet restore
+
+            - name: Run dotnet list vulnerable packages
+              run: |
+                  dotnet list package --vulnerable --include-transitive 2>&1 | tee vulnerability-report.txt
+                  if grep -q "has the following vulnerable packages" vulnerability-report.txt; then
+                    echo "::warning::Vulnerable NuGet packages detected. Review vulnerability-report.txt"
+                  fi
+
+            - name: Upload vulnerability report
+              if: always()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: dotnet-vulnerability-report
+                  path: vulnerability-report.txt
+                  retention-days: 90
+
+    sca-npm:
+        name: SCA — npm Dependencies
+        runs-on: ubuntu-latest
+
+        defaults:
+            run:
+                working-directory: ivf-client
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: ${{ env.NODE_VERSION }}
+                  cache: "npm"
+                  cache-dependency-path: ivf-client/package-lock.json
+
+            - name: Install dependencies
+              run: npm ci
+
+            - name: Run npm audit
+              run: |
+                  npm audit --audit-level=moderate --json > npm-audit-report.json 2>&1 || true
+                  npm audit --audit-level=moderate 2>&1 | tee npm-audit-report.txt || true
+
+            - name: Upload npm audit report
+              if: always()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: npm-audit-report
+                  path: |
+                      ivf-client/npm-audit-report.json
+                      ivf-client/npm-audit-report.txt
+                  retention-days: 90
+
+    # ==================== Container Security Scanning ====================
+    container-scan:
+        name: Container Security — Trivy
+        runs-on: ubuntu-latest
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Build Docker image for scanning
+              run: |
+                  docker build -t ivf-api:scan -f src/IVF.API/Dockerfile .
+
+            - name: Run Trivy vulnerability scanner
+              uses: aquasecurity/trivy-action@master
+              with:
+                  image-ref: "ivf-api:scan"
+                  format: "sarif"
+                  output: "trivy-results.sarif"
+                  severity: "CRITICAL,HIGH"
+                  exit-code: "0"
+
+            - name: Upload Trivy scan results to GitHub Security
+              uses: github/codeql-action/upload-sarif@v3
+              if: always()
+              with:
+                  sarif_file: "trivy-results.sarif"
+
+            - name: Run Trivy filesystem scan (IaC)
+              uses: aquasecurity/trivy-action@master
+              with:
+                  scan-type: "fs"
+                  scan-ref: "."
+                  format: "table"
+                  severity: "CRITICAL,HIGH"
+                  exit-code: "0"
+
+    # ==================== Secret Scanning ====================
+    secret-scan:
+        name: Secret Detection — Gitleaks
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - name: Run Gitleaks
+              uses: gitleaks/gitleaks-action@v2
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    # ==================== DAST — Dynamic Application Security Testing ====================
+    dast-zap:
+        name: DAST — OWASP ZAP (Baseline)
+        runs-on: ubuntu-latest
+        if: github.event_name == 'schedule'
+        needs: [sast-dotnet, sca-dotnet]
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Setup .NET
+              uses: actions/setup-dotnet@v4
+              with:
+                  dotnet-version: ${{ env.DOTNET_VERSION }}
+
+            - name: Start API server
+              run: |
+                  dotnet run --project src/IVF.API/IVF.API.csproj --configuration Release &
+                  sleep 30
+
+            - name: OWASP ZAP Baseline Scan
+              uses: zaproxy/action-baseline@v0.12.0
+              with:
+                  target: "http://localhost:5000"
+                  rules_file_name: ".zap/rules.tsv"
+                  cmd_options: "-a -j"
+                  allow_issue_writing: false
+
+            - name: Upload ZAP Report
+              if: always()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: zap-scan-report
+                  path: report_html.html
+                  retention-days: 90
+
+    # ==================== Security Summary ====================
+    security-summary:
+        name: Security Summary
+        runs-on: ubuntu-latest
+        needs: [sast-dotnet, sast-javascript, sca-dotnet, sca-npm, secret-scan]
+        if: always()
+
+        steps:
+            - name: Security Scan Summary
+              run: |
+                  echo "## Security Scan Results Summary"
+                  echo ""
+                  echo "| Scan Type | Job | Status |"
+                  echo "|-----------|-----|--------|"
+                  echo "| SAST (.NET) | sast-dotnet | ${{ needs.sast-dotnet.result }} |"
+                  echo "| SAST (JS/TS) | sast-javascript | ${{ needs.sast-javascript.result }} |"
+                  echo "| SCA (.NET) | sca-dotnet | ${{ needs.sca-dotnet.result }} |"
+                  echo "| SCA (npm) | sca-npm | ${{ needs.sca-npm.result }} |"
+                  echo "| Secrets | secret-scan | ${{ needs.secret-scan.result }} |"
+                  echo ""
+                  echo "Run date: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"

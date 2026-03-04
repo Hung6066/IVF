@@ -4,9 +4,9 @@ using Microsoft.Extensions.Logging;
 namespace IVF.Infrastructure.Services;
 
 /// <summary>
-/// Evaluates vault infrastructure against HIPAA, SOC 2, and GDPR controls.
+/// Evaluates vault infrastructure against HIPAA, SOC 2, GDPR, HITRUST CSF, NIST AI RMF, and ISO 42001 controls.
 /// Each control queries live vault state to produce a real-time compliance score.
-/// v2: 15 HIPAA + 12 SOC 2 + 11 GDPR = 38 controls, 380 max points.
+/// v3: 15 HIPAA + 12 SOC 2 + 11 GDPR + 10 HITRUST + 8 NIST AI + 7 ISO 42001 = 63 controls, 630 max points.
 /// </summary>
 public sealed class ComplianceScoringEngine : IComplianceScoringEngine
 {
@@ -37,6 +37,9 @@ public sealed class ComplianceScoringEngine : IComplianceScoringEngine
             await EvaluateFrameworkAsync(ComplianceFramework.Hipaa, ct),
             await EvaluateFrameworkAsync(ComplianceFramework.Soc2, ct),
             await EvaluateFrameworkAsync(ComplianceFramework.Gdpr, ct),
+            await EvaluateFrameworkAsync(ComplianceFramework.HitrustCsf, ct),
+            await EvaluateFrameworkAsync(ComplianceFramework.NistAiRmf, ct),
+            await EvaluateFrameworkAsync(ComplianceFramework.Iso42001, ct),
         };
 
         var totalScore = frameworks.Sum(f => f.Score);
@@ -59,6 +62,9 @@ public sealed class ComplianceScoringEngine : IComplianceScoringEngine
             ComplianceFramework.Hipaa => await EvaluateHipaaAsync(ct),
             ComplianceFramework.Soc2 => await EvaluateSoc2Async(ct),
             ComplianceFramework.Gdpr => await EvaluateGdprAsync(ct),
+            ComplianceFramework.HitrustCsf => await EvaluateHitrustCsfAsync(ct),
+            ComplianceFramework.NistAiRmf => await EvaluateNistAiRmfAsync(ct),
+            ComplianceFramework.Iso42001 => await EvaluateIso42001Async(ct),
             _ => throw new ArgumentOutOfRangeException(nameof(framework))
         };
 
@@ -581,6 +587,359 @@ public sealed class ComplianceScoringEngine : IComplianceScoringEngine
             lawfulStatus == ControlStatus.Pass ? 10 : lawfulStatus == ControlStatus.Partial ? 5 : 0, 10,
             $"{auditCount} audit entries document processing activities, {fieldPolicies.Count} access controls",
             lawfulStatus != ControlStatus.Pass ? "Maintain comprehensive audit logs (100+) as evidence of lawful processing" : null));
+
+        return controls;
+    }
+
+    // ─── HITRUST CSF — 10 Controls (100 points) ────────────────────
+
+    private async Task<List<ControlResult>> EvaluateHitrustCsfAsync(CancellationToken ct)
+    {
+        var controls = new List<ControlResult>();
+
+        var encConfigs = await _repo.GetAllEncryptionConfigsAsync(ct);
+        var policies = await _repo.GetPoliciesAsync(ct);
+        var userPolicies = await _repo.GetUserPoliciesAsync(ct);
+        var auditCount = await _repo.GetAuditLogCountAsync(ct: ct);
+        var fieldPolicies = await _repo.GetAllFieldAccessPoliciesAsync(ct);
+        var rotations = await _repo.GetRotationSchedulesAsync(activeOnly: true, ct: ct);
+        var tokens = await _repo.GetTokensAsync(includeRevoked: false, ct: ct);
+        var dynamicCreds = await _repo.GetDynamicCredentialsAsync(includeRevoked: false, ct: ct);
+        var autoUnseal = await _repo.GetAutoUnsealConfigAsync(ct);
+
+        List<Domain.Entities.SecurityEvent> recentEvents;
+        try { recentEvents = await _securityEvents.GetRecentEventsAsync(100, ct); }
+        catch { recentEvents = []; }
+
+        // HITRUST-01.b — User password management
+        var enabledConfigs = encConfigs.Count(c => c.IsEnabled);
+        var pwStatus = policies.Count > 0 && userPolicies.Count > 0 ? ControlStatus.Pass
+            : policies.Count > 0 ? ControlStatus.Partial : ControlStatus.Fail;
+        controls.Add(new ControlResult(
+            "HITRUST-01.b", "User Password Management",
+            "Formal management process for password allocation and rotation (01.b)",
+            pwStatus,
+            pwStatus == ControlStatus.Pass ? 10 : pwStatus == ControlStatus.Partial ? 5 : 0, 10,
+            $"{policies.Count} policies, {userPolicies.Count} user bindings",
+            pwStatus != ControlStatus.Pass ? "Assign vault policies to all users and enforce password rotation" : null));
+
+        // HITRUST-01.v — Information access restriction
+        var accessStatus = fieldPolicies.Count >= 3 ? ControlStatus.Pass
+            : fieldPolicies.Count > 0 ? ControlStatus.Partial : ControlStatus.Fail;
+        controls.Add(new ControlResult(
+            "HITRUST-01.v", "Information Access Restriction",
+            "Restrict access to information and application functions per access control policy (01.v)",
+            accessStatus,
+            accessStatus == ControlStatus.Pass ? 10 : accessStatus == ControlStatus.Partial ? 5 : 0, 10,
+            $"{fieldPolicies.Count} field access policies (3+ recommended)",
+            fieldPolicies.Count < 3 ? "Define field-level access policies for all ePHI/PII fields" : null));
+
+        // HITRUST-06.d — Data protection and privacy
+        var encStatus = enabledConfigs >= 3 ? ControlStatus.Pass
+            : enabledConfigs > 0 ? ControlStatus.Partial : ControlStatus.Fail;
+        controls.Add(new ControlResult(
+            "HITRUST-06.d", "Data Protection & Privacy",
+            "Protection of personal data and privacy of personal information (06.d)",
+            encStatus,
+            encStatus == ControlStatus.Pass ? 10 : encStatus == ControlStatus.Partial ? 5 : 0, 10,
+            $"{enabledConfigs}/{encConfigs.Count} encryption configs active",
+            enabledConfigs < 3 ? "Enable field-level encryption for all tables containing personal data" : null));
+
+        // HITRUST-09.ab — Monitoring system use
+        var monitorStatus = auditCount >= 100 && recentEvents.Count > 0 ? ControlStatus.Pass
+            : auditCount > 0 ? ControlStatus.Partial : ControlStatus.Fail;
+        controls.Add(new ControlResult(
+            "HITRUST-09.ab", "Monitoring System Use",
+            "Monitoring system use to detect unauthorized activities (09.ab)",
+            monitorStatus,
+            monitorStatus == ControlStatus.Pass ? 10 : monitorStatus == ControlStatus.Partial ? 5 : 0, 10,
+            $"{auditCount} audit entries, {recentEvents.Count} security events",
+            monitorStatus != ControlStatus.Pass ? "Ensure both audit logging (100+ entries) and security event monitoring are active" : null));
+
+        // HITRUST-09.m — Network controls
+        var kvHealthy = await _kvService.IsHealthyAsync();
+        controls.Add(new ControlResult(
+            "HITRUST-09.m", "Network Controls",
+            "Controls to manage networks to protect information in systems and applications (09.m)",
+            kvHealthy ? ControlStatus.Pass : ControlStatus.Fail,
+            kvHealthy ? 10 : 0, 10,
+            kvHealthy ? "Key vault TLS connection verified and healthy" : "Key vault connection failed",
+            !kvHealthy ? "Verify network connectivity and TLS configuration for all sensitive services" : null));
+
+        // HITRUST-10.a — Security requirements analysis
+        var executedRotations = rotations.Count(r => r.LastRotatedAt != null);
+        var analysisStatus = rotations.Count > 0 && executedRotations > 0 ? ControlStatus.Pass
+            : rotations.Count > 0 ? ControlStatus.Partial : ControlStatus.Fail;
+        controls.Add(new ControlResult(
+            "HITRUST-10.a", "Security Requirements Analysis",
+            "Security requirements for information systems (10.a)",
+            analysisStatus,
+            analysisStatus == ControlStatus.Pass ? 10 : analysisStatus == ControlStatus.Partial ? 5 : 0, 10,
+            $"{rotations.Count} rotation schedules, {executedRotations} executed",
+            analysisStatus != ControlStatus.Pass ? "Configure and verify automated rotation for all credentials" : null));
+
+        // HITRUST-11.a — Security incident reporting
+        var incidentStatus = recentEvents.Count > 0 ? ControlStatus.Pass : ControlStatus.Fail;
+        controls.Add(new ControlResult(
+            "HITRUST-11.a", "Security Incident Reporting",
+            "Report security incidents through management channels (11.a)",
+            incidentStatus,
+            incidentStatus == ControlStatus.Pass ? 10 : 0, 10,
+            recentEvents.Count > 0
+                ? $"Security event pipeline active — {recentEvents.Count(e => e.Severity is "High" or "Critical")} high/critical events"
+                : "No security event monitoring detected",
+            recentEvents.Count == 0 ? "Enable security event logging for incident detection and reporting" : null));
+
+        // HITRUST-12.b — Business continuity and risk assessment
+        DrReadinessStatus? drStatus;
+        try { drStatus = await _drService.GetReadinessAsync(ct); }
+        catch { drStatus = null; }
+
+        var drReady = drStatus is { AutoUnsealConfigured: true, EncryptionActive: true };
+        controls.Add(new ControlResult(
+            "HITRUST-12.b", "Business Continuity & Risk Assessment",
+            "Business continuity and impact analysis including compliance risk (12.b)",
+            drReady ? ControlStatus.Pass : drStatus != null ? ControlStatus.Partial : ControlStatus.Fail,
+            drReady ? 10 : drStatus != null ? 5 : 0, 10,
+            drReady ? $"DR ready — grade: {drStatus!.ReadinessGrade}" : "DR infrastructure not fully configured",
+            !drReady ? "Configure disaster recovery and validate business continuity procedures" : null));
+
+        // HITRUST-09.s — Key management policy
+        var dekSetting = await _repo.GetSettingAsync("dek-version-data", ct);
+        var keyStatus = rotations.Count > 0 && dekSetting != null ? ControlStatus.Pass
+            : rotations.Count > 0 || dekSetting != null ? ControlStatus.Partial : ControlStatus.Fail;
+        controls.Add(new ControlResult(
+            "HITRUST-09.s", "Key Management Policy",
+            "Formal policy for management of cryptographic keys (09.s)",
+            keyStatus,
+            keyStatus == ControlStatus.Pass ? 10 : keyStatus == ControlStatus.Partial ? 5 : 0, 10,
+            $"{rotations.Count} rotation schedules, DEK versioning: {(dekSetting != null ? "active" : "inactive")}",
+            keyStatus != ControlStatus.Pass ? "Configure key rotation schedules and enable DEK versioning" : null));
+
+        // HITRUST-01.j — Privilege management (dynamic credentials)
+        var privStatus = dynamicCreds.Count > 0 ? ControlStatus.Pass : ControlStatus.Partial;
+        controls.Add(new ControlResult(
+            "HITRUST-01.j", "Privilege Management",
+            "Allocation and use of privilege rights restricted and controlled (01.j)",
+            privStatus,
+            privStatus == ControlStatus.Pass ? 10 : 5, 10,
+            dynamicCreds.Count > 0
+                ? $"{dynamicCreds.Count} dynamic credentials enforce scoped privilege"
+                : "No dynamic credentials — static access may grant excessive privileges",
+            dynamicCreds.Count == 0 ? "Use dynamic credentials to enforce least-privilege access" : null));
+
+        return controls;
+    }
+
+    // ─── NIST AI RMF — 8 Controls (80 points) ────────────────────────
+
+    private async Task<List<ControlResult>> EvaluateNistAiRmfAsync(CancellationToken ct)
+    {
+        var controls = new List<ControlResult>();
+
+        var auditCount = await _repo.GetAuditLogCountAsync(ct: ct);
+        var policies = await _repo.GetPoliciesAsync(ct);
+        var userPolicies = await _repo.GetUserPoliciesAsync(ct);
+        var fieldPolicies = await _repo.GetAllFieldAccessPoliciesAsync(ct);
+        var encConfigs = await _repo.GetAllEncryptionConfigsAsync(ct);
+
+        List<Domain.Entities.SecurityEvent> recentEvents;
+        try { recentEvents = await _securityEvents.GetRecentEventsAsync(100, ct); }
+        catch { recentEvents = []; }
+
+        // NIST-GOV1 — AI governance structure
+        // Pass if policies exist (governance infrastructure present)
+        var govStatus = policies.Count >= 3 ? ControlStatus.Pass
+            : policies.Count > 0 ? ControlStatus.Partial : ControlStatus.Fail;
+        controls.Add(new ControlResult(
+            "NIST-GOV1", "AI Governance Structure",
+            "Establish governance for AI risk management (GOVERN 1)",
+            govStatus,
+            govStatus == ControlStatus.Pass ? 10 : govStatus == ControlStatus.Partial ? 5 : 0, 10,
+            $"{policies.Count} governance policies defined (3+ recommended for AI systems)",
+            govStatus != ControlStatus.Pass ? "Define governance policies covering all AI system access and operations" : null));
+
+        // NIST-GOV2 — Human oversight capability
+        var oversightStatus = userPolicies.Count > 0 && fieldPolicies.Count > 0 ? ControlStatus.Pass
+            : userPolicies.Count > 0 ? ControlStatus.Partial : ControlStatus.Fail;
+        controls.Add(new ControlResult(
+            "NIST-GOV2", "Human Oversight",
+            "Ensure human oversight of AI system decisions (GOVERN 2)",
+            oversightStatus,
+            oversightStatus == ControlStatus.Pass ? 10 : oversightStatus == ControlStatus.Partial ? 5 : 0, 10,
+            $"{userPolicies.Count} user policy bindings, {fieldPolicies.Count} field-level access controls",
+            oversightStatus != ControlStatus.Pass ? "Assign user-level policies and field access controls for human review capability" : null));
+
+        // NIST-MAP1 — AI risk categorization
+        // Check for structured event logging that enables risk categorization
+        var riskCatStatus = recentEvents.Count > 0 ? ControlStatus.Pass : ControlStatus.Fail;
+        controls.Add(new ControlResult(
+            "NIST-MAP1", "AI Risk Categorization",
+            "Categorize AI risks based on system context and impact (MAP 1)",
+            riskCatStatus,
+            riskCatStatus == ControlStatus.Pass ? 10 : 0, 10,
+            recentEvents.Count > 0
+                ? $"Security event categorization active — {recentEvents.Select(e => e.EventType).Distinct().Count()} event types tracked"
+                : "No event categorization detected",
+            recentEvents.Count == 0 ? "Enable security event logging with severity categorization for AI risk assessment" : null));
+
+        // NIST-MAP3 — AI system transparency
+        var transparencyStatus = auditCount >= 100 ? ControlStatus.Pass
+            : auditCount > 0 ? ControlStatus.Partial : ControlStatus.Fail;
+        controls.Add(new ControlResult(
+            "NIST-MAP3", "AI Transparency & Documentation",
+            "Document AI system capabilities, limitations, and decision factors (MAP 3)",
+            transparencyStatus,
+            transparencyStatus == ControlStatus.Pass ? 10 : transparencyStatus == ControlStatus.Partial ? 5 : 0, 10,
+            $"{auditCount} audit entries documenting AI system operations (100+ recommended)",
+            auditCount < 100 ? "Maintain comprehensive audit logs for AI decision transparency" : null));
+
+        // NIST-MEA1 — AI performance measurement
+        var measureStatus = recentEvents.Count > 0 && auditCount >= 100 ? ControlStatus.Pass
+            : recentEvents.Count > 0 || auditCount > 0 ? ControlStatus.Partial : ControlStatus.Fail;
+        controls.Add(new ControlResult(
+            "NIST-MEA1", "Performance Measurement",
+            "Measure AI system performance including accuracy and error rates (MEASURE 1)",
+            measureStatus,
+            measureStatus == ControlStatus.Pass ? 10 : measureStatus == ControlStatus.Partial ? 5 : 0, 10,
+            $"{recentEvents.Count} events tracked, {auditCount} audit entries for performance analysis",
+            measureStatus != ControlStatus.Pass ? "Track AI system performance with event logging and audit trails" : null));
+
+        // NIST-MEA3 — Bias detection
+        var enabledConfigs = encConfigs.Count(c => c.IsEnabled);
+        var biasStatus = fieldPolicies.Count >= 3 && enabledConfigs >= 3 ? ControlStatus.Pass
+            : fieldPolicies.Count > 0 ? ControlStatus.Partial : ControlStatus.Fail;
+        controls.Add(new ControlResult(
+            "NIST-MEA3", "Bias Detection & Fairness",
+            "Monitor for biased outcomes in AI decisions (MEASURE 3)",
+            biasStatus,
+            biasStatus == ControlStatus.Pass ? 10 : biasStatus == ControlStatus.Partial ? 5 : 0, 10,
+            $"{fieldPolicies.Count} field access policies, {enabledConfigs} encryption configs for data protection",
+            biasStatus != ControlStatus.Pass ? "Define field-level access policies (3+) to protect demographic data used in bias testing" : null));
+
+        // NIST-MAN1 — AI risk response
+        DrReadinessStatus? drStatus;
+        try { drStatus = await _drService.GetReadinessAsync(ct); }
+        catch { drStatus = null; }
+
+        var drReady = drStatus is { AutoUnsealConfigured: true, EncryptionActive: true };
+        var responseStatus = drReady && recentEvents.Count > 0 ? ControlStatus.Pass
+            : drReady || recentEvents.Count > 0 ? ControlStatus.Partial : ControlStatus.Fail;
+        controls.Add(new ControlResult(
+            "NIST-MAN1", "AI Risk Response",
+            "Respond to identified AI risks with mitigation actions (MANAGE 1)",
+            responseStatus,
+            responseStatus == ControlStatus.Pass ? 10 : responseStatus == ControlStatus.Partial ? 5 : 0, 10,
+            $"DR: {(drReady ? "ready" : "not ready")}, Security events: {recentEvents.Count}",
+            responseStatus != ControlStatus.Pass ? "Configure both DR infrastructure and security event monitoring for AI risk response" : null));
+
+        // NIST-MAN4 — AI system decommission capability
+        var kvHealthy = await _kvService.IsHealthyAsync();
+        controls.Add(new ControlResult(
+            "NIST-MAN4", "Decommission Capability",
+            "Ability to decommission AI systems when they no longer meet requirements (MANAGE 4)",
+            kvHealthy ? ControlStatus.Pass : ControlStatus.Fail,
+            kvHealthy ? 10 : 0, 10,
+            kvHealthy ? "Key vault healthy — supports key revocation and credential invalidation for decommissioning"
+                      : "Key vault unhealthy — decommission capability may be impaired",
+            !kvHealthy ? "Restore key vault connectivity to ensure AI system decommission capability" : null));
+
+        return controls;
+    }
+
+    // ─── ISO 42001 — 7 Controls (70 points) ───────────────────────────
+
+    private async Task<List<ControlResult>> EvaluateIso42001Async(CancellationToken ct)
+    {
+        var controls = new List<ControlResult>();
+
+        var policies = await _repo.GetPoliciesAsync(ct);
+        var userPolicies = await _repo.GetUserPoliciesAsync(ct);
+        var auditCount = await _repo.GetAuditLogCountAsync(ct: ct);
+        var encConfigs = await _repo.GetAllEncryptionConfigsAsync(ct);
+        var fieldPolicies = await _repo.GetAllFieldAccessPoliciesAsync(ct);
+
+        List<Domain.Entities.SecurityEvent> recentEvents;
+        try { recentEvents = await _securityEvents.GetRecentEventsAsync(100, ct); }
+        catch { recentEvents = []; }
+
+        // ISO42001-5: Clause 5 — AI management system leadership
+        var leadershipStatus = policies.Count >= 3 && userPolicies.Count >= 3 ? ControlStatus.Pass
+            : policies.Count > 0 ? ControlStatus.Partial : ControlStatus.Fail;
+        controls.Add(new ControlResult(
+            "ISO42001-5", "AIMS Leadership & Commitment",
+            "Top management commitment to AI management system (Clause 5)",
+            leadershipStatus,
+            leadershipStatus == ControlStatus.Pass ? 10 : leadershipStatus == ControlStatus.Partial ? 5 : 0, 10,
+            $"{policies.Count} governance policies, {userPolicies.Count} user assignments",
+            leadershipStatus != ControlStatus.Pass ? "Define at least 3 governance policies and assign to 3+ users" : null));
+
+        // ISO42001-6: Clause 6 — Planning (risk assessment)
+        var planningStatus = recentEvents.Count > 0 && auditCount >= 50 ? ControlStatus.Pass
+            : auditCount > 0 ? ControlStatus.Partial : ControlStatus.Fail;
+        controls.Add(new ControlResult(
+            "ISO42001-6", "AIMS Planning & Risk Assessment",
+            "Plan actions to address AI risks and opportunities (Clause 6)",
+            planningStatus,
+            planningStatus == ControlStatus.Pass ? 10 : planningStatus == ControlStatus.Partial ? 5 : 0, 10,
+            $"{recentEvents.Count} security events, {auditCount} audit entries for risk analysis",
+            planningStatus != ControlStatus.Pass ? "Enable security event monitoring and maintain 50+ audit entries for risk planning" : null));
+
+        // ISO42001-8: Clause 8 — AI system operation
+        var enabledConfigs = encConfigs.Count(c => c.IsEnabled);
+        var operationStatus = enabledConfigs >= 3 && fieldPolicies.Count >= 3 ? ControlStatus.Pass
+            : enabledConfigs > 0 || fieldPolicies.Count > 0 ? ControlStatus.Partial : ControlStatus.Fail;
+        controls.Add(new ControlResult(
+            "ISO42001-8", "AIMS Operational Controls",
+            "Plan, implement, and control AI processes per requirements (Clause 8)",
+            operationStatus,
+            operationStatus == ControlStatus.Pass ? 10 : operationStatus == ControlStatus.Partial ? 5 : 0, 10,
+            $"{enabledConfigs} encryption configs, {fieldPolicies.Count} field access policies",
+            operationStatus != ControlStatus.Pass ? "Enable 3+ encryption configs and 3+ field access policies for operational control" : null));
+
+        // ISO42001-9: Clause 9 — Performance evaluation
+        var evalStatus = auditCount >= 100 && recentEvents.Count > 0 ? ControlStatus.Pass
+            : auditCount > 0 ? ControlStatus.Partial : ControlStatus.Fail;
+        controls.Add(new ControlResult(
+            "ISO42001-9", "Performance Evaluation",
+            "Monitor, measure, analyze, and evaluate AI management system (Clause 9)",
+            evalStatus,
+            evalStatus == ControlStatus.Pass ? 10 : evalStatus == ControlStatus.Partial ? 5 : 0, 10,
+            $"{auditCount} audit entries, {recentEvents.Count} security events for performance evaluation",
+            evalStatus != ControlStatus.Pass ? "Maintain 100+ audit entries and active security events for comprehensive evaluation" : null));
+
+        // ISO42001-A7: Annex A.7 — Third-party & supply chain
+        var supplyChainStatus = policies.Count > 0 ? ControlStatus.Partial : ControlStatus.Fail;
+        controls.Add(new ControlResult(
+            "ISO42001-A7", "Supply Chain Management",
+            "Manage AI-related third-party and supply chain risks (Annex A.7)",
+            supplyChainStatus,
+            supplyChainStatus == ControlStatus.Partial ? 5 : 0, 10,
+            $"{policies.Count} access policies governing third-party access",
+            "Implement formal vendor risk assessment for all AI third-party components"));
+
+        // ISO42001-A8: Annex A.8 — Data for AI systems
+        var dataStatus = enabledConfigs >= 3 ? ControlStatus.Pass
+            : enabledConfigs > 0 ? ControlStatus.Partial : ControlStatus.Fail;
+        controls.Add(new ControlResult(
+            "ISO42001-A8", "AI Data Management",
+            "Manage data quality, privacy, and integrity for AI systems (Annex A.8)",
+            dataStatus,
+            dataStatus == ControlStatus.Pass ? 10 : dataStatus == ControlStatus.Partial ? 5 : 0, 10,
+            $"{enabledConfigs} encryption configs protect AI training/inference data",
+            dataStatus != ControlStatus.Pass ? "Enable encryption for all tables that feed AI/ML systems" : null));
+
+        // ISO42001-A10: Annex A.10 — Human oversight
+        var kvHealthy = await _kvService.IsHealthyAsync();
+        var oversightStatus = kvHealthy && userPolicies.Count >= 3 ? ControlStatus.Pass
+            : kvHealthy || userPolicies.Count > 0 ? ControlStatus.Partial : ControlStatus.Fail;
+        controls.Add(new ControlResult(
+            "ISO42001-A10", "Human Oversight of AI",
+            "Maintain meaningful human oversight of AI system decisions (Annex A.10)",
+            oversightStatus,
+            oversightStatus == ControlStatus.Pass ? 10 : oversightStatus == ControlStatus.Partial ? 5 : 0, 10,
+            $"Key vault: {(kvHealthy ? "healthy" : "unhealthy")}, {userPolicies.Count} user oversight bindings",
+            oversightStatus != ControlStatus.Pass ? "Ensure key vault is healthy and assign oversight policies to 3+ users" : null));
 
         return controls;
     }

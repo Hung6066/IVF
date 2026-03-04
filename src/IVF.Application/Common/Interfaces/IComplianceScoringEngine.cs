@@ -16,7 +16,10 @@ public enum ComplianceFramework
 {
     Hipaa,
     Soc2,
-    Gdpr
+    Gdpr,
+    HitrustCsf,
+    NistAiRmf,
+    Iso42001
 }
 
 public enum ControlStatus

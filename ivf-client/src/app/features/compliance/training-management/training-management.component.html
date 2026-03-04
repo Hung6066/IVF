@@ -1,0 +1,251 @@
+<div class="training-page">
+  <div class="page-header">
+    <div class="header-left">
+      <h1>📚 Quản lý Đào tạo Tuân thủ</h1>
+      <p class="subtitle">HIPAA, GDPR, Security Awareness — Giao, theo dõi, và chứng nhận</p>
+    </div>
+    <button class="btn-primary" (click)="openAssignModal()">➕ Giao đào tạo</button>
+  </div>
+
+  <div class="filters">
+    <select [(ngModel)]="filterType" (ngModelChange)="onFilterChange()">
+      <option value="">Tất cả loại</option>
+      @for (t of trainingTypes; track t) {
+        <option [value]="t">{{ t }}</option>
+      }
+    </select>
+    <select [(ngModel)]="filterCompleted" (ngModelChange)="onFilterChange()">
+      <option value="">Tất cả trạng thái</option>
+      <option value="true">Đã hoàn thành</option>
+      <option value="false">Chưa hoàn thành</option>
+    </select>
+    <label class="checkbox-filter">
+      <input type="checkbox" [(ngModel)]="filterOverdue" (ngModelChange)="onFilterChange()" />
+      Chỉ quá hạn
+    </label>
+  </div>
+
+  @if (loading()) {
+    <div class="loading-state"><div class="spinner"></div></div>
+  } @else {
+    <div class="stats-bar">
+      <div class="stat">
+        <span class="stat-value">{{ totalCount() }}</span>
+        <span class="stat-label">Tổng</span>
+      </div>
+      <div class="stat completed">
+        <span class="stat-value">{{ completedCount }}</span>
+        <span class="stat-label">Hoàn thành</span>
+      </div>
+      <div class="stat overdue">
+        <span class="stat-value">{{ overdueCount }}</span>
+        <span class="stat-label">Quá hạn</span>
+      </div>
+    </div>
+
+    <div class="training-list">
+      @for (t of trainings(); track t.id) {
+        <div
+          class="training-card"
+          [class.completed]="t.isCompleted"
+          [class.overdue]="isOverdue(t)"
+          [class.expiring]="isExpiringSoon(t)"
+        >
+          <div class="card-header">
+            <div class="card-title">
+              <span class="type-badge" [attr.data-type]="t.trainingType">{{ t.trainingType }}</span>
+              <h3>{{ t.trainingName }}</h3>
+            </div>
+            <div class="card-status">
+              @if (t.isCompleted) {
+                <span class="status-badge completed">✅ Hoàn thành</span>
+              } @else if (isOverdue(t)) {
+                <span class="status-badge overdue">⚠️ Quá hạn {{ -getDaysUntilDue(t) }} ngày</span>
+              } @else {
+                <span class="status-badge pending">⏳ Còn {{ getDaysUntilDue(t) }} ngày</span>
+              }
+            </div>
+          </div>
+
+          @if (t.description) {
+            <p class="description">{{ t.description }}</p>
+          }
+
+          <div class="card-details">
+            <div class="detail">
+              <span class="label">Nhân viên:</span> {{ getUserDisplay(t.userId) }}
+            </div>
+            <div class="detail">
+              <span class="label">Giao ngày:</span> {{ t.assignedAt | date: 'dd/MM/yyyy' }}
+            </div>
+            <div class="detail">
+              <span class="label">Hạn:</span> {{ t.dueDate | date: 'dd/MM/yyyy' }}
+            </div>
+            <div class="detail"><span class="label">Ngưỡng đạt:</span> {{ t.passThreshold }}%</div>
+
+            @if (t.isCompleted) {
+              <div class="detail">
+                <span class="label">Điểm:</span>
+                <span [class.pass]="t.isPassed" [class.fail]="!t.isPassed"
+                  >{{ t.scorePercent }}%</span
+                >
+                @if (t.isPassed) {
+                  ✅
+                } @else {
+                  ❌
+                }
+              </div>
+              <div class="detail">
+                <span class="label">Hoàn thành:</span> {{ t.completedAt | date: 'dd/MM/yyyy' }}
+              </div>
+              @if (t.certificateId) {
+                <div class="detail">
+                  <span class="label">Chứng chỉ:</span> {{ t.certificateId }}
+                </div>
+              }
+            }
+
+            @if (t.expiresAt) {
+              <div class="detail">
+                <span class="label">Hết hạn:</span>
+                <span [class.expiring-text]="isExpiringSoon(t)">{{
+                  t.expiresAt | date: 'dd/MM/yyyy'
+                }}</span>
+              </div>
+            }
+          </div>
+
+          @if (!t.isCompleted) {
+            <div class="card-actions">
+              <button class="btn-success" (click)="openCompleteModal(t)">✅ Hoàn thành</button>
+            </div>
+          }
+        </div>
+      } @empty {
+        <div class="empty-state">
+          <p>📚 Chưa có đào tạo nào</p>
+        </div>
+      }
+    </div>
+  }
+
+  <!-- Assign Training Modal -->
+  @if (showAssignModal) {
+    <div class="modal-overlay" (click)="showAssignModal = false">
+      <div class="modal" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h2>➕ Giao đào tạo mới</h2>
+          <button class="close-btn" (click)="showAssignModal = false">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Nhân viên *</label>
+            <input
+              type="text"
+              [(ngModel)]="userSearchQuery"
+              (input)="onUserSearch($any($event.target).value)"
+              placeholder="🔍 Tìm nhân viên..."
+              class="search-input"
+            />
+            <select [(ngModel)]="assignForm.userId" class="user-select">
+              <option value="">-- Chọn nhân viên --</option>
+              @for (u of users(); track u.id) {
+                <option [value]="u.id">{{ u.fullName }} ({{ u.username }}) — {{ u.role }}</option>
+              }
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Loại đào tạo *</label>
+            <select [(ngModel)]="assignForm.trainingType">
+              <option value="">-- Chọn --</option>
+              @for (t of trainingTypes; track t) {
+                <option [value]="t">{{ t }}</option>
+              }
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Tên khóa đào tạo *</label>
+            <input type="text" [(ngModel)]="assignForm.trainingName" placeholder="Nhập tên khóa" />
+          </div>
+          <div class="form-group">
+            <label>Mô tả</label>
+            <textarea
+              [(ngModel)]="assignForm.description"
+              rows="3"
+              placeholder="Mô tả nội dung..."
+            ></textarea>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Hạn hoàn thành *</label>
+              <input type="date" [(ngModel)]="assignForm.dueDate" />
+            </div>
+            <div class="form-group">
+              <label>Ngưỡng đạt (%)</label>
+              <input type="number" [(ngModel)]="assignForm.passThreshold" min="0" max="100" />
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary" (click)="showAssignModal = false">Hủy</button>
+          <button class="btn-primary" (click)="submitAssign()">Giao đào tạo</button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- Complete Training Modal -->
+  @if (showCompleteModal && selectedTraining) {
+    <div class="modal-overlay" (click)="showCompleteModal = false">
+      <div class="modal" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h2>✅ Hoàn thành đào tạo</h2>
+          <button class="close-btn" (click)="showCompleteModal = false">✕</button>
+        </div>
+        <div class="modal-body">
+          <p class="context">
+            <strong>{{ selectedTraining.trainingName }}</strong> ({{
+              selectedTraining.trainingType
+            }})
+          </p>
+          <p class="context">Ngưỡng đạt: {{ selectedTraining.passThreshold }}%</p>
+          <div class="form-group">
+            <label>Điểm (%)*</label>
+            <input
+              type="number"
+              [(ngModel)]="completeScore"
+              min="0"
+              max="100"
+              placeholder="0 - 100"
+            />
+          </div>
+          <div class="form-group">
+            <label>Bằng chứng / Ghi chú</label>
+            <textarea
+              [(ngModel)]="completeEvidence"
+              rows="3"
+              placeholder="URL chứng chỉ, ghi chú..."
+            ></textarea>
+          </div>
+          @if (completeScore > 0) {
+            <div
+              class="result-preview"
+              [class.pass]="completeScore >= selectedTraining.passThreshold"
+              [class.fail]="completeScore < selectedTraining.passThreshold"
+            >
+              @if (completeScore >= selectedTraining.passThreshold) {
+                ✅ ĐẠT — {{ completeScore }}% ≥ {{ selectedTraining.passThreshold }}%
+              } @else {
+                ❌ KHÔNG ĐẠT — {{ completeScore }}% < {{ selectedTraining.passThreshold }}%
+              }
+            </div>
+          }
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary" (click)="showCompleteModal = false">Hủy</button>
+          <button class="btn-primary" (click)="submitComplete()">Xác nhận</button>
+        </div>
+      </div>
+    </div>
+  }
+</div>

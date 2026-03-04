@@ -128,6 +128,22 @@ public class IvfDbContext : DbContext
     public DbSet<PermissionDelegation> PermissionDelegations => Set<PermissionDelegation>();
     public DbSet<NotificationPreference> NotificationPreferences => Set<NotificationPreference>();
 
+    // Compliance — Breach Notification & Training Tracking
+    public DbSet<BreachNotification> BreachNotifications => Set<BreachNotification>();
+    public DbSet<ComplianceTraining> ComplianceTrainings => Set<ComplianceTraining>();
+
+    // Compliance — Phase 2: Asset Inventory, ROPA, AI Bias Testing
+    public DbSet<AssetInventory> AssetInventories => Set<AssetInventory>();
+    public DbSet<ProcessingActivity> ProcessingActivities => Set<ProcessingActivity>();
+    public DbSet<AiBiasTestResult> AiBiasTestResults => Set<AiBiasTestResult>();
+
+    // Compliance — Phase 3: AI Model Versioning
+    public DbSet<AiModelVersion> AiModelVersions => Set<AiModelVersion>();
+
+    // Compliance — Phase 4: DSR Tracking, Compliance Schedule, Ongoing Monitoring
+    public DbSet<DataSubjectRequest> DataSubjectRequests => Set<DataSubjectRequest>();
+    public DbSet<ComplianceSchedule> ComplianceSchedules => Set<ComplianceSchedule>();
+
     // Vault System (self-hosted, Azure KV only for auto-unseal wrap/unwrap)
     public DbSet<VaultSecret> VaultSecrets => Set<VaultSecret>();
     public DbSet<VaultPolicy> VaultPolicies => Set<VaultPolicy>();

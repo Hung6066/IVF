@@ -294,6 +294,50 @@ export const routes: Routes = [
         path: 'forms',
         loadChildren: () => import('./features/forms/forms.routes').then((m) => m.FORMS_ROUTES),
       },
+
+      // ─── Compliance ───
+      {
+        path: 'compliance',
+        loadComponent: () =>
+          import('./features/compliance/compliance-dashboard/compliance-dashboard.component').then(
+            (m) => m.ComplianceDashboardComponent,
+          ),
+      },
+      {
+        path: 'compliance/dsr',
+        loadComponent: () =>
+          import('./features/compliance/dsr-management/dsr-management.component').then(
+            (m) => m.DsrManagementComponent,
+          ),
+      },
+      {
+        path: 'compliance/schedule',
+        loadComponent: () =>
+          import('./features/compliance/compliance-schedule/compliance-schedule.component').then(
+            (m) => m.ComplianceScheduleComponent,
+          ),
+      },
+      {
+        path: 'compliance/assets',
+        loadComponent: () =>
+          import('./features/compliance/asset-inventory/asset-inventory.component').then(
+            (m) => m.AssetInventoryComponent,
+          ),
+      },
+      {
+        path: 'compliance/ai',
+        loadComponent: () =>
+          import('./features/compliance/ai-governance/ai-governance.component').then(
+            (m) => m.AiGovernanceComponent,
+          ),
+      },
+      {
+        path: 'compliance/training',
+        loadComponent: () =>
+          import('./features/compliance/training-management/training-management.component').then(
+            (m) => m.TrainingManagementComponent,
+          ),
+      },
     ],
   },
   { path: '**', redirectTo: 'login' },

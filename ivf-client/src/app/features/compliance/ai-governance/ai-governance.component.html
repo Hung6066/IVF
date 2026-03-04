@@ -1,0 +1,172 @@
+<div class="ai-page">
+  <div class="page-header">
+    <div class="header-left">
+      <h1>🤖 Quản trị AI</h1>
+      <p class="subtitle">
+        NIST AI RMF & ISO 42001 — Versioning, Bias Testing, Fairness Monitoring
+      </p>
+    </div>
+  </div>
+
+  <div class="tab-nav">
+    <button [class.active]="activeTab() === 'models'" (click)="activeTab.set('models')">
+      🚀 AI Models ({{ totalModels() }})
+    </button>
+    <button [class.active]="activeTab() === 'bias'" (click)="activeTab.set('bias')">
+      ⚖️ Bias Tests ({{ totalTests() }})
+    </button>
+  </div>
+
+  <div class="filters">
+    <input
+      type="text"
+      [(ngModel)]="filterSystem"
+      (input)="onFilterChange()"
+      placeholder="🔍 Hệ thống AI..."
+    />
+    @if (activeTab() === 'models') {
+      <select [(ngModel)]="filterStatus" (ngModelChange)="onFilterChange()">
+        <option value="">Tất cả trạng thái</option>
+        @for (s of modelStatuses; track s) {
+          <option [value]="s">{{ s }}</option>
+        }
+      </select>
+    }
+  </div>
+
+  @if (loading()) {
+    <div class="loading-state"><div class="spinner"></div></div>
+  } @else {
+    <!-- Models Tab -->
+    @if (activeTab() === 'models') {
+      <div class="data-table">
+        <table>
+          <thead>
+            <tr>
+              <th>Hệ thống AI</th>
+              <th>Version</th>
+              <th>Trạng thái</th>
+              <th>Accuracy</th>
+              <th>Precision</th>
+              <th>Recall</th>
+              <th>F1</th>
+              <th>FPR</th>
+              <th>FNR</th>
+              <th>Bias</th>
+              <th>Ngày tạo</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (model of models(); track model.id) {
+              <tr
+                [class.deployed]="model.status === 'Deployed'"
+                [class.retired]="model.status === 'Retired'"
+              >
+                <td class="bold">{{ model.aiSystemName }}</td>
+                <td>
+                  <span class="version-badge">{{ model.modelVersion }}</span>
+                  @if (model.previousVersion) {
+                    <span class="prev-version">← {{ model.previousVersion }}</span>
+                  }
+                </td>
+                <td>
+                  <span class="status-badge" [attr.data-status]="model.status">
+                    {{ getStatusIcon(model.status) }} {{ model.status }}
+                  </span>
+                </td>
+                <td>{{ formatPercent(model.accuracy) }}</td>
+                <td>{{ formatPercent(model.precision) }}</td>
+                <td>{{ formatPercent(model.recall) }}</td>
+                <td>{{ formatPercent(model.f1Score) }}</td>
+                <td [class.danger]="model.fpr && model.fpr > 0.05">
+                  {{ formatPercent(model.fpr) }}
+                </td>
+                <td [class.danger]="model.fnr && model.fnr > 0.05">
+                  {{ formatPercent(model.fnr) }}
+                </td>
+                <td>
+                  @if (model.biasTestPassed) {
+                    <span class="pass">✅ Pass</span>
+                  } @else {
+                    <span class="fail">❌ Fail</span>
+                  }
+                </td>
+                <td class="date">{{ model.createdAt | date: 'dd/MM/yyyy' }}</td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="11" class="empty-state">Chưa có model nào</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      @if (models().length > 0) {
+        <div class="legend">
+          <span><span class="dot deployed"></span> Deployed</span>
+          <span><span class="dot retired"></span> Retired</span>
+          <span class="danger-text">* FPR/FNR > 5% cần xem xét</span>
+        </div>
+      }
+    }
+
+    <!-- Bias Tests Tab -->
+    @if (activeTab() === 'bias') {
+      <div class="data-table">
+        <table>
+          <thead>
+            <tr>
+              <th>Hệ thống AI</th>
+              <th>Loại test</th>
+              <th>Thuộc tính</th>
+              <th>Nhóm</th>
+              <th>Mẫu</th>
+              <th>FPR</th>
+              <th>FNR</th>
+              <th>Accuracy</th>
+              <th>F1</th>
+              <th>Disparity FPR</th>
+              <th>Kết quả</th>
+              <th>Ngày test</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (test of biasTests(); track test.id) {
+              <tr [class.failed]="!test.passesFairnessThreshold">
+                <td class="bold">{{ test.aiSystemName }}</td>
+                <td>{{ test.testType }}</td>
+                <td>{{ test.protectedAttribute }}</td>
+                <td>{{ test.protectedGroupValue }}</td>
+                <td>{{ test.sampleSize }}</td>
+                <td [class.danger]="test.falsePositiveRate > 0.05">
+                  {{ (test.falsePositiveRate * 100).toFixed(2) }}%
+                </td>
+                <td [class.danger]="test.falseNegativeRate > 0.05">
+                  {{ (test.falseNegativeRate * 100).toFixed(2) }}%
+                </td>
+                <td>{{ (test.accuracy * 100).toFixed(1) }}%</td>
+                <td>{{ (test.f1Score * 100).toFixed(1) }}%</td>
+                <td [class.danger]="test.disparityRatioFpr && test.disparityRatioFpr > 1.2">
+                  {{ test.disparityRatioFpr ? test.disparityRatioFpr.toFixed(3) : '—' }}
+                </td>
+                <td>
+                  @if (test.passesFairnessThreshold) {
+                    <span class="pass">✅ Pass</span>
+                  } @else {
+                    <span class="fail">❌ Fail</span>
+                  }
+                </td>
+                <td class="date">{{ test.createdAt | date: 'dd/MM/yyyy' }}</td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="12" class="empty-state">Chưa có bias test nào</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  }
+</div>

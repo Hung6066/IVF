@@ -1,0 +1,443 @@
+<div class="compliance-dashboard">
+  <!-- Header -->
+  <div class="page-header">
+    <div class="header-left">
+      <h1>🛡️ Trung tâm tuân thủ</h1>
+      <p class="subtitle">
+        Giám sát tuân thủ theo thời gian thực — SOC 2, ISO 27001, HIPAA, GDPR, HITRUST, NIST AI RMF,
+        ISO 42001
+      </p>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-outline" (click)="loadAll()">🔄 Làm mới</button>
+    </div>
+  </div>
+
+  @if (loading()) {
+    <div class="loading-state">
+      <div class="spinner"></div>
+      <p>Đang tải dữ liệu tuân thủ...</p>
+    </div>
+  } @else if (health()) {
+    <!-- Tab Navigation -->
+    <div class="tab-nav">
+      <button [class.active]="activeTab() === 'overview'" (click)="activeTab.set('overview')">
+        📊 Tổng quan
+      </button>
+      <button [class.active]="activeTab() === 'gdpr'" (click)="activeTab.set('gdpr')">
+        🇪🇺 GDPR
+      </button>
+      <button [class.active]="activeTab() === 'security'" (click)="activeTab.set('security')">
+        🔒 Bảo mật
+      </button>
+      <button [class.active]="activeTab() === 'ai'" (click)="activeTab.set('ai')">🤖 AI</button>
+      <button [class.active]="activeTab() === 'audit'" (click)="activeTab.set('audit')">
+        📋 Audit
+      </button>
+    </div>
+
+    <!-- Overview Tab -->
+    @if (activeTab() === 'overview') {
+      <!-- Health Score Banner -->
+      <div class="health-banner" [class]="'health-' + health()!.healthStatus.toLowerCase()">
+        <div class="health-score">
+          <div class="score-circle" [style.border-color]="getHealthColor()">
+            <span class="score-value">{{ health()!.overallHealthScore }}</span>
+            <span class="score-label">điểm</span>
+          </div>
+        </div>
+        <div class="health-info">
+          <h2>
+            {{ getStatusIcon(health()!.healthStatus) }}
+            {{
+              health()!.healthStatus === 'Healthy'
+                ? 'Hệ thống tuân thủ tốt'
+                : health()!.healthStatus === 'Warning'
+                  ? 'Cần chú ý'
+                  : 'Cần xử lý gấp'
+            }}
+          </h2>
+          <p>Điểm sức khoẻ tuân thủ tổng thể dựa trên phân tích 7 framework quốc tế</p>
+        </div>
+      </div>
+
+      <!-- Quick Stats -->
+      <div class="stats-grid">
+        <div class="stat-card" routerLink="/compliance/dsr">
+          <div class="stat-icon gdpr">🇪🇺</div>
+          <div class="stat-content">
+            <span class="stat-value">{{ health()!.gdpr.dsrPending }}</span>
+            <span class="stat-label">DSR đang chờ</span>
+            @if (health()!.gdpr.dsrOverdue > 0) {
+              <span class="stat-alert">{{ health()!.gdpr.dsrOverdue }} quá hạn</span>
+            }
+          </div>
+        </div>
+
+        <div class="stat-card" routerLink="/compliance/schedule">
+          <div class="stat-icon tasks">📋</div>
+          <div class="stat-content">
+            <span class="stat-value">{{ health()!.tasks.overdue }}</span>
+            <span class="stat-label">Tác vụ quá hạn</span>
+            <span class="stat-sub">/ {{ health()!.tasks.totalActive }} tổng</span>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-icon security">🔒</div>
+          <div class="stat-content">
+            <span class="stat-value">{{ health()!.security.openIncidents }}</span>
+            <span class="stat-label">Sự cố mở</span>
+            @if (health()!.security.criticalIncidents > 0) {
+              <span class="stat-alert"
+                >{{ health()!.security.criticalIncidents }} nghiêm trọng</span
+              >
+            }
+          </div>
+        </div>
+
+        <div class="stat-card" routerLink="/compliance/training">
+          <div class="stat-icon training">🎓</div>
+          <div class="stat-content">
+            <span class="stat-value">{{ health()!.training.complianceRate }}%</span>
+            <span class="stat-label">Tỷ lệ đào tạo</span>
+            @if (health()!.training.overdue > 0) {
+              <span class="stat-alert">{{ health()!.training.overdue }} quá hạn</span>
+            }
+          </div>
+        </div>
+
+        <div class="stat-card" routerLink="/compliance/assets">
+          <div class="stat-icon assets">🖥️</div>
+          <div class="stat-content">
+            <span class="stat-value">{{ health()!.assets.totalAssets }}</span>
+            <span class="stat-label">Tài sản CNTT</span>
+          </div>
+        </div>
+
+        <div class="stat-card" routerLink="/compliance/ai">
+          <div class="stat-icon ai">🤖</div>
+          <div class="stat-content">
+            <span class="stat-value">{{ health()!.ai.deployedModels }}</span>
+            <span class="stat-label">AI models</span>
+            @if (health()!.ai.modelsRequiringAttention > 0) {
+              <span class="stat-alert">{{ health()!.ai.modelsRequiringAttention }} cần xử lý</span>
+            }
+          </div>
+        </div>
+      </div>
+
+      <!-- Alerts -->
+      @if (health()!.alerts && health()!.alerts.length > 0) {
+        <div class="section">
+          <h3>⚡ Cảnh báo tuân thủ</h3>
+          <div class="alerts-list">
+            @for (alert of health()!.alerts; track alert.message) {
+              <div class="alert-item" [class]="'alert-' + alert.severity.toLowerCase()">
+                <span class="alert-icon">{{ getAlertIcon(alert.severity) }}</span>
+                <span class="alert-category">{{ alert.category }}</span>
+                <span class="alert-message">{{ alert.message }}</span>
+              </div>
+            }
+          </div>
+        </div>
+      }
+
+      <!-- Quick Navigation -->
+      <div class="section">
+        <h3>🔗 Quản lý tuân thủ</h3>
+        <div class="nav-grid">
+          <a routerLink="/compliance/dsr" class="nav-card">
+            <span class="nav-icon">📝</span>
+            <span class="nav-title">Yêu cầu chủ thể dữ liệu</span>
+            <span class="nav-desc">GDPR Art. 12-23 — Quản lý DSR</span>
+          </a>
+          <a routerLink="/compliance/schedule" class="nav-card">
+            <span class="nav-icon">📅</span>
+            <span class="nav-title">Lịch tuân thủ</span>
+            <span class="nav-desc">Tác vụ định kỳ & nhắc nhở</span>
+          </a>
+          <a routerLink="/compliance/training" class="nav-card">
+            <span class="nav-icon">🎓</span>
+            <span class="nav-title">Đào tạo tuân thủ</span>
+            <span class="nav-desc">Giao và theo dõi khóa học</span>
+          </a>
+          <a routerLink="/compliance/assets" class="nav-card">
+            <span class="nav-icon">🖥️</span>
+            <span class="nav-title">Kho tài sản CNTT</span>
+            <span class="nav-desc">ISO 27001 A.5.9 — CMDB</span>
+          </a>
+          <a routerLink="/compliance/ai" class="nav-card">
+            <span class="nav-icon">🤖</span>
+            <span class="nav-title">Quản trị AI</span>
+            <span class="nav-desc">NIST AI RMF & ISO 42001</span>
+          </a>
+        </div>
+      </div>
+    }
+
+    <!-- GDPR Tab -->
+    @if (activeTab() === 'gdpr') {
+      <div class="section">
+        <h3>🇪🇺 Số liệu GDPR</h3>
+        <div class="metrics-grid">
+          <div class="metric-card">
+            <span class="metric-label">Tổng DSR</span>
+            <span class="metric-value">{{ health()!.gdpr.dsrTotal }}</span>
+          </div>
+          <div class="metric-card">
+            <span class="metric-label">DSR đang chờ</span>
+            <span class="metric-value warn">{{ health()!.gdpr.dsrPending }}</span>
+          </div>
+          <div class="metric-card">
+            <span class="metric-label">DSR quá hạn</span>
+            <span class="metric-value" [class.danger]="health()!.gdpr.dsrOverdue > 0">{{
+              health()!.gdpr.dsrOverdue
+            }}</span>
+          </div>
+          <div class="metric-card">
+            <span class="metric-label">Tỷ lệ tuân thủ DSR</span>
+            <span class="metric-value" [class.success]="health()!.gdpr.dsrComplianceRate >= 95"
+              >{{ health()!.gdpr.dsrComplianceRate }}%</span
+            >
+          </div>
+          <div class="metric-card">
+            <span class="metric-label">Hoạt động xử lý (ROPA)</span>
+            <span class="metric-value">{{ health()!.gdpr.ropaActivities }}</span>
+          </div>
+          <div class="metric-card">
+            <span class="metric-label">Vi phạm 90 ngày qua</span>
+            <span class="metric-value" [class.danger]="health()!.gdpr.breachesLast90Days > 0">{{
+              health()!.gdpr.breachesLast90Days
+            }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-actions">
+        <a routerLink="/compliance/dsr" class="btn btn-primary">📝 Quản lý DSR</a>
+      </div>
+    }
+
+    <!-- Security Tab -->
+    @if (activeTab() === 'security') {
+      <div class="section">
+        <h3>🔒 Số liệu bảo mật</h3>
+        <div class="metrics-grid">
+          <div class="metric-card">
+            <span class="metric-label">Tổng sự cố</span>
+            <span class="metric-value">{{ health()!.security.totalIncidents }}</span>
+          </div>
+          <div class="metric-card">
+            <span class="metric-label">Sự cố mở</span>
+            <span class="metric-value" [class.danger]="health()!.security.openIncidents > 0">{{
+              health()!.security.openIncidents
+            }}</span>
+          </div>
+          <div class="metric-card">
+            <span class="metric-label">Sự cố nghiêm trọng</span>
+            <span class="metric-value" [class.danger]="health()!.security.criticalIncidents > 0">{{
+              health()!.security.criticalIncidents
+            }}</span>
+          </div>
+          <div class="metric-card">
+            <span class="metric-label">Đã xử lý 30 ngày</span>
+            <span class="metric-value success">{{ health()!.security.resolvedLast30Days }}</span>
+          </div>
+          <div class="metric-card">
+            <span class="metric-label">MTTR (giờ)</span>
+            <span class="metric-value">{{ health()!.security.mttrHours }}</span>
+          </div>
+        </div>
+      </div>
+
+      @if (securityTrends().length > 0) {
+        <div class="section">
+          <h3>📈 Xu hướng bảo mật (6 tháng)</h3>
+          <div class="trends-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>Tháng</th>
+                  <th>Tổng sự cố</th>
+                  <th>Nghiêm trọng</th>
+                  <th>Đã xử lý</th>
+                  <th>TB phản hồi (giờ)</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (trend of securityTrends(); track trend.month) {
+                  <tr>
+                    <td>{{ trend.month }}</td>
+                    <td>{{ trend.incidentCount }}</td>
+                    <td [class.danger]="trend.criticalCount > 0">{{ trend.criticalCount }}</td>
+                    <td class="success">{{ trend.resolvedCount }}</td>
+                    <td>{{ trend.avgResponseHours }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      }
+    }
+
+    <!-- AI Tab -->
+    @if (activeTab() === 'ai') {
+      <div class="section">
+        <h3>🤖 Hiệu suất AI</h3>
+        <div class="metrics-grid">
+          <div class="metric-card">
+            <span class="metric-label">Models triển khai</span>
+            <span class="metric-value">{{ health()!.ai.deployedModels }}</span>
+          </div>
+          <div class="metric-card">
+            <span class="metric-label">Bias tests đã chạy</span>
+            <span class="metric-value">{{ health()!.ai.biasTestsRun }}</span>
+          </div>
+          <div class="metric-card">
+            <span class="metric-label">Tỷ lệ pass bias</span>
+            <span class="metric-value" [class.success]="health()!.ai.biasTestPassRate >= 90"
+              >{{ health()!.ai.biasTestPassRate }}%</span
+            >
+          </div>
+          <div class="metric-card">
+            <span class="metric-label">Cần chú ý</span>
+            <span class="metric-value" [class.danger]="health()!.ai.modelsRequiringAttention > 0">{{
+              health()!.ai.modelsRequiringAttention
+            }}</span>
+          </div>
+        </div>
+      </div>
+
+      @if (aiPerformance()) {
+        @if (aiPerformance()!.deployedModels.length > 0) {
+          <div class="section">
+            <h3>📊 Models đang hoạt động</h3>
+            <div class="trends-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Hệ thống AI</th>
+                    <th>Phiên bản</th>
+                    <th>Accuracy</th>
+                    <th>Precision</th>
+                    <th>Recall</th>
+                    <th>FPR</th>
+                    <th>FNR</th>
+                    <th>Bias Test</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (model of aiPerformance()!.deployedModels; track model.aiSystemName) {
+                    <tr>
+                      <td class="bold">{{ model.aiSystemName }}</td>
+                      <td>{{ model.currentVersion }}</td>
+                      <td>{{ model.accuracy ? (model.accuracy * 100).toFixed(1) + '%' : '—' }}</td>
+                      <td>
+                        {{ model.precision ? (model.precision * 100).toFixed(1) + '%' : '—' }}
+                      </td>
+                      <td>{{ model.recall ? (model.recall * 100).toFixed(1) + '%' : '—' }}</td>
+                      <td [class.danger]="model.fpr && model.fpr > 0.05">
+                        {{ model.fpr ? (model.fpr * 100).toFixed(2) + '%' : '—' }}
+                      </td>
+                      <td [class.danger]="model.fnr && model.fnr > 0.05">
+                        {{ model.fnr ? (model.fnr * 100).toFixed(2) + '%' : '—' }}
+                      </td>
+                      <td>{{ model.biasTestPassed ? '✅' : '❌' }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+        }
+
+        @if (aiPerformance()!.alerts.length > 0) {
+          <div class="section">
+            <h3>⚠️ Cảnh báo AI</h3>
+            <div class="alerts-list">
+              @for (alert of aiPerformance()!.alerts; track alert.aiSystemName + alert.alertType) {
+                <div class="alert-item alert-high">
+                  <span class="alert-icon">🟠</span>
+                  <span class="alert-category">{{ alert.aiSystemName }}</span>
+                  <span class="alert-message">{{ alert.message }}</span>
+                </div>
+              }
+            </div>
+          </div>
+        }
+      }
+
+      <div class="section-actions">
+        <a routerLink="/compliance/ai" class="btn btn-primary">🤖 Quản trị AI chi tiết</a>
+      </div>
+    }
+
+    <!-- Audit Tab -->
+    @if (activeTab() === 'audit') {
+      @if (auditReadiness()) {
+        <div class="section">
+          <h3>📋 Sẵn sàng kiểm toán</h3>
+          <div class="audit-overall">
+            <div
+              class="score-circle large"
+              [style.border-color]="
+                auditReadiness()!.overallScore >= 80
+                  ? '#10b981'
+                  : auditReadiness()!.overallScore >= 60
+                    ? '#f59e0b'
+                    : '#ef4444'
+              "
+            >
+              <span class="score-value">{{ auditReadiness()!.overallScore }}</span>
+              <span class="score-label">tổng</span>
+            </div>
+          </div>
+
+          <div class="trends-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>Framework</th>
+                  <th>Điểm</th>
+                  <th>Tổng controls</th>
+                  <th>Đạt</th>
+                  <th>Một phần</th>
+                  <th>Thiếu</th>
+                  <th>Tiến độ</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (fw of auditReadiness()!.frameworks; track fw.framework) {
+                  <tr>
+                    <td class="bold">{{ fw.framework }}</td>
+                    <td>
+                      <span
+                        class="score-badge"
+                        [class.success]="fw.readinessScore >= 80"
+                        [class.warn]="fw.readinessScore >= 60 && fw.readinessScore < 80"
+                        [class.danger]="fw.readinessScore < 60"
+                      >
+                        {{ fw.readinessScore }}%
+                      </span>
+                    </td>
+                    <td>{{ fw.controlsTotal }}</td>
+                    <td class="success">{{ fw.controlsMet }}</td>
+                    <td class="warn">{{ fw.controlsPartial }}</td>
+                    <td [class.danger]="fw.controlsGaps > 0">{{ fw.controlsGaps }}</td>
+                    <td>
+                      <div class="progress-bar">
+                        <div class="progress-fill" [style.width.%]="fw.readinessScore"></div>
+                      </div>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      }
+    }
+  }
+</div>

@@ -538,6 +538,14 @@ app.MapZeroTrustEndpoints();
 app.MapSecurityEventEndpoints(); // Zero Trust security monitoring dashboard
 app.MapAdvancedSecurityEndpoints(); // Advanced security: lockouts, rate-limits, geo, IP whitelist
 app.MapEnterpriseSecurityEndpoints(); // Enterprise: conditional access, incidents, delegation, retention
+app.MapComplianceEndpoints(); // Compliance: breaches, training, password policy, dashboard
+app.MapAssetInventoryEndpoints(); // Phase 2: CMDB asset register (ISO 27001 A.5.9)
+app.MapProcessingActivityEndpoints(); // Phase 2: ROPA (GDPR Art. 30)
+app.MapAiBiasEndpoints(); // Phase 2: AI bias testing, FPR/FNR dashboard, explainability
+app.MapAiModelVersionEndpoints(); // Phase 3: AI model versioning, changelog, rollback
+app.MapDataSubjectRequestEndpoints(); // Phase 4: GDPR DSR tracking (Art. 12-23)
+app.MapComplianceScheduleEndpoints(); // Phase 4: Ongoing compliance task scheduler
+app.MapComplianceMonitoringEndpoints(); // Phase 4: Continuous monitoring, health dashboard, AI alerts
 
 // ── Config seeders: run in every environment (idempotent, no demo data) ──────
 {

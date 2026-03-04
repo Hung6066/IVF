@@ -42,6 +42,11 @@ public class Patient : BaseEntity
     public bool IsAnonymized { get; private set; }
     public DateTime? AnonymizedAt { get; private set; }
 
+    // GDPR Art. 18 — Right to restriction of processing
+    public bool IsRestricted { get; private set; }
+    public DateTime? RestrictedAt { get; private set; }
+    public string? RestrictionReason { get; private set; }
+
     // Risk & priority
     public RiskLevel RiskLevel { get; private set; } = RiskLevel.Low;
     public string? RiskNotes { get; private set; }
@@ -246,6 +251,22 @@ public class Patient : BaseEntity
     public void SetDataRetentionExpiry(DateTime expiryDate)
     {
         DataRetentionExpiryDate = expiryDate;
+        SetUpdated();
+    }
+
+    public void RestrictProcessing(string reason)
+    {
+        IsRestricted = true;
+        RestrictedAt = DateTime.UtcNow;
+        RestrictionReason = reason;
+        SetUpdated();
+    }
+
+    public void LiftRestriction()
+    {
+        IsRestricted = false;
+        RestrictedAt = null;
+        RestrictionReason = null;
         SetUpdated();
     }
 

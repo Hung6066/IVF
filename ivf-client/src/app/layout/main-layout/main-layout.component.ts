@@ -69,6 +69,18 @@ const FALLBACK_MENU: MenuSection[] = [
       { icon: '🎨', label: 'UI Library', route: '/ui-library', adminOnly: true },
     ],
   },
+  {
+    header: 'Tuân thủ',
+    adminOnly: true,
+    items: [
+      { icon: '📊', label: 'Tổng quan', route: '/compliance', adminOnly: true },
+      { icon: '📋', label: 'Yêu cầu DSR', route: '/compliance/dsr', adminOnly: true },
+      { icon: '📅', label: 'Lịch tuân thủ', route: '/compliance/schedule', adminOnly: true },
+      { icon: '🗃️', label: 'Tài sản dữ liệu', route: '/compliance/assets', adminOnly: true },
+      { icon: '🤖', label: 'Quản trị AI', route: '/compliance/ai', adminOnly: true },
+      { icon: '📚', label: 'Đào tạo', route: '/compliance/training', adminOnly: true },
+    ],
+  },
 ];
 
 @Component({

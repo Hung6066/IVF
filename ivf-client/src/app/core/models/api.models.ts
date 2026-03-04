@@ -12,3 +12,4 @@ export * from './audit.models';
 export * from './catalog.models';
 export * from './signing.models';
 export * from './security.model';
+export * from './compliance.model';

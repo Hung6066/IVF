@@ -1,0 +1,304 @@
+<div class="schedule-page">
+  <div class="page-header">
+    <div class="header-left">
+      <h1>📅 Lịch tuân thủ</h1>
+      <p class="subtitle">
+        Quản lý tác vụ định kỳ — SOC 2, ISO 27001, HIPAA, GDPR, HITRUST, NIST AI RMF, ISO 42001
+      </p>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-outline" (click)="seedDefaults()">🌱 Khởi tạo mặc định</button>
+      <button class="btn btn-primary" (click)="openCreate()">➕ Tạo tác vụ</button>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="filters">
+    <select [(ngModel)]="filterFramework" (ngModelChange)="onFilterChange()">
+      <option value="">Tất cả framework</option>
+      @for (fw of frameworks; track fw) {
+        <option [value]="fw">{{ fw }}</option>
+      }
+    </select>
+    <select [(ngModel)]="filterFrequency" (ngModelChange)="onFilterChange()">
+      <option value="">Tất cả tần suất</option>
+      @for (f of frequencies; track f) {
+        <option [value]="f">{{ getFrequencyLabel(f) }}</option>
+      }
+    </select>
+    <select [(ngModel)]="filterCategory" (ngModelChange)="onFilterChange()">
+      <option value="">Tất cả loại</option>
+      @for (c of categories; track c) {
+        <option [value]="c">{{ c }}</option>
+      }
+    </select>
+    <label class="checkbox-label">
+      <input type="checkbox" [(ngModel)]="filterOverdue" (ngModelChange)="onFilterChange()" /> Quá
+      hạn
+    </label>
+    <label class="checkbox-label">
+      <input type="checkbox" [(ngModel)]="filterUpcoming" (ngModelChange)="onFilterChange()" /> Sắp
+      đến hạn
+    </label>
+  </div>
+
+  @if (loading()) {
+    <div class="loading-state"><div class="spinner"></div></div>
+  } @else {
+    <div class="task-table">
+      <table>
+        <thead>
+          <tr>
+            <th>Ưu tiên</th>
+            <th>Tên tác vụ</th>
+            <th>Framework</th>
+            <th>Tần suất</th>
+            <th>Loại</th>
+            <th>Người phụ trách</th>
+            <th>Hạn chót</th>
+            <th>Trạng thái</th>
+            <th>Đã HT</th>
+            <th>Thao tác</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (task of tasks(); track task.id) {
+            <tr
+              [class.overdue]="task.isOverdue"
+              [class.upcoming]="task.isUpcoming && !task.isOverdue"
+              [class.paused]="task.status === 'Paused'"
+            >
+              <td>{{ getPriorityIcon(task.priority) }}</td>
+              <td>
+                <div class="task-name">{{ task.taskName }}</div>
+                <div class="task-desc">{{ task.description }}</div>
+              </td>
+              <td>
+                <span class="fw-badge">{{ task.framework }}</span>
+              </td>
+              <td>{{ getFrequencyLabel(task.frequency) }}</td>
+              <td>{{ task.category }}</td>
+              <td>{{ getUserDisplay(task.owner) }}</td>
+              <td [class.danger]="task.isOverdue">
+                @if (task.nextDueDate) {
+                  {{ task.nextDueDate | date: 'dd/MM/yyyy' }}
+                  @if (task.isOverdue) {
+                    <span class="overdue-tag">QUÁ HẠN</span>
+                  } @else if (task.isUpcoming) {
+                    <span class="upcoming-tag">SẮP ĐẾN</span>
+                  }
+                } @else {
+                  —
+                }
+              </td>
+              <td>
+                <span class="status-badge" [attr.data-status]="task.status">{{ task.status }}</span>
+              </td>
+              <td>{{ task.completionCount }}</td>
+              <td>
+                <div class="row-actions">
+                  @if (task.status === 'Active') {
+                    <button class="btn-sm btn-primary" (click)="openComplete(task)">✅</button>
+                    <button class="btn-sm" (click)="openAssign(task)" title="Giao việc">👤</button>
+                    <button class="btn-sm" (click)="pauseTask(task)" title="Tạm dừng">⏸️</button>
+                  }
+                  @if (task.status === 'Paused') {
+                    <button class="btn-sm btn-primary" (click)="resumeTask(task)" title="Tiếp tục">
+                      ▶️
+                    </button>
+                  }
+                </div>
+              </td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="10" class="empty-state">
+                Chưa có tác vụ nào. Bấm "Khởi tạo mặc định" để tạo 21 tác vụ mẫu.
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+
+  <!-- Create Modal -->
+  @if (showCreateModal) {
+    <div class="modal-overlay" (click)="showCreateModal = false">
+      <div class="modal" (click)="$event.stopPropagation()">
+        <h2>➕ Tạo tác vụ tuân thủ</h2>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Tên tác vụ *</label>
+            <input
+              type="text"
+              [(ngModel)]="createForm.taskName"
+              placeholder="VD: Security Metrics Review"
+            />
+          </div>
+          <div class="form-group">
+            <label>Framework *</label>
+            <select [(ngModel)]="createForm.framework">
+              @for (fw of frameworks; track fw) {
+                <option [value]="fw">{{ fw }}</option>
+              }
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Mô tả</label>
+          <textarea
+            [(ngModel)]="createForm.description"
+            rows="2"
+            placeholder="Mô tả tác vụ..."
+          ></textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Tần suất</label>
+            <select [(ngModel)]="createForm.frequency">
+              @for (f of frequencies; track f) {
+                <option [value]="f">{{ getFrequencyLabel(f) }}</option>
+              }
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Loại</label>
+            <select [(ngModel)]="createForm.category">
+              @for (c of categories; track c) {
+                <option [value]="c">{{ c }}</option>
+              }
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Ưu tiên</label>
+            <select [(ngModel)]="createForm.priority">
+              <option value="Critical">🔴 Critical</option>
+              <option value="High">🟠 High</option>
+              <option value="Medium">🟡 Medium</option>
+              <option value="Low">🟢 Low</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Người phụ trách *</label>
+            <input
+              type="text"
+              [(ngModel)]="userSearchQuery"
+              (input)="onUserSearch($any($event.target).value)"
+              placeholder="🔍 Tìm nhân viên..."
+              class="search-input"
+            />
+            <select [(ngModel)]="createForm.owner" class="user-select">
+              <option value="">-- Chọn nhân viên --</option>
+              @for (u of users(); track u.id) {
+                <option [value]="u.username">
+                  {{ u.fullName }} ({{ u.username }}) — {{ u.role }}
+                </option>
+              }
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Hạn chót đầu tiên *</label>
+            <input type="date" [(ngModel)]="createForm.nextDueDate" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Bằng chứng cần thiết</label>
+          <input
+            type="text"
+            [(ngModel)]="createForm.evidenceRequired"
+            placeholder="VD: Scan reports, meeting minutes..."
+          />
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-outline" (click)="showCreateModal = false">Huỷ</button>
+          <button
+            class="btn btn-primary"
+            (click)="submitCreate()"
+            [disabled]="!createForm.taskName || !createForm.owner || !createForm.nextDueDate"
+          >
+            Tạo
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- Complete Modal -->
+  @if (showCompleteModal) {
+    <div class="modal-overlay" (click)="showCompleteModal = false">
+      <div class="modal" (click)="$event.stopPropagation()">
+        <h2>✅ Hoàn thành tác vụ</h2>
+        <p class="modal-desc">{{ selectedTask()?.taskName }}</p>
+        <div class="form-group">
+          <label>Người hoàn thành *</label>
+          <input
+            type="text"
+            [(ngModel)]="userSearchQuery"
+            (input)="onUserSearch($any($event.target).value)"
+            placeholder="🔍 Tìm nhân viên..."
+            class="search-input"
+          />
+          <select [(ngModel)]="completeForm.completedBy" class="user-select">
+            <option value="">-- Chọn nhân viên --</option>
+            @for (u of users(); track u.id) {
+              <option [value]="u.username">{{ u.fullName }} ({{ u.username }})</option>
+            }
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Ghi chú / Bằng chứng</label>
+          <textarea
+            [(ngModel)]="completeForm.notes"
+            rows="3"
+            placeholder="Ghi chú kết quả..."
+          ></textarea>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-outline" (click)="showCompleteModal = false">Huỷ</button>
+          <button
+            class="btn btn-primary"
+            (click)="submitComplete()"
+            [disabled]="!completeForm.completedBy"
+          >
+            Hoàn thành
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- Assign Modal -->
+  @if (showAssignModal) {
+    <div class="modal-overlay" (click)="showAssignModal = false">
+      <div class="modal" (click)="$event.stopPropagation()">
+        <h2>👤 Giao tác vụ</h2>
+        <p class="modal-desc">{{ selectedTask()?.taskName }}</p>
+        <div class="form-group">
+          <label>Giao cho</label>
+          <input
+            type="text"
+            [(ngModel)]="userSearchQuery"
+            (input)="onUserSearch($any($event.target).value)"
+            placeholder="🔍 Tìm nhân viên..."
+            class="search-input"
+          />
+          <select [(ngModel)]="assignForm.userId" class="user-select">
+            <option value="">-- Chọn nhân viên --</option>
+            @for (u of users(); track u.id) {
+              <option [value]="u.id">{{ u.fullName }} ({{ u.username }}) — {{ u.role }}</option>
+            }
+          </select>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-outline" (click)="showAssignModal = false">Huỷ</button>
+          <button class="btn btn-primary" (click)="submitAssign()" [disabled]="!assignForm.userId">
+            Giao việc
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+</div>
