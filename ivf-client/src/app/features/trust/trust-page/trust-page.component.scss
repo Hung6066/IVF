@@ -1,0 +1,660 @@
+// ─── Trust Page — Public-facing security & compliance page ───
+// Design inspired by Vanta/Drata trust centers
+
+:host {
+  display: block;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+  color: #1a1a2e;
+  background: #f8f9fc;
+  min-height: 100vh;
+}
+
+// ─── Loading / Error ───
+.trust-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  gap: 16px;
+  color: #6b7280;
+
+  .spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid #e5e7eb;
+    border-top-color: #4f46e5;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+}
+
+.trust-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  color: #ef4444;
+  font-size: 1.1rem;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+// ─── Hero ───
+.trust-hero {
+  background: linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4338ca 100%);
+  color: white;
+  padding: 80px 24px 60px;
+  text-align: center;
+
+  .hero-content {
+    max-width: 720px;
+    margin: 0 auto;
+  }
+
+  .hero-badge {
+    display: inline-block;
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(8px);
+    padding: 6px 16px;
+    border-radius: 100px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    margin-bottom: 20px;
+    letter-spacing: 0.5px;
+  }
+
+  h1 {
+    font-size: 3rem;
+    font-weight: 700;
+    margin: 0 0 16px;
+    letter-spacing: -1px;
+  }
+
+  .hero-subtitle {
+    font-size: 1.15rem;
+    color: rgba(255, 255, 255, 0.85);
+    line-height: 1.6;
+    margin: 0 0 12px;
+  }
+
+  .hero-updated {
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.5);
+    margin: 0;
+  }
+}
+
+// ─── Navigation ───
+.trust-nav {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  padding: 12px 24px;
+  background: white;
+  border-bottom: 1px solid #e5e7eb;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+
+  button {
+    padding: 10px 20px;
+    border: none;
+    background: transparent;
+    color: #6b7280;
+    font-size: 0.9rem;
+    font-weight: 500;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+
+    &:hover {
+      background: #f3f4f6;
+      color: #1a1a2e;
+    }
+
+    &.active {
+      background: #eef2ff;
+      color: #4338ca;
+      font-weight: 600;
+    }
+  }
+}
+
+// ─── Section Base ───
+.trust-section {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 40px 24px;
+}
+
+.section-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin: 40px 0 20px;
+
+  &:first-child {
+    margin-top: 0;
+  }
+}
+
+.section-desc {
+  color: #6b7280;
+  margin: -12px 0 24px;
+  line-height: 1.6;
+}
+
+// ─── Metrics Grid ───
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.metric-card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  }
+
+  &.highlight {
+    background: linear-gradient(135deg, #4338ca, #6366f1);
+    color: white;
+    border-color: transparent;
+
+    .metric-label {
+      color: rgba(255, 255, 255, 0.8);
+    }
+  }
+
+  &.metric-success {
+    border-color: #10b981;
+  }
+
+  .metric-icon {
+    font-size: 1.5rem;
+    margin-bottom: 8px;
+  }
+
+  .metric-value {
+    font-size: 1.3rem;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+
+  .metric-label {
+    font-size: 0.8rem;
+    color: #6b7280;
+    font-weight: 500;
+  }
+}
+
+// ─── Framework Summary Bars ───
+.framework-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 24px;
+}
+
+.fw-bar {
+  .fw-bar-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+
+  .fw-bar-icon {
+    font-size: 1.1rem;
+  }
+
+  .fw-bar-name {
+    font-size: 0.9rem;
+    font-weight: 600;
+    flex: 1;
+  }
+
+  .fw-bar-score {
+    font-size: 0.9rem;
+    font-weight: 700;
+  }
+}
+
+.progress-track {
+  height: 8px;
+  background: #f3f4f6;
+  border-radius: 100px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: 100px;
+  transition: width 1s ease;
+
+  &.score-excellent {
+    background: linear-gradient(90deg, #10b981, #059669);
+  }
+  &.score-good {
+    background: linear-gradient(90deg, #3b82f6, #2563eb);
+  }
+  &.score-fair {
+    background: linear-gradient(90deg, #f59e0b, #d97706);
+  }
+  &.score-low {
+    background: linear-gradient(90deg, #ef4444, #dc2626);
+  }
+}
+
+.score-excellent {
+  color: #059669;
+}
+.score-good {
+  color: #2563eb;
+}
+.score-fair {
+  color: #d97706;
+}
+.score-low {
+  color: #dc2626;
+}
+
+// ─── Cert Grid ───
+.cert-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.cert-card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+  transition: transform 0.2s;
+
+  &:hover {
+    transform: translateY(-2px);
+  }
+
+  &.status-compliant {
+    border-left: 4px solid #10b981;
+  }
+
+  &.status-ready {
+    border-left: 4px solid #3b82f6;
+  }
+
+  &.status-progress {
+    border-left: 4px solid #f59e0b;
+  }
+
+  .cert-icon {
+    font-size: 2rem;
+    margin-bottom: 8px;
+  }
+
+  .cert-name {
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+
+  .cert-date {
+    font-size: 0.8rem;
+    color: #6b7280;
+  }
+}
+
+// ─── Framework Detail Grid ───
+.fw-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+}
+
+.fw-detail-card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 24px;
+  transition: box-shadow 0.2s;
+
+  &:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  }
+
+  .fw-detail-header {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    margin-bottom: 16px;
+
+    h3 {
+      margin: 0 0 4px;
+      font-size: 1.05rem;
+      font-weight: 700;
+    }
+
+    .fw-desc {
+      margin: 0;
+      font-size: 0.8rem;
+      color: #6b7280;
+      line-height: 1.4;
+    }
+  }
+
+  .fw-icon-lg {
+    font-size: 2rem;
+    flex-shrink: 0;
+  }
+
+  .fw-detail-body {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
+
+// ─── Score Ring (SVG donut) ───
+.fw-score-ring {
+  width: 72px;
+  height: 72px;
+
+  svg {
+    width: 100%;
+    height: 100%;
+  }
+
+  .ring-bg {
+    fill: none;
+    stroke: #f3f4f6;
+    stroke-width: 3;
+  }
+
+  .ring-fill {
+    fill: none;
+    stroke-width: 3;
+    stroke-linecap: round;
+    transform: rotate(-90deg);
+    transform-origin: 50% 50%;
+    transition: stroke-dasharray 1s ease;
+  }
+
+  .ring-text {
+    fill: #1a1a2e;
+    font-size: 8px;
+    font-weight: 700;
+    text-anchor: middle;
+  }
+
+  &.score-excellent .ring-fill {
+    stroke: #10b981;
+  }
+  &.score-good .ring-fill {
+    stroke: #3b82f6;
+  }
+  &.score-fair .ring-fill {
+    stroke: #f59e0b;
+  }
+  &.score-low .ring-fill {
+    stroke: #ef4444;
+  }
+}
+
+.fw-status-badge {
+  padding: 4px 12px;
+  border-radius: 100px;
+  font-size: 0.75rem;
+  font-weight: 600;
+
+  &.status-compliant {
+    background: #ecfdf5;
+    color: #059669;
+  }
+
+  &.status-ready {
+    background: #eff6ff;
+    color: #2563eb;
+  }
+
+  &.status-progress {
+    background: #fffbeb;
+    color: #d97706;
+  }
+
+  &.status-default {
+    background: #f3f4f6;
+    color: #6b7280;
+  }
+}
+
+// ─── Security Controls ───
+.controls-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+.control-card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 24px;
+
+  .control-title {
+    font-size: 1rem;
+    font-weight: 700;
+    margin: 0 0 16px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid #eef2ff;
+    color: #312e81;
+  }
+
+  .control-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+
+    li {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      font-size: 0.85rem;
+      color: #374151;
+      line-height: 1.4;
+    }
+
+    .check-icon {
+      color: #10b981;
+      font-weight: 700;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+  }
+}
+
+// ─── Documents & Contact ───
+.docs-contact-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 40px;
+}
+
+.doc-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.doc-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  transition: background 0.15s;
+
+  &:hover {
+    background: #f9fafb;
+  }
+
+  .doc-icon {
+    font-size: 1.1rem;
+    flex-shrink: 0;
+  }
+
+  .doc-name {
+    flex: 1;
+    font-size: 0.9rem;
+    font-weight: 500;
+  }
+
+  .doc-badge {
+    font-size: 0.7rem;
+    padding: 3px 8px;
+    border-radius: 100px;
+    font-weight: 600;
+
+    &.available {
+      background: #ecfdf5;
+      color: #059669;
+    }
+  }
+}
+
+.contact-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.contact-card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 20px;
+
+  &.accent {
+    background: linear-gradient(135deg, #fef3c7, #fde68a);
+    border-color: #f59e0b;
+  }
+
+  .contact-icon {
+    font-size: 1.5rem;
+    margin-bottom: 8px;
+  }
+
+  h4 {
+    margin: 0 0 4px;
+    font-size: 0.95rem;
+    font-weight: 700;
+  }
+
+  p {
+    margin: 0 0 8px;
+    font-size: 0.8rem;
+    color: #6b7280;
+  }
+
+  a {
+    color: #4338ca;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}
+
+// ─── Footer ───
+.trust-footer {
+  text-align: center;
+  padding: 32px 24px;
+  color: #9ca3af;
+  font-size: 0.8rem;
+  border-top: 1px solid #e5e7eb;
+  margin-top: 40px;
+}
+
+// ─── Responsive ───
+@media (max-width: 900px) {
+  .metrics-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .cert-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .fw-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .controls-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .docs-contact-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .trust-hero h1 {
+    font-size: 2rem;
+  }
+}
+
+@media (max-width: 600px) {
+  .metrics-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .cert-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .trust-nav {
+    flex-wrap: wrap;
+
+    button {
+      font-size: 0.8rem;
+      padding: 8px 14px;
+    }
+  }
+
+  .trust-hero {
+    padding: 48px 16px 40px;
+
+    h1 {
+      font-size: 1.75rem;
+    }
+  }
+}

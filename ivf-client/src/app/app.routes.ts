@@ -3,6 +3,11 @@ import { authGuard, guestGuard } from './core/guards/auth.guard';
 
 export const routes: Routes = [
   {
+    path: 'trust',
+    loadComponent: () =>
+      import('./features/trust/trust-page/trust-page.component').then((m) => m.TrustPageComponent),
+  },
+  {
     path: 'login',
     loadComponent: () => import('./auth/login/login.component').then((m) => m.LoginComponent),
     canActivate: [guestGuard],

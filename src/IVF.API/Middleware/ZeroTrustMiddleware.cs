@@ -44,6 +44,9 @@ public class ZeroTrustMiddleware
         "/api/notifications",
         "/api/dashboard",
         "/api/compliance",
+        "/api/ai",
+        "/api/admin/certificates",
+        "/api/trust",
         "/health",
         "/healthz",
         "/swagger"
@@ -141,10 +144,10 @@ public class ZeroTrustMiddleware
         var userRole = context.User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
 
         // DEBUG: log all claims to diagnose amr issue
-        _logger.LogWarning("ZT Claims for user {UserId}: {Claims}, AuthLevel={AuthLevel}",
-            securityContext.UserId,
-            string.Join(", ", context.User.Claims.Select(c => $"{c.Type}={c.Value}")),
-            securityContext.CurrentAuthLevel);
+        // _logger.LogWarning("ZT Claims for user {UserId}: {Claims}, AuthLevel={AuthLevel}",
+        //     securityContext.UserId,
+        //     string.Join(", ", context.User.Claims.Select(c => $"{c.Type}={c.Value}")),
+        //     securityContext.CurrentAuthLevel);
 
         var deviceFpHeader = context.Request.Headers["X-Device-Fingerprint"].FirstOrDefault();
         DeviceTrustResult? deviceTrustResult = null;

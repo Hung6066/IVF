@@ -551,6 +551,7 @@ app.MapAiModelVersionEndpoints(); // Phase 3: AI model versioning, changelog, ro
 app.MapDataSubjectRequestEndpoints(); // Phase 4: GDPR DSR tracking (Art. 12-23)
 app.MapComplianceScheduleEndpoints(); // Phase 4: Ongoing compliance task scheduler
 app.MapComplianceMonitoringEndpoints(); // Phase 4: Continuous monitoring, health dashboard, AI alerts
+app.MapTrustPageEndpoints(); // Public trust/security page — no auth required
 
 // ── Config seeders: run in every environment (idempotent, no demo data) ──────
 {

@@ -1,0 +1,244 @@
+@if (loading()) {
+  <div class="trust-loading">
+    <div class="spinner"></div>
+    <p>Loading security information...</p>
+  </div>
+} @else if (error()) {
+  <div class="trust-error">
+    <p>{{ error() }}</p>
+  </div>
+} @else if (data(); as d) {
+  <div class="trust-page">
+    <!-- Hero -->
+    <header class="trust-hero">
+      <div class="hero-content">
+        <div class="hero-badge">🛡️ Security & Compliance</div>
+        <h1>Trust Center</h1>
+        <p class="hero-subtitle">
+          {{ d.companyName }} is committed to protecting your data with enterprise-grade security
+          controls and compliance with international standards.
+        </p>
+        <p class="hero-updated">Last updated: {{ d.lastUpdated }}</p>
+      </div>
+    </header>
+
+    <!-- Navigation -->
+    <nav class="trust-nav">
+      <button [class.active]="activeSection() === 'overview'" (click)="setSection('overview')">
+        Overview
+      </button>
+      <button [class.active]="activeSection() === 'frameworks'" (click)="setSection('frameworks')">
+        Compliance Frameworks
+      </button>
+      <button [class.active]="activeSection() === 'security'" (click)="setSection('security')">
+        Security Controls
+      </button>
+      <button [class.active]="activeSection() === 'documents'" (click)="setSection('documents')">
+        Documents & Contact
+      </button>
+    </nav>
+
+    <!-- Overview Section -->
+    @if (activeSection() === 'overview') {
+      <section class="trust-section">
+        <!-- Key Metrics -->
+        <div class="metrics-grid">
+          <div class="metric-card highlight">
+            <div class="metric-icon">🛡️</div>
+            <div class="metric-value">7</div>
+            <div class="metric-label">Compliance Frameworks</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-icon">🔐</div>
+            <div class="metric-value">{{ d.metrics.encryptionAtRest }}</div>
+            <div class="metric-label">Encryption at Rest</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-icon">🌐</div>
+            <div class="metric-value">{{ d.metrics.encryptionInTransit }}</div>
+            <div class="metric-label">Encryption in Transit</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-icon">📊</div>
+            <div class="metric-value">{{ d.metrics.uptimeSla }}</div>
+            <div class="metric-label">Uptime SLA</div>
+          </div>
+          <div class="metric-card" [class.metric-success]="d.metrics.mfaEnforced">
+            <div class="metric-icon">🔑</div>
+            <div class="metric-value">{{ d.metrics.mfaEnforced ? 'Enforced' : 'Optional' }}</div>
+            <div class="metric-label">Multi-Factor Auth</div>
+          </div>
+          <div class="metric-card" [class.metric-success]="d.metrics.zeroTrustEnabled">
+            <div class="metric-icon">🏛️</div>
+            <div class="metric-value">{{ d.metrics.zeroTrustEnabled ? 'Active' : 'Inactive' }}</div>
+            <div class="metric-label">Zero Trust Architecture</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-icon">💾</div>
+            <div class="metric-value">{{ d.metrics.backupFrequency }}</div>
+            <div class="metric-label">Backup Frequency</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-icon">🤖</div>
+            <div class="metric-value">{{ d.metrics.aiBiasFairnessRate }}%</div>
+            <div class="metric-label">AI Fairness Rate</div>
+          </div>
+        </div>
+
+        <!-- Live Compliance Scores -->
+        <h2 class="section-title">Compliance Posture</h2>
+        <div class="framework-summary">
+          @for (fw of d.frameworks; track fw.id) {
+            <div class="fw-bar">
+              <div class="fw-bar-header">
+                <span class="fw-bar-icon">{{ getFrameworkIcon(fw.icon) }}</span>
+                <span class="fw-bar-name">{{ fw.name }}</span>
+                <span class="fw-bar-score" [class]="getScoreClass(fw.score)">{{ fw.score }}%</span>
+              </div>
+              <div class="progress-track">
+                <div
+                  class="progress-fill"
+                  [class]="getScoreClass(fw.score)"
+                  [style.width.%]="fw.score"
+                ></div>
+              </div>
+            </div>
+          }
+        </div>
+
+        <!-- Certifications -->
+        <h2 class="section-title">Certifications & Assessments</h2>
+        <div class="cert-grid">
+          @for (cert of d.certifications; track cert.name) {
+            <div class="cert-card" [class]="getStatusClass(cert.status)">
+              <div class="cert-icon">{{ getCertStatusIcon(cert.status) }}</div>
+              <div class="cert-name">{{ cert.name }}</div>
+              <div class="cert-date">{{ cert.date }}</div>
+            </div>
+          }
+        </div>
+      </section>
+    }
+
+    <!-- Frameworks Detail -->
+    @if (activeSection() === 'frameworks') {
+      <section class="trust-section">
+        <h2 class="section-title">Compliance Framework Details</h2>
+        <div class="fw-detail-grid">
+          @for (fw of d.frameworks; track fw.id) {
+            <div class="fw-detail-card">
+              <div class="fw-detail-header">
+                <span class="fw-icon-lg">{{ getFrameworkIcon(fw.icon) }}</span>
+                <div>
+                  <h3>{{ fw.name }}</h3>
+                  <p class="fw-desc">{{ fw.description }}</p>
+                </div>
+              </div>
+              <div class="fw-detail-body">
+                <div class="fw-score-ring" [class]="getScoreClass(fw.score)">
+                  <svg viewBox="0 0 36 36">
+                    <path
+                      class="ring-bg"
+                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                    />
+                    <path
+                      class="ring-fill"
+                      [attr.stroke-dasharray]="fw.score + ', 100'"
+                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                    />
+                    <text x="18" y="20.35" class="ring-text">{{ fw.score }}%</text>
+                  </svg>
+                </div>
+                <span class="fw-status-badge" [class]="getStatusClass(fw.status)">{{
+                  fw.status
+                }}</span>
+              </div>
+            </div>
+          }
+        </div>
+      </section>
+    }
+
+    <!-- Security Controls -->
+    @if (activeSection() === 'security') {
+      <section class="trust-section">
+        <h2 class="section-title">Security Controls</h2>
+        <div class="controls-grid">
+          @for (ctrl of d.securityControls; track ctrl.category) {
+            <div class="control-card">
+              <h3 class="control-title">{{ ctrl.category }}</h3>
+              <ul class="control-list">
+                @for (item of ctrl.items; track item) {
+                  <li>
+                    <span class="check-icon">✓</span>
+                    {{ item }}
+                  </li>
+                }
+              </ul>
+            </div>
+          }
+        </div>
+      </section>
+    }
+
+    <!-- Documents & Contact -->
+    @if (activeSection() === 'documents') {
+      <section class="trust-section">
+        <div class="docs-contact-grid">
+          <div>
+            <h2 class="section-title">Available Documents</h2>
+            <p class="section-desc">
+              The following compliance documents are available upon request. Contact our security
+              team to request access.
+            </p>
+            <div class="doc-list">
+              @for (doc of d.documents; track doc.name) {
+                <div class="doc-item">
+                  <span class="doc-icon">{{ doc.available ? '📄' : '🔒' }}</span>
+                  <span class="doc-name">{{ doc.name }}</span>
+                  @if (doc.available) {
+                    <span class="doc-badge available">Available on request</span>
+                  }
+                </div>
+              }
+            </div>
+          </div>
+
+          <div>
+            <h2 class="section-title">Contact</h2>
+            <div class="contact-cards">
+              <div class="contact-card">
+                <div class="contact-icon">🔒</div>
+                <h4>Security Team</h4>
+                <p>For security inquiries and document requests</p>
+                <a href="mailto:{{ d.contact.securityEmail }}">{{ d.contact.securityEmail }}</a>
+              </div>
+              <div class="contact-card">
+                <div class="contact-icon">👤</div>
+                <h4>Data Protection Officer</h4>
+                <p>For GDPR and privacy inquiries</p>
+                <a href="mailto:{{ d.contact.dpoEmail }}">{{ d.contact.dpoEmail }}</a>
+              </div>
+              <div class="contact-card accent">
+                <div class="contact-icon">🐛</div>
+                <h4>Report a Vulnerability</h4>
+                <p>Responsible disclosure program</p>
+                <a href="mailto:{{ d.contact.reportVulnerability }}">{{
+                  d.contact.reportVulnerability
+                }}</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    }
+
+    <!-- Footer -->
+    <footer class="trust-footer">
+      <p>
+        &copy; {{ d.lastUpdated | slice: 0 : 4 }} {{ d.companyName }}. All information is
+        auto-generated from live system compliance data.
+      </p>
+    </footer>
+  </div>
+}
