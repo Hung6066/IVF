@@ -33,6 +33,9 @@ public class MenuItemConfiguration : IEntityTypeConfiguration<MenuItem>
         builder.Property(m => m.Permission)
             .HasMaxLength(100);
 
+        builder.Property(m => m.RequiredFeatureCode)
+            .HasMaxLength(50);
+
         builder.HasIndex(m => new { m.Section, m.SortOrder });
         builder.HasIndex(m => m.Route).IsUnique();
 

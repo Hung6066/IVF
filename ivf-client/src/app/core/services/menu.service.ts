@@ -11,6 +11,7 @@ export interface MenuItemDto {
   permission?: string;
   adminOnly: boolean;
   sortOrder: number;
+  requiredFeatureCode?: string;
 }
 
 export interface MenuSectionDto {
@@ -32,6 +33,7 @@ export interface MenuItemAdmin {
   adminOnly: boolean;
   sortOrder: number;
   isActive: boolean;
+  requiredFeatureCode: string | null;
   createdAt: string;
   updatedAt: string | null;
 }

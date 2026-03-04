@@ -132,13 +132,24 @@ export interface UpdateSubscriptionRequest {
 
 export interface PricingPlan {
   plan: string;
+  displayName: string;
+  description?: string;
   price: number;
   currency: string;
   duration: string;
   maxUsers: number;
   maxPatients: number;
   storageGb: number;
-  features: string[];
+  isFeatured: boolean;
+  features: PlanFeatureItem[];
+}
+
+export interface PlanFeatureItem {
+  code: string;
+  displayName: string;
+  description?: string;
+  icon: string;
+  category: string;
 }
 
 export type TenantStatus = 'PendingSetup' | 'Active' | 'Suspended' | 'Cancelled' | 'Trial';
@@ -149,18 +160,7 @@ export type DataIsolationStrategy = 'SharedDatabase' | 'SeparateSchema' | 'Separ
 
 export interface TenantFeatures {
   isPlatformAdmin: boolean;
-  canManageTenants: boolean;
-  canViewPlatformStats: boolean;
-  canManageCompliance: boolean;
-  canManageSecurity: boolean;
-  canManageBackups: boolean;
-  canManageUsers: boolean;
-  canManageForms: boolean;
-  canViewReports: boolean;
-  canUseAi: boolean;
-  canUseDigitalSigning: boolean;
-  canUseBiometrics: boolean;
-  canUseAdvancedReporting: boolean;
+  enabledFeatures: string[];
   isolationStrategy: DataIsolationStrategy;
   maxUsers: number;
   maxPatients: number;

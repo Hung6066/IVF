@@ -583,6 +583,7 @@ if (app.Environment.IsDevelopment())
     await FormTemplateSeeder.SeedFormTemplatesAsync(app.Services);
     await FormTemplateCodeSeeder.RegenerateCodesAsync(app.Services); // Backfill codes after migration
     await MenuSeeder.SeedAsync(db);                  // default menu items
+    await FeaturePlanSeeder.SeedAsync(db);           // feature definitions + plan definitions
 }
 
 // QuestPDF community license

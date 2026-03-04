@@ -9,6 +9,7 @@ public class CreateTenantCommandHandler : IRequestHandler<CreateTenantCommand, G
 {
     private readonly ITenantRepository _repo;
     private readonly IUserRepository _userRepo;
+    private readonly IPricingRepository _pricingRepo;
     private readonly IUnitOfWork _uow;
 
     private static readonly Dictionary<SubscriptionPlan, decimal> PlanPricing = new()
@@ -29,10 +30,11 @@ public class CreateTenantCommandHandler : IRequestHandler<CreateTenantCommand, G
         [SubscriptionPlan.Custom] = (999, 99999, 1_048_576, true, true, true, true)
     };
 
-    public CreateTenantCommandHandler(ITenantRepository repo, IUserRepository userRepo, IUnitOfWork uow)
+    public CreateTenantCommandHandler(ITenantRepository repo, IUserRepository userRepo, IPricingRepository pricingRepo, IUnitOfWork uow)
     {
         _repo = repo;
         _userRepo = userRepo;
+        _pricingRepo = pricingRepo;
         _uow = uow;
     }
 
@@ -70,6 +72,9 @@ public class CreateTenantCommandHandler : IRequestHandler<CreateTenantCommand, G
         var usage = TenantUsageRecord.Create(tenant.Id, now.Year, now.Month);
         usage.UpdateUsage(1, 0, 0, 0, 0, 0, 0);
         await _repo.AddUsageRecordAsync(usage, ct);
+
+        // Sync tenant features from plan definition
+        await _pricingRepo.SyncTenantFeaturesFromPlanAsync(tenant.Id, request.Plan, ct);
 
         await _uow.SaveChangesAsync(ct);
         return tenant.Id;
@@ -174,8 +179,14 @@ public class CancelTenantCommandHandler : IRequestHandler<CancelTenantCommand>
 public class UpdateSubscriptionCommandHandler : IRequestHandler<UpdateSubscriptionCommand>
 {
     private readonly ITenantRepository _repo;
+    private readonly IPricingRepository _pricingRepo;
     private readonly IUnitOfWork _uow;
-    public UpdateSubscriptionCommandHandler(ITenantRepository repo, IUnitOfWork uow) { _repo = repo; _uow = uow; }
+    public UpdateSubscriptionCommandHandler(ITenantRepository repo, IPricingRepository pricingRepo, IUnitOfWork uow)
+    {
+        _repo = repo;
+        _pricingRepo = pricingRepo;
+        _uow = uow;
+    }
 
     public async Task Handle(UpdateSubscriptionCommand request, CancellationToken ct)
     {
@@ -192,6 +203,9 @@ public class UpdateSubscriptionCommandHandler : IRequestHandler<UpdateSubscripti
             sub.SetDiscount(request.DiscountPercent);
             await _repo.AddSubscriptionAsync(sub, ct);
         }
+
+        // Sync tenant features when plan changes
+        await _pricingRepo.SyncTenantFeaturesFromPlanAsync(request.TenantId, request.Plan, ct);
 
         await _uow.SaveChangesAsync(ct);
     }

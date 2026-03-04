@@ -32,7 +32,8 @@ public static class MenuEndpoints
                         i.Route,
                         i.Permission,
                         i.AdminOnly,
-                        i.SortOrder
+                        i.SortOrder,
+                        i.RequiredFeatureCode
                     })
                 });
 
@@ -55,6 +56,7 @@ public static class MenuEndpoints
                 i.AdminOnly,
                 i.SortOrder,
                 i.IsActive,
+                i.RequiredFeatureCode,
                 i.CreatedAt,
                 i.UpdatedAt
             }));
@@ -79,7 +81,8 @@ public static class MenuEndpoints
                 request.Permission,
                 request.AdminOnly,
                 request.SortOrder,
-                request.IsActive);
+                request.IsActive,
+                request.RequiredFeatureCode);
 
             await repo.AddAsync(item);
             await uow.SaveChangesAsync();
@@ -114,7 +117,8 @@ public static class MenuEndpoints
                 request.Permission,
                 request.AdminOnly,
                 request.SortOrder,
-                request.IsActive);
+                request.IsActive,
+                request.RequiredFeatureCode);
 
             await repo.UpdateAsync(item);
             await uow.SaveChangesAsync();
@@ -189,7 +193,8 @@ public record CreateMenuItemRequest(
     string? Permission,
     bool AdminOnly,
     int SortOrder,
-    bool IsActive = true);
+    bool IsActive = true,
+    string? RequiredFeatureCode = null);
 
 public record UpdateMenuItemRequest(
     string? Section,
@@ -200,7 +205,8 @@ public record UpdateMenuItemRequest(
     string? Permission,
     bool AdminOnly,
     int SortOrder,
-    bool IsActive);
+    bool IsActive,
+    string? RequiredFeatureCode = null);
 
 public record ReorderMenuRequest(List<ReorderEntry> Items);
 public record ReorderEntry(Guid Id, int SortOrder);

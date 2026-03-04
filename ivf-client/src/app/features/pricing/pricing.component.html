@@ -59,8 +59,8 @@
         </div>
 
         <ul class="feature-list">
-          @for (feature of plan.features; track feature) {
-            <li><i class="fas fa-check"></i> {{ feature }}</li>
+          @for (feature of plan.features; track feature.code) {
+            <li><span class="feature-icon">{{ feature.icon }}</span> {{ feature.displayName }}</li>
           }
         </ul>
 

@@ -1,6 +1,7 @@
 using IVF.Application.Common.Interfaces;
 using IVF.Application.Features.Tenants.Commands;
 using IVF.Application.Features.Tenants.Queries;
+using IVF.Application.Features.Pricing.Queries;
 using IVF.Domain.Enums;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
@@ -44,51 +45,9 @@ public static class TenantEndpoints
             return Results.Ok(result);
         });
 
-        group.MapGet("/pricing", () =>
+        group.MapGet("/pricing", async (IMediator mediator) =>
         {
-            var plans = new object[]
-            {
-                new {
-                    Plan = "Trial",
-                    Price = 0,
-                    Currency = "VND",
-                    Duration = "30 ngày",
-                    MaxUsers = 3,
-                    MaxPatients = 20,
-                    StorageGb = 0.5,
-                    Features = new[] { "Quản lý bệnh nhân", "Lịch hẹn", "Hàng đợi", "Biểu mẫu cơ bản" }
-                },
-                new {
-                    Plan = "Starter",
-                    Price = 5_000_000,
-                    Currency = "VND",
-                    Duration = "Tháng",
-                    MaxUsers = 10,
-                    MaxPatients = 100,
-                    StorageGb = 5,
-                    Features = new[] { "Tất cả Trial", "Báo cáo nâng cao", "Export PDF", "Hỗ trợ email" }
-                },
-                new {
-                    Plan = "Professional",
-                    Price = 15_000_000,
-                    Currency = "VND",
-                    Duration = "Tháng",
-                    MaxUsers = 30,
-                    MaxPatients = 500,
-                    StorageGb = 20,
-                    Features = new[] { "Tất cả Starter", "AI hỗ trợ", "Ký số", "HIPAA/GDPR", "Hỗ trợ ưu tiên" }
-                },
-                new {
-                    Plan = "Enterprise",
-                    Price = 35_000_000,
-                    Currency = "VND",
-                    Duration = "Tháng",
-                    MaxUsers = 100,
-                    MaxPatients = 2000,
-                    StorageGb = 100,
-                    Features = new[] { "Tất cả Professional", "Sinh trắc học", "SSO/SAML", "SLA 99.9%", "Hỗ trợ 24/7", "Custom domain" }
-                }
-            };
+            var plans = await mediator.Send(new GetDynamicPricingQuery());
             return Results.Ok(plans);
         }).AllowAnonymous();
 
@@ -173,50 +132,20 @@ public static class TenantEndpoints
 
         group.MapGet("/my-features", async (ICurrentUserService currentUser, IMediator mediator) =>
         {
-            if (currentUser.IsPlatformAdmin)
-            {
-                return Results.Ok(new TenantFeatures(
-                    IsPlatformAdmin: true,
-                    CanManageTenants: true,
-                    CanViewPlatformStats: true,
-                    CanManageCompliance: true,
-                    CanManageSecurity: true,
-                    CanManageBackups: true,
-                    CanManageUsers: true,
-                    CanManageForms: true,
-                    CanViewReports: true,
-                    CanUseAi: true,
-                    CanUseDigitalSigning: true,
-                    CanUseBiometrics: true,
-                    CanUseAdvancedReporting: true,
-                    IsolationStrategy: DataIsolationStrategy.SharedDatabase,
-                    MaxUsers: 999,
-                    MaxPatients: 99999));
-            }
+            var result = await mediator.Send(new GetTenantDynamicFeaturesQuery(
+                currentUser.TenantId,
+                currentUser.IsPlatformAdmin));
+            return Results.Ok(result);
+        });
 
-            if (currentUser.TenantId is not { } tenantId || tenantId == Guid.Empty)
+        // ═══════════════ Feature/Plan Admin ═══════════════
+
+        group.MapGet("/feature-definitions", async (IMediator mediator, ICurrentUserService currentUser) =>
+        {
+            if (!currentUser.IsPlatformAdmin)
                 return Results.Forbid();
-
-            var tenant = await mediator.Send(new GetTenantByIdQuery(tenantId));
-            if (tenant is null) return Results.NotFound();
-
-            return Results.Ok(new TenantFeatures(
-                IsPlatformAdmin: false,
-                CanManageTenants: false,
-                CanViewPlatformStats: false,
-                CanManageCompliance: false,
-                CanManageSecurity: false,
-                CanManageBackups: false,
-                CanManageUsers: true,
-                CanManageForms: true,
-                CanViewReports: true,
-                CanUseAi: tenant.AiEnabled,
-                CanUseDigitalSigning: tenant.DigitalSigningEnabled,
-                CanUseBiometrics: tenant.BiometricsEnabled,
-                CanUseAdvancedReporting: tenant.AdvancedReportingEnabled,
-                IsolationStrategy: tenant.IsolationStrategy,
-                MaxUsers: tenant.MaxUsers,
-                MaxPatients: tenant.MaxPatientsPerMonth));
+            var result = await mediator.Send(new GetAllFeatureDefinitionsQuery());
+            return Results.Ok(result);
         });
     }
 
@@ -232,22 +161,4 @@ public static class TenantEndpoints
         DataIsolationStrategy IsolationStrategy,
         string? ConnectionString,
         string? DatabaseSchema);
-
-    record TenantFeatures(
-        bool IsPlatformAdmin,
-        bool CanManageTenants,
-        bool CanViewPlatformStats,
-        bool CanManageCompliance,
-        bool CanManageSecurity,
-        bool CanManageBackups,
-        bool CanManageUsers,
-        bool CanManageForms,
-        bool CanViewReports,
-        bool CanUseAi,
-        bool CanUseDigitalSigning,
-        bool CanUseBiometrics,
-        bool CanUseAdvancedReporting,
-        DataIsolationStrategy IsolationStrategy,
-        int MaxUsers,
-        int MaxPatients);
 }

@@ -65,6 +65,7 @@ public static class DependencyInjection
         services.AddScoped<IConceptRepository, ConceptRepository>();
         services.AddScoped<IPatientDocumentRepository, PatientDocumentRepository>();
         services.AddScoped<ITenantRepository, TenantRepository>();
+        services.AddScoped<IPricingRepository, PricingRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 
         // Register Services

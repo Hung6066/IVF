@@ -40,6 +40,6 @@ export class PricingComponent implements OnInit {
   }
 
   isPrimary(plan: string): boolean {
-    return plan === 'Professional';
+    return this.plans().find((p) => p.plan === plan)?.isFeatured ?? false;
   }
 }

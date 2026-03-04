@@ -35,6 +35,9 @@ public class MenuItem : BaseEntity
     /// <summary>Whether this menu item is active/visible.</summary>
     public bool IsActive { get; private set; } = true;
 
+    /// <summary>Feature code required to see this item (e.g. "ai", "digital_signing"). Null = no feature gate.</summary>
+    public string? RequiredFeatureCode { get; private set; }
+
     // EF private constructor
     private MenuItem() { }
 
@@ -47,7 +50,8 @@ public class MenuItem : BaseEntity
         string? permission,
         bool adminOnly,
         int sortOrder,
-        bool isActive = true)
+        bool isActive = true,
+        string? requiredFeatureCode = null)
     {
         return new MenuItem
         {
@@ -59,7 +63,8 @@ public class MenuItem : BaseEntity
             Permission = permission,
             AdminOnly = adminOnly,
             SortOrder = sortOrder,
-            IsActive = isActive
+            IsActive = isActive,
+            RequiredFeatureCode = requiredFeatureCode
         };
     }
 
@@ -72,7 +77,8 @@ public class MenuItem : BaseEntity
         string? permission,
         bool adminOnly,
         int sortOrder,
-        bool isActive)
+        bool isActive,
+        string? requiredFeatureCode = null)
     {
         Section = section;
         SectionHeader = sectionHeader;
@@ -83,6 +89,7 @@ public class MenuItem : BaseEntity
         AdminOnly = adminOnly;
         SortOrder = sortOrder;
         IsActive = isActive;
+        RequiredFeatureCode = requiredFeatureCode;
         SetUpdated();
     }
 

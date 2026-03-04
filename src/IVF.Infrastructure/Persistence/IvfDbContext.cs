@@ -19,6 +19,10 @@ public class IvfDbContext : DbContext
     public DbSet<Tenant> Tenants => Set<Tenant>();
     public DbSet<TenantSubscription> TenantSubscriptions => Set<TenantSubscription>();
     public DbSet<TenantUsageRecord> TenantUsageRecords => Set<TenantUsageRecord>();
+    public DbSet<FeatureDefinition> FeatureDefinitions => Set<FeatureDefinition>();
+    public DbSet<PlanDefinition> PlanDefinitions => Set<PlanDefinition>();
+    public DbSet<PlanFeature> PlanFeatures => Set<PlanFeature>();
+    public DbSet<TenantFeature> TenantFeatures => Set<TenantFeature>();
 
     public DbSet<User> Users => Set<User>();
     public DbSet<Patient> Patients => Set<Patient>();

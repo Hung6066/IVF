@@ -18,6 +18,7 @@ export interface MenuItem {
   permission?: string;
   adminOnly?: boolean;
   platformAdminOnly?: boolean;
+  requiredFeatureCode?: string;
 }
 
 export interface MenuSection {
@@ -176,6 +177,7 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
               route: i.route,
               permission: i.permission ?? undefined,
               adminOnly: i.adminOnly,
+              requiredFeatureCode: i.requiredFeatureCode ?? undefined,
             })),
           }));
         }
@@ -282,8 +284,15 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   isMenuItemVisible(item: MenuItem): boolean {
     if (item.platformAdminOnly) return this.authService.isPlatformAdmin();
     if (item.adminOnly) return this.isAdmin();
-    if (item.permission) return this.canView(item.permission);
-    return true; // no restriction
+    if (item.permission && !this.canView(item.permission)) return false;
+    // Feature gate: if item requires a feature, check tenant has it enabled
+    if (item.requiredFeatureCode && this.tenantFeatures) {
+      if (!this.tenantFeatures.isPlatformAdmin &&
+          !this.tenantFeatures.enabledFeatures.includes(item.requiredFeatureCode)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   canView(permission: string): boolean {
