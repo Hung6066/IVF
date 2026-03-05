@@ -1,6 +1,7 @@
 using IVF.Application.Common.Interfaces;
 using IVF.Domain.Entities;
 using IVF.Domain.Enums;
+using FluentValidation;
 using MediatR;
 
 namespace IVF.Application.Features.Tenants.Commands;
@@ -106,7 +107,89 @@ public class UpdateTenantBrandingCommandHandler : IRequestHandler<UpdateTenantBr
     {
         var tenant = await _repo.GetByIdAsync(request.Id, ct)
             ?? throw new KeyNotFoundException($"Tenant {request.Id} not found");
+
+        // Validate custom domain format and uniqueness
+        if (!string.IsNullOrWhiteSpace(request.CustomDomain))
+        {
+            var domain = request.CustomDomain.Trim().ToLowerInvariant();
+            if (!IsValidDomain(domain))
+                throw new ValidationException("Tên miền không hợp lệ. Vui lòng nhập dạng: clinic.your-domain.com");
+
+            if (await _repo.CustomDomainExistsAsync(domain, request.Id, ct))
+                throw new ValidationException("Tên miền này đã được sử dụng bởi tenant khác.");
+        }
+
         tenant.UpdateBranding(request.LogoUrl, request.PrimaryColor, request.CustomDomain);
+        await _uow.SaveChangesAsync(ct);
+    }
+
+    private static bool IsValidDomain(string domain)
+    {
+        if (domain.Length > 200) return false;
+        // Must be a valid hostname (no scheme, no path, no port)
+        return System.Text.RegularExpressions.Regex.IsMatch(domain,
+            @"^(?!-)[a-z0-9-]{1,63}(?<!-)(\.[a-z0-9-]{1,63})*\.[a-z]{2,}$");
+    }
+}
+
+public class VerifyCustomDomainCommandHandler : IRequestHandler<VerifyCustomDomainCommand, CustomDomainVerificationResult>
+{
+    private readonly ITenantRepository _repo;
+    private readonly IUnitOfWork _uow;
+    private readonly IDomainVerificationService _domainVerification;
+
+    public VerifyCustomDomainCommandHandler(ITenantRepository repo, IUnitOfWork uow, IDomainVerificationService domainVerification)
+    {
+        _repo = repo;
+        _uow = uow;
+        _domainVerification = domainVerification;
+    }
+
+    public async Task<CustomDomainVerificationResult> Handle(VerifyCustomDomainCommand request, CancellationToken ct)
+    {
+        var tenant = await _repo.GetByIdAsync(request.TenantId, ct)
+            ?? throw new KeyNotFoundException($"Tenant {request.TenantId} not found");
+
+        if (string.IsNullOrWhiteSpace(tenant.CustomDomain))
+            return new CustomDomainVerificationResult(false, "Tenant chưa cấu hình custom domain.");
+
+        var result = await _domainVerification.VerifyDomainAsync(
+            tenant.CustomDomain, tenant.CustomDomainVerificationToken!, ct);
+
+        if (result.TxtVerified)
+        {
+            tenant.VerifyCustomDomain();
+            await _uow.SaveChangesAsync(ct);
+            return new CustomDomainVerificationResult(true, "Xác minh tên miền thành công!");
+        }
+        else
+        {
+            tenant.FailCustomDomainVerification();
+            await _uow.SaveChangesAsync(ct);
+
+            var details = new List<string>();
+            if (!result.CnameVerified)
+                details.Add($"CNAME: Trỏ {tenant.CustomDomain} → app.ivf.clinic");
+            if (!result.TxtVerified)
+                details.Add($"TXT: Tạo _ivf-verify.{tenant.CustomDomain} với giá trị: {tenant.CustomDomainVerificationToken}");
+
+            return new CustomDomainVerificationResult(false,
+                $"Xác minh thất bại. Vui lòng cấu hình DNS:\n{string.Join("\n", details)}");
+        }
+    }
+}
+
+public class RemoveCustomDomainCommandHandler : IRequestHandler<RemoveCustomDomainCommand>
+{
+    private readonly ITenantRepository _repo;
+    private readonly IUnitOfWork _uow;
+    public RemoveCustomDomainCommandHandler(ITenantRepository repo, IUnitOfWork uow) { _repo = repo; _uow = uow; }
+
+    public async Task Handle(RemoveCustomDomainCommand request, CancellationToken ct)
+    {
+        var tenant = await _repo.GetByIdAsync(request.TenantId, ct)
+            ?? throw new KeyNotFoundException($"Tenant {request.TenantId} not found");
+        tenant.RemoveCustomDomain();
         await _uow.SaveChangesAsync(ct);
     }
 }

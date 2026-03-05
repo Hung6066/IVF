@@ -12,6 +12,7 @@ import {
   UsageDetailResult,
   TenantUsersResult,
   TenantApiCallsResult,
+  CustomDomainVerificationResult,
   CreateTenantRequest,
   UpdateTenantRequest,
   UpdateBrandingRequest,
@@ -67,6 +68,17 @@ export class TenantService {
     return this.http.put<void>(`${this.baseUrl}/${request.id}/branding`, request);
   }
 
+  verifyCustomDomain(tenantId: string): Observable<CustomDomainVerificationResult> {
+    return this.http.post<CustomDomainVerificationResult>(
+      `${this.baseUrl}/${tenantId}/domain/verify`,
+      {},
+    );
+  }
+
+  removeCustomDomain(tenantId: string): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/${tenantId}/domain`);
+  }
+
   updateLimits(request: UpdateLimitsRequest): Observable<void> {
     return this.http.put<void>(`${this.baseUrl}/${request.id}/limits`, request);
   }
@@ -96,21 +108,24 @@ export class TenantService {
   }
 
   getUsageAnalytics(tenantId: string, months = 12): Observable<TenantUsageAnalytics> {
-    return this.http.get<TenantUsageAnalytics>(
-      `${this.baseUrl}/${tenantId}/usage-analytics`,
-      { params: { months: months.toString() } },
-    );
+    return this.http.get<TenantUsageAnalytics>(`${this.baseUrl}/${tenantId}/usage-analytics`, {
+      params: { months: months.toString() },
+    });
   }
 
   refreshUsage(tenantId: string): Observable<UsageSnapshot> {
     return this.http.post<UsageSnapshot>(`${this.baseUrl}/${tenantId}/refresh-usage`, {});
   }
 
-  getUsageDetail(tenantId: string, metric: string, year: number, month: number): Observable<UsageDetailResult> {
-    return this.http.get<UsageDetailResult>(
-      `${this.baseUrl}/${tenantId}/usage-detail/${metric}`,
-      { params: { year: year.toString(), month: month.toString() } },
-    );
+  getUsageDetail(
+    tenantId: string,
+    metric: string,
+    year: number,
+    month: number,
+  ): Observable<UsageDetailResult> {
+    return this.http.get<UsageDetailResult>(`${this.baseUrl}/${tenantId}/usage-detail/${metric}`, {
+      params: { year: year.toString(), month: month.toString() },
+    });
   }
 
   getTenantUsers(
@@ -129,7 +144,9 @@ export class TenantService {
   }
 
   resetUserPassword(tenantId: string, userId: string, newPassword: string): Observable<void> {
-    return this.http.post<void>(`${this.baseUrl}/${tenantId}/users/${userId}/reset-password`, { newPassword });
+    return this.http.post<void>(`${this.baseUrl}/${tenantId}/users/${userId}/reset-password`, {
+      newPassword,
+    });
   }
 
   getTenantApiCalls(

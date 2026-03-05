@@ -113,10 +113,16 @@
       <button [class.active]="activeTab() === 'isolation'" (click)="activeTab.set('isolation')">
         Cô lập dữ liệu
       </button>
-      <button [class.active]="activeTab() === 'users'" (click)="activeTab.set('users'); loadTenantUsers()">
+      <button
+        [class.active]="activeTab() === 'users'"
+        (click)="activeTab.set('users'); loadTenantUsers()"
+      >
         Người dùng
       </button>
-      <button [class.active]="activeTab() === 'apiCalls'" (click)="activeTab.set('apiCalls'); loadApiCalls()">
+      <button
+        [class.active]="activeTab() === 'apiCalls'"
+        (click)="activeTab.set('apiCalls'); loadApiCalls()"
+      >
         API Calls
       </button>
     </div>
@@ -214,9 +220,23 @@
     @if (activeTab() === 'usage') {
       <div class="tab-content card">
         <div class="usage-header-row">
-          <h3>Thống kê sử dụng — Tháng {{ usageAnalytics()?.currentUsage?.month || t.currentUsage?.month }}/{{ usageAnalytics()?.currentUsage?.year || t.currentUsage?.year }}</h3>
-          <button class="btn btn-sm btn-outline" (click)="refreshUsage()" [disabled]="usageRefreshing()">
-            <i class="fas" [class.fa-sync-alt]="!usageRefreshing()" [class.fa-spinner]="usageRefreshing()" [class.fa-spin]="usageRefreshing()"></i>
+          <h3>
+            Thống kê sử dụng — Tháng
+            {{ usageAnalytics()?.currentUsage?.month || t.currentUsage?.month }}/{{
+              usageAnalytics()?.currentUsage?.year || t.currentUsage?.year
+            }}
+          </h3>
+          <button
+            class="btn btn-sm btn-outline"
+            (click)="refreshUsage()"
+            [disabled]="usageRefreshing()"
+          >
+            <i
+              class="fas"
+              [class.fa-sync-alt]="!usageRefreshing()"
+              [class.fa-spinner]="usageRefreshing()"
+              [class.fa-spin]="usageRefreshing()"
+            ></i>
             {{ usageRefreshing() ? 'Đang cập nhật...' : 'Cập nhật real-time' }}
           </button>
         </div>
@@ -244,31 +264,56 @@
                   <span class="limit-value">{{ lc.currentUsers }} / {{ lc.maxUsers }}</span>
                 </div>
                 <div class="progress-bar-enhanced">
-                  <div class="progress-fill-enhanced" [class]="getProgressClass(lc.usersPercent)" [style.width.%]="Math.min(lc.usersPercent, 100)"></div>
+                  <div
+                    class="progress-fill-enhanced"
+                    [class]="getProgressClass(lc.usersPercent)"
+                    [style.width.%]="Math.min(lc.usersPercent, 100)"
+                  ></div>
                 </div>
-                <span class="limit-percent" [class]="getProgressClass(lc.usersPercent)">{{ lc.usersPercent }}%</span>
+                <span class="limit-percent" [class]="getProgressClass(lc.usersPercent)"
+                  >{{ lc.usersPercent }}%</span
+                >
                 <span class="click-hint"><i class="fas fa-chevron-right"></i></span>
               </div>
               <div class="limit-card clickable" (click)="openUsageDetail('patients')">
                 <div class="limit-info">
-                  <span class="limit-label"><i class="fas fa-user-plus"></i> Bệnh nhân / tháng</span>
-                  <span class="limit-value">{{ lc.currentPatients }} / {{ lc.maxPatientsPerMonth }}</span>
+                  <span class="limit-label"
+                    ><i class="fas fa-user-plus"></i> Bệnh nhân / tháng</span
+                  >
+                  <span class="limit-value"
+                    >{{ lc.currentPatients }} / {{ lc.maxPatientsPerMonth }}</span
+                  >
                 </div>
                 <div class="progress-bar-enhanced">
-                  <div class="progress-fill-enhanced" [class]="getProgressClass(lc.patientsPercent)" [style.width.%]="Math.min(lc.patientsPercent, 100)"></div>
+                  <div
+                    class="progress-fill-enhanced"
+                    [class]="getProgressClass(lc.patientsPercent)"
+                    [style.width.%]="Math.min(lc.patientsPercent, 100)"
+                  ></div>
                 </div>
-                <span class="limit-percent" [class]="getProgressClass(lc.patientsPercent)">{{ lc.patientsPercent }}%</span>
+                <span class="limit-percent" [class]="getProgressClass(lc.patientsPercent)"
+                  >{{ lc.patientsPercent }}%</span
+                >
                 <span class="click-hint"><i class="fas fa-chevron-right"></i></span>
               </div>
               <div class="limit-card clickable" (click)="openUsageDetail('storage')">
                 <div class="limit-info">
                   <span class="limit-label"><i class="fas fa-database"></i> Lưu trữ</span>
-                  <span class="limit-value">{{ formatStorage(lc.currentStorageMb) }} / {{ formatStorage(lc.storageLimitMb) }}</span>
+                  <span class="limit-value"
+                    >{{ formatStorage(lc.currentStorageMb) }} /
+                    {{ formatStorage(lc.storageLimitMb) }}</span
+                  >
                 </div>
                 <div class="progress-bar-enhanced">
-                  <div class="progress-fill-enhanced" [class]="getProgressClass(lc.storagePercent)" [style.width.%]="Math.min(lc.storagePercent, 100)"></div>
+                  <div
+                    class="progress-fill-enhanced"
+                    [class]="getProgressClass(lc.storagePercent)"
+                    [style.width.%]="Math.min(lc.storagePercent, 100)"
+                  ></div>
                 </div>
-                <span class="limit-percent" [class]="getProgressClass(lc.storagePercent)">{{ lc.storagePercent }}%</span>
+                <span class="limit-percent" [class]="getProgressClass(lc.storagePercent)"
+                  >{{ lc.storagePercent }}%</span
+                >
                 <span class="click-hint"><i class="fas fa-chevron-right"></i></span>
               </div>
             </div>
@@ -299,7 +344,8 @@
               <span class="stat-hint"><i class="fas fa-search-plus"></i> Chi tiết</span>
             </div>
             <div class="usage-stat clickable" (click)="openUsageDetail('documents')">
-              <i class="fas fa-file-signature"></i><span class="value">{{ u.signedDocuments }}</span>
+              <i class="fas fa-file-signature"></i
+              ><span class="value">{{ u.signedDocuments }}</span>
               <span class="label">Tài liệu ký</span>
               <span class="stat-hint"><i class="fas fa-search-plus"></i> Chi tiết</span>
             </div>
@@ -310,7 +356,8 @@
               <span class="stat-hint"><i class="fas fa-search-plus"></i> Chi tiết</span>
             </div>
             <div class="usage-stat">
-              <i class="fas fa-exchange-alt"></i><span class="value">{{ u.apiCalls | number }}</span>
+              <i class="fas fa-exchange-alt"></i
+              ><span class="value">{{ u.apiCalls | number }}</span>
               <span class="label">API Calls</span>
             </div>
           </div>
@@ -337,7 +384,8 @@
               <span class="stat-hint"><i class="fas fa-search-plus"></i> Chi tiết</span>
             </div>
             <div class="usage-stat clickable" (click)="openUsageDetail('documents')">
-              <i class="fas fa-file-signature"></i><span class="value">{{ u.signedDocuments }}</span>
+              <i class="fas fa-file-signature"></i
+              ><span class="value">{{ u.signedDocuments }}</span>
               <span class="label">Tài liệu ký</span>
               <span class="stat-hint"><i class="fas fa-search-plus"></i> Chi tiết</span>
             </div>
@@ -348,18 +396,26 @@
               <span class="stat-hint"><i class="fas fa-search-plus"></i> Chi tiết</span>
             </div>
             <div class="usage-stat">
-              <i class="fas fa-exchange-alt"></i><span class="value">{{ u.apiCalls | number }}</span>
+              <i class="fas fa-exchange-alt"></i
+              ><span class="value">{{ u.apiCalls | number }}</span>
               <span class="label">API Calls</span>
             </div>
           </div>
         } @else {
-          <div class="empty-state"><p>Chưa có dữ liệu sử dụng. Nhấn "Cập nhật real-time" để lấy dữ liệu.</p></div>
+          <div class="empty-state">
+            <p>Chưa có dữ liệu sử dụng. Nhấn "Cập nhật real-time" để lấy dữ liệu.</p>
+          </div>
         }
 
         <!-- Usage History Table -->
         @if (usageAnalytics()?.history?.length) {
           <div class="usage-history-section">
-            <h4><i class="fas fa-chart-line"></i> Lịch sử sử dụng ({{ usageAnalytics()!.history.length }} tháng)</h4>
+            <h4>
+              <i class="fas fa-chart-line"></i> Lịch sử sử dụng ({{
+                usageAnalytics()!.history.length
+              }}
+              tháng)
+            </h4>
             <div class="table-container">
               <table class="usage-history-table">
                 <thead>
@@ -377,7 +433,9 @@
                 <tbody>
                   @for (h of usageAnalytics()!.history; track h.year + '-' + h.month) {
                     <tr>
-                      <td><strong>{{ getMonthLabel(h.month) }} {{ h.year }}</strong></td>
+                      <td>
+                        <strong>{{ getMonthLabel(h.month) }} {{ h.year }}</strong>
+                      </td>
                       <td>{{ h.activeUsers }}</td>
                       <td>{{ h.newPatients }}</td>
                       <td>{{ h.treatmentCycles }}</td>
@@ -412,10 +470,120 @@
             </div>
           </div>
         </div>
-        <div class="form-group">
-          <label>Custom Domain</label>
-          <input [(ngModel)]="editBranding.customDomain" placeholder="ivf.your-domain.com" />
+
+        <!-- Custom Domain Section -->
+        <div class="domain-section">
+          <h4><i class="fas fa-globe"></i> Custom Domain</h4>
+          <div class="form-group">
+            <label>Tên miền</label>
+            <input [(ngModel)]="editBranding.customDomain" placeholder="ivf.your-domain.com" />
+          </div>
+
+          @if (t.customDomain) {
+            <!-- Domain Status -->
+            <div class="domain-status">
+              <span
+                class="domain-status-badge"
+                [class.status-pending]="t.customDomainStatus === 'Pending'"
+                [class.status-verified]="t.customDomainStatus === 'Verified'"
+                [class.status-failed]="t.customDomainStatus === 'Failed'"
+              >
+                @if (t.customDomainStatus === 'Verified') {
+                  <i class="fas fa-check-circle"></i> Đã xác minh
+                } @else if (t.customDomainStatus === 'Pending') {
+                  <i class="fas fa-clock"></i> Chờ xác minh
+                } @else if (t.customDomainStatus === 'Failed') {
+                  <i class="fas fa-times-circle"></i> Xác minh thất bại
+                }
+              </span>
+              @if (t.customDomainVerifiedAt) {
+                <span class="domain-verified-date">
+                  Xác minh lúc: {{ t.customDomainVerifiedAt | date: 'dd/MM/yyyy HH:mm' }}
+                </span>
+              }
+            </div>
+
+            <!-- DNS Setup Instructions -->
+            @if (t.customDomainStatus !== 'Verified') {
+              <div class="dns-instructions">
+                <h5><i class="fas fa-server"></i> Hướng dẫn cấu hình DNS</h5>
+                <p>Để sử dụng custom domain, bạn cần tạo các bản ghi DNS sau:</p>
+
+                <div class="dns-record">
+                  <div class="dns-record-header">
+                    <span class="dns-type">CNAME</span>
+                    <span>Trỏ domain về server</span>
+                  </div>
+                  <div class="dns-record-row">
+                    <div><strong>Host:</strong> {{ t.customDomain }}</div>
+                    <div><strong>Value:</strong> app.ivf.clinic</div>
+                  </div>
+                </div>
+
+                <div class="dns-record">
+                  <div class="dns-record-header">
+                    <span class="dns-type">TXT</span>
+                    <span>Xác minh quyền sở hữu</span>
+                  </div>
+                  <div class="dns-record-row">
+                    <div><strong>Host:</strong> _ivf-verify.{{ t.customDomain }}</div>
+                    <div class="dns-token">
+                      <strong>Value:</strong>
+                      <code>{{ t.customDomainVerificationToken }}</code>
+                    </div>
+                  </div>
+                </div>
+
+                <p class="dns-note">
+                  <i class="fas fa-info-circle"></i>
+                  Sau khi cấu hình DNS, nhấn "Xác minh tên miền" bên dưới. DNS có thể mất 24-48 giờ
+                  để cập nhật.
+                </p>
+              </div>
+            }
+
+            @if (domainVerificationMessage()) {
+              <div
+                class="domain-message"
+                [class.success]="t.customDomainStatus === 'Verified'"
+                [class.error]="t.customDomainStatus === 'Failed'"
+              >
+                {{ domainVerificationMessage() }}
+              </div>
+            }
+
+            <!-- Domain Actions -->
+            <div class="domain-actions">
+              @if (t.customDomainStatus !== 'Verified') {
+                <button
+                  class="btn btn-success"
+                  (click)="verifyDomain()"
+                  [disabled]="domainVerifying()"
+                >
+                  @if (domainVerifying()) {
+                    <i class="fas fa-spinner fa-spin"></i>
+                  } @else {
+                    <i class="fas fa-check-double"></i>
+                  }
+                  Xác minh tên miền
+                </button>
+              }
+              <button
+                class="btn btn-danger-outline"
+                (click)="removeDomain()"
+                [disabled]="domainRemoving()"
+              >
+                @if (domainRemoving()) {
+                  <i class="fas fa-spinner fa-spin"></i>
+                } @else {
+                  <i class="fas fa-trash"></i>
+                }
+                Xóa domain
+              </button>
+            </div>
+          }
         </div>
+
         <div class="info-box">
           <i class="fas fa-info-circle"></i>
           <span>Locale: {{ t.locale }} | Timezone: {{ t.timeZone }}</span>
@@ -579,12 +747,18 @@
         <div class="filter-bar">
           <div class="search-box">
             <i class="fas fa-search"></i>
-            <input type="text" placeholder="Tìm kiếm username, họ tên..."
-                   [ngModel]="usersSearch()"
-                   (ngModelChange)="usersSearch.set($event)"
-                   (keyup.enter)="onUsersSearch()" />
+            <input
+              type="text"
+              placeholder="Tìm kiếm username, họ tên..."
+              [ngModel]="usersSearch()"
+              (ngModelChange)="usersSearch.set($event)"
+              (keyup.enter)="onUsersSearch()"
+            />
           </div>
-          <select [ngModel]="usersRoleFilter()" (ngModelChange)="usersRoleFilter.set($event); onUsersSearch()">
+          <select
+            [ngModel]="usersRoleFilter()"
+            (ngModelChange)="usersRoleFilter.set($event); onUsersSearch()"
+          >
             <option value="">Tất cả vai trò</option>
             <option value="Admin">Quản trị</option>
             <option value="Doctor">Bác sĩ</option>
@@ -595,7 +769,10 @@
             <option value="Cashier">Thu ngân</option>
             <option value="Pharmacist">Dược sĩ</option>
           </select>
-          <select [ngModel]="usersActiveFilter()" (ngModelChange)="usersActiveFilter.set($event); onUsersSearch()">
+          <select
+            [ngModel]="usersActiveFilter()"
+            (ngModelChange)="usersActiveFilter.set($event); onUsersSearch()"
+          >
             <option value="">Tất cả trạng thái</option>
             <option value="true">Hoạt động</option>
             <option value="false">Đã khóa</option>
@@ -608,7 +785,9 @@
         @if (usersLoading()) {
           <div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i> Đang tải...</div>
         } @else {
-          <div class="users-count">Tổng: <strong>{{ tenantUsersTotal() }}</strong> người dùng</div>
+          <div class="users-count">
+            Tổng: <strong>{{ tenantUsersTotal() }}</strong> người dùng
+          </div>
 
           <div class="detail-table-container">
             <table class="detail-table">
@@ -629,25 +808,43 @@
                 @for (user of tenantUsers(); track user.id; let i = $index) {
                   <tr>
                     <td class="row-num">{{ (usersPage() - 1) * 20 + i + 1 }}</td>
-                    <td><strong>{{ user.username }}</strong></td>
+                    <td>
+                      <strong>{{ user.username }}</strong>
+                    </td>
                     <td>{{ user.fullName }}</td>
-                    <td><span class="role-badge" [class]="'role-' + user.role.toLowerCase()">{{ getRoleLabel(user.role) }}</span></td>
+                    <td>
+                      <span class="role-badge" [class]="'role-' + user.role.toLowerCase()">{{
+                        getRoleLabel(user.role)
+                      }}</span>
+                    </td>
                     <td>{{ user.department || '—' }}</td>
                     <td>
-                      <span class="active-badge" [class.active]="user.isActive" [class.inactive]="!user.isActive">
+                      <span
+                        class="active-badge"
+                        [class.active]="user.isActive"
+                        [class.inactive]="!user.isActive"
+                      >
                         {{ user.isActive ? 'Hoạt động' : 'Đã khóa' }}
                       </span>
                     </td>
-                    <td>{{ user.lastLoginAt ? (user.lastLoginAt | date:'dd/MM/yyyy HH:mm') : '—' }}</td>
-                    <td>{{ user.createdAt | date:'dd/MM/yyyy' }}</td>
                     <td>
-                      <button class="btn btn-sm btn-warning" (click)="openResetPasswordModal(user)" title="Đặt lại mật khẩu">
+                      {{ user.lastLoginAt ? (user.lastLoginAt | date: 'dd/MM/yyyy HH:mm') : '—' }}
+                    </td>
+                    <td>{{ user.createdAt | date: 'dd/MM/yyyy' }}</td>
+                    <td>
+                      <button
+                        class="btn btn-sm btn-warning"
+                        (click)="openResetPasswordModal(user)"
+                        title="Đặt lại mật khẩu"
+                      >
                         <i class="fas fa-key"></i>
                       </button>
                     </td>
                   </tr>
                 } @empty {
-                  <tr><td colspan="9" class="empty-cell">Không có người dùng</td></tr>
+                  <tr>
+                    <td colspan="9" class="empty-cell">Không có người dùng</td>
+                  </tr>
                 }
               </tbody>
             </table>
@@ -655,11 +852,19 @@
 
           @if (usersTotalPages > 1) {
             <div class="pagination">
-              <button class="btn btn-sm" [disabled]="usersPage() <= 1" (click)="onUsersPageChange(usersPage() - 1)">
+              <button
+                class="btn btn-sm"
+                [disabled]="usersPage() <= 1"
+                (click)="onUsersPageChange(usersPage() - 1)"
+              >
                 <i class="fas fa-chevron-left"></i>
               </button>
               <span>Trang {{ usersPage() }} / {{ usersTotalPages }}</span>
-              <button class="btn btn-sm" [disabled]="usersPage() >= usersTotalPages" (click)="onUsersPageChange(usersPage() + 1)">
+              <button
+                class="btn btn-sm"
+                [disabled]="usersPage() >= usersTotalPages"
+                (click)="onUsersPageChange(usersPage() + 1)"
+              >
                 <i class="fas fa-chevron-right"></i>
               </button>
             </div>
@@ -702,7 +907,7 @@
             <div class="api-stat-card">
               <div class="stat-icon duration"><i class="fas fa-tachometer-alt"></i></div>
               <div class="stat-info">
-                <span class="stat-value">{{ data.stats.avgDurationMs | number:'1.0-0' }} ms</span>
+                <span class="stat-value">{{ data.stats.avgDurationMs | number: '1.0-0' }} ms</span>
                 <span class="stat-label">Trung bình (max: {{ data.stats.maxDurationMs }} ms)</span>
               </div>
             </div>
@@ -715,9 +920,18 @@
               <div class="distribution-bars">
                 @for (entry of data.stats.byMethod | keyvalue; track entry.key) {
                   <div class="dist-item">
-                    <span class="method-tag" [class]="getMethodClass(entry.key)">{{ entry.key }}</span>
+                    <span class="method-tag" [class]="getMethodClass(entry.key)">{{
+                      entry.key
+                    }}</span>
                     <div class="dist-bar-track">
-                      <div class="dist-bar-fill" [style.width.%]="data.stats.totalCalls > 0 ? (entry.value / data.stats.totalCalls * 100) : 0"></div>
+                      <div
+                        class="dist-bar-fill"
+                        [style.width.%]="
+                          data.stats.totalCalls > 0
+                            ? (entry.value / data.stats.totalCalls) * 100
+                            : 0
+                        "
+                      ></div>
                     </div>
                     <span class="dist-count">{{ entry.value | number }}</span>
                   </div>
@@ -740,7 +954,10 @@
 
           <!-- Filters -->
           <div class="filter-bar">
-            <select [ngModel]="apiCallsMethodFilter()" (ngModelChange)="apiCallsMethodFilter.set($event); onApiCallsFilter()">
+            <select
+              [ngModel]="apiCallsMethodFilter()"
+              (ngModelChange)="apiCallsMethodFilter.set($event); onApiCallsFilter()"
+            >
               <option value="">Tất cả Methods</option>
               <option value="GET">GET</option>
               <option value="POST">POST</option>
@@ -748,7 +965,10 @@
               <option value="DELETE">DELETE</option>
               <option value="PATCH">PATCH</option>
             </select>
-            <select [ngModel]="apiCallsStatusFilter()" (ngModelChange)="apiCallsStatusFilter.set($event); onApiCallsFilter()">
+            <select
+              [ngModel]="apiCallsStatusFilter()"
+              (ngModelChange)="apiCallsStatusFilter.set($event); onApiCallsFilter()"
+            >
               <option value="">Tất cả Status</option>
               <option value="200">200 OK</option>
               <option value="201">201 Created</option>
@@ -779,16 +999,26 @@
                 @for (log of data.items; track log.id; let i = $index) {
                   <tr>
                     <td class="row-num">{{ (apiCallsPage() - 1) * 20 + i + 1 }}</td>
-                    <td>{{ log.requestedAt | date:'dd/MM HH:mm:ss' }}</td>
-                    <td><span class="method-tag" [class]="getMethodClass(log.method)">{{ log.method }}</span></td>
+                    <td>{{ log.requestedAt | date: 'dd/MM HH:mm:ss' }}</td>
+                    <td>
+                      <span class="method-tag" [class]="getMethodClass(log.method)">{{
+                        log.method
+                      }}</span>
+                    </td>
                     <td class="path-cell" [title]="log.path">{{ log.path }}</td>
-                    <td><span class="status-code" [class]="getStatusCodeClass(log.statusCode)">{{ log.statusCode }}</span></td>
+                    <td>
+                      <span class="status-code" [class]="getStatusCodeClass(log.statusCode)">{{
+                        log.statusCode
+                      }}</span>
+                    </td>
                     <td>{{ log.durationMs }}</td>
                     <td>{{ log.username || '—' }}</td>
                     <td>{{ log.ipAddress || '—' }}</td>
                   </tr>
                 } @empty {
-                  <tr><td colspan="8" class="empty-cell">Không có dữ liệu API calls</td></tr>
+                  <tr>
+                    <td colspan="8" class="empty-cell">Không có dữ liệu API calls</td>
+                  </tr>
                 }
               </tbody>
             </table>
@@ -796,11 +1026,19 @@
 
           @if (apiCallsTotalPages > 1) {
             <div class="pagination">
-              <button class="btn btn-sm" [disabled]="apiCallsPage() <= 1" (click)="onApiCallsPageChange(apiCallsPage() - 1)">
+              <button
+                class="btn btn-sm"
+                [disabled]="apiCallsPage() <= 1"
+                (click)="onApiCallsPageChange(apiCallsPage() - 1)"
+              >
                 <i class="fas fa-chevron-left"></i>
               </button>
               <span>Trang {{ apiCallsPage() }} / {{ apiCallsTotalPages }}</span>
-              <button class="btn btn-sm" [disabled]="apiCallsPage() >= apiCallsTotalPages" (click)="onApiCallsPageChange(apiCallsPage() + 1)">
+              <button
+                class="btn btn-sm"
+                [disabled]="apiCallsPage() >= apiCallsTotalPages"
+                (click)="onApiCallsPageChange(apiCallsPage() + 1)"
+              >
                 <i class="fas fa-chevron-right"></i>
               </button>
             </div>
@@ -890,7 +1128,9 @@
     <div class="modal-panel modal-sm" (click)="$event.stopPropagation()">
       <div class="modal-header">
         <h3><i class="fas fa-key"></i> Đặt lại mật khẩu</h3>
-        <button class="btn-close" (click)="closeResetPasswordModal()"><i class="fas fa-times"></i></button>
+        <button class="btn-close" (click)="closeResetPasswordModal()">
+          <i class="fas fa-times"></i>
+        </button>
       </div>
       <div class="modal-body">
         @if (resetTargetUser(); as user) {
@@ -899,16 +1139,20 @@
           </p>
           <div class="form-group">
             <label>Mật khẩu mới</label>
-            <input type="password"
-                   [ngModel]="resetNewPassword()"
-                   (ngModelChange)="resetNewPassword.set($event)"
-                   placeholder="Nhập mật khẩu mới (tối thiểu 10 ký tự)" />
+            <input
+              type="password"
+              [ngModel]="resetNewPassword()"
+              (ngModelChange)="resetNewPassword.set($event)"
+              placeholder="Nhập mật khẩu mới (tối thiểu 10 ký tự)"
+            />
           </div>
           <div class="form-actions">
             <button class="btn btn-secondary" (click)="closeResetPasswordModal()">Hủy</button>
-            <button class="btn btn-primary"
-                    (click)="confirmResetPassword()"
-                    [disabled]="resetSaving() || resetNewPassword().length < 10">
+            <button
+              class="btn btn-primary"
+              (click)="confirmResetPassword()"
+              [disabled]="resetSaving() || resetNewPassword().length < 10"
+            >
               @if (resetSaving()) {
                 <i class="fas fa-spinner fa-spin"></i>
               }

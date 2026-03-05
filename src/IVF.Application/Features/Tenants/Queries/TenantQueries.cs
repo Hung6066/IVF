@@ -31,6 +31,9 @@ public record TenantDto(
     string? Locale,
     string? TimeZone,
     string? CustomDomain,
+    CustomDomainStatus CustomDomainStatus,
+    DateTime? CustomDomainVerifiedAt,
+    string? CustomDomainVerificationToken,
     DateTime CreatedAt,
     SubscriptionDto? ActiveSubscription,
     UsageDto? CurrentUsage);

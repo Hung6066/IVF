@@ -350,6 +350,48 @@ services:
       - ivf-data
 
   # =============================================
+  # Caddy — Reverse Proxy + Auto-HTTPS
+  # Handles TLS termination, wildcard SSL for *.ivf.clinic,
+  # and On-Demand TLS for tenant custom domains via Let's Encrypt.
+  # Activate with: docker compose --profile proxy up -d
+  # =============================================
+  caddy:
+    image: caddy:2-alpine
+    container_name: ivf-caddy
+    profiles:
+      - proxy
+    environment:
+      - ACME_EMAIL=admin@ivf.clinic
+      - API_UPSTREAM=api:8080
+    ports:
+      - "80:80" # HTTP → HTTPS redirect
+      - "443:443" # HTTPS
+    volumes:
+      - ./docker/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data # TLS certs + ACME state
+      - caddy_config:/config # Caddy runtime config
+    depends_on:
+      - api
+    networks:
+      - ivf-public
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:2019/metrics",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # =============================================
   # SignServer + SoftHSM2 (Phase 4: PKCS#11 / FIPS 140-2 Level 1)
   # Custom image extending SignServer CE with SoftHSM2 library.
   # Activate with: docker compose --profile softhsm up -d
@@ -462,6 +504,8 @@ volumes:
   minio_data:
   trivy_cache:
   softhsm_tokens:
+  caddy_data:
+  caddy_config:
 
 networks:
   # Public network: API + frontend (external access)

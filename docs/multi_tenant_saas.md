@@ -15,6 +15,9 @@ IVF Platform là hệ thống quản lý trung tâm IVF đầu tiên tại Việ
 - ✅ **Feature Gate Pipeline** — MediatR pipeline tự động chặn command nếu feature chưa kích hoạt (`[RequiresFeature]`)
 - ✅ **Route-level Feature Guard** — Angular route guard chặn truy cập trang nếu feature chưa mua
 - ✅ **Tenant Limit Interceptor** — HTTP interceptor hiển thị thông báo khi vượt giới hạn (403)
+- ✅ **Custom Domain** — Tenant Enterprise/Custom có thể gán tên miền riêng + xác minh DNS (CNAME + TXT) tự động
+- ✅ **DnsClient.NET** — Xác minh DNS chính xác qua CNAME & TXT record (thay thế System.Net.Dns)
+- ✅ **Caddy Reverse Proxy** — Wildcard SSL cho `*.ivf.clinic` + On-Demand TLS auto-cert cho custom domain
 
 ---
 
@@ -133,6 +136,14 @@ public class Tenant : BaseEntity
     public bool DigitalSigningEnabled { get; private set; }
     public bool BiometricsEnabled { get; private set; }
     public bool AdvancedReportingEnabled { get; private set; }
+
+    // Custom Domain (Enterprise/Custom plans)
+    public string? CustomDomain { get; private set; }
+    public CustomDomainStatus CustomDomainStatus { get; private set; } = CustomDomainStatus.None;
+    public DateTime? CustomDomainVerifiedAt { get; private set; }
+    public string? CustomDomainVerificationToken { get; private set; }
+
+    // Methods: UpdateBranding(), VerifyCustomDomain(), FailCustomDomainVerification(), RemoveCustomDomain()
     // ... branding, customization
 }
 ```
@@ -526,9 +537,10 @@ export class TenantFeatureService {
 
 ### 3.1 Public Endpoints
 
-| Method | Path                   | Mô tả                               | Auth         |
-| ------ | ---------------------- | ----------------------------------- | ------------ |
-| `GET`  | `/api/tenants/pricing` | Bảng giá SaaS dynamic (từ database) | ❌ Anonymous |
+| Method | Path                                | Mô tả                                  | Auth         |
+| ------ | ----------------------------------- | -------------------------------------- | ------------ |
+| `GET`  | `/api/tenants/pricing`              | Bảng giá SaaS dynamic (từ database)    | ❌ Anonymous |
+| `GET`  | `/api/tenants/domain-check?domain=` | Caddy On-Demand TLS callback (200/404) | ❌ Anonymous |
 
 ### 3.2 Authenticated Endpoints
 
@@ -538,21 +550,23 @@ export class TenantFeatureService {
 
 ### 3.3 Platform Admin Only Endpoints
 
-| Method | Path                               | Mô tả                                 | Auth             |
-| ------ | ---------------------------------- | ------------------------------------- | ---------------- |
-| `GET`  | `/api/tenants`                     | Danh sách tenants                     | ✅ PlatformAdmin |
-| `GET`  | `/api/tenants/{id}`                | Chi tiết tenant                       | ✅ PlatformAdmin |
-| `POST` | `/api/tenants`                     | Tạo tenant mới + auto-sync features   | ✅ PlatformAdmin |
-| `PUT`  | `/api/tenants/{id}`                | Cập nhật thông tin                    | ✅ PlatformAdmin |
-| `PUT`  | `/api/tenants/{id}/branding`       | Cập nhật branding                     | ✅ PlatformAdmin |
-| `PUT`  | `/api/tenants/{id}/limits`         | Cập nhật giới hạn & features          | ✅ PlatformAdmin |
-| `PUT`  | `/api/tenants/{id}/isolation`      | Thay đổi chiến lược cô lập            | ✅ PlatformAdmin |
-| `PUT`  | `/api/tenants/{id}/subscription`   | Cập nhật subscription + sync features | ✅ PlatformAdmin |
-| `POST` | `/api/tenants/{id}/activate`       | Kích hoạt tenant                      | ✅ PlatformAdmin |
-| `POST` | `/api/tenants/{id}/suspend`        | Tạm ngưng tenant                      | ✅ PlatformAdmin |
-| `POST` | `/api/tenants/{id}/cancel`         | Hủy tenant                            | ✅ PlatformAdmin |
-| `GET`  | `/api/tenants/stats`               | Thống kê toàn platform                | ✅ PlatformAdmin |
-| `GET`  | `/api/tenants/feature-definitions` | Tất cả feature definitions (CRUD)     | ✅ PlatformAdmin |
+| Method   | Path                               | Mô tả                                  | Auth             |
+| -------- | ---------------------------------- | -------------------------------------- | ---------------- |
+| `GET`    | `/api/tenants`                     | Danh sách tenants                      | ✅ PlatformAdmin |
+| `GET`    | `/api/tenants/{id}`                | Chi tiết tenant                        | ✅ PlatformAdmin |
+| `POST`   | `/api/tenants`                     | Tạo tenant mới + auto-sync features    | ✅ PlatformAdmin |
+| `PUT`    | `/api/tenants/{id}`                | Cập nhật thông tin                     | ✅ PlatformAdmin |
+| `PUT`    | `/api/tenants/{id}/branding`       | Cập nhật branding                      | ✅ PlatformAdmin |
+| `PUT`    | `/api/tenants/{id}/limits`         | Cập nhật giới hạn & features           | ✅ PlatformAdmin |
+| `PUT`    | `/api/tenants/{id}/isolation`      | Thay đổi chiến lược cô lập             | ✅ PlatformAdmin |
+| `PUT`    | `/api/tenants/{id}/subscription`   | Cập nhật subscription + sync features  | ✅ PlatformAdmin |
+| `POST`   | `/api/tenants/{id}/activate`       | Kích hoạt tenant                       | ✅ PlatformAdmin |
+| `POST`   | `/api/tenants/{id}/suspend`        | Tạm ngưng tenant                       | ✅ PlatformAdmin |
+| `POST`   | `/api/tenants/{id}/cancel`         | Hủy tenant                             | ✅ PlatformAdmin |
+| `GET`    | `/api/tenants/stats`               | Thống kê toàn platform                 | ✅ PlatformAdmin |
+| `POST`   | `/api/tenants/{id}/domain/verify`  | Xác minh DNS custom domain (CNAME+TXT) | ✅ PlatformAdmin |
+| `DELETE` | `/api/tenants/{id}/domain`         | Xóa custom domain                      | ✅ PlatformAdmin |
+| `GET`    | `/api/tenants/feature-definitions` | Tất cả feature definitions (CRUD)      | ✅ PlatformAdmin |
 
 ### 3.4 Pricing API Response Example
 
@@ -889,9 +903,210 @@ Tenant gói Starter (maxUsers = 10) cố tạo user thứ 11:
 
 ---
 
-## 7. Bảo mật & Tuân thủ
+## 7. Custom Domain & Reverse Proxy
 
-### 5.1 Kiến trúc bảo mật
+### 7.1 Tổng quan Custom Domain
+
+Tenant gói Enterprise/Custom có thể sử dụng tên miền riêng (VD: `ivf.benhvienabc.vn`) thay vì subdomain mặc định (`benhvienabc.ivf.clinic`). Hệ thống tự động xác minh quyền sở hữu domain qua DNS records và cấp SSL certificate tự động qua Let's Encrypt.
+
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│                    Custom Domain Architecture                           │
+│                                                                        │
+│  Tenant Admin                                                          │
+│   │                                                                    │
+│   ├─ 1. Nhập domain vào Branding tab (VD: ivf.benhvienabc.vn)         │
+│   │     → Backend: regex validation + uniqueness check                 │
+│   │     → Tenant.UpdateBranding() → Status = Pending                  │
+│   │     → Generate token: "ivf-verify-{guid}"                         │
+│   │                                                                    │
+│   ├─ 2. Cấu hình DNS tại registrar:                                   │
+│   │     CNAME: ivf.benhvienabc.vn → app.ivf.clinic                    │
+│   │     TXT:   _ivf-verify.ivf.benhvienabc.vn → ivf-verify-{token}    │
+│   │                                                                    │
+│   ├─ 3. Click "Xác minh tên miền"                                     │
+│   │     → POST /api/tenants/{id}/domain/verify                        │
+│   │     → DnsClient.NET query CNAME + TXT records                      │
+│   │     → ✅ TXT match → Status = Verified                            │
+│   │     → ❌ TXT mismatch → Status = Failed + chi tiết lỗi            │
+│   │                                                                    │
+│   └─ 4. Caddy auto-SSL:                                               │
+│         → GET /api/tenants/domain-check?domain=ivf.benhvienabc.vn     │
+│         → 200 OK (domain verified) → Let's Encrypt cấp cert           │
+│         → Tenant truy cập qua HTTPS custom domain ✅                  │
+└──────────────────────────────────────────────────────────────────────────┘
+```
+
+### 7.2 CustomDomainStatus Enum
+
+| Giá trị    | Mô tả                                             |
+| ---------- | ------------------------------------------------- |
+| `None`     | Chưa cấu hình custom domain                       |
+| `Pending`  | Đã nhập domain, chờ xác minh DNS                  |
+| `Verified` | DNS đã xác minh thành công, domain hoạt động      |
+| `Failed`   | Xác minh DNS thất bại (CNAME hoặc TXT không đúng) |
+
+### 7.3 DNS Verification (DnsClient.NET)
+
+Hệ thống sử dụng package **DnsClient 1.8.0** (thay thế `System.Net.Dns`) để xác minh DNS chính xác:
+
+```csharp
+// IDomainVerificationService (Application Layer)
+public interface IDomainVerificationService
+{
+    Task<DomainVerificationResult> VerifyDomainAsync(
+        string domain, string expectedToken, CancellationToken ct = default);
+}
+
+public record DomainVerificationResult(
+    bool CnameVerified,    // CNAME → app.ivf.clinic?
+    bool TxtVerified,      // _ivf-verify.{domain} chứa token?
+    string? CnameTarget,   // Target thực tế của CNAME
+    List<string> TxtRecords // Tất cả TXT records tìm thấy
+);
+```
+
+**Quy trình xác minh:**
+
+| Bước | DNS Record   | Query                  | Expected Value       | Mục đích                              |
+| ---- | ------------ | ---------------------- | -------------------- | ------------------------------------- |
+| 1    | CNAME        | `{domain}`             | `app.ivf.clinic`     | Xác nhận domain trỏ về hệ thống       |
+| 1b   | A (fallback) | `{domain}`             | Bất kỳ A record      | Nếu không có CNAME, kiểm tra A record |
+| 2    | TXT          | `_ivf-verify.{domain}` | `ivf-verify-{token}` | Xác nhận quyền sở hữu                 |
+
+**Cấu hình DnsClient:**
+
+- `UseCache = false` — Luôn query DNS mới nhất
+- `Timeout = 10 giây` — Cho phép DNS server phản hồi
+- `Retries = 2` — Retry nếu timeout
+- Platform CNAME target: `app.ivf.clinic`
+
+### 7.4 Tenant Resolution qua Custom Domain
+
+`TenantResolutionMiddleware` hỗ trợ resolve tenant từ Host header cho custom domain:
+
+```
+HTTP Request → Host: ivf.benhvienabc.vn
+  │
+  ├─ JWT có tenant_id claim? → Dùng tenant từ JWT
+  │
+  ├─ Host là default? (localhost, ivf.clinic, *.ivf.clinic) → Skip
+  │
+  └─ Custom domain:
+       ├─ ITenantRepository.GetByCustomDomainAsync("ivf.benhvienabc.vn")
+       ├─ Tenant found + CustomDomainStatus == Verified
+       │   → SetCurrentTenant(tenantId) ✅
+       └─ Tenant not found → No tenant context (anonymous)
+```
+
+### 7.5 Caddy Reverse Proxy
+
+**Caddy 2** đóng vai trò reverse proxy với automatic HTTPS:
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│                    Caddy Reverse Proxy                               │
+│                                                                      │
+│  ┌─ Wildcard SSL ─────────────────────────────────────────────────┐  │
+│  │  ivf.clinic + *.ivf.clinic                                     │  │
+│  │  → Let's Encrypt wildcard certificate (DNS-01 challenge)       │  │
+│  │  → /api/*, /hubs/* → reverse_proxy api:8080                   │  │
+│  │  → /* → SPA (/srv/frontend, fallback index.html)              │  │
+│  └────────────────────────────────────────────────────────────────┘  │
+│                                                                      │
+│  ┌─ On-Demand TLS ────────────────────────────────────────────────┐  │
+│  │  :443 (catch-all cho custom domains)                           │  │
+│  │  → On-Demand TLS: tls { on_demand }                           │  │
+│  │  → Ask endpoint: GET /api/tenants/domain-check?domain=X       │  │
+│  │     ├─ 200 OK → Caddy cấp cert từ Let's Encrypt               │  │
+│  │     └─ 404 → Caddy từ chối, không cấp cert                    │  │
+│  │  → Same reverse proxy rules                                   │  │
+│  └────────────────────────────────────────────────────────────────┘  │
+│                                                                      │
+│  Security Headers (cả 2 blocks):                                    │
+│    • HSTS: max-age=63072000, includeSubDomains, preload            │
+│    • X-Content-Type-Options: nosniff                                │
+│    • X-Frame-Options: DENY                                          │
+│    • Referrer-Policy: strict-origin-when-cross-origin               │
+│    • X-XSS-Protection: 1; mode=block                                │
+│    • Server header: stripped                                        │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+**Docker Compose — Caddy Service:**
+
+```yaml
+caddy:
+  image: caddy:2-alpine
+  container_name: ivf-caddy
+  profiles: [proxy] # Dev: docker compose --profile proxy up
+  environment:
+    - ACME_EMAIL=admin@ivf.clinic
+    - API_UPSTREAM=api:8080
+  ports:
+    - "80:80" # HTTP → HTTPS redirect
+    - "443:443" # HTTPS (wildcard + on-demand)
+  volumes:
+    - ./docker/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+    - caddy_data:/data # Let's Encrypt certificates
+    - caddy_config:/config # Caddy auto config
+  depends_on: [api]
+  networks: [ivf-public]
+  restart: unless-stopped
+  healthcheck:
+    test: wget --no-verbose --tries=1 --spider http://localhost:2019/metrics
+```
+
+**Production Override (`docker-compose.production.yml`):**
+
+- `profiles: []` — Caddy luôn chạy (không cần `--profile`)
+- Mount built Angular SPA: `./ivf-client/dist/ivf-client/browser:/srv/frontend:ro`
+- API service: ports bị remove (Caddy xử lý TLS termination)
+- Memory limit: 256M
+
+### 7.6 Custom Domain API Endpoints
+
+| Method   | Path                                | Auth              | Mô tả                                                    |
+| -------- | ----------------------------------- | ----------------- | -------------------------------------------------------- |
+| `POST`   | `/api/tenants/{id}/domain/verify`   | ✅ PlatformAdmin  | Xác minh DNS cho custom domain (CNAME + TXT)             |
+| `DELETE` | `/api/tenants/{id}/domain`          | ✅ PlatformAdmin  | Xóa custom domain                                        |
+| `GET`    | `/api/tenants/domain-check?domain=` | ❌ AllowAnonymous | Caddy On-Demand TLS callback (200=cấp cert, 404=từ chối) |
+
+### 7.7 Custom Domain Flow — Chi tiết kỹ thuật
+
+```
+1. Lưu domain (PUT /api/tenants/{id}/branding)
+   ├─ Regex validation: ^(?!-)[a-z0-9-]{1,63}(?<!-)(\.[a-z0-9-]{1,63})*\.[a-z]{2,}$
+   ├─ Max 200 ký tự, không chứa scheme/path/port
+   ├─ CustomDomainExistsAsync() → đảm bảo unique
+   ├─ Tenant.UpdateBranding() → Status = Pending
+   └─ Token = "ivf-verify-{Guid:N}"
+
+2. Xác minh (POST /api/tenants/{id}/domain/verify)
+   ├─ VerifyCustomDomainCommand → VerifyCustomDomainCommandHandler
+   ├─ IDomainVerificationService.VerifyDomainAsync(domain, token)
+   │   ├─ DnsClient: QueryAsync(domain, CNAME) → check target
+   │   └─ DnsClient: QueryAsync(_ivf-verify.{domain}, TXT) → match token
+   ├─ TxtVerified = true → Tenant.VerifyCustomDomain() ✅
+   └─ TxtVerified = false → Tenant.FailCustomDomainVerification() ❌
+
+3. Xóa domain (DELETE /api/tenants/{id}/domain)
+   ├─ RemoveCustomDomainCommand → RemoveCustomDomainCommandHandler
+   └─ Tenant.RemoveCustomDomain() → Clear all 4 fields
+
+4. Auto SSL (Caddy On-Demand TLS)
+   ├─ First HTTPS request to custom domain
+   ├─ Caddy calls GET /api/tenants/domain-check?domain=X
+   ├─ Endpoint checks: tenant exists + CustomDomainStatus == Verified
+   ├─ 200 → Caddy obtains Let's Encrypt certificate
+   └─ 404 → Caddy rejects, no cert issued
+```
+
+---
+
+## 8. Bảo mật & Tuân thủ
+
+### 8.1 Kiến trúc bảo mật
 
 ```
 ┌────────────────────────────────────────────────┐
@@ -934,7 +1149,7 @@ Tenant gói Starter (maxUsers = 10) cố tạo user thứ 11:
 └────────────────────────────────────────────────┘
 ```
 
-### 7.2 Chứng nhận & Framework
+### 8.2 Chứng nhận & Framework
 
 | Framework | Trạng thái | Mô tả                  |
 | --------- | ---------- | ---------------------- |
@@ -947,22 +1162,24 @@ Tenant gói Starter (maxUsers = 10) cố tạo user thứ 11:
 
 ---
 
-## 8. Hiệu suất & Khả năng mở rộng
+## 9. Hiệu suất & Khả năng mở rộng
 
-### 8.1 Kiến trúc kỹ thuật
+### 9.1 Kiến trúc kỹ thuật
 
-| Component       | Technology                             | Mục đích                             |
-| --------------- | -------------------------------------- | ------------------------------------ |
-| Backend         | **.NET 10** (Clean Architecture)       | API nhanh, type-safe, CQRS pattern   |
-| Frontend        | **Angular 21** (Standalone Components) | SPA responsive, lazy loading         |
-| Database        | **PostgreSQL 16+**                     | ACID, partitioning, full-text search |
-| Cache           | **Redis**                              | In-memory caching, session store     |
-| File Storage    | **MinIO** (S3-compatible)              | Hình ảnh y tế, PDF, documents        |
-| Real-time       | **SignalR**                            | WebSocket cho hàng đợi, thông báo    |
-| PDF             | **QuestPDF**                           | Xuất báo cáo, biểu mẫu               |
-| Digital Signing | **EJBCA + SignServer**                 | PKI, chữ ký số hợp pháp              |
+| Component       | Technology                             | Mục đích                                       |
+| --------------- | -------------------------------------- | ---------------------------------------------- |
+| Backend         | **.NET 10** (Clean Architecture)       | API nhanh, type-safe, CQRS pattern             |
+| Frontend        | **Angular 21** (Standalone Components) | SPA responsive, lazy loading                   |
+| Database        | **PostgreSQL 16+**                     | ACID, partitioning, full-text search           |
+| Cache           | **Redis**                              | In-memory caching, session store               |
+| File Storage    | **MinIO** (S3-compatible)              | Hình ảnh y tế, PDF, documents                  |
+| Real-time       | **SignalR**                            | WebSocket cho hàng đợi, thông báo              |
+| PDF             | **QuestPDF**                           | Xuất báo cáo, biểu mẫu                         |
+| Digital Signing | **EJBCA + SignServer**                 | PKI, chữ ký số hợp pháp                        |
+| Reverse Proxy   | **Caddy 2** (Alpine)                   | Auto HTTPS, wildcard SSL, On-Demand TLS        |
+| DNS Verify      | **DnsClient.NET 1.8.0**                | Xác minh CNAME + TXT records cho custom domain |
 
-### 8.2 Benchmark hiệu suất
+### 9.2 Benchmark hiệu suất
 
 | Metric             | Target        | Ghi chú                         |
 | ------------------ | ------------- | ------------------------------- |
@@ -973,7 +1190,7 @@ Tenant gói Starter (maxUsers = 10) cố tạo user thứ 11:
 | Database Queries   | < 50ms (p95)  | Index optimization, query plans |
 | WebSocket Latency  | < 100ms       | SignalR hubs                    |
 
-### 8.3 Khả năng mở rộng
+### 9.3 Khả năng mở rộng
 
 ```
                     Load Balancer
@@ -1003,9 +1220,9 @@ Tenant gói Starter (maxUsers = 10) cố tạo user thứ 11:
 
 ---
 
-## 9. ROI & Lợi ích cho Trung tâm IVF
+## 10. ROI & Lợi ích cho Trung tâm IVF
 
-### 9.1 So sánh chi phí
+### 10.1 So sánh chi phí
 
 | Hạng mục             | Tự phát triển    | IVF Platform SaaS  |
 | -------------------- | ---------------- | ------------------ |
@@ -1018,7 +1235,7 @@ Tenant gói Starter (maxUsers = 10) cố tạo user thứ 11:
 | **Tổng năm đầu**     | **2.1-5.2 tỷ**   | **60-420 triệu**   |
 | **Tổng từ năm 2**    | **90-170 triệu** | **60-420 triệu**   |
 
-### 9.2 Lợi ích vận hành
+### 10.2 Lợi ích vận hành
 
 | Lĩnh vực           | Trước            | Sau khi dùng IVF Platform  |
 | ------------------ | ---------------- | -------------------------- |
@@ -1029,19 +1246,20 @@ Tenant gói Starter (maxUsers = 10) cố tạo user thứ 11:
 | Hoá đơn            | Viết tay/Excel   | **Tự động, tích hợp**      |
 | Hàng đợi           | Bảng thủ công    | **Real-time, tự động gọi** |
 
-### 9.3 Unique Selling Points
+### 10.3 Unique Selling Points
 
 1. **Duy nhất tại Việt Nam**: Hệ thống IVF chuyên biệt, thiết kế riêng cho quy trình IVF/IUI/ICSI/IVM
 2. **Multi-tenant**: Mở rộng không giới hạn, mỗi trung tâm độc lập
-3. **Ký số hợp pháp**: Tích hợp PKI/SignServer, đáp ứng Nghị định 130/2018/NĐ-CP
-4. **Sinh trắc học**: Xác minh bệnh nhân bằng vân tay, tránh nhầm lẫn
-5. **AI hỗ trợ**: Gợi ý phác đồ, dự đoán kết quả
-6. **Tuân thủ quốc tế**: HIPAA, GDPR sẵn sàng ngay từ đầu
-7. **Responsive**: Hoạt động trên PC, tablet, mobile
+3. **Custom Domain + Auto SSL**: Tenant dùng domain riêng, SSL tự động qua Let's Encrypt
+4. **Ký số hợp pháp**: Tích hợp PKI/SignServer, đáp ứng Nghị định 130/2018/NĐ-CP
+5. **Sinh trắc học**: Xác minh bệnh nhân bằng vân tay, tránh nhầm lẫn
+6. **AI hỗ trợ**: Gợi ý phác đồ, dự đoán kết quả
+7. **Tuân thủ quốc tế**: HIPAA, GDPR sẵn sàng ngay từ đầu
+8. **Responsive**: Hoạt động trên PC, tablet, mobile
 
 ---
 
-## 10. Lộ trình triển khai
+## 11. Lộ trình triển khai
 
 ```
 Tuần 1: Thiết lập trung tâm, tài khoản admin, cấu hình
@@ -1057,7 +1275,7 @@ Sau 30 ngày: Review & tối ưu
 
 ---
 
-## 11. Thông tin Liên hệ
+## 12. Thông tin Liên hệ
 
 - **Email**: admin@ivf-platform.vn
 - **Website**: https://ivf-platform.vn
@@ -1066,7 +1284,7 @@ Sau 30 ngày: Review & tối ưu
 
 ---
 
-_Tài liệu này được cập nhật tự động từ hệ thống. Phiên bản: 4.0 — Cập nhật: 2026-03-06_
+_Tài liệu này được cập nhật tự động từ hệ thống. Phiên bản: 5.0 — Cập nhật: 2026-03-05_
 
 ---
 
@@ -1074,29 +1292,32 @@ _Tài liệu này được cập nhật tự động từ hệ thống. Phiên b
 
 ### A.1 Bảng `tenants`
 
-| Column                     | Type                                     | Mô tả                                                       |
-| -------------------------- | ---------------------------------------- | ----------------------------------------------------------- |
-| `Id`                       | `uuid` PK                                | Tenant ID                                                   |
-| `Name`                     | `varchar(200)`                           | Tên trung tâm                                               |
-| `Slug`                     | `varchar(100)` UNIQUE                    | URL-friendly slug                                           |
-| `Status`                   | `varchar(30)`                            | `Active`, `Trial`, `Suspended`, `Cancelled`, `PendingSetup` |
-| `IsolationStrategy`        | `varchar(30)` DEFAULT `'SharedDatabase'` | `SharedDatabase`, `SeparateSchema`, `SeparateDatabase`      |
-| `IsRootTenant`             | `boolean` DEFAULT `false`                | Root/Platform tenant flag                                   |
-| `ConnectionString`         | `text` NULL                              | Connection string cho SeparateDatabase                      |
-| `DatabaseSchema`           | `varchar(100)` NULL                      | Schema name cho SeparateSchema                              |
-| `MaxUsers`                 | `integer`                                | Giới hạn users                                              |
-| `MaxPatientsPerMonth`      | `integer`                                | Giới hạn bệnh nhân/tháng                                    |
-| `StorageLimitMb`           | `bigint`                                 | Giới hạn lưu trữ (MB)                                       |
-| `AiEnabled`                | `boolean`                                | Feature flag: AI                                            |
-| `DigitalSigningEnabled`    | `boolean`                                | Feature flag: Ký số                                         |
-| `BiometricsEnabled`        | `boolean`                                | Feature flag: Sinh trắc học                                 |
-| `AdvancedReportingEnabled` | `boolean`                                | Feature flag: Báo cáo nâng cao                              |
-| `PrimaryColor`             | `varchar(10)` NULL                       | Màu thương hiệu                                             |
-| `LogoUrl`                  | `text` NULL                              | Logo URL                                                    |
-| `CustomDomain`             | `varchar(255)` NULL                      | Custom domain                                               |
-| `Locale`                   | `varchar(10)`                            | Locale (default: `vi-VN`)                                   |
-| `TimeZone`                 | `varchar(50)`                            | Timezone (default: `Asia/Ho_Chi_Minh`)                      |
-| `CreatedAt`                | `timestamp`                              | Ngày tạo                                                    |
+| Column                          | Type                                     | Mô tả                                                       |
+| ------------------------------- | ---------------------------------------- | ----------------------------------------------------------- |
+| `Id`                            | `uuid` PK                                | Tenant ID                                                   |
+| `Name`                          | `varchar(200)`                           | Tên trung tâm                                               |
+| `Slug`                          | `varchar(100)` UNIQUE                    | URL-friendly slug                                           |
+| `Status`                        | `varchar(30)`                            | `Active`, `Trial`, `Suspended`, `Cancelled`, `PendingSetup` |
+| `IsolationStrategy`             | `varchar(30)` DEFAULT `'SharedDatabase'` | `SharedDatabase`, `SeparateSchema`, `SeparateDatabase`      |
+| `IsRootTenant`                  | `boolean` DEFAULT `false`                | Root/Platform tenant flag                                   |
+| `ConnectionString`              | `text` NULL                              | Connection string cho SeparateDatabase                      |
+| `DatabaseSchema`                | `varchar(100)` NULL                      | Schema name cho SeparateSchema                              |
+| `MaxUsers`                      | `integer`                                | Giới hạn users                                              |
+| `MaxPatientsPerMonth`           | `integer`                                | Giới hạn bệnh nhân/tháng                                    |
+| `StorageLimitMb`                | `bigint`                                 | Giới hạn lưu trữ (MB)                                       |
+| `AiEnabled`                     | `boolean`                                | Feature flag: AI                                            |
+| `DigitalSigningEnabled`         | `boolean`                                | Feature flag: Ký số                                         |
+| `BiometricsEnabled`             | `boolean`                                | Feature flag: Sinh trắc học                                 |
+| `AdvancedReportingEnabled`      | `boolean`                                | Feature flag: Báo cáo nâng cao                              |
+| `PrimaryColor`                  | `varchar(10)` NULL                       | Màu thương hiệu                                             |
+| `LogoUrl`                       | `text` NULL                              | Logo URL                                                    |
+| `CustomDomain`                  | `varchar(255)` NULL UNIQUE (filtered)    | Custom domain (VD: ivf.benhvien.vn)                         |
+| `CustomDomainStatus`            | `varchar(30)` DEFAULT `'None'`           | `None`, `Pending`, `Verified`, `Failed`                     |
+| `CustomDomainVerifiedAt`        | `timestamp` NULL                         | Thời điểm xác minh DNS thành công                           |
+| `CustomDomainVerificationToken` | `varchar(100)` NULL                      | Token xác minh (VD: `ivf-verify-{guid}`)                    |
+| `Locale`                        | `varchar(10)`                            | Locale (default: `vi-VN`)                                   |
+| `TimeZone`                      | `varchar(50)`                            | Timezone (default: `Asia/Ho_Chi_Minh`)                      |
+| `CreatedAt`                     | `timestamp`                              | Ngày tạo                                                    |
 
 ### A.2 Bảng `tenant_subscriptions`
 
@@ -1196,11 +1417,12 @@ _Tài liệu này được cập nhật tự động từ hệ thống. Phiên b
 
 ### A.9 EF Migrations
 
-| Migration                                     | Mô tả                                                                                                                   |
-| --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `20260304110904_AddMultiTenancy`              | Tạo bảng tenants, subscriptions, usage records + ITenantEntity cho 12 entities                                          |
-| `20260304114914_AddTenantIsolationStrategy`   | Thêm `IsolationStrategy`, `IsRootTenant` + set root tenant & platform admin                                             |
-| `20260304161344_AddDynamicFeaturePlanMapping` | Tạo `feature_definitions`, `plan_definitions`, `plan_features`, `tenant_features` + RequiredFeatureCode trên menu_items |
+| Migration                                     | Mô tả                                                                                                                            |
+| --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `20260304110904_AddMultiTenancy`              | Tạo bảng tenants, subscriptions, usage records + ITenantEntity cho 12 entities                                                   |
+| `20260304114914_AddTenantIsolationStrategy`   | Thêm `IsolationStrategy`, `IsRootTenant` + set root tenant & platform admin                                                      |
+| `20260304161344_AddDynamicFeaturePlanMapping` | Tạo `feature_definitions`, `plan_definitions`, `plan_features`, `tenant_features` + RequiredFeatureCode trên menu_items          |
+| `20260305071416_AddCustomDomainVerification`  | Thêm `CustomDomainStatus`, `CustomDomainVerifiedAt`, `CustomDomainVerificationToken` + unique filtered index trên `CustomDomain` |
 
 ---
 
@@ -1219,9 +1441,20 @@ _Tài liệu này được cập nhật tự động từ hệ thống. Phiên b
 1. **Thông tin** — Name, email, phone, website, tax ID, address
 2. **Gói dịch vụ** — Plan, billing cycle, price, discount, dates
 3. **Sử dụng** — Monthly usage statistics (users, patients, storage, cycles, API calls)
-4. **Thương hiệu** — Logo, primary color, custom domain, locale
+4. **Thương hiệu** — Logo, primary color, locale + **Custom Domain** (nhập domain, DNS instructions, verify/remove)
 5. **Giới hạn** — Max users, patients, storage + feature toggles (AI, signing, biometrics, reporting)
 6. **Cô lập dữ liệu** — Current isolation strategy, root tenant badge, schema/connection info, change strategy
+
+**Tab Thương hiệu — Custom Domain UI:**
+
+- Input field: nhập domain (VD: `ivf.your-domain.com`)
+- Status badge: màu sắc theo `CustomDomainStatus` (xanh/vàng/đỏ)
+- DNS Instructions panel (khi chưa verified):
+  - CNAME record: `{domain}` → `app.ivf.clinic`
+  - TXT record: `_ivf-verify.{domain}` → hiển thị token
+  - Lưu ý: DNS propagation 24-48h
+- Nút "Xác minh tên miền" (verify) + "Xóa domain" (remove)
+- Thông báo kết quả xác minh (success/error) qua signals
 
 ### B.3 Pricing Page (`/pricing`) — Dynamic
 
@@ -1310,13 +1543,15 @@ interface MenuItemDto {
 
 ### C.2 Tenant Commands (MediatR)
 
-| Command                        | Handler                               | Feature Sync                         |
-| ------------------------------ | ------------------------------------- | ------------------------------------ |
-| `CreateTenantCommand`          | `CreateTenantCommandHandler`          | ✅ `SyncTenantFeaturesFromPlanAsync` |
-| `UpdateSubscriptionCommand`    | `UpdateSubscriptionCommandHandler`    | ✅ `SyncTenantFeaturesFromPlanAsync` |
-| `UpdateTenantIsolationCommand` | `UpdateTenantIsolationCommandHandler` | — (isolation only)                   |
-| `UpdateTenantCommand`          | `UpdateTenantCommandHandler`          | — (info only)                        |
-| `UpdateBrandingCommand`        | `UpdateBrandingCommandHandler`        | — (branding only)                    |
+| Command                        | Handler                               | Feature Sync                                |
+| ------------------------------ | ------------------------------------- | ------------------------------------------- |
+| `CreateTenantCommand`          | `CreateTenantCommandHandler`          | ✅ `SyncTenantFeaturesFromPlanAsync`        |
+| `UpdateSubscriptionCommand`    | `UpdateSubscriptionCommandHandler`    | ✅ `SyncTenantFeaturesFromPlanAsync`        |
+| `UpdateTenantIsolationCommand` | `UpdateTenantIsolationCommandHandler` | — (isolation only)                          |
+| `UpdateTenantCommand`          | `UpdateTenantCommandHandler`          | — (info only)                               |
+| `UpdateBrandingCommand`        | `UpdateBrandingCommandHandler`        | — (branding + custom domain validation)     |
+| `VerifyCustomDomainCommand`    | `VerifyCustomDomainCommandHandler`    | DNS verify via `IDomainVerificationService` |
+| `RemoveCustomDomainCommand`    | `RemoveCustomDomainCommandHandler`    | — (clear domain fields)                     |
 
 ### C.3 Repository Interface
 
@@ -1329,6 +1564,14 @@ public interface IPricingRepository
     Task<List<FeatureDefinition>> GetAllFeaturesAsync(bool activeOnly = true, CancellationToken ct = default);
     Task<List<string>> GetTenantFeatureCodesAsync(Guid tenantId, CancellationToken ct = default);
     Task SyncTenantFeaturesFromPlanAsync(Guid tenantId, SubscriptionPlan plan, CancellationToken ct = default);
+}
+
+// ITenantRepository.cs (custom domain methods)
+public interface ITenantRepository
+{
+    // ... existing methods ...
+    Task<Tenant?> GetByCustomDomainAsync(string domain, CancellationToken ct = default);
+    Task<bool> CustomDomainExistsAsync(string domain, Guid? excludeTenantId = null, CancellationToken ct = default);
 }
 ```
 
@@ -1369,12 +1612,14 @@ if (app.Environment.IsDevelopment())
 | `Common/Exceptions/TenantLimitExceededException.cs` | Exception | Properties: `LimitType`, `CurrentCount`, `MaxAllowed`                          |
 | `Common/Exceptions/FeatureNotEnabledException.cs`   | Exception | Property: `FeatureCode`                                                        |
 | `Common/Interfaces/ITenantLimitService.cs`          | Interface | 4 methods: EnsureUser/Patient/Storage/FeatureEnabled                           |
+| `Common/Interfaces/IDomainVerificationService.cs`   | Interface | `VerifyDomainAsync()` + `DomainVerificationResult` record                      |
 
 ### E.2 Backend — Infrastructure Layer
 
-| File                             | Loại           | Mô tả                                                                     |
-| -------------------------------- | -------------- | ------------------------------------------------------------------------- |
-| `Services/TenantLimitService.cs` | Implementation | Effective limits: PlanDef → Tenant → Hard defaults. Platform Admin bypass |
+| File                                    | Loại           | Mô tả                                                                     |
+| --------------------------------------- | -------------- | ------------------------------------------------------------------------- |
+| `Services/TenantLimitService.cs`        | Implementation | Effective limits: PlanDef → Tenant → Hard defaults. Platform Admin bypass |
+| `Services/DomainVerificationService.cs` | Implementation | DnsClient.NET: CNAME + TXT record verification. Singleton                 |
 
 ### E.3 Backend — API Layer
 

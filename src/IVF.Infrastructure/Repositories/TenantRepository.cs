@@ -18,8 +18,20 @@ public class TenantRepository : ITenantRepository
     public async Task<Tenant?> GetBySlugAsync(string slug, CancellationToken ct = default)
         => await _context.Tenants.FirstOrDefaultAsync(t => t.Slug == slug, ct);
 
+    public async Task<Tenant?> GetByCustomDomainAsync(string domain, CancellationToken ct = default)
+        => await _context.Tenants.FirstOrDefaultAsync(t => t.CustomDomain == domain.ToLowerInvariant(), ct);
+
     public async Task<bool> SlugExistsAsync(string slug, CancellationToken ct = default)
         => await _context.Tenants.AnyAsync(t => t.Slug == slug, ct);
+
+    public async Task<bool> CustomDomainExistsAsync(string domain, Guid? excludeTenantId = null, CancellationToken ct = default)
+    {
+        var normalizedDomain = domain.ToLowerInvariant();
+        var query = _context.Tenants.Where(t => t.CustomDomain == normalizedDomain);
+        if (excludeTenantId.HasValue)
+            query = query.Where(t => t.Id != excludeTenantId.Value);
+        return await query.AnyAsync(ct);
+    }
 
     public async Task<(IReadOnlyList<Tenant> Items, int TotalCount)> GetAllAsync(
         int page, int pageSize, string? search, TenantStatus? status, CancellationToken ct = default)

@@ -50,6 +50,7 @@ public class GetTenantByIdQueryHandler : IRequestHandler<GetTenantByIdQuery, Ten
             tenant.IsolationStrategy, tenant.IsRootTenant,
             tenant.DatabaseSchema, tenant.ConnectionString,
             tenant.PrimaryColor, tenant.Locale, tenant.TimeZone, tenant.CustomDomain,
+            tenant.CustomDomainStatus, tenant.CustomDomainVerifiedAt, tenant.CustomDomainVerificationToken,
             tenant.CreatedAt,
             sub is null ? null : new SubscriptionDto(
                 sub.Id, sub.Plan, sub.Status, sub.BillingCycle,

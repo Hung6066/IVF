@@ -32,6 +32,12 @@ public class TenantConfiguration : IEntityTypeConfiguration<Tenant>
         builder.Property(t => t.Locale).HasMaxLength(10);
         builder.Property(t => t.TimeZone).HasMaxLength(50);
         builder.Property(t => t.CustomDomain).HasMaxLength(200);
+        builder.HasIndex(t => t.CustomDomain).IsUnique().HasFilter("\"CustomDomain\" IS NOT NULL");
+        builder.Property(t => t.CustomDomainStatus)
+            .HasConversion<string>()
+            .HasMaxLength(20)
+            .HasDefaultValue(IVF.Domain.Enums.CustomDomainStatus.None);
+        builder.Property(t => t.CustomDomainVerificationToken).HasMaxLength(100);
         builder.Property(t => t.ConnectionString).HasMaxLength(500);
         builder.Property(t => t.DatabaseSchema).HasMaxLength(63);
 

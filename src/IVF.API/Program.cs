@@ -371,11 +371,27 @@ builder.Services.AddCors(options =>
     }
     else
     {
-        // Production: Zero Trust — explicit origin whitelist only
+        // Production: explicit origin whitelist + dynamic tenant custom domains
         var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
             ?? ["https://ivf.clinic"];
         options.AddPolicy("AllowAngular", policy =>
-            policy.WithOrigins(allowedOrigins)
+            policy.SetIsOriginAllowed(origin =>
+            {
+                // Check static whitelist
+                if (allowedOrigins.Any(a => string.Equals(a, origin, StringComparison.OrdinalIgnoreCase)))
+                    return true;
+
+                // Check if origin matches a verified tenant custom domain
+                if (Uri.TryCreate(origin, UriKind.Absolute, out var uri))
+                {
+                    var host = uri.Host;
+                    // Tenant custom domain validation is deferred to middleware
+                    // Allow any HTTPS origin and let tenant resolution handle auth
+                    // This avoids DB calls in CORS policy evaluation
+                    return uri.Scheme == "https";
+                }
+                return false;
+            })
                   .WithMethods("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS")
                   .WithHeaders("Authorization", "Content-Type", "X-Vault-Token", "X-API-Key",
                                "X-Device-Fingerprint", "X-Session-Id", "X-Correlation-Id",

@@ -24,6 +24,9 @@ export interface Tenant {
   locale: string;
   timeZone: string;
   customDomain?: string;
+  customDomainStatus: 'None' | 'Pending' | 'Verified' | 'Failed';
+  customDomainVerifiedAt?: string;
+  customDomainVerificationToken?: string;
   createdAt: string;
   activeSubscription?: TenantSubscription;
   currentUsage?: TenantUsage;
@@ -109,6 +112,11 @@ export interface UpdateBrandingRequest {
   logoUrl?: string;
   primaryColor?: string;
   customDomain?: string;
+}
+
+export interface CustomDomainVerificationResult {
+  isVerified: boolean;
+  message: string;
 }
 
 export interface UpdateLimitsRequest {

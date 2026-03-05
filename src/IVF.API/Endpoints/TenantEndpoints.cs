@@ -105,6 +105,17 @@ public static class TenantEndpoints
             return Results.Ok(plans);
         }).AllowAnonymous();
 
+        // Caddy On-Demand TLS check — validates if domain belongs to a verified tenant
+        group.MapGet("/domain-check", async ([FromQuery] string domain, ITenantRepository repo) =>
+        {
+            if (string.IsNullOrWhiteSpace(domain))
+                return Results.BadRequest();
+            var tenant = await repo.GetByCustomDomainAsync(domain.ToLowerInvariant());
+            if (tenant is not null && tenant.CustomDomainStatus == CustomDomainStatus.Verified)
+                return Results.Ok();
+            return Results.NotFound(); // Caddy won't issue cert for unverified domains
+        }).AllowAnonymous();
+
         // ═══════════════ Commands (Platform Admin only) ═══════════════
 
         group.MapPost("/", async (CreateTenantCommand command, IMediator mediator, ICurrentUserService currentUser) =>
@@ -130,6 +141,24 @@ public static class TenantEndpoints
                 return Results.Forbid();
             if (id != command.Id) return Results.BadRequest("ID mismatch");
             await mediator.Send(command);
+            return Results.NoContent();
+        });
+
+        // ═══════════════ Custom Domain ═══════════════
+
+        group.MapPost("/{id:guid}/domain/verify", async (Guid id, IMediator mediator, ICurrentUserService currentUser) =>
+        {
+            if (!currentUser.IsPlatformAdmin)
+                return Results.Forbid();
+            var result = await mediator.Send(new VerifyCustomDomainCommand(id));
+            return Results.Ok(result);
+        });
+
+        group.MapDelete("/{id:guid}/domain", async (Guid id, IMediator mediator, ICurrentUserService currentUser) =>
+        {
+            if (!currentUser.IsPlatformAdmin)
+                return Results.Forbid();
+            await mediator.Send(new RemoveCustomDomainCommand(id));
             return Results.NoContent();
         });
 
@@ -324,7 +353,7 @@ public static class TenantEndpoints
 
     record UpdatePlanFeaturesRequest(List<Guid> FeatureDefinitionIds);
 
-record UpdateTenantFeaturesRequest(List<TenantFeatureUpdateItem> Features);
+    record UpdateTenantFeaturesRequest(List<TenantFeatureUpdateItem> Features);
     record TenantFeatureUpdateItem(Guid FeatureDefinitionId, bool IsEnabled);
     record ResetPasswordRequest(string NewPassword);
 }

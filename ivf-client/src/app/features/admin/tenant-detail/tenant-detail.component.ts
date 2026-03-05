@@ -33,9 +33,9 @@ export class TenantDetailComponent implements OnInit {
   Math = Math; // Expose Math for template
   tenant = signal<Tenant | null>(null);
   loading = signal(false);
-  activeTab = signal<'info' | 'subscription' | 'usage' | 'branding' | 'limits' | 'isolation' | 'users' | 'apiCalls'>(
-    'info',
-  );
+  activeTab = signal<
+    'info' | 'subscription' | 'usage' | 'branding' | 'limits' | 'isolation' | 'users' | 'apiCalls'
+  >('info');
   saving = signal(false);
 
   // Dynamic features
@@ -75,6 +75,11 @@ export class TenantDetailComponent implements OnInit {
   apiCallsPage = signal(1);
   apiCallsMethodFilter = signal('');
   apiCallsStatusFilter = signal<string>('');
+
+  // Custom domain
+  domainVerifying = signal(false);
+  domainRemoving = signal(false);
+  domainVerificationMessage = signal('');
 
   editInfo: UpdateTenantRequest = {
     id: '',
@@ -204,6 +209,37 @@ export class TenantDetailComponent implements OnInit {
         this.saving.set(false);
       },
       error: () => this.saving.set(false),
+    });
+  }
+
+  verifyDomain(): void {
+    const t = this.tenant();
+    if (!t) return;
+    this.domainVerifying.set(true);
+    this.domainVerificationMessage.set('');
+    this.tenantService.verifyCustomDomain(t.id).subscribe({
+      next: (result) => {
+        this.domainVerificationMessage.set(result.message);
+        this.domainVerifying.set(false);
+        this.loadTenant(t.id);
+      },
+      error: () => {
+        this.domainVerificationMessage.set('Lỗi khi xác minh tên miền.');
+        this.domainVerifying.set(false);
+      },
+    });
+  }
+
+  removeDomain(): void {
+    const t = this.tenant();
+    if (!t || !confirm('Bạn có chắc chắn muốn xóa custom domain?')) return;
+    this.domainRemoving.set(true);
+    this.tenantService.removeCustomDomain(t.id).subscribe({
+      next: () => {
+        this.domainRemoving.set(false);
+        this.loadTenant(t.id);
+      },
+      error: () => this.domainRemoving.set(false),
     });
   }
 
@@ -350,9 +386,12 @@ export class TenantDetailComponent implements OnInit {
 
   getAlertIcon(alert: UsageAlert): string {
     switch (alert.type) {
-      case 'critical': return 'fas fa-exclamation-circle';
-      case 'warning': return 'fas fa-exclamation-triangle';
-      default: return 'fas fa-info-circle';
+      case 'critical':
+        return 'fas fa-exclamation-circle';
+      case 'warning':
+        return 'fas fa-exclamation-triangle';
+      default:
+        return 'fas fa-info-circle';
     }
   }
 
@@ -364,7 +403,21 @@ export class TenantDetailComponent implements OnInit {
   }
 
   getMonthLabel(month: number): string {
-    const months = ['', 'Th1', 'Th2', 'Th3', 'Th4', 'Th5', 'Th6', 'Th7', 'Th8', 'Th9', 'Th10', 'Th11', 'Th12'];
+    const months = [
+      '',
+      'Th1',
+      'Th2',
+      'Th3',
+      'Th4',
+      'Th5',
+      'Th6',
+      'Th7',
+      'Th8',
+      'Th9',
+      'Th10',
+      'Th11',
+      'Th12',
+    ];
     return months[month] || '';
   }
 
@@ -373,7 +426,7 @@ export class TenantDetailComponent implements OnInit {
     if (!t) return;
     const analytics = this.usageAnalytics();
     const year = analytics?.currentUsage?.year || new Date().getFullYear();
-    const month = analytics?.currentUsage?.month || (new Date().getMonth() + 1);
+    const month = analytics?.currentUsage?.month || new Date().getMonth() + 1;
 
     this.usageDetailLoading.set(true);
     this.usageDetailOpen.set(true);
@@ -472,20 +525,25 @@ export class TenantDetailComponent implements OnInit {
     const t = this.tenant();
     if (!t) return;
     this.usersLoading.set(true);
-    const isActive = this.usersActiveFilter() === '' ? undefined : this.usersActiveFilter() === 'true';
-    this.tenantService.getTenantUsers(
-      t.id, this.usersPage(), 20,
-      this.usersSearch() || undefined,
-      this.usersRoleFilter() || undefined,
-      isActive,
-    ).subscribe({
-      next: (res) => {
-        this.tenantUsers.set(res.items);
-        this.tenantUsersTotal.set(res.totalCount);
-        this.usersLoading.set(false);
-      },
-      error: () => this.usersLoading.set(false),
-    });
+    const isActive =
+      this.usersActiveFilter() === '' ? undefined : this.usersActiveFilter() === 'true';
+    this.tenantService
+      .getTenantUsers(
+        t.id,
+        this.usersPage(),
+        20,
+        this.usersSearch() || undefined,
+        this.usersRoleFilter() || undefined,
+        isActive,
+      )
+      .subscribe({
+        next: (res) => {
+          this.tenantUsers.set(res.items);
+          this.tenantUsersTotal.set(res.totalCount);
+          this.usersLoading.set(false);
+        },
+        error: () => this.usersLoading.set(false),
+      });
   }
 
   onUsersSearch(): void {
@@ -549,18 +607,24 @@ export class TenantDetailComponent implements OnInit {
     const t = this.tenant();
     if (!t) return;
     this.apiCallsLoading.set(true);
-    const statusCode = this.apiCallsStatusFilter() ? Number(this.apiCallsStatusFilter()) : undefined;
-    this.tenantService.getTenantApiCalls(
-      t.id, this.apiCallsPage(), 20,
-      this.apiCallsMethodFilter() || undefined,
-      statusCode,
-    ).subscribe({
-      next: (res) => {
-        this.apiCallsData.set(res);
-        this.apiCallsLoading.set(false);
-      },
-      error: () => this.apiCallsLoading.set(false),
-    });
+    const statusCode = this.apiCallsStatusFilter()
+      ? Number(this.apiCallsStatusFilter())
+      : undefined;
+    this.tenantService
+      .getTenantApiCalls(
+        t.id,
+        this.apiCallsPage(),
+        20,
+        this.apiCallsMethodFilter() || undefined,
+        statusCode,
+      )
+      .subscribe({
+        next: (res) => {
+          this.apiCallsData.set(res);
+          this.apiCallsLoading.set(false);
+        },
+        error: () => this.apiCallsLoading.set(false),
+      });
   }
 
   onApiCallsFilter(): void {

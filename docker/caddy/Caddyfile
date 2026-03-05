@@ -1,0 +1,114 @@
+# =====================================================
+# Caddy Reverse Proxy — IVF Multi-Tenant Platform
+# =====================================================
+# Caddy handles:
+#   1. Automatic HTTPS via Let's Encrypt (ACME)
+#   2. Wildcard SSL for *.ivf.clinic subdomains
+#   3. Custom domain SSL via On-Demand TLS
+#   4. Reverse proxy to API + frontend
+#   5. Security headers
+#
+# Environment variables (set in docker-compose):
+#   ACME_EMAIL     — Let's Encrypt registration email
+#   API_UPSTREAM   — API server address (default: api:8080)
+# =====================================================
+
+# Global options
+{
+	# Email for Let's Encrypt ACME registration
+	email {$ACME_EMAIL:admin@ivf.clinic}
+
+	# On-Demand TLS — allows Caddy to automatically obtain certs
+	# for any custom domain that passes the ask endpoint check
+	on_demand_tls {
+		ask http://api:8080/api/tenants/domain-check
+		interval 5m
+		burst 5
+	}
+
+	# Logging
+	log {
+		level INFO
+	}
+}
+
+# ─────────────────────────────────────────────
+# Primary platform domain (dashboard + API)
+# ─────────────────────────────────────────────
+ivf.clinic, *.ivf.clinic {
+	# Security headers
+	header {
+		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-XSS-Protection "1; mode=block"
+		-Server
+	}
+
+	# API routes → backend
+	handle /api/* {
+		reverse_proxy {$API_UPSTREAM:api:8080}
+	}
+
+	# SignalR hubs → backend (WebSocket upgrade)
+	handle /hubs/* {
+		reverse_proxy {$API_UPSTREAM:api:8080}
+	}
+
+	# Swagger (dev only, guarded by ASPNETCORE_ENVIRONMENT)
+	handle /swagger/* {
+		reverse_proxy {$API_UPSTREAM:api:8080}
+	}
+
+	# Frontend SPA — serve static files, fallback to index.html
+	handle {
+		root * /srv/frontend
+		try_files {path} /index.html
+		file_server
+	}
+}
+
+# ─────────────────────────────────────────────
+# Custom tenant domains — On-Demand TLS
+# Caddy will auto-obtain SSL certs for verified
+# tenant domains via the ask endpoint above.
+# ─────────────────────────────────────────────
+:443 {
+	# On-Demand TLS — only issues certs for domains
+	# that pass the /api/tenants/domain-check endpoint
+	tls {
+		on_demand
+	}
+
+	# Security headers
+	header {
+		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-XSS-Protection "1; mode=block"
+		-Server
+	}
+
+	# API routes → backend
+	handle /api/* {
+		reverse_proxy {$API_UPSTREAM:api:8080}
+	}
+
+	# SignalR hubs → backend
+	handle /hubs/* {
+		reverse_proxy {$API_UPSTREAM:api:8080}
+	}
+
+	# Frontend SPA
+	handle {
+		root * /srv/frontend
+		try_files {path} /index.html
+		file_server
+	}
+}
+
+# ─────────────────────────────────────────────
+# HTTP → HTTPS redirect (handled automatically by Caddy)
+# ─────────────────────────────────────────────

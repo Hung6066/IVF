@@ -35,6 +35,9 @@ public class Tenant : BaseEntity
     public string? Locale { get; private set; } = "vi-VN";
     public string? TimeZone { get; private set; } = "Asia/Ho_Chi_Minh";
     public string? CustomDomain { get; private set; }
+    public CustomDomainStatus CustomDomainStatus { get; private set; } = CustomDomainStatus.None;
+    public DateTime? CustomDomainVerifiedAt { get; private set; }
+    public string? CustomDomainVerificationToken { get; private set; }
 
     private Tenant() { }
 
@@ -95,8 +98,43 @@ public class Tenant : BaseEntity
     {
         LogoUrl = logoUrl;
         PrimaryColor = primaryColor;
-        CustomDomain = customDomain;
+
+        // If domain changed, reset verification
+        if (!string.Equals(CustomDomain, customDomain, StringComparison.OrdinalIgnoreCase))
+        {
+            CustomDomain = string.IsNullOrWhiteSpace(customDomain) ? null : customDomain.Trim().ToLowerInvariant();
+            CustomDomainStatus = string.IsNullOrWhiteSpace(customDomain) ? CustomDomainStatus.None : CustomDomainStatus.Pending;
+            CustomDomainVerifiedAt = null;
+            CustomDomainVerificationToken = string.IsNullOrWhiteSpace(customDomain) ? null : GenerateVerificationToken();
+        }
         SetUpdated();
+    }
+
+    public void VerifyCustomDomain()
+    {
+        CustomDomainStatus = CustomDomainStatus.Verified;
+        CustomDomainVerifiedAt = DateTime.UtcNow;
+        SetUpdated();
+    }
+
+    public void FailCustomDomainVerification()
+    {
+        CustomDomainStatus = CustomDomainStatus.Failed;
+        SetUpdated();
+    }
+
+    public void RemoveCustomDomain()
+    {
+        CustomDomain = null;
+        CustomDomainStatus = CustomDomainStatus.None;
+        CustomDomainVerifiedAt = null;
+        CustomDomainVerificationToken = null;
+        SetUpdated();
+    }
+
+    private static string GenerateVerificationToken()
+    {
+        return $"ivf-verify-{Guid.NewGuid():N}";
     }
 
     public void SetResourceLimits(int maxUsers, int maxPatientsPerMonth, long storageLimitMb,

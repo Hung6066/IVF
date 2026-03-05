@@ -58,3 +58,8 @@ public record UpdateTenantIsolationCommand(
     DataIsolationStrategy IsolationStrategy,
     string? ConnectionString,
     string? DatabaseSchema) : IRequest;
+
+// Custom Domain
+public record VerifyCustomDomainCommand(Guid TenantId) : IRequest<CustomDomainVerificationResult>;
+public record RemoveCustomDomainCommand(Guid TenantId) : IRequest;
+public record CustomDomainVerificationResult(bool IsVerified, string Message);

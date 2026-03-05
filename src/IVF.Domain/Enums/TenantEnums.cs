@@ -34,6 +34,14 @@ public enum BillingCycle
     Annually
 }
 
+public enum CustomDomainStatus
+{
+    None,
+    Pending,
+    Verified,
+    Failed
+}
+
 /// <summary>
 /// Strategy for data isolation between tenants.
 /// SharedDatabase: Row-level isolation via global query filters (default)
