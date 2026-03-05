@@ -25,7 +25,7 @@ export interface Tenant {
   timeZone: string;
   customDomain?: string;
   createdAt: string;
-  subscription?: TenantSubscription;
+  activeSubscription?: TenantSubscription;
   currentUsage?: TenantUsage;
 }
 
@@ -145,6 +145,7 @@ export interface PricingPlan {
 }
 
 export interface PlanFeatureItem {
+  featureDefinitionId: string;
   code: string;
   displayName: string;
   description?: string;
@@ -170,4 +171,94 @@ export interface UpdateIsolationRequest {
   isolationStrategy: DataIsolationStrategy;
   connectionString?: string;
   databaseSchema?: string;
+}
+
+// ── Admin Feature/Plan Config Models ──
+
+export interface FeatureDefinitionDto {
+  id: string;
+  code: string;
+  displayName: string;
+  description?: string;
+  icon: string;
+  category: string;
+  sortOrder: number;
+  isActive: boolean;
+}
+
+export interface PlanDefinitionDto {
+  id: string;
+  plan: string;
+  displayName: string;
+  description?: string;
+  monthlyPrice: number;
+  currency: string;
+  duration: string;
+  maxUsers: number;
+  maxPatientsPerMonth: number;
+  storageLimitMb: number;
+  sortOrder: number;
+  isFeatured: boolean;
+  isActive: boolean;
+  features: PlanFeatureDto[];
+}
+
+export interface PlanFeatureDto {
+  featureDefinitionId: string;
+  code: string;
+  displayName: string;
+}
+
+export interface TenantFeatureDto {
+  featureDefinitionId: string;
+  code: string;
+  displayName: string;
+  icon: string;
+  category: string;
+  isEnabled: boolean;
+}
+
+export interface CreateFeatureRequest {
+  code: string;
+  displayName: string;
+  description?: string;
+  icon: string;
+  category: string;
+  sortOrder: number;
+}
+
+export interface UpdateFeatureRequest {
+  displayName: string;
+  description?: string;
+  icon: string;
+  category: string;
+  sortOrder: number;
+  isActive: boolean;
+}
+
+export interface CreatePlanRequest {
+  plan: string;
+  displayName: string;
+  description?: string;
+  monthlyPrice: number;
+  currency: string;
+  duration: string;
+  maxUsers: number;
+  maxPatientsPerMonth: number;
+  storageLimitMb: number;
+  sortOrder: number;
+  isFeatured: boolean;
+}
+
+export interface UpdatePlanRequest {
+  displayName: string;
+  description?: string;
+  monthlyPrice: number;
+  duration: string;
+  maxUsers: number;
+  maxPatientsPerMonth: number;
+  storageLimitMb: number;
+  sortOrder: number;
+  isFeatured: boolean;
+  isActive: boolean;
 }

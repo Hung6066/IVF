@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using IVF.Application.Common;
+using IVF.Application.Common.Attributes;
 using IVF.Application.Common.Interfaces;
 using IVF.Domain.Entities;
 using IVF.Domain.Enums;
@@ -10,6 +11,7 @@ namespace IVF.Application.Features.Forms.Commands;
 
 #region Form Categories
 
+[RequiresFeature(FeatureCodes.BasicForms)]
 public record CreateFormCategoryCommand(
     string Name,
     string? Description,

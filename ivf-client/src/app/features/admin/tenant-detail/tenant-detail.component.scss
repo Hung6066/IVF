@@ -445,6 +445,119 @@
   text-align: center;
   padding: 48px;
   color: #999;
+
+  &.small {
+    padding: 24px;
+  }
+}
+
+// ═══ Dynamic Features Grid ═══
+.loading-inline {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 24px;
+  color: #666;
+
+  .spinner {
+    width: 24px;
+    height: 24px;
+    border: 3px solid #e5e7eb;
+    border-top-color: #4361ee;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+}
+
+.dynamic-features-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.feature-toggle-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  background: #f8f9fb;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &.enabled {
+    background: #eef7ee;
+    border-color: #22c55e;
+  }
+
+  &:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  }
+}
+
+.feature-toggle-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  .feature-icon {
+    font-size: 20px;
+    width: 32px;
+    text-align: center;
+  }
+
+  strong {
+    display: block;
+    font-size: 14px;
+    color: #1f2937;
+  }
+
+  small {
+    display: block;
+    font-size: 12px;
+    color: #9ca3af;
+    margin-top: 2px;
+  }
+}
+
+.toggle-switch {
+  cursor: pointer;
+}
+
+.toggle-track {
+  width: 44px;
+  height: 24px;
+  background: #d1d5db;
+  border-radius: 12px;
+  position: relative;
+  transition: background 0.2s;
+
+  &.on {
+    background: #22c55e;
+  }
+
+  .toggle-thumb {
+    width: 20px;
+    height: 20px;
+    background: white;
+    border-radius: 50%;
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    transition: transform 0.2s;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  }
+
+  &.on .toggle-thumb {
+    transform: translateX(20px);
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @media (max-width: 768px) {
@@ -458,7 +571,8 @@
   .form-row {
     grid-template-columns: 1fr;
   }
-  .feature-toggles {
+  .feature-toggles,
+  .dynamic-features-grid {
     grid-template-columns: 1fr;
   }
   .page-header {

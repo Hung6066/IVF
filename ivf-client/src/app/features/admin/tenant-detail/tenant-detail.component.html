@@ -16,8 +16,8 @@
             <span class="status-badge" [class]="getStatusClass(t.status)">{{
               getStatusLabel(t.status)
             }}</span>
-            @if (t.subscription) {
-              <span class="plan-badge">{{ getPlanLabel(t.subscription.plan) }}</span>
+            @if (t.activeSubscription) {
+              <span class="plan-badge">{{ getPlanLabel(t.activeSubscription.plan) }}</span>
             }
           </div>
         </div>
@@ -154,7 +154,7 @@
     @if (activeTab() === 'subscription') {
       <div class="tab-content card">
         <h3>Gói dịch vụ & Thanh toán</h3>
-        @if (t.subscription; as sub) {
+        @if (t.activeSubscription; as sub) {
           <div class="detail-grid">
             <div class="detail-item">
               <label>Gói</label><span class="plan-badge">{{ getPlanLabel(sub.plan) }}</span>
@@ -299,37 +299,53 @@
           <label>Storage Limit (MB)</label>
           <input type="number" [(ngModel)]="editLimits.storageLimitMb" />
         </div>
-        <h4>Tính năng</h4>
-        <div class="feature-toggles">
-          <label class="toggle"
-            ><input type="checkbox" [(ngModel)]="editLimits.aiEnabled" /><span
-              >AI hỗ trợ</span
-            ></label
-          >
-          <label class="toggle"
-            ><input type="checkbox" [(ngModel)]="editLimits.digitalSigningEnabled" /><span
-              >Ký số</span
-            ></label
-          >
-          <label class="toggle"
-            ><input type="checkbox" [(ngModel)]="editLimits.biometricsEnabled" /><span
-              >Sinh trắc học</span
-            ></label
-          >
-          <label class="toggle"
-            ><input type="checkbox" [(ngModel)]="editLimits.advancedReportingEnabled" /><span
-              >Báo cáo nâng cao</span
-            ></label
-          >
-        </div>
         <div class="form-actions">
           <button class="btn btn-primary" (click)="saveLimits()" [disabled]="saving()">
             @if (saving()) {
-              <i class="fas fa-spinner fa-spin"></i>
+              ⏳
             }
             Cập nhật giới hạn
           </button>
         </div>
+
+        <hr style="margin: 24px 0; border: none; border-top: 1px solid #e5e7eb" />
+
+        <h3>🧩 Tính năng ({{ enabledFeatureCount() }} / {{ tenantFeatures().length }} bật)</h3>
+        @if (featuresLoading()) {
+          <div class="loading-inline">
+            <div class="spinner"></div>
+            <p>Đang tải tính năng...</p>
+          </div>
+        } @else if (tenantFeatures().length) {
+          <div class="dynamic-features-grid">
+            @for (tf of tenantFeatures(); track tf.featureDefinitionId) {
+              <label class="feature-toggle-item" [class.enabled]="tf.isEnabled">
+                <div class="feature-toggle-info">
+                  <span class="feature-icon">{{ tf.icon }}</span>
+                  <div>
+                    <strong>{{ tf.displayName }}</strong>
+                    <small>{{ tf.code }} · {{ tf.category }}</small>
+                  </div>
+                </div>
+                <div class="toggle-switch" (click)="toggleFeature(tf)">
+                  <div class="toggle-track" [class.on]="tf.isEnabled">
+                    <div class="toggle-thumb"></div>
+                  </div>
+                </div>
+              </label>
+            }
+          </div>
+          <div class="form-actions" style="margin-top: 16px">
+            <button class="btn btn-primary" (click)="saveFeatures()" [disabled]="featuresSaving()">
+              @if (featuresSaving()) {
+                ⏳
+              }
+              Lưu tính năng
+            </button>
+          </div>
+        } @else {
+          <div class="empty-state small"><p>Chưa có tính năng nào được cấu hình</p></div>
+        }
       </div>
     }
 

@@ -5,6 +5,7 @@ using FluentValidation;
 
 namespace IVF.Application.Features.Users.Commands;
 
+
 // Create
 public record CreateUserCommand(string Username, string Password, string FullName, string Role, string? Department) : IRequest<Guid>;
 
@@ -12,15 +13,19 @@ public class CreateUserCommandHandler : IRequestHandler<CreateUserCommand, Guid>
 {
     private readonly IUserRepository _repo;
     private readonly IUnitOfWork _uow;
+    private readonly ITenantLimitService _limitService;
 
-    public CreateUserCommandHandler(IUserRepository repo, IUnitOfWork uow)
+    public CreateUserCommandHandler(IUserRepository repo, IUnitOfWork uow, ITenantLimitService limitService)
     {
         _repo = repo;
         _uow = uow;
+        _limitService = limitService;
     }
 
     public async Task<Guid> Handle(CreateUserCommand request, CancellationToken cancellationToken)
     {
+        await _limitService.EnsureUserLimitAsync(cancellationToken);
+
         var existing = await _repo.GetByUsernameAsync(request.Username, cancellationToken);
         if (existing != null) throw new ValidationException("Username already exists");
 
@@ -54,7 +59,7 @@ public class UpdateUserCommandHandler : IRequestHandler<UpdateUserCommand>
         if (user == null) throw new KeyNotFoundException($"User {request.Id} not found");
 
         user.UpdateInfo(request.FullName, request.Role, request.Department);
-        
+
         if (request.IsActive && !user.IsActive) user.Activate();
         if (!request.IsActive && user.IsActive) user.Deactivate();
 

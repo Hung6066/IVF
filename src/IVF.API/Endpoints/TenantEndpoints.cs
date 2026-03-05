@@ -2,6 +2,7 @@ using IVF.Application.Common.Interfaces;
 using IVF.Application.Features.Tenants.Commands;
 using IVF.Application.Features.Tenants.Queries;
 using IVF.Application.Features.Pricing.Queries;
+using IVF.Application.Features.Pricing.Commands;
 using IVF.Domain.Enums;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
@@ -147,6 +148,93 @@ public static class TenantEndpoints
             var result = await mediator.Send(new GetAllFeatureDefinitionsQuery());
             return Results.Ok(result);
         });
+
+        // ═══════════════ Feature CRUD (Platform Admin) ═══════════════
+
+        group.MapPost("/feature-definitions", async (CreateFeatureDefinitionRequest req, IMediator mediator, ICurrentUserService currentUser) =>
+        {
+            if (!currentUser.IsPlatformAdmin) return Results.Forbid();
+            var id = await mediator.Send(new CreateFeatureDefinitionCommand(
+                req.Code, req.DisplayName, req.Description, req.Icon, req.Category, req.SortOrder));
+            return Results.Created($"/api/tenants/feature-definitions/{id}", new { id });
+        });
+
+        group.MapPut("/feature-definitions/{id:guid}", async (Guid id, UpdateFeatureDefinitionRequest req, IMediator mediator, ICurrentUserService currentUser) =>
+        {
+            if (!currentUser.IsPlatformAdmin) return Results.Forbid();
+            await mediator.Send(new UpdateFeatureDefinitionCommand(
+                id, req.DisplayName, req.Description, req.Icon, req.Category, req.SortOrder, req.IsActive));
+            return Results.NoContent();
+        });
+
+        group.MapDelete("/feature-definitions/{id:guid}", async (Guid id, IMediator mediator, ICurrentUserService currentUser) =>
+        {
+            if (!currentUser.IsPlatformAdmin) return Results.Forbid();
+            await mediator.Send(new DeleteFeatureDefinitionCommand(id));
+            return Results.NoContent();
+        });
+
+        // ═══════════════ Plan CRUD (Platform Admin) ═══════════════
+
+        group.MapGet("/plan-definitions", async (IMediator mediator, ICurrentUserService currentUser) =>
+        {
+            if (!currentUser.IsPlatformAdmin) return Results.Forbid();
+            var result = await mediator.Send(new GetAllPlanDefinitionsQuery());
+            return Results.Ok(result);
+        });
+
+        group.MapPost("/plan-definitions", async (CreatePlanDefinitionRequest req, IMediator mediator, ICurrentUserService currentUser) =>
+        {
+            if (!currentUser.IsPlatformAdmin) return Results.Forbid();
+            var id = await mediator.Send(new CreatePlanDefinitionCommand(
+                req.Plan, req.DisplayName, req.Description, req.MonthlyPrice, req.Currency,
+                req.Duration, req.MaxUsers, req.MaxPatientsPerMonth, req.StorageLimitMb,
+                req.SortOrder, req.IsFeatured));
+            return Results.Created($"/api/tenants/plan-definitions/{id}", new { id });
+        });
+
+        group.MapPut("/plan-definitions/{id:guid}", async (Guid id, UpdatePlanDefinitionRequest req, IMediator mediator, ICurrentUserService currentUser) =>
+        {
+            if (!currentUser.IsPlatformAdmin) return Results.Forbid();
+            await mediator.Send(new UpdatePlanDefinitionCommand(
+                id, req.DisplayName, req.Description, req.MonthlyPrice, req.Duration,
+                req.MaxUsers, req.MaxPatientsPerMonth, req.StorageLimitMb,
+                req.SortOrder, req.IsFeatured, req.IsActive));
+            return Results.NoContent();
+        });
+
+        group.MapDelete("/plan-definitions/{id:guid}", async (Guid id, IMediator mediator, ICurrentUserService currentUser) =>
+        {
+            if (!currentUser.IsPlatformAdmin) return Results.Forbid();
+            await mediator.Send(new DeletePlanDefinitionCommand(id));
+            return Results.NoContent();
+        });
+
+        // ═══════════════ Plan-Feature Mapping (Platform Admin) ═══════════════
+
+        group.MapPut("/plan-definitions/{id:guid}/features", async (Guid id, UpdatePlanFeaturesRequest req, IMediator mediator, ICurrentUserService currentUser) =>
+        {
+            if (!currentUser.IsPlatformAdmin) return Results.Forbid();
+            await mediator.Send(new UpdatePlanFeaturesCommand(id, req.FeatureDefinitionIds));
+            return Results.NoContent();
+        });
+
+        // ═══════════════ Tenant Feature Override (Platform Admin) ═══════════════
+
+        group.MapGet("/{id:guid}/features", async (Guid id, IMediator mediator, ICurrentUserService currentUser) =>
+        {
+            if (!currentUser.IsPlatformAdmin) return Results.Forbid();
+            var result = await mediator.Send(new GetTenantFeatureOverridesQuery(id));
+            return Results.Ok(result);
+        });
+
+        group.MapPut("/{id:guid}/features", async (Guid id, UpdateTenantFeaturesRequest req, IMediator mediator, ICurrentUserService currentUser) =>
+        {
+            if (!currentUser.IsPlatformAdmin) return Results.Forbid();
+            await mediator.Send(new UpdateTenantFeaturesCommand(id,
+                req.Features.Select(f => new TenantFeatureUpdate(f.FeatureDefinitionId, f.IsEnabled)).ToList()));
+            return Results.NoContent();
+        });
     }
 
     record SuspendRequest(string? Reason);
@@ -161,4 +249,28 @@ public static class TenantEndpoints
         DataIsolationStrategy IsolationStrategy,
         string? ConnectionString,
         string? DatabaseSchema);
+
+    record CreateFeatureDefinitionRequest(
+        string Code, string DisplayName, string? Description,
+        string Icon, string Category, int SortOrder);
+
+    record UpdateFeatureDefinitionRequest(
+        string DisplayName, string? Description,
+        string Icon, string Category, int SortOrder, bool IsActive);
+
+    record CreatePlanDefinitionRequest(
+        SubscriptionPlan Plan, string DisplayName, string? Description,
+        decimal MonthlyPrice, string Currency, string Duration,
+        int MaxUsers, int MaxPatientsPerMonth, long StorageLimitMb,
+        int SortOrder, bool IsFeatured);
+
+    record UpdatePlanDefinitionRequest(
+        string DisplayName, string? Description, decimal MonthlyPrice,
+        string Duration, int MaxUsers, int MaxPatientsPerMonth,
+        long StorageLimitMb, int SortOrder, bool IsFeatured, bool IsActive);
+
+    record UpdatePlanFeaturesRequest(List<Guid> FeatureDefinitionIds);
+
+    record UpdateTenantFeaturesRequest(List<TenantFeatureUpdateItem> Features);
+    record TenantFeatureUpdateItem(Guid FeatureDefinitionId, bool IsEnabled);
 }

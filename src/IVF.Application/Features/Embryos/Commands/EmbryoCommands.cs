@@ -1,5 +1,6 @@
 using FluentValidation;
 using IVF.Application.Common;
+using IVF.Application.Common.Attributes;
 using IVF.Application.Common.Interfaces;
 using IVF.Domain.Entities;
 using IVF.Domain.Enums;
@@ -8,6 +9,7 @@ using MediatR;
 namespace IVF.Application.Features.Embryos.Commands;
 
 // ==================== CREATE EMBRYO ====================
+[RequiresFeature(FeatureCodes.Lab)]
 public record CreateEmbryoCommand(
     Guid CycleId,
     DateTime FertilizationDate,
@@ -40,8 +42,8 @@ public class CreateEmbryoHandler : IRequestHandler<CreateEmbryoCommand, Result<E
 
         var number = await _embryoRepo.GetNextNumberForCycleAsync(request.CycleId, ct);
         var embryo = Embryo.Create(
-            request.CycleId, 
-            number, 
+            request.CycleId,
+            number,
             request.FertilizationDate,
             request.Grade,
             request.Day,
@@ -72,7 +74,7 @@ public class CreateEmbryoHandler : IRequestHandler<CreateEmbryoCommand, Result<E
                 return Result<EmbryoDto>.Failure($"No available space in {request.Location}");
             }
         }
-        
+
         await _embryoRepo.AddAsync(embryo, ct);
         await _unitOfWork.SaveChangesAsync(ct);
 
@@ -81,6 +83,7 @@ public class CreateEmbryoHandler : IRequestHandler<CreateEmbryoCommand, Result<E
 }
 
 // ==================== UPDATE EMBRYO ====================
+[RequiresFeature(FeatureCodes.Lab)]
 public record UpdateEmbryoCommand(
     Guid Id,
     Guid CycleId,
@@ -242,6 +245,7 @@ public class UpdateEmbryoGradeHandler : IRequestHandler<UpdateEmbryoGradeCommand
 }
 
 // ==================== TRANSFER EMBRYO ====================
+[RequiresFeature(FeatureCodes.Lab)]
 public record TransferEmbryoCommand(Guid EmbryoId) : IRequest<Result>;
 
 public class TransferEmbryoHandler : IRequestHandler<TransferEmbryoCommand, Result>
@@ -270,6 +274,7 @@ public class TransferEmbryoHandler : IRequestHandler<TransferEmbryoCommand, Resu
 }
 
 // ==================== FREEZE EMBRYO ====================
+[RequiresFeature(FeatureCodes.Lab)]
 public record FreezeEmbryoCommand(Guid EmbryoId, Guid CryoLocationId) : IRequest<Result<EmbryoDto>>;
 
 public class FreezeEmbryoHandler : IRequestHandler<FreezeEmbryoCommand, Result<EmbryoDto>>
@@ -300,7 +305,7 @@ public class FreezeEmbryoHandler : IRequestHandler<FreezeEmbryoCommand, Result<E
 
         embryo.Freeze(request.CryoLocationId);
         location.Occupy();
-        
+
         await _embryoRepo.UpdateAsync(embryo, ct);
         await _cryoRepo.UpdateAsync(location, ct);
         await _unitOfWork.SaveChangesAsync(ct);
@@ -310,6 +315,7 @@ public class FreezeEmbryoHandler : IRequestHandler<FreezeEmbryoCommand, Result<E
 }
 
 // ==================== THAW EMBRYO ====================
+[RequiresFeature(FeatureCodes.Lab)]
 public record ThawEmbryoCommand(Guid EmbryoId) : IRequest<Result<EmbryoDto>>;
 
 public class ThawEmbryoHandler : IRequestHandler<ThawEmbryoCommand, Result<EmbryoDto>>

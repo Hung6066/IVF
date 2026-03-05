@@ -1,8 +1,9 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { TenantService } from '../../../core/services/tenant.service';
+import { PricingConfigService } from '../../../core/services/pricing-config.service';
 import {
   Tenant,
   UpdateTenantRequest,
@@ -11,6 +12,7 @@ import {
   UpdateSubscriptionRequest,
   DataIsolationStrategy,
   UpdateIsolationRequest,
+  TenantFeatureDto,
 } from '../../../core/models/tenant.model';
 
 @Component({
@@ -27,6 +29,12 @@ export class TenantDetailComponent implements OnInit {
     'info',
   );
   saving = signal(false);
+
+  // Dynamic features
+  tenantFeatures = signal<TenantFeatureDto[]>([]);
+  featuresLoading = signal(false);
+  featuresSaving = signal(false);
+  enabledFeatureCount = computed(() => this.tenantFeatures().filter((f) => f.isEnabled).length);
 
   editInfo: UpdateTenantRequest = {
     id: '',
@@ -54,6 +62,7 @@ export class TenantDetailComponent implements OnInit {
     private route: ActivatedRoute,
     private router: Router,
     private tenantService: TenantService,
+    private pricingConfigService: PricingConfigService,
   ) {}
 
   ngOnInit(): void {
@@ -93,8 +102,45 @@ export class TenantDetailComponent implements OnInit {
         };
         this.editIsolation = { isolationStrategy: t.isolationStrategy || 'SharedDatabase' };
         this.loading.set(false);
+        this.loadTenantFeatures(t.id);
       },
       error: () => this.loading.set(false),
+    });
+  }
+
+  loadTenantFeatures(tenantId: string): void {
+    this.featuresLoading.set(true);
+    this.pricingConfigService.getTenantFeatures(tenantId).subscribe({
+      next: (features) => {
+        this.tenantFeatures.set(features);
+        this.featuresLoading.set(false);
+      },
+      error: () => this.featuresLoading.set(false),
+    });
+  }
+
+  toggleFeature(tf: TenantFeatureDto): void {
+    this.tenantFeatures.update((list) =>
+      list.map((f) =>
+        f.featureDefinitionId === tf.featureDefinitionId ? { ...f, isEnabled: !f.isEnabled } : f,
+      ),
+    );
+  }
+
+  saveFeatures(): void {
+    const t = this.tenant();
+    if (!t) return;
+    this.featuresSaving.set(true);
+    const updates = this.tenantFeatures().map((f) => ({
+      featureDefinitionId: f.featureDefinitionId,
+      isEnabled: f.isEnabled,
+    }));
+    this.pricingConfigService.updateTenantFeatures(t.id, updates).subscribe({
+      next: () => {
+        this.featuresSaving.set(false);
+        this.loadTenantFeatures(t.id);
+      },
+      error: () => this.featuresSaving.set(false),
     });
   }
 

@@ -1,5 +1,6 @@
 using FluentValidation;
 using IVF.Application.Common;
+using IVF.Application.Common.Attributes;
 using IVF.Application.Common.Interfaces;
 using IVF.Domain.Entities;
 using IVF.Domain.Enums;
@@ -8,6 +9,7 @@ using MediatR;
 namespace IVF.Application.Features.Billing.Commands;
 
 // ==================== CREATE INVOICE ====================
+[RequiresFeature(FeatureCodes.Billing)]
 public record CreateInvoiceCommand(
     Guid PatientId,
     DateTime InvoiceDate,
@@ -43,6 +45,7 @@ public class CreateInvoiceHandler : IRequestHandler<CreateInvoiceCommand, Result
 }
 
 // ==================== ADD ITEM ====================
+[RequiresFeature(FeatureCodes.Billing)]
 public record AddInvoiceItemCommand(
     Guid InvoiceId,
     string ServiceCode,
@@ -76,6 +79,7 @@ public class AddInvoiceItemHandler : IRequestHandler<AddInvoiceItemCommand, Resu
 }
 
 // ==================== ISSUE INVOICE ====================
+[RequiresFeature(FeatureCodes.Billing)]
 public record IssueInvoiceCommand(Guid InvoiceId) : IRequest<Result<InvoiceDto>>;
 
 public class IssueInvoiceHandler : IRequestHandler<IssueInvoiceCommand, Result<InvoiceDto>>
@@ -131,9 +135,9 @@ public class RecordPaymentHandler : IRequestHandler<RecordPaymentCommand, Result
 
         var paymentNumber = await _paymentRepo.GeneratePaymentNumberAsync(ct);
         var payment = Payment.Create(r.InvoiceId, paymentNumber, DateTime.UtcNow, r.Amount, r.PaymentMethod, r.TransactionReference, r.ReceivedByUserId);
-        
+
         invoice.RecordPayment(r.Amount);
-        
+
         await _paymentRepo.AddAsync(payment, ct);
         await _invoiceRepo.UpdateAsync(invoice, ct);
         await _unitOfWork.SaveChangesAsync(ct);

@@ -1,5 +1,6 @@
 using System.Text;
 using FluentValidation;
+using IVF.Application.Common.Exceptions;
 using IVF.API.Authorization;
 using IVF.API.Endpoints;
 using IVF.API.Middleware;
@@ -401,6 +402,28 @@ app.UseExceptionHandler(appBuilder =>
             await context.Response.WriteAsJsonAsync(new
             {
                 errors = validationException.Errors.Select(e => new { e.PropertyName, e.ErrorMessage })
+            });
+        }
+        else if (exception is TenantLimitExceededException limitEx)
+        {
+            context.Response.StatusCode = 403;
+            await context.Response.WriteAsJsonAsync(new
+            {
+                code = "TENANT_LIMIT_EXCEEDED",
+                limitType = limitEx.LimitType,
+                currentCount = limitEx.CurrentCount,
+                maxAllowed = limitEx.MaxAllowed,
+                message = limitEx.Message
+            });
+        }
+        else if (exception is FeatureNotEnabledException featureEx)
+        {
+            context.Response.StatusCode = 403;
+            await context.Response.WriteAsJsonAsync(new
+            {
+                code = "FEATURE_NOT_ENABLED",
+                featureCode = featureEx.FeatureCode,
+                message = featureEx.Message
             });
         }
     });

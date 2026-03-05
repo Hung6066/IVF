@@ -1,9 +1,12 @@
+using IVF.Application.Common;
+using IVF.Application.Common.Attributes;
 using IVF.Domain.Enums;
 using MediatR;
 
 namespace IVF.Application.Features.Documents.Commands;
 
 // ─── Upload Document ───
+[RequiresFeature(FeatureCodes.PatientManagement)]
 public sealed record UploadPatientDocumentCommand(
     Guid PatientId,
     string Title,
@@ -44,6 +47,7 @@ public sealed record DeletePatientDocumentCommand(
 ) : IRequest<Result<bool>>;
 
 // ─── Sign Document ───
+[RequiresFeature(FeatureCodes.DigitalSigning)]
 public sealed record SignDocumentCommand(
     Guid DocumentId,
     string SignedByName,

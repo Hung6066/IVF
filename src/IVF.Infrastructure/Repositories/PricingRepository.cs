@@ -22,6 +22,23 @@ public class PricingRepository : IPricingRepository
             .ToListAsync(ct);
     }
 
+    public async Task<List<PlanDefinition>> GetAllPlansWithFeaturesAsync(CancellationToken ct = default)
+    {
+        return await _context.PlanDefinitions
+            .Include(p => p.PlanFeatures)
+                .ThenInclude(pf => pf.FeatureDefinition)
+            .OrderBy(p => p.SortOrder)
+            .ToListAsync(ct);
+    }
+
+    public async Task<PlanDefinition?> GetPlanByIdAsync(Guid id, CancellationToken ct = default)
+    {
+        return await _context.PlanDefinitions
+            .Include(p => p.PlanFeatures)
+                .ThenInclude(pf => pf.FeatureDefinition)
+            .FirstOrDefaultAsync(p => p.Id == id, ct);
+    }
+
     public async Task<PlanDefinition?> GetPlanByTypeAsync(SubscriptionPlan plan, CancellationToken ct = default)
     {
         return await _context.PlanDefinitions
@@ -38,6 +55,11 @@ public class PricingRepository : IPricingRepository
         return await query.OrderBy(f => f.SortOrder).ToListAsync(ct);
     }
 
+    public async Task<FeatureDefinition?> GetFeatureByIdAsync(Guid id, CancellationToken ct = default)
+    {
+        return await _context.FeatureDefinitions.FirstOrDefaultAsync(f => f.Id == id, ct);
+    }
+
     public async Task<List<string>> GetTenantFeatureCodesAsync(Guid tenantId, CancellationToken ct = default)
     {
         return await _context.TenantFeatures
@@ -45,6 +67,15 @@ public class PricingRepository : IPricingRepository
             .Include(tf => tf.FeatureDefinition)
             .Where(tf => tf.FeatureDefinition.IsActive)
             .Select(tf => tf.FeatureDefinition.Code)
+            .ToListAsync(ct);
+    }
+
+    public async Task<List<TenantFeature>> GetTenantFeaturesAsync(Guid tenantId, CancellationToken ct = default)
+    {
+        return await _context.TenantFeatures
+            .Where(tf => tf.TenantId == tenantId)
+            .Include(tf => tf.FeatureDefinition)
+            .OrderBy(tf => tf.FeatureDefinition.SortOrder)
             .ToListAsync(ct);
     }
 
@@ -69,4 +100,37 @@ public class PricingRepository : IPricingRepository
                 TenantFeature.Create(tenantId, pf.FeatureDefinitionId), ct);
         }
     }
+
+    // ── CRUD ──
+
+    public async Task AddFeatureAsync(FeatureDefinition feature, CancellationToken ct = default)
+        => await _context.FeatureDefinitions.AddAsync(feature, ct);
+
+    public async Task AddPlanAsync(PlanDefinition plan, CancellationToken ct = default)
+        => await _context.PlanDefinitions.AddAsync(plan, ct);
+
+    public async Task AddPlanFeatureAsync(PlanFeature planFeature, CancellationToken ct = default)
+        => await _context.PlanFeatures.AddAsync(planFeature, ct);
+
+    public async Task AddTenantFeatureAsync(TenantFeature tenantFeature, CancellationToken ct = default)
+        => await _context.TenantFeatures.AddAsync(tenantFeature, ct);
+
+    public async Task RemovePlanFeaturesAsync(Guid planDefinitionId, CancellationToken ct = default)
+    {
+        var existing = await _context.PlanFeatures
+            .Where(pf => pf.PlanDefinitionId == planDefinitionId)
+            .ToListAsync(ct);
+        _context.PlanFeatures.RemoveRange(existing);
+    }
+
+    public async Task RemoveTenantFeaturesAsync(Guid tenantId, CancellationToken ct = default)
+    {
+        var existing = await _context.TenantFeatures
+            .Where(tf => tf.TenantId == tenantId)
+            .ToListAsync(ct);
+        _context.TenantFeatures.RemoveRange(existing);
+    }
+
+    public async Task SaveChangesAsync(CancellationToken ct = default)
+        => await _context.SaveChangesAsync(ct);
 }

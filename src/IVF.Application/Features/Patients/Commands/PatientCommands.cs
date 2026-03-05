@@ -1,5 +1,6 @@
 using FluentValidation;
 using IVF.Application.Common;
+using IVF.Application.Common.Attributes;
 using IVF.Application.Common.Interfaces;
 using IVF.Domain.Entities;
 using IVF.Domain.Enums;
@@ -8,6 +9,7 @@ using MediatR;
 namespace IVF.Application.Features.Patients.Commands;
 
 // ==================== CREATE PATIENT ====================
+[RequiresFeature(FeatureCodes.PatientManagement)]
 public record CreatePatientCommand(
     string FullName,
     DateTime DateOfBirth,
@@ -51,18 +53,22 @@ public class CreatePatientHandler : IRequestHandler<CreatePatientCommand, Result
     private readonly IUnitOfWork _unitOfWork;
     private readonly IAuditLogRepository _auditLogRepo;
     private readonly ICurrentUserService _currentUser;
+    private readonly ITenantLimitService _limitService;
 
     public CreatePatientHandler(IPatientRepository patientRepo, IUnitOfWork unitOfWork,
-        IAuditLogRepository auditLogRepo, ICurrentUserService currentUser)
+        IAuditLogRepository auditLogRepo, ICurrentUserService currentUser, ITenantLimitService limitService)
     {
         _patientRepo = patientRepo;
         _unitOfWork = unitOfWork;
         _auditLogRepo = auditLogRepo;
         _currentUser = currentUser;
+        _limitService = limitService;
     }
 
     public async Task<Result<PatientDto>> Handle(CreatePatientCommand request, CancellationToken ct)
     {
+        await _limitService.EnsurePatientLimitAsync(ct);
+
         var code = await _patientRepo.GenerateCodeAsync(ct);
 
         var patient = Patient.Create(

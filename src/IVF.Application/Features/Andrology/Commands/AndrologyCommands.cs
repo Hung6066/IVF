@@ -1,5 +1,6 @@
 using FluentValidation;
 using IVF.Application.Common;
+using IVF.Application.Common.Attributes;
 using IVF.Application.Common.Interfaces;
 using IVF.Domain.Entities;
 using IVF.Domain.Enums;
@@ -8,6 +9,7 @@ using MediatR;
 namespace IVF.Application.Features.Andrology.Commands;
 
 // ==================== CREATE SEMEN ANALYSIS ====================
+[RequiresFeature(FeatureCodes.Andrology)]
 public record CreateSemenAnalysisCommand(
     Guid PatientId,
     DateTime AnalysisDate,
@@ -61,15 +63,15 @@ public class CreateSemenAnalysisHandler : IRequestHandler<CreateSemenAnalysisCom
 
         // 2. Create Entity
         var analysis = SemenAnalysis.Create(
-            request.PatientId, 
-            request.AnalysisDate, 
-            request.AnalysisType, 
-            request.CycleId, 
+            request.PatientId,
+            request.AnalysisDate,
+            request.AnalysisType,
+            request.CycleId,
             request.PerformedByUserId);
-        
+
         // 3. Record results (if any provided)
         // Check Macroscopic
-        if (request.Volume.HasValue || !string.IsNullOrWhiteSpace(request.Appearance) || 
+        if (request.Volume.HasValue || !string.IsNullOrWhiteSpace(request.Appearance) ||
             !string.IsNullOrWhiteSpace(request.Liquefaction) || request.Ph.HasValue)
         {
             analysis.RecordMacroscopic(request.Volume, request.Appearance, request.Liquefaction, request.Ph);
@@ -77,14 +79,14 @@ public class CreateSemenAnalysisHandler : IRequestHandler<CreateSemenAnalysisCom
 
         // Check Microscopic
         if (request.Concentration.HasValue || request.TotalCount.HasValue || request.ProgressiveMotility.HasValue ||
-            request.NonProgressiveMotility.HasValue || request.Immotile.HasValue || 
+            request.NonProgressiveMotility.HasValue || request.Immotile.HasValue ||
             request.NormalMorphology.HasValue || request.Vitality.HasValue)
         {
             analysis.RecordMicroscopic(request.Concentration, request.TotalCount, request.ProgressiveMotility,
                 request.NonProgressiveMotility, request.Immotile, request.NormalMorphology, request.Vitality);
         }
 
-        try 
+        try
         {
             await _analysisRepo.AddAsync(analysis, ct);
             await _unitOfWork.SaveChangesAsync(ct);
@@ -202,8 +204,8 @@ public record SemenAnalysisDto(
     public static SemenAnalysisDto FromEntity(SemenAnalysis a) => new(
         a.Id, a.PatientId, a.CycleId, a.AnalysisDate, a.AnalysisType.ToString(),
         a.Volume, a.Appearance, a.Liquefaction, a.Ph,
-        a.Concentration, a.TotalCount, a.ProgressiveMotility, 
-        a.NonProgressiveMotility, a.Immotile, 
+        a.Concentration, a.TotalCount, a.ProgressiveMotility,
+        a.NonProgressiveMotility, a.Immotile,
         a.NormalMorphology, a.Vitality, a.CreatedAt,
         a.Patient?.FullName ?? "", a.Patient?.PatientCode ?? "",
         a.Concentration == null ? "Pending" : "Completed"

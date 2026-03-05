@@ -15,6 +15,7 @@ public static class DependencyInjection
 
         // Add pipeline behaviors
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
+        services.AddTransient(typeof(IPipelineBehavior<,>), typeof(FeatureGateBehavior<,>));
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(VaultPolicyBehavior<,>));
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ZeroTrustBehavior<,>));
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(FieldAccessBehavior<,>));

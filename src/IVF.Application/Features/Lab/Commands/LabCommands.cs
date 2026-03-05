@@ -1,4 +1,5 @@
 using IVF.Application.Common;
+using IVF.Application.Common.Attributes;
 using IVF.Application.Common.Interfaces;
 using IVF.Domain.Constants;
 using IVF.Domain.Entities;
@@ -8,6 +9,7 @@ using MediatR;
 namespace IVF.Application.Features.Lab.Commands;
 
 // ==================== TOGGLE SCHEDULE ====================
+[RequiresFeature(FeatureCodes.Lab)]
 public record ToggleScheduleStatusCommand(string Id) : IRequest<Result<bool>>;
 
 public class ToggleScheduleStatusHandler : IRequestHandler<ToggleScheduleStatusCommand, Result<bool>>
@@ -21,6 +23,7 @@ public class ToggleScheduleStatusHandler : IRequestHandler<ToggleScheduleStatusC
 }
 
 // ==================== CRYO: CREATE ====================
+[RequiresFeature(FeatureCodes.Lab)]
 public record CreateCryoLocationCommand(string Tank, int Canister, int Cane, int Goblet, SpecimenType SpecimenType, int Used) : IRequest<Result<Guid>>;
 
 public class CreateCryoLocationHandler : IRequestHandler<CreateCryoLocationCommand, Result<Guid>>
@@ -68,13 +71,14 @@ public class CreateCryoLocationHandler : IRequestHandler<CreateCryoLocationComma
                 }
             }
         }
-        
+
         await _unitOfWork.SaveChangesAsync(ct);
         return Result<Guid>.Success(Guid.NewGuid());
     }
 }
 
 // ==================== CRYO: DELETE ====================
+[RequiresFeature(FeatureCodes.Lab)]
 public record DeleteCryoLocationCommand(string Tank) : IRequest<Result<bool>>;
 
 public class DeleteCryoLocationHandler : IRequestHandler<DeleteCryoLocationCommand, Result<bool>>
@@ -96,6 +100,7 @@ public class DeleteCryoLocationHandler : IRequestHandler<DeleteCryoLocationComma
 }
 
 // ==================== CRYO: UPDATE ====================
+[RequiresFeature(FeatureCodes.Lab)]
 public record UpdateCryoTankCommand(string Tank, int Used, SpecimenType SpecimenType) : IRequest<Result<bool>>;
 
 public class UpdateCryoTankHandler : IRequestHandler<UpdateCryoTankCommand, Result<bool>>
@@ -114,13 +119,14 @@ public class UpdateCryoTankHandler : IRequestHandler<UpdateCryoTankCommand, Resu
         // Since individual locations are rows, "updating the tank" means checking current state 
         // and occupying/releasing slots to specific count.
         // For simplicity in this demo: We will recalculate occupancy.
-        
+
         await _cryoRepo.SetTankOccupancyAsync(request.Tank, request.Used, request.SpecimenType, ct);
         await _unitOfWork.SaveChangesAsync(ct);
         return Result<bool>.Success(true);
     }
 }
 // ==================== SCHEDULE: CREATE ====================
+[RequiresFeature(FeatureCodes.Lab)]
 public record CreateLabScheduleCommand(
     Guid CycleId,
     DateTime Date, // Combined date and time
@@ -156,13 +162,13 @@ public class CreateLabScheduleHandler : IRequestHandler<CreateLabScheduleCommand
             if (patientId == Guid.Empty) return Result<Guid>.Failure("Patient not found in cycle");
 
             var appt = Appointment.Create(
-                patientId, 
+                patientId,
                 dateTime,
-                AppointmentType.Other, 
+                AppointmentType.Other,
                 request.CycleId,
-                null, 
-                15, 
-                AppointmentNotes.EmbryoReport, 
+                null,
+                15,
+                AppointmentNotes.EmbryoReport,
                 "Lab"
             );
 

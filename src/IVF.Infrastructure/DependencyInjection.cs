@@ -72,6 +72,7 @@ public static class DependencyInjection
         services.AddScoped<INotificationService, Services.NotificationService>();
         services.AddScoped<IConsentValidationService, Services.ConsentValidationService>();
         services.AddScoped<ITenantProvisioningService, Services.TenantProvisioningService>();
+        services.AddScoped<ITenantLimitService, Services.TenantLimitService>();
         services.AddScoped<IFlowSeeder, FlowSeeder>();
 
         // Key Vault & Zero Trust

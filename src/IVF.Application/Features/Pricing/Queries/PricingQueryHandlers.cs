@@ -32,6 +32,7 @@ public class GetDynamicPricingQueryHandler : IRequestHandler<GetDynamicPricingQu
                     .Where(pf => !pf.IsDeleted && pf.FeatureDefinition.IsActive)
                     .OrderBy(pf => pf.SortOrder)
                     .Select(pf => new PlanFeatureDto(
+                        pf.FeatureDefinitionId,
                         pf.FeatureDefinition.Code,
                         pf.FeatureDefinition.DisplayName,
                         pf.FeatureDefinition.Description,
@@ -97,6 +98,77 @@ public class GetAllFeatureDefinitionsQueryHandler : IRequestHandler<GetAllFeatur
             .Select(f => new FeatureDefinitionDto(
                 f.Id, f.Code, f.DisplayName, f.Description,
                 f.Icon, f.Category, f.SortOrder, f.IsActive))
+            .ToList();
+    }
+}
+
+public class GetAllPlanDefinitionsQueryHandler : IRequestHandler<GetAllPlanDefinitionsQuery, List<PlanDefinitionDto>>
+{
+    private readonly IPricingRepository _repo;
+
+    public GetAllPlanDefinitionsQueryHandler(IPricingRepository repo) => _repo = repo;
+
+    public async Task<List<PlanDefinitionDto>> Handle(GetAllPlanDefinitionsQuery request, CancellationToken ct)
+    {
+        var plans = await _repo.GetAllPlansWithFeaturesAsync(ct);
+        return plans.OrderBy(p => p.SortOrder)
+            .Select(p => new PlanDefinitionDto(
+                p.Id, p.Plan.ToString(), p.DisplayName, p.Description,
+                p.MonthlyPrice, p.Currency, p.Duration,
+                p.MaxUsers, p.MaxPatientsPerMonth, p.StorageLimitMb,
+                p.SortOrder, p.IsFeatured, p.IsActive,
+                p.PlanFeatures
+                    .Where(pf => !pf.IsDeleted)
+                    .OrderBy(pf => pf.SortOrder)
+                    .Select(pf => new PlanFeatureDto(
+                        pf.FeatureDefinitionId,
+                        pf.FeatureDefinition.Code,
+                        pf.FeatureDefinition.DisplayName,
+                        pf.FeatureDefinition.Description,
+                        pf.FeatureDefinition.Icon,
+                        pf.FeatureDefinition.Category))
+                    .ToList()))
+            .ToList();
+    }
+}
+
+public class GetTenantFeatureOverridesQueryHandler : IRequestHandler<GetTenantFeatureOverridesQuery, List<TenantFeatureDto>>
+{
+    private readonly IPricingRepository _pricingRepo;
+    private readonly ITenantRepository _tenantRepo;
+    private readonly IUnitOfWork _unitOfWork;
+
+    public GetTenantFeatureOverridesQueryHandler(IPricingRepository pricingRepo, ITenantRepository tenantRepo, IUnitOfWork unitOfWork)
+    {
+        _pricingRepo = pricingRepo;
+        _tenantRepo = tenantRepo;
+        _unitOfWork = unitOfWork;
+    }
+
+    public async Task<List<TenantFeatureDto>> Handle(GetTenantFeatureOverridesQuery request, CancellationToken ct)
+    {
+        var tenantFeatures = await _pricingRepo.GetTenantFeaturesAsync(request.TenantId, ct);
+
+        // Auto-sync from plan if no features exist yet (legacy tenants created before feature system)
+        if (tenantFeatures.Count == 0)
+        {
+            var plan = await _tenantRepo.GetTenantActiveSubscriptionPlanAsync(request.TenantId, ct);
+            if (plan.HasValue)
+            {
+                await _pricingRepo.SyncTenantFeaturesFromPlanAsync(request.TenantId, plan.Value, ct);
+                await _unitOfWork.SaveChangesAsync(ct);
+                tenantFeatures = await _pricingRepo.GetTenantFeaturesAsync(request.TenantId, ct);
+            }
+        }
+
+        return tenantFeatures
+            .Select(tf => new TenantFeatureDto(
+                tf.FeatureDefinitionId,
+                tf.FeatureDefinition.Code,
+                tf.FeatureDefinition.DisplayName,
+                tf.FeatureDefinition.Icon,
+                tf.FeatureDefinition.Category,
+                tf.IsEnabled))
             .ToList();
     }
 }

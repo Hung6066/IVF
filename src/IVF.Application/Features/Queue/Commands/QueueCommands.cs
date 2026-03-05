@@ -1,5 +1,6 @@
 using FluentValidation;
 using IVF.Application.Common;
+using IVF.Application.Common.Attributes;
 using IVF.Application.Common.Interfaces;
 using IVF.Domain.Entities;
 using IVF.Domain.Enums;
@@ -9,6 +10,7 @@ using Microsoft.Extensions.Logging;
 namespace IVF.Application.Features.Queue.Commands;
 
 // ==================== ISSUE TICKET ====================
+[RequiresFeature(FeatureCodes.Queue)]
 public record IssueTicketCommand(
     Guid PatientId,
     TicketPriority Priority,
@@ -43,7 +45,7 @@ public class IssueTicketHandler : IRequestHandler<IssueTicketCommand, Result<Que
 
     public async Task<Result<QueueTicketDto>> Handle(IssueTicketCommand request, CancellationToken ct)
     {
-        _logger.LogInformation("IssueTicket: Dept={Dept}, Priority={Priority}, ServicesCount={Count}", 
+        _logger.LogInformation("IssueTicket: Dept={Dept}, Priority={Priority}, ServicesCount={Count}",
             request.DepartmentCode, request.Priority, request.ServiceIds?.Count ?? 0);
 
         var patient = await _patientRepo.GetByIdAsync(request.PatientId, ct);
@@ -53,9 +55,9 @@ public class IssueTicketHandler : IRequestHandler<IssueTicketCommand, Result<Que
         var ticketNumber = await _queueRepo.GenerateTicketNumberAsync(request.DepartmentCode, ct);
 
         var queueType = GetQueueType(request.DepartmentCode);
-        
+
         var ticket = QueueTicket.Create(ticketNumber, queueType, request.Priority, request.PatientId, request.DepartmentCode, request.CycleId, request.ServiceIds);
-        
+
         await _queueRepo.AddAsync(ticket, ct);
         await _unitOfWork.SaveChangesAsync(ct);
 
@@ -80,6 +82,7 @@ public class IssueTicketHandler : IRequestHandler<IssueTicketCommand, Result<Que
 }
 
 // ==================== CALL TICKET ====================
+[RequiresFeature(FeatureCodes.Queue)]
 public record CallTicketCommand(Guid TicketId, Guid UserId) : IRequest<Result<QueueTicketDto>>;
 
 public class CallTicketHandler : IRequestHandler<CallTicketCommand, Result<QueueTicketDto>>
@@ -108,6 +111,7 @@ public class CallTicketHandler : IRequestHandler<CallTicketCommand, Result<Queue
 }
 
 // Start Service Command
+[RequiresFeature(FeatureCodes.Queue)]
 public record StartServiceCommand(Guid TicketId) : IRequest<Result<QueueTicketDto>>;
 
 public class StartServiceHandler : IRequestHandler<StartServiceCommand, Result<QueueTicketDto>>
@@ -136,6 +140,7 @@ public class StartServiceHandler : IRequestHandler<StartServiceCommand, Result<Q
 }
 
 // ==================== COMPLETE TICKET ====================
+[RequiresFeature(FeatureCodes.Queue)]
 public record CompleteTicketCommand(Guid TicketId, string? Notes = null) : IRequest<Result>;
 
 public class CompleteTicketHandler : IRequestHandler<CompleteTicketCommand, Result>
@@ -166,6 +171,7 @@ public class CompleteTicketHandler : IRequestHandler<CompleteTicketCommand, Resu
 }
 
 // ==================== SKIP TICKET ====================
+[RequiresFeature(FeatureCodes.Queue)]
 public record SkipTicketCommand(Guid TicketId) : IRequest<Result>;
 
 public class SkipTicketHandler : IRequestHandler<SkipTicketCommand, Result>

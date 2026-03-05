@@ -1,0 +1,517 @@
+<div class="feature-plan-config">
+  <!-- Header -->
+  <div class="page-header">
+    <div class="header-left">
+      <h1>⚙️ Cấu hình Tính năng & Gói dịch vụ</h1>
+      <p class="subtitle">Quản lý features, plans và phân quyền tính năng cho từng tenant</p>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button [class.active]="activeTab() === 'features'" (click)="activeTab.set('features')">
+      <i class="fas fa-puzzle-piece"></i> Tính năng
+    </button>
+    <button [class.active]="activeTab() === 'plans'" (click)="activeTab.set('plans')">
+      <i class="fas fa-tags"></i> Gói dịch vụ
+    </button>
+    <button [class.active]="activeTab() === 'mapping'" (click)="activeTab.set('mapping')">
+      <i class="fas fa-project-diagram"></i> Gán tính năng → Gói
+    </button>
+    <button
+      [class.active]="activeTab() === 'tenant-features'"
+      (click)="activeTab.set('tenant-features')"
+    >
+      <i class="fas fa-building"></i> Override Tenant
+    </button>
+  </div>
+
+  <!-- ═══ TAB: Features ═══ -->
+  @if (activeTab() === 'features') {
+    <div class="tab-content">
+      <div class="tab-header">
+        <h2>Danh sách tính năng ({{ features().length }})</h2>
+        <button class="btn btn-primary" (click)="openCreateFeature()">
+          <i class="fas fa-plus"></i> Thêm tính năng
+        </button>
+      </div>
+
+      @for (group of featuresByCategory(); track group.category) {
+        <div class="category-group">
+          <h3 class="category-title">{{ group.category }}</h3>
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th style="width: 40px">Icon</th>
+                  <th>Mã</th>
+                  <th>Tên hiển thị</th>
+                  <th>Mô tả</th>
+                  <th style="width: 80px">Thứ tự</th>
+                  <th style="width: 100px">Trạng thái</th>
+                  <th style="width: 100px">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (f of group.features; track f.id) {
+                  <tr>
+                    <td><i [class]="f.icon"></i></td>
+                    <td>
+                      <code>{{ f.code }}</code>
+                    </td>
+                    <td>
+                      <strong>{{ f.displayName }}</strong>
+                    </td>
+                    <td class="desc-cell">{{ f.description }}</td>
+                    <td class="center">{{ f.sortOrder }}</td>
+                    <td>
+                      <span
+                        class="status-badge"
+                        [class.active]="f.isActive"
+                        [class.inactive]="!f.isActive"
+                      >
+                        {{ f.isActive ? 'Bật' : 'Tắt' }}
+                      </span>
+                    </td>
+                    <td class="actions">
+                      <button class="btn-icon btn-info" title="Sửa" (click)="openEditFeature(f)">
+                        <i class="fas fa-edit"></i>
+                      </button>
+                      <button class="btn-icon btn-danger" title="Xóa" (click)="deleteFeature(f)">
+                        <i class="fas fa-trash"></i>
+                      </button>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      } @empty {
+        <div class="empty-state">
+          <i class="fas fa-puzzle-piece"></i>
+          <p>Chưa có tính năng nào</p>
+        </div>
+      }
+    </div>
+  }
+
+  <!-- ═══ TAB: Plans ═══ -->
+  @if (activeTab() === 'plans') {
+    <div class="tab-content">
+      <div class="tab-header">
+        <h2>Danh sách gói dịch vụ ({{ plans().length }})</h2>
+        <button class="btn btn-primary" (click)="openCreatePlan()">
+          <i class="fas fa-plus"></i> Thêm gói
+        </button>
+      </div>
+
+      <div class="plans-grid">
+        @for (p of plans(); track p.id) {
+          <div class="plan-card" [class.featured]="p.isFeatured" [class.inactive]="!p.isActive">
+            <div class="plan-card-header">
+              <div class="plan-name">
+                <h3>{{ p.displayName }}</h3>
+                @if (p.isFeatured) {
+                  <span class="featured-badge">⭐ Nổi bật</span>
+                }
+                @if (!p.isActive) {
+                  <span class="inactive-badge">Ngưng</span>
+                }
+              </div>
+              <div class="plan-price">
+                <span class="price">{{ formatCurrency(p.monthlyPrice) }}</span>
+                <span class="duration">{{ p.duration }}</span>
+              </div>
+            </div>
+            <div class="plan-card-body">
+              @if (p.description) {
+                <p class="plan-desc">{{ p.description }}</p>
+              }
+              <div class="plan-limits">
+                <div class="limit-item">
+                  <i class="fas fa-users"></i>
+                  <span>{{ p.maxUsers }} người dùng</span>
+                </div>
+                <div class="limit-item">
+                  <i class="fas fa-user-injured"></i>
+                  <span>{{ p.maxPatientsPerMonth }} BN/tháng</span>
+                </div>
+                <div class="limit-item">
+                  <i class="fas fa-database"></i>
+                  <span>{{ formatStorage(p.storageLimitMb) }}</span>
+                </div>
+              </div>
+              <div class="plan-features-list">
+                <h4>{{ p.features.length }} tính năng:</h4>
+                @for (f of p.features; track f.featureDefinitionId) {
+                  <span class="feature-tag">{{ f.displayName }}</span>
+                } @empty {
+                  <span class="no-features">Chưa gán tính năng</span>
+                }
+              </div>
+            </div>
+            <div class="plan-card-footer">
+              <button class="btn btn-sm btn-secondary" (click)="openEditPlan(p)">
+                <i class="fas fa-edit"></i> Sửa
+              </button>
+              <button class="btn btn-sm btn-danger-outline" (click)="deletePlan(p)">
+                <i class="fas fa-trash"></i> Xóa
+              </button>
+            </div>
+          </div>
+        } @empty {
+          <div class="empty-state">
+            <i class="fas fa-tags"></i>
+            <p>Chưa có gói dịch vụ nào</p>
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  <!-- ═══ TAB: Plan-Feature Mapping ═══ -->
+  @if (activeTab() === 'mapping') {
+    <div class="tab-content">
+      <div class="tab-header">
+        <h2>Gán tính năng cho Gói dịch vụ</h2>
+      </div>
+
+      <div class="mapping-layout">
+        <div class="mapping-sidebar">
+          <label>Chọn gói dịch vụ:</label>
+          <select [ngModel]="selectedPlanId()" (ngModelChange)="onPlanSelected($event)">
+            <option value="">— Chọn gói —</option>
+            @for (p of plans(); track p.id) {
+              <option [value]="p.id">{{ p.displayName }}</option>
+            }
+          </select>
+        </div>
+
+        @if (selectedPlan()) {
+          <div class="mapping-content">
+            <div class="mapping-info">
+              <strong>{{ selectedPlan()!.displayName }}</strong> — chọn tính năng bên dưới:
+            </div>
+
+            @for (group of featuresByCategory(); track group.category) {
+              <div class="mapping-category">
+                <h4>{{ group.category }}</h4>
+                <div class="feature-checkboxes">
+                  @for (f of group.features; track f.id) {
+                    <label class="checkbox-item" [class.checked]="isPlanFeatureSelected(f.id)">
+                      <input
+                        type="checkbox"
+                        [checked]="isPlanFeatureSelected(f.id)"
+                        (change)="togglePlanFeature(f.id)"
+                      />
+                      <i [class]="f.icon"></i>
+                      <span>{{ f.displayName }}</span>
+                    </label>
+                  }
+                </div>
+              </div>
+            }
+
+            <div class="mapping-actions">
+              <button class="btn btn-primary" (click)="savePlanFeatures()" [disabled]="loading()">
+                @if (loading()) {
+                  <i class="fas fa-spinner fa-spin"></i>
+                }
+                Lưu thay đổi
+              </button>
+              <span class="mapping-count">{{ planFeatureIds().size }} tính năng được chọn</span>
+            </div>
+          </div>
+        } @else {
+          <div class="mapping-placeholder">
+            <i class="fas fa-hand-pointer"></i>
+            <p>Chọn 1 gói dịch vụ để gán tính năng</p>
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  <!-- ═══ TAB: Tenant Feature Overrides ═══ -->
+  @if (activeTab() === 'tenant-features') {
+    <div class="tab-content">
+      <div class="tab-header">
+        <h2>Override tính năng cho Trung tâm</h2>
+      </div>
+
+      <div class="mapping-layout">
+        <div class="mapping-sidebar">
+          <label>Chọn trung tâm:</label>
+          <select [ngModel]="selectedTenantId()" (ngModelChange)="onTenantSelected($event)">
+            <option value="">— Chọn trung tâm —</option>
+            @for (t of tenants(); track t.id) {
+              <option [value]="t.id">{{ t.name }}</option>
+            }
+          </select>
+        </div>
+
+        @if (selectedTenantId()) {
+          <div class="mapping-content">
+            @if (tenantFeaturesLoading()) {
+              <div class="loading-inline">
+                <div class="spinner"></div>
+                <p>Đang tải...</p>
+              </div>
+            } @else {
+              <div class="tenant-features-grid">
+                @for (tf of tenantFeatures(); track tf.featureDefinitionId) {
+                  <label class="toggle-item" [class.enabled]="tf.isEnabled">
+                    <div class="toggle-info">
+                      <i [class]="tf.icon"></i>
+                      <div>
+                        <strong>{{ tf.displayName }}</strong>
+                        <small>{{ tf.code }} · {{ tf.category }}</small>
+                      </div>
+                    </div>
+                    <div class="toggle-switch" (click)="toggleTenantFeature(tf)">
+                      <div class="toggle-track" [class.on]="tf.isEnabled">
+                        <div class="toggle-thumb"></div>
+                      </div>
+                    </div>
+                  </label>
+                } @empty {
+                  <div class="empty-state small">
+                    <p>Trung tâm này chưa có cấu hình tính năng</p>
+                  </div>
+                }
+              </div>
+
+              @if (tenantFeatures().length) {
+                <div class="mapping-actions">
+                  <button
+                    class="btn btn-primary"
+                    (click)="saveTenantFeatures()"
+                    [disabled]="loading()"
+                  >
+                    @if (loading()) {
+                      <i class="fas fa-spinner fa-spin"></i>
+                    }
+                    Lưu thay đổi
+                  </button>
+                  <span class="mapping-count">
+                    {{ enabledTenantFeatureCount() }} / {{ tenantFeatures().length }} tính năng bật
+                  </span>
+                </div>
+              }
+            }
+          </div>
+        } @else {
+          <div class="mapping-placeholder">
+            <i class="fas fa-building"></i>
+            <p>Chọn 1 trung tâm để cấu hình tính năng</p>
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  <!-- ═══ Feature Modal ═══ -->
+  @if (showFeatureModal()) {
+    <div class="modal-overlay" (click)="showFeatureModal.set(false)">
+      <div class="modal" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h2>{{ editingFeature() ? 'Sửa tính năng' : 'Thêm tính năng mới' }}</h2>
+          <button class="btn-close" (click)="showFeatureModal.set(false)">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Mã tính năng *</label>
+              <input
+                type="text"
+                [(ngModel)]="featureForm.code"
+                placeholder="VD: patient_management"
+                [disabled]="!!editingFeature()"
+              />
+            </div>
+            <div class="form-group">
+              <label>Tên hiển thị *</label>
+              <input
+                type="text"
+                [(ngModel)]="featureForm.displayName"
+                placeholder="VD: Quản lý bệnh nhân"
+              />
+            </div>
+          </div>
+          <div class="form-group full-width">
+            <label>Mô tả</label>
+            <input
+              type="text"
+              [(ngModel)]="featureForm.description"
+              placeholder="Mô tả ngắn gọn..."
+            />
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Icon (FontAwesome class)</label>
+              <div class="icon-input">
+                <input type="text" [(ngModel)]="featureForm.icon" placeholder="fas fa-users" />
+                <i [class]="featureForm.icon" class="icon-preview"></i>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Danh mục *</label>
+              <input
+                type="text"
+                [(ngModel)]="featureForm.category"
+                placeholder="VD: Lâm sàng"
+                list="categoryList"
+              />
+              <datalist id="categoryList">
+                @for (cat of categories(); track cat) {
+                  <option [value]="cat">{{ cat }}</option>
+                }
+              </datalist>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Thứ tự sắp xếp</label>
+              <input type="number" [(ngModel)]="featureForm.sortOrder" />
+            </div>
+            @if (editingFeature()) {
+              <div class="form-group">
+                <label>Trạng thái</label>
+                <select [(ngModel)]="featureForm.isActive">
+                  <option [ngValue]="true">Bật</option>
+                  <option [ngValue]="false">Tắt</option>
+                </select>
+              </div>
+            }
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" (click)="showFeatureModal.set(false)">Hủy</button>
+          <button class="btn btn-primary" (click)="saveFeature()" [disabled]="loading()">
+            @if (loading()) {
+              <i class="fas fa-spinner fa-spin"></i>
+            }
+            {{ editingFeature() ? 'Cập nhật' : 'Tạo mới' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ═══ Plan Modal ═══ -->
+  @if (showPlanModal()) {
+    <div class="modal-overlay" (click)="showPlanModal.set(false)">
+      <div class="modal modal-lg" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h2>{{ editingPlan() ? 'Sửa gói dịch vụ' : 'Thêm gói dịch vụ mới' }}</h2>
+          <button class="btn-close" (click)="showPlanModal.set(false)">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-section">
+            <h3>Thông tin cơ bản</h3>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Mã gói (enum) *</label>
+                <select [(ngModel)]="planForm.plan" [disabled]="!!editingPlan()">
+                  <option value="">— Chọn —</option>
+                  <option value="Trial">Trial</option>
+                  <option value="Starter">Starter</option>
+                  <option value="Professional">Professional</option>
+                  <option value="Enterprise">Enterprise</option>
+                  <option value="Custom">Custom</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Tên hiển thị *</label>
+                <input
+                  type="text"
+                  [(ngModel)]="planForm.displayName"
+                  placeholder="VD: Gói Chuyên nghiệp"
+                />
+              </div>
+            </div>
+            <div class="form-group full-width">
+              <label>Mô tả</label>
+              <input
+                type="text"
+                [(ngModel)]="planForm.description"
+                placeholder="Mô tả ngắn gọn..."
+              />
+            </div>
+          </div>
+
+          <div class="form-section">
+            <h3>Giá & Chu kỳ</h3>
+            <div class="form-row three-cols">
+              <div class="form-group">
+                <label>Giá hàng tháng *</label>
+                <input type="number" [(ngModel)]="planForm.monthlyPrice" />
+              </div>
+              <div class="form-group">
+                <label>Đơn vị tiền</label>
+                <input type="text" [(ngModel)]="planForm.currency" />
+              </div>
+              <div class="form-group">
+                <label>Chu kỳ hiển thị</label>
+                <input type="text" [(ngModel)]="planForm.duration" placeholder="/tháng" />
+              </div>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <h3>Giới hạn</h3>
+            <div class="form-row three-cols">
+              <div class="form-group">
+                <label>Max người dùng</label>
+                <input type="number" [(ngModel)]="planForm.maxUsers" />
+              </div>
+              <div class="form-group">
+                <label>Max BN/tháng</label>
+                <input type="number" [(ngModel)]="planForm.maxPatientsPerMonth" />
+              </div>
+              <div class="form-group">
+                <label>Lưu trữ (MB)</label>
+                <input type="number" [(ngModel)]="planForm.storageLimitMb" />
+              </div>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <h3>Hiển thị</h3>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Thứ tự</label>
+                <input type="number" [(ngModel)]="planForm.sortOrder" />
+              </div>
+              <div class="form-group">
+                <label class="checkbox-label">
+                  <input type="checkbox" [(ngModel)]="planForm.isFeatured" />
+                  Gói nổi bật (⭐)
+                </label>
+              </div>
+            </div>
+            @if (editingPlan()) {
+              <div class="form-group">
+                <label>Trạng thái</label>
+                <select [(ngModel)]="planForm.isActive">
+                  <option [ngValue]="true">Hoạt động</option>
+                  <option [ngValue]="false">Ngưng</option>
+                </select>
+              </div>
+            }
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" (click)="showPlanModal.set(false)">Hủy</button>
+          <button class="btn btn-primary" (click)="savePlan()" [disabled]="loading()">
+            @if (loading()) {
+              <i class="fas fa-spinner fa-spin"></i>
+            }
+            {{ editingPlan() ? 'Cập nhật' : 'Tạo mới' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+</div>

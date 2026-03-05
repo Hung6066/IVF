@@ -51,6 +51,7 @@ public static class MenuSeeder
             MenuItem.Create("admin", null,        "🛡️", "Cấu hình quyền", "/admin/permission-config", null,         true, 100),
             MenuItem.Create("admin", null,        "🔐", "Bảo mật nâng cao", "/admin/security", null,        true, 105),
             MenuItem.Create("admin", null,        "🏢", "Bảo mật doanh nghiệp", "/admin/enterprise-security", null, true, 110),
+            MenuItem.Create("admin", null,        "⚙️", "Cấu hình Feature/Plan", "/admin/feature-plan-config", null, true, 115),
         };
 
         await context.MenuItems.AddRangeAsync(items);

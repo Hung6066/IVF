@@ -11,11 +11,17 @@ public class PatientCommandsTests
 {
     private readonly Mock<IPatientRepository> _patientRepoMock;
     private readonly Mock<IUnitOfWork> _unitOfWorkMock;
+    private readonly Mock<IAuditLogRepository> _auditLogRepoMock;
+    private readonly Mock<ICurrentUserService> _currentUserMock;
+    private readonly Mock<ITenantLimitService> _limitServiceMock;
 
     public PatientCommandsTests()
     {
         _patientRepoMock = new Mock<IPatientRepository>();
         _unitOfWorkMock = new Mock<IUnitOfWork>();
+        _auditLogRepoMock = new Mock<IAuditLogRepository>();
+        _currentUserMock = new Mock<ICurrentUserService>();
+        _limitServiceMock = new Mock<ITenantLimitService>();
     }
 
     [Fact]
@@ -29,7 +35,9 @@ public class PatientCommandsTests
         _unitOfWorkMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(1);
 
-        var handler = new CreatePatientHandler(_patientRepoMock.Object, _unitOfWorkMock.Object);
+        var handler = new CreatePatientHandler(
+            _patientRepoMock.Object, _unitOfWorkMock.Object,
+            _auditLogRepoMock.Object, _currentUserMock.Object, _limitServiceMock.Object);
         var command = new CreatePatientCommand(
             "Nguyen Van A",
             new DateTime(1990, 1, 15),
@@ -37,7 +45,10 @@ public class PatientCommandsTests
             PatientType.Infertility,
             "012345678901",
             "0901234567",
-            "123 Main St"
+            null, // Email
+            "123 Main St",
+            null, null, null, null, null, null, null,
+            null, null, null, null, null
         );
 
         // Act
@@ -48,7 +59,7 @@ public class PatientCommandsTests
         result.Value.Should().NotBeNull();
         result.Value!.PatientCode.Should().Be("BN-2026-000001");
         result.Value.FullName.Should().Be("Nguyen Van A");
-        
+
         _patientRepoMock.Verify(r => r.AddAsync(It.IsAny<Patient>(), It.IsAny<CancellationToken>()), Times.Once);
         _unitOfWorkMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
@@ -75,9 +86,9 @@ public class PatientCommandsTests
     public async Task UpdatePatient_WhenPatientExists_ShouldReturnSuccess()
     {
         // Arrange
-        var existingPatient = Patient.Create("BN-2026-000001", "Old Name", DateTime.Now.AddYears(-30), 
+        var existingPatient = Patient.Create("BN-2026-000001", "Old Name", DateTime.Now.AddYears(-30),
             Gender.Female, PatientType.Infertility);
-        
+
         _patientRepoMock.Setup(r => r.GetByIdAsync(existingPatient.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(existingPatient);
         _unitOfWorkMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
@@ -99,9 +110,9 @@ public class PatientCommandsTests
     public async Task DeletePatient_WhenPatientExists_ShouldMarkAsDeleted()
     {
         // Arrange
-        var existingPatient = Patient.Create("BN-2026-000001", "Test", DateTime.Now.AddYears(-30), 
+        var existingPatient = Patient.Create("BN-2026-000001", "Test", DateTime.Now.AddYears(-30),
             Gender.Female, PatientType.Infertility);
-        
+
         _patientRepoMock.Setup(r => r.GetByIdAsync(existingPatient.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(existingPatient);
         _unitOfWorkMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))

@@ -19,6 +19,7 @@ public record PlanPricingDto(
     List<PlanFeatureDto> Features);
 
 public record PlanFeatureDto(
+    Guid FeatureDefinitionId,
     string Code,
     string DisplayName,
     string? Description,
@@ -46,3 +47,30 @@ public record TenantFeaturesDto(
 public record GetDynamicPricingQuery() : IRequest<List<PlanPricingDto>>;
 public record GetTenantDynamicFeaturesQuery(Guid? TenantId, bool IsPlatformAdmin) : IRequest<TenantFeaturesDto>;
 public record GetAllFeatureDefinitionsQuery() : IRequest<List<FeatureDefinitionDto>>;
+public record GetAllPlanDefinitionsQuery() : IRequest<List<PlanDefinitionDto>>;
+public record GetTenantFeatureOverridesQuery(Guid TenantId) : IRequest<List<TenantFeatureDto>>;
+
+// ── Additional DTOs ──────────────────────────────────
+public record PlanDefinitionDto(
+    Guid Id,
+    string Plan,
+    string DisplayName,
+    string? Description,
+    decimal MonthlyPrice,
+    string Currency,
+    string Duration,
+    int MaxUsers,
+    int MaxPatientsPerMonth,
+    long StorageLimitMb,
+    int SortOrder,
+    bool IsFeatured,
+    bool IsActive,
+    List<PlanFeatureDto> Features);
+
+public record TenantFeatureDto(
+    Guid FeatureDefinitionId,
+    string Code,
+    string DisplayName,
+    string Icon,
+    string Category,
+    bool IsEnabled);

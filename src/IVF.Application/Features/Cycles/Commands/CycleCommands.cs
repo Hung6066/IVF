@@ -1,5 +1,6 @@
 using FluentValidation;
 using IVF.Application.Common;
+using IVF.Application.Common.Attributes;
 using IVF.Application.Common.Interfaces;
 using IVF.Domain.Entities;
 using IVF.Domain.Enums;
@@ -8,6 +9,7 @@ using MediatR;
 namespace IVF.Application.Features.Cycles.Commands;
 
 // ==================== CREATE CYCLE ====================
+[RequiresFeature(FeatureCodes.PatientManagement)]
 public record CreateCycleCommand(
     Guid CoupleId,
     TreatmentMethod Method,
@@ -45,7 +47,7 @@ public class CreateCycleHandler : IRequestHandler<CreateCycleCommand, Result<Cyc
 
         var code = await _cycleRepo.GenerateCodeAsync(ct);
         var cycle = TreatmentCycle.Create(request.CoupleId, code, request.Method, request.StartDate, request.Notes);
-        
+
         await _cycleRepo.AddAsync(cycle, ct);
         await _unitOfWork.SaveChangesAsync(ct);
 
@@ -54,6 +56,7 @@ public class CreateCycleHandler : IRequestHandler<CreateCycleCommand, Result<Cyc
 }
 
 // ==================== ADVANCE PHASE ====================
+[RequiresFeature(FeatureCodes.PatientManagement)]
 public record AdvancePhaseCommand(Guid CycleId, CyclePhase NewPhase) : IRequest<Result<CycleDto>>;
 
 public class AdvancePhaseHandler : IRequestHandler<AdvancePhaseCommand, Result<CycleDto>>
@@ -82,6 +85,7 @@ public class AdvancePhaseHandler : IRequestHandler<AdvancePhaseCommand, Result<C
 }
 
 // ==================== COMPLETE CYCLE ====================
+[RequiresFeature(FeatureCodes.PatientManagement)]
 public record CompleteCycleCommand(Guid CycleId, CycleOutcome Outcome) : IRequest<Result<CycleDto>>;
 
 public class CompleteCycleHandler : IRequestHandler<CompleteCycleCommand, Result<CycleDto>>

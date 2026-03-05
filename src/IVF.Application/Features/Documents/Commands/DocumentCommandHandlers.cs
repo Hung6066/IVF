@@ -8,13 +8,16 @@ public sealed class UploadPatientDocumentHandler(
     IPatientDocumentRepository documentRepo,
     IPatientRepository patientRepo,
     IObjectStorageService objectStorage,
-    IUnitOfWork unitOfWork)
+    IUnitOfWork unitOfWork,
+    ITenantLimitService limitService)
     : IRequestHandler<UploadPatientDocumentCommand, Result<PatientDocumentDto>>
 {
     public async Task<Result<PatientDocumentDto>> Handle(
         UploadPatientDocumentCommand request,
         CancellationToken cancellationToken)
     {
+        await limitService.EnsureStorageLimitAsync(request.FileSizeBytes, cancellationToken);
+
         // Validate patient exists
         var patient = await patientRepo.GetByIdAsync(request.PatientId, cancellationToken);
         if (patient == null)

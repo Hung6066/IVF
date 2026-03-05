@@ -1,5 +1,6 @@
 using FluentValidation;
 using IVF.Application.Common;
+using IVF.Application.Common.Attributes;
 using IVF.Application.Common.Interfaces;
 using IVF.Domain.Entities;
 using IVF.Domain.Enums;
@@ -8,6 +9,7 @@ using MediatR;
 namespace IVF.Application.Features.Andrology.Commands;
 
 // ==================== CREATE SPERM WASHING ====================
+[RequiresFeature(FeatureCodes.Andrology)]
 public record CreateSpermWashingCommand(
     Guid CycleId,
     Guid PatientId,
@@ -38,7 +40,7 @@ public class CreateSpermWashingHandler : IRequestHandler<CreateSpermWashingComma
     private readonly IUnitOfWork _unitOfWork;
 
     public CreateSpermWashingHandler(
-        ISpermWashingRepository washingRepo, 
+        ISpermWashingRepository washingRepo,
         IPatientRepository patientRepo,
         ITreatmentCycleRepository cycleRepo,
         IUnitOfWork unitOfWork)
@@ -58,13 +60,13 @@ public class CreateSpermWashingHandler : IRequestHandler<CreateSpermWashingComma
         if (cycle == null) return Result<SpermWashingDto>.Failure("Cycle not found");
 
         var washing = SpermWashing.Create(request.CycleId, request.PatientId, request.Method, request.WashDate);
-        
+
         // If results are provided during creation, record them
         if (!string.IsNullOrEmpty(request.Notes) || request.PreWashConcentration != null || request.PostWashConcentration != null || request.PostWashMotility != null)
         {
             washing.UpdateResult(request.PreWashConcentration, request.PostWashConcentration, request.PostWashMotility, request.Notes);
         }
-        
+
         await _washingRepo.AddAsync(washing, ct);
         await _unitOfWork.SaveChangesAsync(ct);
 
@@ -109,7 +111,7 @@ public class UpdateSpermWashingHandler : IRequestHandler<UpdateSpermWashingComma
             return Result<SpermWashingDto>.Failure("Washing not found");
 
         washing.UpdateResult(request.PreWashConcentration, request.PostWashConcentration, request.PostWashMotility, request.Notes);
-        
+
         await _washingRepo.UpdateAsync(washing, ct);
         await _unitOfWork.SaveChangesAsync(ct);
 

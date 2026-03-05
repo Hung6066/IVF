@@ -5,6 +5,7 @@ import { AuthService } from '../../core/services/auth.service';
 import { SignalRService } from '../../core/services/signalr.service';
 import { MenuService, MenuSectionDto } from '../../core/services/menu.service';
 import { TenantService } from '../../core/services/tenant.service';
+import { TenantFeatureService } from '../../core/services/tenant-feature.service';
 import { TenantFeatures } from '../../core/models/tenant.model';
 import { ConsentBannerService } from '../../core/services/consent-banner.service';
 import { NotificationBellComponent } from '../../shared/components/notification-bell/notification-bell.component';
@@ -141,6 +142,7 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     private signalRService: SignalRService,
     private menuService: MenuService,
     private tenantService: TenantService,
+    private tenantFeatureService: TenantFeatureService,
     private router: Router,
     public consentBanner: ConsentBannerService,
   ) {}
@@ -151,6 +153,8 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
 
     // Load tenant features to determine menu visibility
     this.loadTenantFeatures();
+    // Also load into shared service for guards
+    this.tenantFeatureService.load();
 
     // Load consent status for menu lock indicators
     if (this.authService.isAuthenticated()) {

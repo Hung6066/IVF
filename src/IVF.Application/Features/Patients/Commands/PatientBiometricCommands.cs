@@ -1,5 +1,6 @@
 using FluentValidation;
 using IVF.Application.Common;
+using IVF.Application.Common.Attributes;
 using IVF.Application.Common.Interfaces;
 using IVF.Domain.Entities;
 using IVF.Domain.Enums;
@@ -94,6 +95,7 @@ public class DeletePatientPhotoHandler : IRequestHandler<DeletePatientPhotoComma
 }
 
 // ==================== REGISTER PATIENT FINGERPRINT ====================
+[RequiresFeature(FeatureCodes.Biometrics)]
 public record RegisterPatientFingerprintCommand(
     Guid PatientId,
     byte[] FingerprintData,

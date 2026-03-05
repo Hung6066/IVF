@@ -1,5 +1,6 @@
 using FluentValidation;
 using IVF.Application.Common;
+using IVF.Application.Common.Attributes;
 using IVF.Application.Common.Interfaces;
 using IVF.Domain.Entities;
 using IVF.Domain.Enums;
@@ -8,6 +9,7 @@ using MediatR;
 namespace IVF.Application.Features.SpermBank.Commands;
 
 // ==================== CREATE DONOR ====================
+[RequiresFeature(FeatureCodes.SpermBank)]
 public record CreateDonorCommand(Guid PatientId) : IRequest<Result<SpermDonorDto>>;
 
 public class CreateDonorHandler : IRequestHandler<CreateDonorCommand, Result<SpermDonorDto>>
@@ -38,6 +40,7 @@ public class CreateDonorHandler : IRequestHandler<CreateDonorCommand, Result<Spe
 }
 
 // ==================== UPDATE PROFILE ====================
+[RequiresFeature(FeatureCodes.SpermBank)]
 public record UpdateDonorProfileCommand(
     Guid DonorId,
     string? BloodType,
@@ -75,6 +78,7 @@ public class UpdateDonorProfileHandler : IRequestHandler<UpdateDonorProfileComma
 }
 
 // ==================== CREATE SAMPLE ====================
+[RequiresFeature(FeatureCodes.SpermBank)]
 public record CreateSampleCommand(
     Guid DonorId,
     DateTime CollectionDate,
@@ -101,9 +105,9 @@ public class CreateSampleHandler : IRequestHandler<CreateSampleCommand, Result<S
 
         var code = await _sampleRepo.GenerateCodeAsync(ct);
         var sample = SpermSample.Create(request.DonorId, code, request.CollectionDate, request.SpecimenType);
-        
+
         donor.RecordDonation();
-        
+
         await _sampleRepo.AddAsync(sample, ct);
         await _donorRepo.UpdateAsync(donor, ct);
         await _unitOfWork.SaveChangesAsync(ct);

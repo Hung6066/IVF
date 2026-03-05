@@ -11,6 +11,10 @@ IVF Platform là hệ thống quản lý trung tâm IVF đầu tiên tại Việ
 - ✅ **Real Provisioning** — Tự động tạo Schema/Database riêng + migrate dữ liệu
 - ✅ **Per-Tenant Feature Override** — Override tính năng cho từng trung tâm (custom plan)
 - ✅ **Automatic Feature Sync** — Khi nâng/hạ gói, tính năng tự động đồng bộ
+- ✅ **System-wide Limit Enforcement** — Giới hạn users, bệnh nhân/tháng, lưu trữ tự động kiểm tra ở backend
+- ✅ **Feature Gate Pipeline** — MediatR pipeline tự động chặn command nếu feature chưa kích hoạt (`[RequiresFeature]`)
+- ✅ **Route-level Feature Guard** — Angular route guard chặn truy cập trang nếu feature chưa mua
+- ✅ **Tenant Limit Interceptor** — HTTP interceptor hiển thị thông báo khi vượt giới hạn (403)
 
 ---
 
@@ -48,6 +52,17 @@ IVF Platform là hệ thống quản lý trung tâm IVF đầu tiên tại Việ
 │  │                                                                   │  │
 │  │  FeatureDefinition ←→ PlanFeature ←→ PlanDefinition              │  │
 │  │       (24 features)     (84 mappings)    (5 plans)               │  │
+│  │                                                                   │  │
+│  │  ┌─── Enforcement Layer ───────────────────────────────────────┐ │  │
+│  │  │ Backend:                                                     │ │  │
+│  │  │  • [RequiresFeature] + FeatureGateBehavior (MediatR)        │ │  │
+│  │  │  • ITenantLimitService (Users, Patients, Storage)           │ │  │
+│  │  │  • 403 TENANT_LIMIT_EXCEEDED / FEATURE_NOT_ENABLED          │ │  │
+│  │  │ Frontend:                                                    │ │  │
+│  │  │  • featureGuard() route guards (11 routes)                  │ │  │
+│  │  │  • TenantFeatureService (signals)                           │ │  │
+│  │  │  • tenantLimitInterceptor (HTTP 403 handler)                │ │  │
+│  │  └─────────────────────────────────────────────────────────────┘ │  │
 │  │            ↓                                                      │  │
 │  │     TenantFeature (per-tenant activation, auto-synced)           │  │
 │  │            ↓                                                      │  │
@@ -305,6 +320,195 @@ Nâng/hạ gói (PUT /api/tenants/{id}/subscription)
             ├─ Xóa tất cả TenantFeature cũ (Professional features)
             ├─ Tạo TenantFeature mới (Enterprise features)
             └─ Tenant giờ có feature set của Enterprise
+```
+
+#### 2.3.6 System-wide Limit & Feature Enforcement
+
+Hệ thống áp dụng giới hạn và feature gating ở **cả backend lẫn frontend**, đảm bảo tenant chỉ sử dụng được tính năng và tài nguyên trong phạm vi gói đã mua.
+
+##### Backend Enforcement Architecture
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│                    MediatR Pipeline (theo thứ tự)                    │
+│                                                                      │
+│  Request → ValidationBehavior                                        │
+│          → FeatureGateBehavior  ◄── [RequiresFeature] attribute      │
+│          → VaultPolicyBehavior                                       │
+│          → ZeroTrustBehavior                                         │
+│          → FieldAccessBehavior                                       │
+│          → Handler                                                   │
+│               └─ ITenantLimitService.EnsureXxxLimitAsync()           │
+│                                                                      │
+│  Nếu vi phạm:                                                       │
+│  • Feature chưa kích hoạt → FeatureNotEnabledException → 403        │
+│  • Vượt giới hạn tài nguyên → TenantLimitExceededException → 403   │
+│  • Platform Admin bypass TẤT CẢ kiểm tra                            │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+**1. Feature Gate Pipeline (`FeatureGateBehavior`)**
+
+`IPipelineBehavior<TRequest, TResponse>` tự động kiểm tra `[RequiresFeature]` attribute trên mỗi MediatR command/query trước khi handler thực thi:
+
+```csharp
+// Đánh dấu command yêu cầu feature
+[RequiresFeature(FeatureCodes.Billing)]
+public record CreateInvoiceCommand(...) : IRequest<Guid>;
+
+[RequiresFeature(FeatureCodes.PatientManagement)]
+[RequiresFeature(FeatureCodes.DigitalSigning)]  // Có thể yêu cầu nhiều features
+public record SignPatientDocumentCommand(...) : IRequest<string>;
+```
+
+Danh sách commands đã gắn `[RequiresFeature]`:
+
+| Feature Code         | Commands                                             |
+| -------------------- | ---------------------------------------------------- |
+| `patient_management` | CreatePatient, UploadDocument                        |
+| `billing`            | CreateInvoice, AddPayment, AssignService             |
+| `queue`              | CreateQueueTicket, CallNext, CheckIn, TransferTicket |
+| `ultrasound`         | CreateUltrasound                                     |
+| `consultation`       | CreateConsultation                                   |
+| `injection`          | CreateInjection                                      |
+| `andrology`          | CreateAndrology                                      |
+| `sperm_bank`         | CreateSpermWashing                                   |
+| `lab`                | CreateLabResult, CreateEmbryoRecord                  |
+| `basic_forms`        | SubmitFormResponse                                   |
+| `digital_signing`    | SignDocument                                         |
+| `biometrics`         | EnrollBiometric, VerifyBiometric                     |
+| `appointments`       | CreateAppointment                                    |
+
+**2. Resource Limit Enforcement (`ITenantLimitService`)**
+
+Handler-level checks cho 3 loại giới hạn tài nguyên:
+
+```csharp
+public interface ITenantLimitService
+{
+    // Kiểm tra số lượng users hiện tại vs MaxUsers
+    Task EnsureUserLimitAsync(CancellationToken ct = default);
+
+    // Kiểm tra bệnh nhân mới tháng này vs MaxPatientsPerMonth
+    Task EnsurePatientLimitAsync(CancellationToken ct = default);
+
+    // Kiểm tra dung lượng lưu trữ + file mới vs StorageLimitMb
+    Task EnsureStorageLimitAsync(long additionalBytes, CancellationToken ct = default);
+
+    // Kiểm tra feature có enabled trong tenant_features
+    Task EnsureFeatureEnabledAsync(string featureCode, CancellationToken ct = default);
+}
+```
+
+**Quy tắc xác định giới hạn (Effective Limits):**
+
+```
+1. PlanDefinition limits     ← Ưu tiên cao nhất (từ gói đã đăng ký)
+2. Tenant entity defaults    ← Fallback (cấu hình riêng per-tenant)
+3. Hard defaults (5/50/1024) ← Fallback cuối cùng
+```
+
+**Handlers đã tích hợp limit check:**
+
+| Handler                        | Limit Check                              |
+| ------------------------------ | ---------------------------------------- |
+| `CreateUserCommandHandler`     | `EnsureUserLimitAsync()`                 |
+| `CreatePatientHandler`         | `EnsurePatientLimitAsync()`              |
+| `UploadPatientDocumentHandler` | `EnsureStorageLimitAsync(fileSizeBytes)` |
+
+**3. Custom Exceptions & API Response**
+
+```csharp
+// TenantLimitExceededException
+{
+    LimitType: "MaxUsers" | "MaxPatientsPerMonth" | "StorageLimitMb",
+    CurrentCount: int,
+    MaxAllowed: int,
+    Message: "Đã vượt giới hạn MaxUsers: hiện tại 30/30"
+}
+
+// FeatureNotEnabledException
+{
+    FeatureCode: "billing",
+    Message: "Tính năng 'billing' chưa được kích hoạt cho tổ chức của bạn"
+}
+```
+
+API response format (HTTP 403):
+
+```json
+// TENANT_LIMIT_EXCEEDED
+{
+  "code": "TENANT_LIMIT_EXCEEDED",
+  "message": "Đã vượt giới hạn MaxUsers: hiện tại 30/30",
+  "limitType": "MaxUsers",
+  "currentCount": 30,
+  "maxAllowed": 30
+}
+
+// FEATURE_NOT_ENABLED
+{
+  "code": "FEATURE_NOT_ENABLED",
+  "message": "Tính năng 'billing' chưa được kích hoạt cho tổ chức của bạn",
+  "featureCode": "billing"
+}
+```
+
+##### Frontend Enforcement Architecture
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│                    Frontend Enforcement Layers                       │
+│                                                                      │
+│  Layer 1: Route Guards (featureGuard)                                │
+│  ├─ Chặn TRƯỚC khi navigate vào route                              │
+│  ├─ Check TenantFeatureService.isFeatureEnabled(code)               │
+│  └─ Redirect → /dashboard?featureBlocked={code}                    │
+│                                                                      │
+│  Layer 2: Menu Visibility (isMenuItemVisible)                       │
+│  ├─ Ẩn menu items có requiredFeatureCode chưa kích hoạt            │
+│  └─ Platform Admin bypass tất cả                                    │
+│                                                                      │
+│  Layer 3: HTTP Interceptor (tenantLimitInterceptor)                 │
+│  ├─ Bắt 403 TENANT_LIMIT_EXCEEDED → alert giới hạn                │
+│  └─ Bắt 403 FEATURE_NOT_ENABLED → alert tính năng                 │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+**Route Guards (11 routes bảo vệ):**
+
+```typescript
+// app.routes.ts
+{ path: 'billing',     canActivate: [featureGuard('billing')],     ... },
+{ path: 'queue',        canActivate: [featureGuard('queue')],        ... },
+{ path: 'ultrasound',   canActivate: [featureGuard('ultrasound')],   ... },
+{ path: 'consultation', canActivate: [featureGuard('consultation')], ... },
+{ path: 'injection',    canActivate: [featureGuard('injection')],    ... },
+{ path: 'andrology',    canActivate: [featureGuard('andrology')],    ... },
+{ path: 'sperm-bank',   canActivate: [featureGuard('sperm_bank')],   ... },
+{ path: 'lab',          canActivate: [featureGuard('lab')],          ... },
+{ path: 'pharmacy',     canActivate: [featureGuard('pharmacy')],     ... },
+{ path: 'reports',      canActivate: [featureGuard('advanced_reporting')], ... },
+{ path: 'appointments', canActivate: [featureGuard('appointments')], ... },
+```
+
+**TenantFeatureService (Signal-based State):**
+
+```typescript
+@Injectable({ providedIn: "root" })
+export class TenantFeatureService {
+  // Signals
+  readonly features: Signal<TenantFeatures | null>;
+  readonly enabledFeatures: Signal<string[]>;
+  readonly isPlatformAdmin: Signal<boolean>;
+  readonly maxUsers: Signal<number>;
+  readonly maxPatients: Signal<number>;
+
+  load(): Promise<void>; // Lazy load from GET /api/tenants/my-features
+  reload(): Promise<void>; // Force reload (after plan upgrade)
+  isFeatureEnabled(code: string): boolean; // Check + platform admin bypass
+  clear(): void; // Clear on logout
+}
 ```
 
 ### 2.4 JWT Claims
@@ -636,6 +840,53 @@ Result:
    └─ Professional tenant → visible (ai in features)
 ```
 
+### 6.4 Enforcement: Chặn truy cập Feature chưa mua
+
+```
+Tenant gói Trial cố tạo hoá đơn (billing chưa kích hoạt):
+
+Frontend:
+  1. User click menu "Thanh toán"
+  2. featureGuard('billing') → TenantFeatureService.isFeatureEnabled('billing')
+  3. Trial không có billing → redirect /dashboard?featureBlocked=billing
+  4. ❌ CHẶN — không vào được trang
+
+Backend (nếu bypass frontend, gọi API trực tiếp):
+  1. POST /api/billing/invoices → CreateInvoiceCommand
+  2. MediatR Pipeline → FeatureGateBehavior
+  3. [RequiresFeature("billing")] detected
+  4. ITenantLimitService.EnsureFeatureEnabledAsync("billing")
+  5. tenant_features: billing.IsEnabled = false
+  6. Throw FeatureNotEnabledException("billing")
+  7. Exception Handler → HTTP 403
+     { "code": "FEATURE_NOT_ENABLED", "featureCode": "billing" }
+  8. Frontend: tenantLimitInterceptor catches 403
+  9. Alert: "Tính năng 'billing' chưa được kích hoạt"
+```
+
+### 6.5 Enforcement: Vượt giới hạn tài nguyên
+
+```
+Tenant gói Starter (maxUsers = 10) cố tạo user thứ 11:
+
+  1. POST /api/users → CreateUserCommand
+  2. MediatR Pipeline → FeatureGateBehavior → pass (no feature attr)
+  3. CreateUserCommandHandler:
+     └─ ITenantLimitService.EnsureUserLimitAsync()
+        ├─ GetEffectiveLimitsAsync():
+        │   ├─ Find active subscription → Starter
+        │   ├─ PlanDefinition for Starter → maxUsers = 10
+        │   └─ return (10, 100, 5120)
+        ├─ GetTenantUserCountAsync() → 10 (hiện tại)
+        └─ 10 >= 10 → Throw TenantLimitExceededException("MaxUsers", 10, 10)
+  4. Exception Handler → HTTP 403
+     { "code": "TENANT_LIMIT_EXCEEDED", "limitType": "MaxUsers",
+       "currentCount": 10, "maxAllowed": 10 }
+  5. tenantLimitInterceptor → Alert:
+     "Đã vượt giới hạn số lượng người dùng: 10/10.
+      Vui lòng liên hệ quản trị viên hoặc nâng cấp gói dịch vụ."
+```
+
 ---
 
 ## 7. Bảo mật & Tuân thủ
@@ -664,12 +915,18 @@ Result:
 │  │    • EF Core Global Query Filters       │   │
 │  │    • Automatic TenantId assignment       │   │
 │  ├─────────────────────────────────────────┤   │
-│  │ 5. Encryption                           │   │
+│  │ 5. Feature & Limit Enforcement          │   │
+│  │    • FeatureGateBehavior (MediatR)       │   │
+│  │    • ITenantLimitService (3 limit types) │   │
+│  │    • 403 structured error responses      │   │
+│  │    • Platform Admin bypass               │   │
+│  ├─────────────────────────────────────────┤   │
+│  │ 6. Encryption                           │   │
 │  │    • AES-256 at rest                     │   │
 │  │    • TLS 1.3 in transit                  │   │
 │  │    • BCrypt password hashing             │   │
 │  ├─────────────────────────────────────────┤   │
-│  │ 6. Audit & Compliance                   │   │
+│  │ 7. Audit & Compliance                   │   │
 │  │    • Partitioned audit log               │   │
 │  │    • HIPAA, GDPR, ISO 27001, SOC 2      │   │
 │  │    • Automated compliance checks         │   │
@@ -809,7 +1066,7 @@ Sau 30 ngày: Review & tối ưu
 
 ---
 
-_Tài liệu này được cập nhật tự động từ hệ thống. Phiên bản: 3.0 — Cập nhật: 2026-03-05_
+_Tài liệu này được cập nhật tự động từ hệ thống. Phiên bản: 4.0 — Cập nhật: 2026-03-06_
 
 ---
 
@@ -1097,5 +1354,53 @@ if (app.Environment.IsDevelopment())
 - 5 PlanDefinitions (Trial, Starter, Professional, Enterprise, Custom)
 - 84 PlanFeature mappings (4 + 13 + 19 + 24 + 24)
 - 24 TenantFeatures cho Root Tenant (tất cả enabled)
+
+---
+
+## Phụ lục E: Enforcement Components
+
+### E.1 Backend — Application Layer
+
+| File                                                | Loại      | Mô tả                                                                          |
+| --------------------------------------------------- | --------- | ------------------------------------------------------------------------------ |
+| `Common/FeatureCodes.cs`                            | Constants | 24 const string mapping feature codes (match `feature_definitions.code`)       |
+| `Common/Attributes/RequiresFeatureAttribute.cs`     | Attribute | `[RequiresFeature("code")]` — đánh dấu command cần feature, AllowMultiple=true |
+| `Common/Behaviors/FeatureGateBehavior.cs`           | Pipeline  | MediatR behavior đọc `[RequiresFeature]` → gọi `EnsureFeatureEnabledAsync`     |
+| `Common/Exceptions/TenantLimitExceededException.cs` | Exception | Properties: `LimitType`, `CurrentCount`, `MaxAllowed`                          |
+| `Common/Exceptions/FeatureNotEnabledException.cs`   | Exception | Property: `FeatureCode`                                                        |
+| `Common/Interfaces/ITenantLimitService.cs`          | Interface | 4 methods: EnsureUser/Patient/Storage/FeatureEnabled                           |
+
+### E.2 Backend — Infrastructure Layer
+
+| File                             | Loại           | Mô tả                                                                     |
+| -------------------------------- | -------------- | ------------------------------------------------------------------------- |
+| `Services/TenantLimitService.cs` | Implementation | Effective limits: PlanDef → Tenant → Hard defaults. Platform Admin bypass |
+
+### E.3 Backend — API Layer
+
+| File         | Loại              | Mô tả                                                        |
+| ------------ | ----------------- | ------------------------------------------------------------ |
+| `Program.cs` | Exception Handler | `TenantLimitExceededException` → 403 `TENANT_LIMIT_EXCEEDED` |
+|              |                   | `FeatureNotEnabledException` → 403 `FEATURE_NOT_ENABLED`     |
+
+### E.4 Frontend — Angular
+
+| File                                            | Loại        | Mô tả                                                                   |
+| ----------------------------------------------- | ----------- | ----------------------------------------------------------------------- |
+| `core/services/tenant-feature.service.ts`       | Service     | Signal-based state: load/reload/isFeatureEnabled/clear                  |
+| `core/guards/feature.guard.ts`                  | Guard       | Factory `featureGuard(code)` → CanActivateFn, redirect on blocked       |
+| `core/interceptors/tenant-limit.interceptor.ts` | Interceptor | Catches 403 TENANT_LIMIT_EXCEEDED & FEATURE_NOT_ENABLED → alert (vi-VN) |
+
+### E.5 MediatR Pipeline Order
+
+```
+Request
+ ├─ 1. ValidationBehavior        (FluentValidation)
+ ├─ 2. FeatureGateBehavior       (Feature gating — NEW)
+ ├─ 3. VaultPolicyBehavior       (Vault policy checks)
+ ├─ 4. ZeroTrustBehavior         (Zero Trust checks)
+ ├─ 5. FieldAccessBehavior       (Field-level access)
+ └─ 6. Handler                   (Business logic + limit checks)
+```
 
 **Idempotent:** Seeder kiểm tra `feature_definitions` đã có data trước khi seed. Safe to run nhiều lần.

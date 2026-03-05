@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { authGuard, guestGuard } from './core/guards/auth.guard';
+import { featureGuard } from './core/guards/feature.guard';
 
 export const routes: Routes = [
   {
@@ -109,6 +110,7 @@ export const routes: Routes = [
       },
       {
         path: 'billing',
+        canActivate: [featureGuard('billing')],
         loadComponent: () =>
           import('./features/billing/invoice-list/invoice-list.component').then(
             (m) => m.InvoiceListComponent,
@@ -116,6 +118,7 @@ export const routes: Routes = [
       },
       {
         path: 'queue/:departmentCode',
+        canActivate: [featureGuard('queue')],
         loadComponent: () =>
           import('./features/queue/queue-display/queue-display.component').then(
             (m) => m.QueueDisplayComponent,
@@ -123,6 +126,7 @@ export const routes: Routes = [
       },
       {
         path: 'ultrasound',
+        canActivate: [featureGuard('ultrasound')],
         loadComponent: () =>
           import('./features/ultrasounds/ultrasound-dashboard/ultrasound-dashboard.component').then(
             (m) => m.UltrasoundDashboardComponent,
@@ -130,6 +134,7 @@ export const routes: Routes = [
       },
       {
         path: 'consultation',
+        canActivate: [featureGuard('consultation')],
         loadComponent: () =>
           import('./features/consultation/consultation-dashboard/consultation-dashboard.component').then(
             (m) => m.ConsultationDashboardComponent,
@@ -137,6 +142,7 @@ export const routes: Routes = [
       },
       {
         path: 'injection',
+        canActivate: [featureGuard('injection')],
         loadComponent: () =>
           import('./features/injection/injection-dashboard/injection-dashboard.component').then(
             (m) => m.InjectionDashboardComponent,
@@ -151,6 +157,7 @@ export const routes: Routes = [
       },
       {
         path: 'andrology',
+        canActivate: [featureGuard('andrology')],
         loadComponent: () =>
           import('./features/andrology/andrology-dashboard/andrology-dashboard.component').then(
             (m) => m.AndrologyDashboardComponent,
@@ -158,6 +165,7 @@ export const routes: Routes = [
       },
       {
         path: 'sperm-bank',
+        canActivate: [featureGuard('sperm_bank')],
         loadComponent: () =>
           import('./features/sperm-bank/sperm-bank-dashboard/sperm-bank-dashboard.component').then(
             (m) => m.SpermBankDashboardComponent,
@@ -165,6 +173,7 @@ export const routes: Routes = [
       },
       {
         path: 'lab',
+        canActivate: [featureGuard('lab')],
         loadComponent: () =>
           import('./features/lab/lab-dashboard/lab-dashboard.component').then(
             (m) => m.LabDashboardComponent,
@@ -172,6 +181,7 @@ export const routes: Routes = [
       },
       {
         path: 'pharmacy',
+        canActivate: [featureGuard('pharmacy')],
         loadComponent: () =>
           import('./features/pharmacy/pharmacy-dashboard/pharmacy-dashboard.component').then(
             (m) => m.PharmacyDashboardComponent,
@@ -179,6 +189,7 @@ export const routes: Routes = [
       },
       {
         path: 'reports',
+        canActivate: [featureGuard('advanced_reporting')],
         loadComponent: () =>
           import('./features/reports/reports-dashboard/reports-dashboard.component').then(
             (m) => m.ReportsDashboardComponent,
@@ -186,6 +197,7 @@ export const routes: Routes = [
       },
       {
         path: 'appointments',
+        canActivate: [featureGuard('appointments')],
         loadComponent: () =>
           import('./features/appointments/appointments-dashboard.component').then(
             (m) => m.AppointmentsDashboardComponent,
@@ -319,6 +331,13 @@ export const routes: Routes = [
         path: 'pricing',
         loadComponent: () =>
           import('./features/pricing/pricing.component').then((m) => m.PricingComponent),
+      },
+      {
+        path: 'admin/feature-plan-config',
+        loadComponent: () =>
+          import('./features/admin/feature-plan-config/feature-plan-config.component').then(
+            (m) => m.FeaturePlanConfigComponent,
+          ),
       },
 
       // ─── Compliance ───

@@ -1,5 +1,6 @@
 using FluentValidation;
 using IVF.Application.Common;
+using IVF.Application.Common.Attributes;
 using IVF.Application.Common.Interfaces;
 using IVF.Domain.Entities;
 using MediatR;
@@ -7,6 +8,7 @@ using MediatR;
 namespace IVF.Application.Features.Ultrasounds.Commands;
 
 // ==================== CREATE ULTRASOUND ====================
+[RequiresFeature(FeatureCodes.Ultrasound)]
 public record CreateUltrasoundCommand(
     Guid CycleId,
     DateTime ExamDate,
@@ -51,6 +53,7 @@ public class CreateUltrasoundHandler : IRequestHandler<CreateUltrasoundCommand, 
 }
 
 // ==================== RECORD FOLLICLES ====================
+[RequiresFeature(FeatureCodes.Ultrasound)]
 public record RecordFolliclesCommand(
     Guid UltrasoundId,
     int? LeftOvaryCount,
@@ -83,7 +86,7 @@ public class RecordFolliclesHandler : IRequestHandler<RecordFolliclesCommand, Re
             request.LeftFollicles, request.RightFollicles,
             request.EndometriumThickness, request.Findings
         );
-        
+
         await _usRepo.UpdateAsync(us, ct);
         await _unitOfWork.SaveChangesAsync(ct);
 
