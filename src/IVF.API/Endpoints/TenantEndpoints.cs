@@ -46,6 +46,59 @@ public static class TenantEndpoints
             return Results.Ok(result);
         });
 
+        group.MapGet("/{id:guid}/usage-analytics", async (Guid id, [FromQuery] int months, IMediator mediator, ICurrentUserService currentUser) =>
+        {
+            if (!currentUser.IsPlatformAdmin)
+                return Results.Forbid();
+            var result = await mediator.Send(new GetTenantUsageHistoryQuery(id, months > 0 ? months : 12));
+            return Results.Ok(result);
+        });
+
+        group.MapPost("/{id:guid}/refresh-usage", async (Guid id, IMediator mediator, ICurrentUserService currentUser) =>
+        {
+            if (!currentUser.IsPlatformAdmin)
+                return Results.Forbid();
+            var result = await mediator.Send(new RefreshTenantUsageCommand(id));
+            return Results.Ok(result);
+        });
+
+        group.MapGet("/{id:guid}/usage-detail/{metric}", async (Guid id, string metric, [FromQuery] int year, [FromQuery] int month, IMediator mediator, ICurrentUserService currentUser) =>
+        {
+            if (!currentUser.IsPlatformAdmin)
+                return Results.Forbid();
+            var now = DateTime.UtcNow;
+            var result = await mediator.Send(new GetTenantUsageDetailQuery(id, metric, year > 0 ? year : now.Year, month > 0 ? month : now.Month));
+            return Results.Ok(result);
+        });
+
+        // ═══════════════ Tenant User Management ═══════════════
+
+        group.MapGet("/{id:guid}/users", async (Guid id, [FromQuery] string? search, [FromQuery] string? role, [FromQuery] bool? isActive, [FromQuery] int page, [FromQuery] int pageSize, IMediator mediator, ICurrentUserService currentUser) =>
+        {
+            if (!currentUser.IsPlatformAdmin)
+                return Results.Forbid();
+            var result = await mediator.Send(new GetTenantUsersQuery(id, search, role, isActive, page > 0 ? page : 1, pageSize > 0 ? pageSize : 20));
+            return Results.Ok(result);
+        });
+
+        group.MapPost("/{id:guid}/users/{userId:guid}/reset-password", async (Guid id, Guid userId, [FromBody] ResetPasswordRequest req, IMediator mediator, ICurrentUserService currentUser) =>
+        {
+            if (!currentUser.IsPlatformAdmin)
+                return Results.Forbid();
+            await mediator.Send(new AdminResetPasswordCommand(id, userId, req.NewPassword));
+            return Results.Ok(new { message = "Mật khẩu đã được đặt lại thành công" });
+        });
+
+        // ═══════════════ API Call Logs ═══════════════
+
+        group.MapGet("/{id:guid}/api-calls", async (Guid id, [FromQuery] int page, [FromQuery] int pageSize, [FromQuery] string? method, [FromQuery] int? statusCode, IMediator mediator, ICurrentUserService currentUser) =>
+        {
+            if (!currentUser.IsPlatformAdmin)
+                return Results.Forbid();
+            var result = await mediator.Send(new GetTenantApiCallsQuery(id, page > 0 ? page : 1, pageSize > 0 ? pageSize : 50, method, statusCode));
+            return Results.Ok(result);
+        });
+
         group.MapGet("/pricing", async (IMediator mediator) =>
         {
             var plans = await mediator.Send(new GetDynamicPricingQuery());
@@ -271,6 +324,7 @@ public static class TenantEndpoints
 
     record UpdatePlanFeaturesRequest(List<Guid> FeatureDefinitionIds);
 
-    record UpdateTenantFeaturesRequest(List<TenantFeatureUpdateItem> Features);
+record UpdateTenantFeaturesRequest(List<TenantFeatureUpdateItem> Features);
     record TenantFeatureUpdateItem(Guid FeatureDefinitionId, bool IsEnabled);
+    record ResetPasswordRequest(string NewPassword);
 }

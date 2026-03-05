@@ -262,3 +262,124 @@ export interface UpdatePlanRequest {
   isFeatured: boolean;
   isActive: boolean;
 }
+
+// ── Advanced Usage Analytics ──
+
+export interface TenantUsageAnalytics {
+  currentUsage: UsageSnapshot;
+  limitComparison: LimitComparison;
+  history: UsageHistoryItem[];
+  alerts: UsageAlert[];
+}
+
+export interface UsageSnapshot {
+  year: number;
+  month: number;
+  activeUsers: number;
+  newPatients: number;
+  treatmentCycles: number;
+  formResponses: number;
+  signedDocuments: number;
+  storageUsedMb: number;
+  apiCalls: number;
+}
+
+export interface LimitComparison {
+  maxUsers: number;
+  currentUsers: number;
+  usersPercent: number;
+  maxPatientsPerMonth: number;
+  currentPatients: number;
+  patientsPercent: number;
+  storageLimitMb: number;
+  currentStorageMb: number;
+  storagePercent: number;
+}
+
+export interface UsageHistoryItem {
+  year: number;
+  month: number;
+  activeUsers: number;
+  newPatients: number;
+  treatmentCycles: number;
+  formResponses: number;
+  signedDocuments: number;
+  storageUsedMb: number;
+  apiCalls: number;
+}
+
+export interface UsageAlert {
+  type: 'warning' | 'critical' | 'info';
+  metric: string;
+  message: string;
+  percent: number;
+}
+
+// ── Usage Detail Drill-Down ──
+
+export interface UsageDetailResult {
+  metric: string;
+  title: string;
+  totalCount: number;
+  items: UsageDetailItem[];
+}
+
+export interface UsageDetailItem {
+  id: string;
+  name: string;
+  description?: string;
+  status?: string;
+  createdAt: string;
+  extra?: Record<string, string>;
+}
+
+// ── Tenant User Management ──
+
+export interface TenantUsersResult {
+  items: TenantUserDto[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface TenantUserDto {
+  id: string;
+  username: string;
+  fullName: string;
+  role: string;
+  department?: string;
+  isActive: boolean;
+  createdAt: string;
+  lastLoginAt?: string;
+}
+
+// ── API Call Logs ──
+
+export interface TenantApiCallsResult {
+  items: ApiCallLogDto[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+  stats: ApiCallStats;
+}
+
+export interface ApiCallLogDto {
+  id: string;
+  username?: string;
+  method: string;
+  path: string;
+  statusCode: number;
+  durationMs: number;
+  ipAddress?: string;
+  requestedAt: string;
+}
+
+export interface ApiCallStats {
+  totalCalls: number;
+  successCalls: number;
+  errorCalls: number;
+  avgDurationMs: number;
+  maxDurationMs: number;
+  byMethod: Record<string, number>;
+  topPaths: Record<string, number>;
+}

@@ -516,6 +516,7 @@ app.UseTenantResolution(); // Multi-tenant row-level isolation — resolve tenan
 app.UseConsentEnforcement(); // GDPR/HIPAA consent enforcement — block access to sensitive data without consent
 app.UseTokenBinding(); // Token binding enforcement — validate device/session claims (Microsoft CAE)
 app.UseZeroTrust(); // Zero Trust continuous verification (Google BeyondCorp + Microsoft CAE + AWS GuardDuty)
+app.UseMiddleware<IVF.API.Middleware.ApiCallLoggingMiddleware>(); // Per-tenant API call logging
 
 // SignalR Hubs
 app.MapHub<IVF.API.Hubs.QueueHub>("/hubs/queue");
