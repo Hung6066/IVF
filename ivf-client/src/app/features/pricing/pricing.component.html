@@ -60,7 +60,9 @@
 
         <ul class="feature-list">
           @for (feature of plan.features; track feature.code) {
-            <li><span class="feature-icon">{{ feature.icon }}</span> {{ feature.displayName }}</li>
+            <li>
+              <span class="feature-icon">{{ feature.icon }}</span> {{ feature.displayName }}
+            </li>
           }
         </ul>
 

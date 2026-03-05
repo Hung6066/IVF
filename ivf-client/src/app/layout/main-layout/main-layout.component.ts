@@ -287,8 +287,10 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     if (item.permission && !this.canView(item.permission)) return false;
     // Feature gate: if item requires a feature, check tenant has it enabled
     if (item.requiredFeatureCode && this.tenantFeatures) {
-      if (!this.tenantFeatures.isPlatformAdmin &&
-          !this.tenantFeatures.enabledFeatures.includes(item.requiredFeatureCode)) {
+      if (
+        !this.tenantFeatures.isPlatformAdmin &&
+        !this.tenantFeatures.enabledFeatures.includes(item.requiredFeatureCode)
+      ) {
         return false;
       }
     }
