@@ -609,7 +609,24 @@ app.MapInfrastructureEndpoints(); // Infrastructure monitoring — VPS, Swarm, S
 {
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<IvfDbContext>();
-    await db.Database.MigrateAsync();
+
+    // Retry migration with backoff — overlay DNS may not be ready immediately on Swarm workers
+    const int maxRetries = 5;
+    for (var attempt = 1; attempt <= maxRetries; attempt++)
+    {
+        try
+        {
+            await db.Database.MigrateAsync();
+            break;
+        }
+        catch (Exception ex) when (attempt < maxRetries)
+        {
+            var delay = TimeSpan.FromSeconds(Math.Pow(2, attempt));
+            app.Logger.LogWarning(ex, "Database migration attempt {Attempt}/{Max} failed, retrying in {Delay}s",
+                attempt, maxRetries, delay.TotalSeconds);
+            await Task.Delay(delay);
+        }
+    }
     await BackupStrategySeeder.SeedAsync(db);        // default 3-2-1 backup strategies
     await CloudReplicationSeeder.SeedAsync(db);      // default cloud replication config
     await ZTPolicySeeder.SeedAsync(db);              // default Zero Trust policies

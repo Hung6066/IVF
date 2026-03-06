@@ -169,10 +169,28 @@ public sealed class InfrastructureMonitorService(
     //  Docker Service Info (reads from Docker socket)
     // ═══════════════════════════════════════════════════════════
 
+    // Cache whether this node is a Swarm manager (checked once, valid for service lifetime)
+    private bool? _isSwarmManager;
+
+    private async Task<bool> IsSwarmManagerAsync(CancellationToken ct)
+    {
+        if (_isSwarmManager.HasValue) return _isSwarmManager.Value;
+
+        var result = await RunCommandAsync("docker", "info --format \"{{.Swarm.ControlAvailable}}\"", ct);
+        _isSwarmManager = result.ExitCode == 0 && result.Output.Trim().Equals("true", StringComparison.OrdinalIgnoreCase);
+
+        if (!_isSwarmManager.Value)
+            logger.LogInformation("This node is not a Swarm manager — Swarm management queries will be skipped");
+
+        return _isSwarmManager.Value;
+    }
+
     public async Task<List<SwarmServiceDto>> GetSwarmServicesAsync(CancellationToken ct = default)
     {
         try
         {
+            if (!await IsSwarmManagerAsync(ct)) return [];
+
             // Use docker CLI to list services (works without Docker SDK dependency)
             var result = await RunCommandAsync(
                 "docker", "service ls --format \"{{.ID}}|{{.Name}}|{{.Mode}}|{{.Replicas}}|{{.Image}}|{{.Ports}}\"", ct);
@@ -217,6 +235,8 @@ public sealed class InfrastructureMonitorService(
     {
         try
         {
+            if (!await IsSwarmManagerAsync(ct)) return [];
+
             var result = await RunCommandAsync(
                 "docker", "node ls --format \"{{.ID}}|{{.Hostname}}|{{.Status}}|{{.Availability}}|{{.ManagerStatus}}|{{.EngineVersion}}\"", ct);
 

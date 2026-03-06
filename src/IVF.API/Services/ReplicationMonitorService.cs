@@ -10,11 +10,16 @@ public sealed class ReplicationMonitorService(
     IConfiguration configuration,
     ILogger<ReplicationMonitorService> logger)
 {
-    private const string DbContainer = "ivf-db";
+    private string? _cachedDbContainer;
+
+    private async Task<string> ResolveDbAsync(CancellationToken ct) =>
+        _cachedDbContainer ??= await DockerContainerResolver.ResolveDbContainerAsync(ct)
+            ?? throw new InvalidOperationException("PostgreSQL container not found on this node.");
 
     public async Task<ReplicationStatus> GetStatusAsync(CancellationToken ct = default)
     {
         var dbUser = GetDbUser();
+        var DbContainer = await ResolveDbAsync(ct);
 
         try
         {
@@ -130,6 +135,7 @@ public sealed class ReplicationMonitorService(
 
     private async Task<List<ConnectedReplica>> GetConnectedReplicasAsync(string dbUser, CancellationToken ct)
     {
+        var DbContainer = await ResolveDbAsync(ct);
         var sql = "SELECT pid::text, usename, application_name, client_addr::text, state, sent_lsn::text, write_lsn::text, flush_lsn::text, replay_lsn::text, sync_state, EXTRACT(EPOCH FROM (now() - backend_start))::bigint::text, CASE WHEN sent_lsn IS NOT NULL AND replay_lsn IS NOT NULL THEN pg_wal_lsn_diff(sent_lsn, replay_lsn)::bigint::text ELSE '0' END FROM pg_stat_replication;";
 
         var cmd = $"docker exec {DbContainer} psql -U {dbUser} -d postgres -t -A -F \"~\" -c \"{sql}\"";
@@ -164,6 +170,7 @@ public sealed class ReplicationMonitorService(
 
     private async Task<List<ReplicationSlot>> GetReplicationSlotsAsync(string dbUser, CancellationToken ct)
     {
+        var DbContainer = await ResolveDbAsync(ct);
         var sql = "SELECT slot_name, slot_type, active::text, restart_lsn::text, confirmed_flush_lsn::text, CASE WHEN restart_lsn IS NOT NULL THEN pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn)::bigint::text ELSE '0' END FROM pg_replication_slots;";
 
         var cmd = $"docker exec {DbContainer} psql -U {dbUser} -d postgres -t -A -F \"~\" -c \"{sql}\"";
@@ -192,6 +199,7 @@ public sealed class ReplicationMonitorService(
 
     private async Task<string?> PsqlScalar(string dbUser, string sql, CancellationToken ct)
     {
+        var DbContainer = await ResolveDbAsync(ct);
         var cmd = $"docker exec {DbContainer} psql -U {dbUser} -d postgres -t -c \"{sql.Replace("\"", "\\\"")}\"";
         var (exit, output) = await RunCommandAsync(cmd, ct);
         return exit == 0 ? output.Trim() : null;

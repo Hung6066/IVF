@@ -23,6 +23,7 @@ env:
     IMAGE_NAME: hung6066/ivf
     STACK_NAME: ivf
     API_SERVICE: ivf_api
+    FRONTEND_SERVICE: ivf_frontend
 
 jobs:
     deploy-production:
@@ -113,7 +114,18 @@ jobs:
                   ls -lh "${BACKUP_FILE}"
                   BACKUP_SCRIPT
 
-            - name: Pull image on all nodes
+            - name: Sync config files to manager
+              env:
+                  SSH_HOST: ${{ secrets.SSH_HOST_MANAGER }}
+                  SSH_USER: ${{ secrets.SSH_USER }}
+              run: |
+                  echo "Syncing stack & config files..."
+                  scp docker-compose.stack.yml Caddyfile "${SSH_USER}@${SSH_HOST}:/root/ivf/"
+                  ssh "${SSH_USER}@${SSH_HOST}" "mkdir -p /root/ivf/docker/postgres"
+                  scp docker/postgres/standby-entrypoint.sh "${SSH_USER}@${SSH_HOST}:/root/ivf/docker/postgres/"
+                  echo "✅ Config files synced"
+
+            - name: Pull images on all nodes
               env:
                   SSH_USER: ${{ secrets.SSH_USER }}
                   SSH_HOST_MANAGER: ${{ secrets.SSH_HOST_MANAGER }}
@@ -121,16 +133,18 @@ jobs:
                   IMAGE_TAG: ${{ steps.tag.outputs.image_tag }}
                   GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
               run: |
-                  FULL_IMAGE="${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
-                  echo "Pulling ${FULL_IMAGE} on all nodes..."
+                  API_IMAGE="${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
+                  FRONTEND_IMAGE="${REGISTRY}/${IMAGE_NAME}-client:${IMAGE_TAG}"
+                  echo "Pulling API=${API_IMAGE} Frontend=${FRONTEND_IMAGE} on all nodes..."
 
                   for HOST in "${SSH_HOST_MANAGER}" "${SSH_HOST_WORKER}"; do
                     echo "--- Pulling on ${HOST} ---"
                     ssh "${SSH_USER}@${HOST}" << PULL_SCRIPT
                   set -euo pipefail
                   echo "${GHCR_TOKEN}" | docker login ghcr.io -u hung6066 --password-stdin
-                  docker pull "${FULL_IMAGE}"
-                  echo "✅ Image pulled on $(hostname)"
+                  docker pull "${API_IMAGE}"
+                  docker pull "${FRONTEND_IMAGE}" || echo "⚠️ Frontend image not found, skipping"
+                  echo "✅ Images pulled on \$(hostname)"
                   PULL_SCRIPT
                   done
 
@@ -144,6 +158,19 @@ jobs:
                     "docker service inspect ${API_SERVICE} --format '{{.Spec.TaskTemplate.ContainerSpec.Image}}'" 2>/dev/null || echo "unknown")
                   echo "current_image=${CURRENT_IMAGE}" >> "$GITHUB_OUTPUT"
                   echo "Current image: ${CURRENT_IMAGE}"
+
+            - name: Deploy stack update (configs + new services)
+              env:
+                  SSH_HOST: ${{ secrets.SSH_HOST_MANAGER }}
+                  SSH_USER: ${{ secrets.SSH_USER }}
+              run: |
+                  echo "Re-deploying stack for config/service changes..."
+                  ssh "${SSH_USER}@${SSH_HOST}" << 'STACK_SCRIPT'
+                  set -euo pipefail
+                  cd /root/ivf
+                  docker stack deploy -c docker-compose.stack.yml ivf --with-registry-auth || true
+                  echo "✅ Stack re-deployed"
+                  STACK_SCRIPT
 
             - name: Rolling update API service
               env:
@@ -217,6 +244,30 @@ jobs:
                   docker service ps ${API_SERVICE} --no-trunc --format "table {{.Name}}\t{{.Image}}\t{{.CurrentState}}\t{{.Error}}" | head -10
                   DEPLOY_SCRIPT
 
+            - name: Rolling update Frontend service
+              env:
+                  SSH_HOST: ${{ secrets.SSH_HOST_MANAGER }}
+                  SSH_USER: ${{ secrets.SSH_USER }}
+                  IMAGE_TAG: ${{ steps.tag.outputs.image_tag }}
+              run: |
+                  FRONTEND_IMAGE="${REGISTRY}/${IMAGE_NAME}-client:${IMAGE_TAG}"
+                  echo "Deploying ${FRONTEND_IMAGE} to ${FRONTEND_SERVICE}..."
+
+                  ssh "${SSH_USER}@${SSH_HOST}" << DEPLOY_SCRIPT
+                  set -euo pipefail
+
+                  docker service update \
+                    --image "${FRONTEND_IMAGE}" \
+                    --update-parallelism 1 \
+                    --update-delay 10s \
+                    --update-order start-first \
+                    --update-failure-action rollback \
+                    --with-registry-auth \
+                    ${FRONTEND_SERVICE} || echo "⚠️ Frontend update failed (may not have new image)"
+
+                  echo "✅ Frontend update sent"
+                  DEPLOY_SCRIPT
+
             - name: Post-deploy health check
               if: ${{ !inputs.skip_health_check }}
               env:
@@ -268,21 +319,41 @@ jobs:
                     echo "⚠️ Readiness: HTTP $READY_CODE (may need investigation)"
                   fi
 
-                  # 3. Service replicas check
+                  # 3. Service replicas check (API should be 2/2)
                   echo "--- Replica Check ---"
                   REPLICAS=$(docker service ls --format "{{.Replicas}}" --filter "name=ivf_api")
-                  echo "Service replicas: $REPLICAS"
+                  echo "API replicas: $REPLICAS"
 
                   RUNNING=$(echo "$REPLICAS" | cut -d'/' -f1)
                   DESIRED=$(echo "$REPLICAS" | cut -d'/' -f2)
 
                   if [ "$RUNNING" = "$DESIRED" ]; then
-                    echo "✅ All $DESIRED replicas running"
+                    echo "✅ All $DESIRED API replicas running"
                   else
-                    echo "⚠️ Only $RUNNING of $DESIRED replicas running"
+                    echo "⚠️ Only $RUNNING of $DESIRED API replicas running"
                   fi
 
-                  # 4. No error logs in last 2 minutes
+                  # 4. VPS2 services check (db-standby, redis-replica, caddy)
+                  echo "--- VPS2 Services Check ---"
+                  for SVC in ivf_db-standby ivf_redis-replica ivf_caddy; do
+                    SVC_REPLICAS=$(docker service ls --format "{{.Replicas}}" --filter "name=$SVC" 2>/dev/null || echo "N/A")
+                    echo "$SVC: $SVC_REPLICAS"
+                  done
+
+                  # 5. PostgreSQL replication check
+                  echo "--- Replication Check ---"
+                  DB_CONTAINER=$(docker ps -q -f name=ivf_db.1 | head -1)
+                  if [ -n "$DB_CONTAINER" ]; then
+                    REPL_STATE=$(docker exec $DB_CONTAINER psql -U postgres -tAc \
+                      "SELECT state FROM pg_stat_replication LIMIT 1;" 2>/dev/null || echo "unknown")
+                    if [ "$REPL_STATE" = "streaming" ]; then
+                      echo "✅ PostgreSQL standby: streaming"
+                    else
+                      echo "⚠️ PostgreSQL standby state: $REPL_STATE"
+                    fi
+                  fi
+
+                  # 6. No error logs in last 2 minutes
                   echo "--- Error Log Check ---"
                   ERROR_COUNT=$(docker service logs ivf_api --since 2m 2>&1 | grep -ci "error\|exception\|fatal" || true)
                   if [ "$ERROR_COUNT" -le 2 ]; then
@@ -307,7 +378,7 @@ jobs:
                       "fields": [
                         {"name": "Version", "value": "'"${{ steps.tag.outputs.image_tag }}"'", "inline": true},
                         {"name": "Previous", "value": "'"${{ steps.current.outputs.current_image }}"'", "inline": true},
-                        {"name": "URL", "value": "https://ivf.clinic", "inline": false}
+                        {"name": "URL", "value": "https://natra.site", "inline": false}
                       ],
                       "timestamp": "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'"
                     }]

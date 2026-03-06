@@ -49,8 +49,8 @@ public class SecurityEnforcementMiddleware
             return;
         }
 
-        // Always allow loopback addresses (local development)
-        if (IPAddress.TryParse(clientIp, out var parsed) && IPAddress.IsLoopback(parsed))
+        // Always allow loopback and private network addresses (Docker overlay, internal services)
+        if (IPAddress.TryParse(clientIp, out var parsed) && (IPAddress.IsLoopback(parsed) || IsPrivateNetwork(parsed)))
         {
             await _next(context);
             return;
@@ -174,6 +174,23 @@ public class SecurityEnforcementMiddleware
         {
             return false;
         }
+    }
+
+    /// <summary>
+    /// Returns true for private/internal network IPs (RFC 1918 + Docker overlay).
+    /// These represent inter-service traffic within Docker Swarm.
+    /// </summary>
+    private static bool IsPrivateNetwork(IPAddress ip)
+    {
+        if (ip.IsIPv4MappedToIPv6)
+            ip = ip.MapToIPv4();
+
+        var bytes = ip.GetAddressBytes();
+        if (bytes.Length != 4) return false;
+
+        return bytes[0] == 10                                          // 10.0.0.0/8
+            || (bytes[0] == 172 && bytes[1] >= 16 && bytes[1] <= 31)   // 172.16.0.0/12
+            || (bytes[0] == 192 && bytes[1] == 168);                   // 192.168.0.0/16
     }
 
     private static string? GetClientIp(HttpContext context)

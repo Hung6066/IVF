@@ -82,6 +82,9 @@ services:
       - ivf-data
     deploy:
       replicas: 2
+      placement:
+        preferences:
+          - spread: node.id
       update_config:
         parallelism: 1
         delay: 30s

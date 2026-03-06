@@ -19,7 +19,6 @@ public sealed class WalBackupSchedulerService : BackgroundService
     private readonly ILogger<WalBackupSchedulerService> _logger;
 
     private static readonly TimeSpan Interval = TimeSpan.FromHours(1);
-    private const string DbContainer = "ivf-db";
 
     public WalBackupSchedulerService(
         WalBackupService walService,
@@ -109,9 +108,16 @@ public sealed class WalBackupSchedulerService : BackgroundService
 
     private async Task<int> CopyNewWalFilesAsync(string localDir, CancellationToken ct)
     {
+        var dbContainer = await ResolveDbContainerAsync(ct);
+        if (dbContainer == null)
+        {
+            _logger.LogDebug("PostgreSQL container not found on this node — skipping WAL copy");
+            return 0;
+        }
+
         // List WAL files in the container's archive directory
         var (exit, output) = await RunCommandAsync(
-            $"docker exec {DbContainer} sh -c \"ls /var/lib/postgresql/archive/ 2>/dev/null\"", ct);
+            $"docker exec {dbContainer} sh -c \"ls /var/lib/postgresql/archive/ 2>/dev/null\"", ct);
 
         if (exit != 0 || string.IsNullOrWhiteSpace(output))
             return 0;
@@ -128,7 +134,7 @@ public sealed class WalBackupSchedulerService : BackgroundService
                 continue; // Already archived
 
             var (cpExit, _) = await RunCommandAsync(
-                $"docker cp {DbContainer}:/var/lib/postgresql/archive/{walFile} \"{localPath}\"", ct);
+                $"docker cp {dbContainer}:/var/lib/postgresql/archive/{walFile} \"{localPath}\"", ct);
 
             if (cpExit == 0)
             {
@@ -141,7 +147,7 @@ public sealed class WalBackupSchedulerService : BackgroundService
         if (copied > 0)
         {
             await RunCommandAsync(
-                $"docker exec {DbContainer} sh -c \"find /var/lib/postgresql/archive/ -name '0*' -mmin +5 -delete 2>/dev/null\"",
+                $"docker exec {dbContainer} sh -c \"find /var/lib/postgresql/archive/ -name '0*' -mmin +5 -delete 2>/dev/null\"",
                 ct);
         }
 
@@ -226,6 +232,21 @@ public sealed class WalBackupSchedulerService : BackgroundService
 
     private string GetBackupsDir() => Path.Combine(
         Path.GetFullPath(Path.Combine(_env.ContentRootPath, "..", "..")), "backups");
+
+    private static async Task<string?> ResolveDbContainerAsync(CancellationToken ct)
+    {
+        var (exit, output) = await RunCommandAsync(
+            "docker ps -q -f name=ivf_db.1 --no-trunc", ct);
+        if (exit == 0 && !string.IsNullOrWhiteSpace(output))
+            return output.Trim().Split('\n')[0].Trim();
+
+        var (exit2, output2) = await RunCommandAsync(
+            "docker ps -q -f name=ivf-db --no-trunc", ct);
+        if (exit2 == 0 && !string.IsNullOrWhiteSpace(output2))
+            return output2.Trim().Split('\n')[0].Trim();
+
+        return null;
+    }
 
     private static async Task<(int ExitCode, string Output)> RunCommandAsync(string command, CancellationToken ct)
     {

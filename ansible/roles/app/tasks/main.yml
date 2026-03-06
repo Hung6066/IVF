@@ -110,11 +110,19 @@
   loop_control:
     label: "{{ item.name }}"
 
-# ─── Copy stack file lên VPS ───
+# ─── Copy stack file & configs lên VPS ───
 - name: Kiểm tra source code
   stat:
     path: "{{ project_dir }}/stack.yml"
   register: source_exist
+
+- name: Tạo thư mục dự án
+  file:
+    path: "{{ project_dir }}/docker/postgres"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0755"
 
 - name: Copy stack file
   copy:
@@ -123,6 +131,22 @@
     owner: "{{ deploy_user }}"
     group: "{{ deploy_group }}"
     mode: "0644"
+
+- name: Copy Caddyfile
+  copy:
+    src: "{{ playbook_dir }}/../Caddyfile"
+    dest: "{{ project_dir }}/Caddyfile"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0644"
+
+- name: Copy standby entrypoint script
+  copy:
+    src: "{{ playbook_dir }}/../docker/postgres/standby-entrypoint.sh"
+    dest: "{{ project_dir }}/docker/postgres/standby-entrypoint.sh"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0755"
 
 # ─── Pull Images từ GHCR ───
 - name: Pull API image
@@ -134,6 +158,20 @@
 - name: Pull Frontend image
   command: "docker pull ghcr.io/{{ ghcr_user }}/ivf-client:{{ image_tag | default('main') }}"
   become_user: "{{ deploy_user }}"
+  when: ghcr_token is defined and ghcr_token | length > 0
+  ignore_errors: true
+
+# ─── Pull Images on Worker Nodes ───
+- name: Pull images on worker nodes
+  command: >
+    ssh -o StrictHostKeyChecking=accept-new
+    {{ deploy_user }}@{{ hostvars[item].ansible_host }}
+    "docker pull {{ img }}"
+  loop: "{{ groups['workers'] }}"
+  loop_control:
+    label: "{{ item }}: {{ img }}"
+  vars:
+    img: "ghcr.io/{{ ghcr_user }}/ivf:{{ image_tag | default('main') }}"
   when: ghcr_token is defined and ghcr_token | length > 0
   ignore_errors: true
 
@@ -150,18 +188,88 @@
     --with-registry-auth
     ivf
   become_user: "{{ deploy_user }}"
-  when: "'ivf' not in deployed_stacks.stdout"
 
 - name: Đợi services khởi động
   pause:
     seconds: 30
-  when: "'ivf' not in deployed_stacks.stdout"
+
+# ─── PostgreSQL Replication Setup ───
+- name: Tìm DB container
+  shell: docker ps -q -f name=ivf_db.1 | head -1
+  register: db_container_id
+  changed_when: false
+
+- name: Kiểm tra replicator user
+  shell: >
+    docker exec {{ db_container_id.stdout }}
+    psql -U postgres -tAc "SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'replicator'"
+  register: replicator_exists
+  changed_when: false
+  when: db_container_id.stdout | length > 0
+
+- name: Tạo replicator user
+  shell: >
+    docker exec {{ db_container_id.stdout }}
+    psql -U postgres -c "CREATE USER replicator WITH REPLICATION ENCRYPTED PASSWORD 'replicator_pass';"
+  when:
+    - db_container_id.stdout | length > 0
+    - replicator_exists.stdout != "1"
+
+- name: Thêm replication entry vào pg_hba.conf
+  shell: >
+    docker exec {{ db_container_id.stdout }}
+    sh -c 'grep -q replicator /var/lib/postgresql/data/pg_hba.conf ||
+    echo "host replication replicator 0.0.0.0/0 md5" >> /var/lib/postgresql/data/pg_hba.conf'
+  when: db_container_id.stdout | length > 0
+
+- name: Thiết lập wal_keep_size
+  shell: >
+    docker exec {{ db_container_id.stdout }}
+    psql -U postgres -c "ALTER SYSTEM SET wal_keep_size = '256MB';"
+  when: db_container_id.stdout | length > 0
+
+- name: Tạo replication slot
+  shell: >
+    docker exec {{ db_container_id.stdout }}
+    psql -U postgres -tAc "SELECT CASE WHEN EXISTS (SELECT 1 FROM pg_replication_slots WHERE slot_name='standby_slot') THEN 'exists' ELSE pg_create_physical_replication_slot('standby_slot', true)::text END;"
+  when: db_container_id.stdout | length > 0
+
+- name: Reload PostgreSQL config
+  shell: >
+    docker exec {{ db_container_id.stdout }}
+    psql -U postgres -c "SELECT pg_reload_conf();"
+  when: db_container_id.stdout | length > 0
 
 - name: Kiểm tra services
-  command: docker service ls
+  command: docker service ls --format 'table {{ '{{' }}.Name{{ '}}' }}\t{{ '{{' }}.Mode{{ '}}' }}\t{{ '{{' }}.Replicas{{ '}}' }}\t{{ '{{' }}.Image{{ '}}' }}'
   register: service_list
   changed_when: false
 
 - name: Hiện trạng services
   debug:
     var: service_list.stdout_lines
+
+- name: Kiểm tra PostgreSQL replication
+  shell: >
+    docker exec $(docker ps -q -f name=ivf_db.1 | head -1)
+    psql -U postgres -tAc "SELECT state FROM pg_stat_replication LIMIT 1;"
+  register: repl_state
+  changed_when: false
+  ignore_errors: true
+
+- name: Hiện trạng replication
+  debug:
+    msg: "PostgreSQL standby replication: {{ repl_state.stdout | default('not connected') }}"
+
+- name: Kiểm tra service distribution
+  shell: >
+    docker service ps --format '{{ '{{' }}.Name{{ '}}' }} → {{ '{{' }}.Node{{ '}}' }}'
+    --filter 'desired-state=running'
+    ivf_api ivf_caddy ivf_db-standby ivf_redis-replica
+  register: service_placement
+  changed_when: false
+  ignore_errors: true
+
+- name: Hiện phân bổ services
+  debug:
+    var: service_placement.stdout_lines

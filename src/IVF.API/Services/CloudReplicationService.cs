@@ -15,8 +15,16 @@ public sealed class CloudReplicationService(
     IConfiguration configuration,
     ILogger<CloudReplicationService> logger)
 {
-    private const string DbContainer = "ivf-db";
-    private const string MinioContainer = "ivf-minio";
+    private string? _cachedDbContainer;
+    private string? _cachedMinioContainer;
+
+    private async Task<string> GetDbContainerAsync(CancellationToken ct) =>
+        _cachedDbContainer ??= await DockerContainerResolver.ResolveContainerAsync(["ivf_db.1", "ivf-db"], ct)
+            ?? throw new InvalidOperationException("PostgreSQL container not found on this node.");
+
+    private async Task<string> GetMinioContainerAsync(CancellationToken ct) =>
+        _cachedMinioContainer ??= await DockerContainerResolver.ResolveContainerAsync(["ivf_minio.1", "ivf-minio"], ct)
+            ?? throw new InvalidOperationException("MinIO container not found on this node.");
 
     private static readonly string[] MinioBuckets = ["ivf-documents", "ivf-signed-pdfs", "ivf-medical-images"];
 
@@ -43,6 +51,7 @@ public sealed class CloudReplicationService(
     /// </summary>
     private async Task EnsureLocalAliasAsync(CancellationToken ct)
     {
+        var MinioContainer = await GetMinioContainerAsync(ct);
         var accessKey = configuration["MinIO:AccessKey"] ?? "minioadmin";
         var secretKey = configuration["MinIO:SecretKey"] ?? "minioadmin";
         // Docker secrets: value may start with "FILE:" prefix
@@ -132,6 +141,7 @@ public sealed class CloudReplicationService(
     /// </summary>
     public async Task<(bool Success, string Message)> TestDbConnectionAsync(CancellationToken ct)
     {
+        var DbContainer = await GetDbContainerAsync(ct);
         var config = await GetConfigAsync(ct);
         if (string.IsNullOrWhiteSpace(config.RemoteDbHost))
             return (false, "Remote DB host chưa được cấu hình");
@@ -165,6 +175,7 @@ public sealed class CloudReplicationService(
         var config = await GetConfigAsync(ct);
         var steps = new List<string>();
         var dbUser = GetDbUser();
+        var DbContainer = await GetDbContainerAsync(ct);
 
         try
         {
@@ -291,6 +302,7 @@ public sealed class CloudReplicationService(
     {
         var config = await GetConfigAsync(ct);
         var dbUser = GetDbUser();
+        var DbContainer = await GetDbContainerAsync(ct);
 
         try
         {
@@ -383,6 +395,7 @@ public sealed class CloudReplicationService(
     /// </summary>
     public async Task<(bool Success, string Message)> TestMinioConnectionAsync(CancellationToken ct)
     {
+        var MinioContainer = await GetMinioContainerAsync(ct);
         var config = await GetConfigAsync(ct);
         if (string.IsNullOrWhiteSpace(config.RemoteMinioEndpoint))
             return (false, "Remote MinIO endpoint chưa được cấu hình");
@@ -415,6 +428,7 @@ public sealed class CloudReplicationService(
     /// </summary>
     public async Task<(bool Success, List<string> Steps)> SetupMinioReplicationAsync(CancellationToken ct)
     {
+        var MinioContainer = await GetMinioContainerAsync(ct);
         var config = await GetConfigAsync(ct);
         var steps = new List<string>();
 
@@ -461,6 +475,7 @@ public sealed class CloudReplicationService(
     /// </summary>
     public async Task<MinioSyncResult> SyncMinioAsync(CancellationToken ct)
     {
+        var MinioContainer = await GetMinioContainerAsync(ct);
         var config = await GetConfigAsync(ct);
         if (string.IsNullOrWhiteSpace(config.RemoteMinioEndpoint))
             return new MinioSyncResult(false, "Remote MinIO chưa được cấu hình", 0, 0, []);
@@ -548,6 +563,7 @@ public sealed class CloudReplicationService(
     /// </summary>
     public async Task<MinioCloudReplicationStatus> GetMinioReplicationStatusAsync(CancellationToken ct)
     {
+        var MinioContainer = await GetMinioContainerAsync(ct);
         var config = await GetConfigAsync(ct);
 
         // Ensure local alias points to primary MinIO (lost on container restart)
@@ -663,6 +679,7 @@ public sealed class CloudReplicationService(
 
     private async Task<string?> PsqlScalar(string dbUser, string sql, CancellationToken ct)
     {
+        var DbContainer = await GetDbContainerAsync(ct);
         var escaped = sql.Replace("\"", "\\\"");
         var cmd = $"docker exec {DbContainer} psql -U {dbUser} -d postgres -t -c \"{escaped}\"";
         var (exit, output) = await RunCommandAsync(cmd, ct);
@@ -671,6 +688,7 @@ public sealed class CloudReplicationService(
 
     private async Task PsqlExec(string dbUser, string sql, CancellationToken ct)
     {
+        var DbContainer = await GetDbContainerAsync(ct);
         var escaped = sql.Replace("\"", "\\\"");
         var cmd = $"docker exec {DbContainer} psql -U {dbUser} -d postgres -c \"{escaped}\"";
         await RunCommandAsync(cmd, ct);

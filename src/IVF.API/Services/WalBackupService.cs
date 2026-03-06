@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Npgsql;
 
 namespace IVF.API.Services;
 
@@ -11,29 +12,55 @@ public sealed class WalBackupService(
     BackupIntegrityService integrityService,
     ILogger<WalBackupService> logger)
 {
-    private const string DbContainer = "ivf-db";
+    /// <summary>
+    /// Resolves the actual Docker container ID for the ivf_db service.
+    /// In Swarm mode containers are named ivf_db.1.&lt;hash&gt;, not ivf-db.
+    /// </summary>
+    private async Task<string?> ResolveDbContainerAsync(CancellationToken ct)
+    {
+        var (exit, output) = await RunCommandAsync(
+            "docker ps -q -f name=ivf_db.1 --no-trunc", ct);
+        if (exit == 0 && !string.IsNullOrWhiteSpace(output))
+            return output.Trim().Split('\n')[0].Trim();
+
+        // Fallback: try legacy name
+        var (exit2, output2) = await RunCommandAsync(
+            "docker ps -q -f name=ivf-db --no-trunc", ct);
+        if (exit2 == 0 && !string.IsNullOrWhiteSpace(output2))
+            return output2.Trim().Split('\n')[0].Trim();
+
+        return null;
+    }
+
+    private string GetConnectionString()
+    {
+        return configuration.GetConnectionString("DefaultConnection")
+            ?? "Host=localhost;Port=5433;Database=ivf_db;Username=postgres;Password=postgres";
+    }
 
     public async Task<WalStatus> GetWalStatusAsync(CancellationToken ct = default)
     {
-        var dbUser = GetDbUser();
-
         try
         {
-            // Single psql call — all on one line to avoid cmd.exe escaping issues
-            var sql = "SELECT current_setting('wal_level'), current_setting('archive_mode'), current_setting('archive_command'), current_setting('archive_timeout'), current_setting('wal_segment_size'), pg_current_wal_lsn()::text, pg_wal_lsn_diff(pg_current_wal_lsn(), '0/0')::bigint, a.last_archived_wal, a.last_archived_time::text, a.last_failed_wal, a.last_failed_time::text, a.archived_count, a.failed_count FROM pg_stat_archiver a;";
+            await using var conn = new NpgsqlConnection(GetConnectionString());
+            await conn.OpenAsync(ct);
 
-            var cmd = $"docker exec {DbContainer} psql -U {dbUser} -d postgres -t -A -F \"^\" -c \"{sql}\"";
-            var (exit, output) = await RunCommandAsync(cmd, ct);
+            var sql = @"SELECT current_setting('wal_level'), current_setting('archive_mode'),
+                current_setting('archive_command'), current_setting('archive_timeout'),
+                current_setting('wal_segment_size'), pg_current_wal_lsn()::text,
+                pg_wal_lsn_diff(pg_current_wal_lsn(), '0/0')::bigint,
+                a.last_archived_wal, a.last_archived_time::text,
+                a.last_failed_wal, a.last_failed_time::text,
+                a.archived_count, a.failed_count
+                FROM pg_stat_archiver a";
 
-            if (exit != 0 || string.IsNullOrWhiteSpace(output))
-                throw new InvalidOperationException($"psql returned exit code {exit}");
+            await using var cmd = new NpgsqlCommand(sql, conn);
+            await using var reader = await cmd.ExecuteReaderAsync(ct);
 
-            var vals = output.Trim().Split('^');
-            string V(int i) => i < vals.Length ? vals[i].Trim() : "";
+            if (!await reader.ReadAsync(ct))
+                throw new InvalidOperationException("No rows returned from pg_stat_archiver");
 
-            long.TryParse(V(6), out var walBytes);
-            int.TryParse(V(11), out var archivedCount);
-            int.TryParse(V(12), out var failedCount);
+            string V(int i) => reader.IsDBNull(i) ? "" : reader.GetValue(i)?.ToString()?.Trim() ?? "";
 
             return new WalStatus(
                 WalLevel: V(0).Length > 0 ? V(0) : "unknown",
@@ -42,13 +69,13 @@ public sealed class WalBackupService(
                 ArchiveTimeout: V(3).Length > 0 ? V(3) : "0",
                 WalSegmentSize: V(4).Length > 0 ? V(4) : "16MB",
                 CurrentLsn: V(5),
-                WalBytesWritten: walBytes,
+                WalBytesWritten: reader.IsDBNull(6) ? 0 : reader.GetInt64(6),
                 LastArchivedWal: V(7).Length > 0 ? V(7) : null,
                 LastArchivedTime: V(8).Length > 0 ? V(8) : null,
                 LastFailedWal: V(9).Length > 0 ? V(9) : null,
                 LastFailedTime: V(10).Length > 0 ? V(10) : null,
-                ArchivedCount: archivedCount,
-                FailedCount: failedCount,
+                ArchivedCount: reader.IsDBNull(11) ? 0 : Convert.ToInt32(reader.GetValue(11)),
+                FailedCount: reader.IsDBNull(12) ? 0 : Convert.ToInt32(reader.GetValue(12)),
                 IsArchivingEnabled: V(1) == "on",
                 IsReplicaLevel: V(0) is "replica" or "logical"
             );
@@ -70,28 +97,38 @@ public sealed class WalBackupService(
 
     public async Task<(bool Success, string Message)> EnableWalArchivingAsync(CancellationToken ct = default)
     {
-        var dbUser = GetDbUser();
-
         try
         {
-            // Create and fix ownership of archive directory
-            await RunCommandAsync($"docker exec {DbContainer} sh -c \"mkdir -p /var/lib/postgresql/archive && chown postgres:postgres /var/lib/postgresql/archive\"", ct);
+            var container = await ResolveDbContainerAsync(ct);
+            if (container == null)
+                return (false, "PostgreSQL container not found. Docker exec operations require the DB container to be on this node.");
 
-            // Configure all WAL settings in a single psql call
-            const string alterSql = @"ALTER SYSTEM SET wal_level = 'replica';
+            // Create and fix ownership of archive directory
+            await RunCommandAsync($"docker exec {container} sh -c \"mkdir -p /var/lib/postgresql/archive && chown postgres:postgres /var/lib/postgresql/archive\"", ct);
+
+            // Use Npgsql for ALTER SYSTEM
+            await using var conn = new NpgsqlConnection(GetConnectionString());
+            await conn.OpenAsync(ct);
+
+            var alterSql = @"ALTER SYSTEM SET wal_level = 'replica';
                 ALTER SYSTEM SET archive_mode = 'on';
                 ALTER SYSTEM SET archive_command = 'cp %p /var/lib/postgresql/archive/%f';
                 ALTER SYSTEM SET archive_timeout = '300';";
-            var (exit, output) = await RunCommandAsync(
-                $"docker exec {DbContainer} psql -U {dbUser} -d postgres -c \"{alterSql.Replace("\"", "\\\"")}\"", ct);
-            if (exit != 0)
-                return (false, $"Failed to set WAL config: {output}");
 
-            // Check if restart is needed (single call)
-            var checkCmd = $"docker exec {DbContainer} psql -U {dbUser} -d postgres -t -A -F '|' -c \"SELECT current_setting('wal_level'), current_setting('archive_mode');\"";
-            var (checkExit, checkOutput) = await RunCommandAsync(checkCmd, ct);
-            var parts = checkExit == 0 ? checkOutput.Trim().Split('|') : [];
-            var needsRestart = parts.Length < 2 || parts[0].Trim() != "replica" || parts[1].Trim() != "on";
+            await using var cmd = new NpgsqlCommand(alterSql, conn);
+            await cmd.ExecuteNonQueryAsync(ct);
+
+            // Check if current settings match (restart may be needed)
+            await using var checkCmd = new NpgsqlCommand(
+                "SELECT current_setting('wal_level'), current_setting('archive_mode')", conn);
+            await using var reader = await checkCmd.ExecuteReaderAsync(ct);
+            var needsRestart = true;
+            if (await reader.ReadAsync(ct))
+            {
+                var walLevel = reader.GetString(0);
+                var archiveMode = reader.GetString(1);
+                needsRestart = walLevel != "replica" || archiveMode != "on";
+            }
 
             if (needsRestart)
             {
@@ -116,6 +153,13 @@ public sealed class WalBackupService(
     {
         Directory.CreateDirectory(outputDir);
 
+        var container = await ResolveDbContainerAsync(ct);
+        if (container == null)
+        {
+            onLog?.Invoke("ERROR", "PostgreSQL container not found on this node.");
+            return null;
+        }
+
         var dbUser = GetDbUser();
 
         var timestamp = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss");
@@ -129,7 +173,7 @@ public sealed class WalBackupService(
             onLog?.Invoke("INFO", "Creating PostgreSQL base backup (pg_basebackup)...");
 
             // Create base backup in tar format
-            var basebackupCmd = $"docker exec {DbContainer} pg_basebackup -U {dbUser} -D {containerBackupPath} -Ft -z -P --checkpoint=fast";
+            var basebackupCmd = $"docker exec {container} pg_basebackup -U {dbUser} -D {containerBackupPath} -Ft -z -P --checkpoint=fast";
             var (exit, output) = await RunCommandAsync(basebackupCmd, ct);
 
             if (exit != 0)
@@ -140,7 +184,7 @@ public sealed class WalBackupService(
             onLog?.Invoke("OK", "Base backup created successfully");
 
             // Tar the backup directory and copy out
-            var tarCmd = $"docker exec {DbContainer} sh -c \"cd /tmp && tar czf /tmp/{tarFileName} {backupName}/\"";
+            var tarCmd = $"docker exec {container} sh -c \"cd /tmp && tar czf /tmp/{tarFileName} {backupName}/\"";
             var (tarExit, tarOutput) = await RunCommandAsync(tarCmd, ct);
             if (tarExit != 0)
             {
@@ -149,7 +193,7 @@ public sealed class WalBackupService(
             }
 
             // Copy to host
-            var copyCmd = $"docker cp {DbContainer}:/tmp/{tarFileName} \"{localPath}\"";
+            var copyCmd = $"docker cp {container}:/tmp/{tarFileName} \"{localPath}\"";
             var (copyExit, _) = await RunCommandAsync(copyCmd, ct);
             if (copyExit != 0)
             {
@@ -158,7 +202,7 @@ public sealed class WalBackupService(
             }
 
             // Cleanup container
-            await RunCommandAsync($"docker exec {DbContainer} rm -rf {containerBackupPath} /tmp/{tarFileName}", ct);
+            await RunCommandAsync($"docker exec {container} rm -rf {containerBackupPath} /tmp/{tarFileName}", ct);
 
             var size = new FileInfo(localPath).Length;
             var checksum = await integrityService.ComputeAndStoreChecksumAsync(localPath, ct);
@@ -168,7 +212,7 @@ public sealed class WalBackupService(
         }
         catch (Exception ex)
         {
-            await RunCommandAsync($"docker exec {DbContainer} rm -rf {containerBackupPath} /tmp/{tarFileName}", CancellationToken.None);
+            await RunCommandAsync($"docker exec {container} rm -rf {containerBackupPath} /tmp/{tarFileName}", CancellationToken.None);
             onLog?.Invoke("ERROR", $"Base backup failed: {ex.Message}");
             logger.LogError(ex, "Base backup failed");
             return null;
@@ -179,12 +223,16 @@ public sealed class WalBackupService(
     {
         try
         {
+            var container = await ResolveDbContainerAsync(ct);
+            if (container == null)
+                return new WalArchiveInfo(0, 0, null);
+
             // Single docker exec with all archive info combined
             var script = "cd /var/lib/postgresql/archive 2>/dev/null && "
                        + "echo \"$(ls -1 | wc -l)|$(du -sb . | cut -f1)|$(ls -t | head -1)\" "
                        + "|| echo '0|0|'";
             var (exit, output) = await RunCommandAsync(
-                $"docker exec {DbContainer} sh -c \"{script}\"", ct);
+                $"docker exec {container} sh -c \"{script}\"", ct);
 
             if (exit == 0 && !string.IsNullOrWhiteSpace(output))
             {
@@ -231,24 +279,18 @@ public sealed class WalBackupService(
 
     public async Task<(bool Success, string Message)> SwitchWalAsync(CancellationToken ct = default)
     {
-        var dbUser = GetDbUser();
-
         try
         {
-            var result = await PsqlScalar(dbUser, "SELECT pg_switch_wal()::text;", ct);
-            return (true, $"WAL switched successfully. New LSN: {result?.Trim()}");
+            await using var conn = new NpgsqlConnection(GetConnectionString());
+            await conn.OpenAsync(ct);
+            await using var cmd = new NpgsqlCommand("SELECT pg_switch_wal()::text", conn);
+            var result = await cmd.ExecuteScalarAsync(ct);
+            return (true, $"WAL switched successfully. New LSN: {result}");
         }
         catch (Exception ex)
         {
             return (false, $"Failed to switch WAL: {ex.Message}");
         }
-    }
-
-    private async Task<string?> PsqlScalar(string dbUser, string sql, CancellationToken ct)
-    {
-        var cmd = $"docker exec {DbContainer} psql -U {dbUser} -d postgres -t -c \"{sql.Replace("\"", "\\\"")}\"";
-        var (exit, output) = await RunCommandAsync(cmd, ct);
-        return exit == 0 ? output.Trim() : null;
     }
 
     /// <summary>

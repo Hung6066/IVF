@@ -15,7 +15,12 @@ public sealed class DatabaseBackupService(
     ILogger<DatabaseBackupService> logger)
 {
     private const string StagingDbSuffix = "_restore_staging";
-    private const string DbContainer = "ivf-db";
+
+    private async Task<string> GetDbContainerAsync(CancellationToken ct)
+    {
+        return await DockerContainerResolver.ResolveDbContainerAsync(ct)
+            ?? throw new InvalidOperationException("PostgreSQL container not found. Ensure the DB is running on this node.");
+    }
 
     /// <summary>
     /// Create a PostgreSQL dump (.sql.gz) using pg_dump inside the Docker container.
@@ -41,6 +46,7 @@ public sealed class DatabaseBackupService(
 
         try
         {
+            var DbContainer = await GetDbContainerAsync(ct);
             onLog?.Invoke("INFO", $"Starting PostgreSQL backup of '{dbName}'...");
 
             // Step 1: Run pg_dump inside Docker container, pipe through gzip
@@ -119,6 +125,7 @@ public sealed class DatabaseBackupService(
 
         var fileName = Path.GetFileName(backupFilePath);
         var containerPath = $"/tmp/{fileName}";
+        var DbContainer = await GetDbContainerAsync(ct);
 
         try
         {
@@ -270,6 +277,7 @@ public sealed class DatabaseBackupService(
         }
 
         // 3. Gzip integrity test
+        var DbContainer = await GetDbContainerAsync(ct);
         var containerPath = $"/tmp/_validate_{fileName}";
         await RunCommandAsync($"docker cp \"{backupFilePath}\" {DbContainer}:{containerPath}", ct);
         var (gzExit, gzOutput) = await RunCommandAsync($"docker exec {DbContainer} sh -c \"gunzip -t {containerPath}\"", ct);
@@ -304,6 +312,7 @@ public sealed class DatabaseBackupService(
 
     private async Task<StagingValidation> ValidateStagingDatabaseAsync(string dbName, string dbUser, CancellationToken ct)
     {
+        var DbContainer = await GetDbContainerAsync(ct);
         // Check table count
         var tableCmd = $"docker exec {DbContainer} psql -U {dbUser} -d {dbName} -t -c \"SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public';\"";
         var (tableExit, tableOutput) = await RunCommandAsync(tableCmd, ct);
@@ -324,6 +333,7 @@ public sealed class DatabaseBackupService(
 
     private async Task FallbackRestoreAsync(string containerPath, string dbName, string dbUser, string stagingDb, Action<string, string>? onLog, CancellationToken ct)
     {
+        var DbContainer = await GetDbContainerAsync(ct);
         // Drop staging DB first
         await RunCommandAsync($"docker exec {DbContainer} psql -U {dbUser} -d postgres -c \"DROP DATABASE IF EXISTS {stagingDb};\"", ct);
 
@@ -347,6 +357,7 @@ public sealed class DatabaseBackupService(
     {
         try
         {
+            var DbContainer = await GetDbContainerAsync(ct);
             var listCmd = $"docker exec {DbContainer} psql -U {dbUser} -d postgres -t -c \"SELECT datname FROM pg_database WHERE datname LIKE '{dbName}_pre_restore_%' ORDER BY datname DESC;\"";
             var (listExit, listOutput) = await RunCommandAsync(listCmd, ct);
             if (listExit != 0) return;
@@ -379,6 +390,7 @@ public sealed class DatabaseBackupService(
 
         try
         {
+            var DbContainer = await GetDbContainerAsync(ct);
             // Get database size
             var sizeCmd = $"docker exec {DbContainer} psql -U {dbUser} -d {dbName} -t -c \"SELECT pg_database_size('{dbName}');\"";
             var (sizeExit, sizeOutput) = await RunCommandAsync(sizeCmd, ct);

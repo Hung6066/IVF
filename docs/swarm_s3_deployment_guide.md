@@ -2,11 +2,11 @@
 
 > **Tài liệu hướng dẫn triển khai chi tiết — từ zero đến production**
 >
-> Phiên bản: 3.0 | Cập nhật: 2026-03-06
+> Phiên bản: 4.0 | Cập nhật: 2026-03-07
 >
 > Áp dụng: IVF Platform v5.0+ | .NET 10 | Angular 21 | PostgreSQL 16
 >
-> Thay đổi v3.0: Caddy host-mode networking (bảo toàn real client IP), Docker CLI trong API container (infrastructure monitoring), IP whitelist fix, HTTPS production domain (natra.site), Caddyfile v2 config versioning
+> Thay đổi v4.0: VPS 2 multi-service deployment (API replica 2, PostgreSQL standby streaming replication, Redis replica, Caddy global mode), CI/CD deploy both nodes, Ansible replication setup, DigitalSigning enabled
 
 ---
 
@@ -1053,50 +1053,55 @@ natra.site {
 
 ### 7.3 Khác biệt chính so với v1.0
 
-| Thay đổi         | v1.0 (cũ)                  | v3.0 (hiện tại)                              |
+| Thay đổi         | v1.0 (cũ)                  | v4.0 (hiện tại)                              |
 | ---------------- | -------------------------- | -------------------------------------------- |
 | File name        | `stack.yml`                | `docker-compose.stack.yml`                   |
-| API image        | `ivf-api:latest` (local)   | `ghcr.io/hung6066/ivf:latest` (GHCR)         |
+| API image        | `ivf-api:latest` (local)   | `ghcr.io/hung6066/ivf:v4-signing` (GHCR)     |
 | API Dockerfile   | Chỉ aspnet runtime         | + Docker CLI (infrastructure monitor)        |
 | API volumes      | Không                      | `/var/run/docker.sock:ro` (Swarm mgmt)       |
+| API replicas     | 1 (chỉ VPS 1)              | 2 (VPS 1 + VPS 2)                            |
 | Frontend         | ❌ Không có                | ✅ `ghcr.io/hung6066/ivf-client:latest`      |
+| Caddy mode       | `replicated` (VPS 1 only)  | `global` (chạy mọi node)                     |
 | Caddy ports      | `"80:80"` (ingress)        | `mode: host` (preserve real client IP)       |
 | Caddy config     | `caddyfile`                | `caddyfile_v2` (versioned, immutable)        |
 | Caddyfile        | `:80` (HTTP only)          | `natra.site` (auto HTTPS + HSTS)             |
 | Caddyfile source | `./docker/caddy/Caddyfile` | `./Caddyfile` (repo root)                    |
 | Caddy routing    | Static files trực tiếp     | Reverse proxy → frontend container           |
 | CORS             | Không cấu hình             | `Cors__AllowedOrigins__0=https://natra.site` |
-| DB Standby       | ✅ `db-standby` service    | ❌ Chưa triển khai                           |
-| API replicas     | 2 (cả 2 VPS)               | 1 (chỉ VPS 1)                                |
+| DB Standby       | ❌ Chưa có                 | ✅ Streaming replication trên VPS 2           |
+| Redis Replica    | ❌ Chưa có                 | ✅ `--replicaof redis 6379` trên VPS 2        |
 | Secrets          | `file:` (local files)      | `external: true` (Swarm raft store)          |
-| DigitalSigning   | Enabled                    | `Enabled=false` (chưa có client cert)        |
-| PG configs       | WAL replication scripts    | Không cần (chưa có standby)                  |
+| DigitalSigning   | `Enabled=false`            | `Enabled=true` (SkipTlsValidation, no mTLS)  |
+| PG configs       | Không cần                  | WAL replication + standby entrypoint config  |
 | `version` key    | `"3.8"`                    | Bỏ (deprecated trong Docker 25+)             |
 
 ### 7.4 Placement constraints hiện tại
 
 ```
-┌──────────────────────────────────────┬──────────────────────────┐
-│       VPS 1 — primary (24 GB)        │   VPS 2 — worker (8 GB)  │
-├──────────────────────────────────────┼──────────────────────────┤
-│ ✅ caddy         (reverse proxy)     │                          │
-│ ✅ frontend      (Angular SPA)       │   (chưa có service)      │
-│ ✅ api           (1 replica)         │                          │
-│ ✅ db            (PostgreSQL 16)     │                          │
-│ ✅ redis         (cache)             │                          │
-│ ✅ minio         (object storage)    │                          │
-│ ✅ minio-init    (one-shot, done)    │                          │
-│ ✅ ejbca         (CA server)         │                          │
-│ ✅ ejbca-db                          │                          │
-│ ⏳ signserver    (cần PKI setup)     │                          │
-│ ✅ signserver-db                     │                          │
-├──────────────────────────────────────┼──────────────────────────┤
-│  RAM ~5.5 GB / 24 GB                │  RAM ~0 GB / 8 GB        │
-│  11 services (9 running)            │  0 services              │
-└──────────────────────────────────────┴──────────────────────────┘
+┌──────────────────────────────────────┬──────────────────────────────────┐
+│       VPS 1 — primary (24 GB)        │     VPS 2 — standby (11 GB)      │
+├──────────────────────────────────────┼──────────────────────────────────┤
+│ ✅ caddy         (global mode)       │ ✅ caddy         (global mode)   │
+│ ✅ frontend      (Angular SPA)       │ ✅ api replica 2 (.NET 10)       │
+│ ✅ api replica 1 (.NET 10)           │ ✅ db-standby    (PG streaming)  │
+│ ✅ db            (PostgreSQL 16)     │ ✅ redis-replica (read replica)  │
+│ ✅ redis         (cache primary)     │                                  │
+│ ✅ minio         (object storage)    │                                  │
+│ ✅ minio-init    (one-shot, done)    │                                  │
+│ ✅ ejbca         (CA server)         │                                  │
+│ ✅ ejbca-db                          │                                  │
+│ ✅ signserver    (document signing)  │                                  │
+│ ✅ signserver-db                     │                                  │
+├──────────────────────────────────────┼──────────────────────────────────┤
+│  RAM ~5.5 GB / 24 GB                │  RAM ~1.9 GB / 11 GB            │
+│  12 services                        │  4 services                      │
+└──────────────────────────────────────┴──────────────────────────────────┘
 ```
 
-> **Lưu ý:** Tất cả services hiện tại chạy trên VPS 1. VPS 2 sẵn sàng cho HA (scale API replicas, DB standby) khi cần.
+**Replication:**
+- PostgreSQL: async streaming replication (primary → standby via replicator user + standby_slot)
+- Redis: `--replicaof redis 6379` (async read-only replica)
+- Caddy: `mode: global` (runs on every Swarm node, `mode: host` ports for real client IP)
 
 ---
 
