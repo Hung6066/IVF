@@ -47,10 +47,13 @@ jobs:
                   }' "$DISCORD_WEBHOOK"
 
             - name: Setup SSH
+              uses: webfactory/ssh-agent@v0.9.0
+              with:
+                  ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+            - name: Add SSH known hosts
               run: |
                   mkdir -p ~/.ssh
-                  echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
-                  chmod 600 ~/.ssh/deploy_key
                   ssh-keyscan -H "${{ secrets.SSH_HOST_STAGING }}" >> ~/.ssh/known_hosts 2>/dev/null
 
             - name: Deploy to staging server
@@ -60,7 +63,7 @@ jobs:
                   IMAGE_TAG: ${{ steps.tag.outputs.sha }}
                   GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
               run: |
-                  ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new \
+                  ssh -o StrictHostKeyChecking=accept-new \
                     "${SSH_USER}@${SSH_HOST}" << 'DEPLOY_SCRIPT'
 
                   set -euo pipefail
@@ -96,7 +99,7 @@ jobs:
                   echo "Waiting for service to stabilize..."
                   sleep 15
 
-                  ssh -i ~/.ssh/deploy_key "${SSH_USER}@${SSH_HOST}" << 'HEALTH_SCRIPT'
+                  ssh "${SSH_USER}@${SSH_HOST}" << 'HEALTH_SCRIPT'
                   set -euo pipefail
                   MAX_RETRIES=10
                   RETRY_INTERVAL=10
@@ -158,7 +161,3 @@ jobs:
                       "timestamp": "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'"
                     }]
                   }' "${{ secrets.DISCORD_WEBHOOK }}"
-
-            - name: Cleanup SSH
-              if: always()
-              run: rm -f ~/.ssh/deploy_key

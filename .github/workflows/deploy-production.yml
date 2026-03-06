@@ -65,10 +65,13 @@ jobs:
                   }' "${{ secrets.DISCORD_WEBHOOK }}" || true
 
             - name: Setup SSH
+              uses: webfactory/ssh-agent@v0.9.0
+              with:
+                  ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+            - name: Add SSH known hosts
               run: |
                   mkdir -p ~/.ssh
-                  echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
-                  chmod 600 ~/.ssh/deploy_key
                   ssh-keyscan -H "${{ secrets.SSH_HOST_MANAGER }}" >> ~/.ssh/known_hosts 2>/dev/null
                   ssh-keyscan -H "${{ secrets.SSH_HOST_WORKER }}" >> ~/.ssh/known_hosts 2>/dev/null
 
@@ -78,7 +81,7 @@ jobs:
                   SSH_USER: ${{ secrets.SSH_USER }}
               run: |
                   echo "Creating pre-deploy database backup..."
-                  ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new \
+                  ssh -o StrictHostKeyChecking=accept-new \
                     "${SSH_USER}@${SSH_HOST}" << 'BACKUP_SCRIPT'
 
                   set -euo pipefail
@@ -109,7 +112,7 @@ jobs:
 
                   for HOST in "${SSH_HOST_MANAGER}" "${SSH_HOST_WORKER}"; do
                     echo "--- Pulling on ${HOST} ---"
-                    ssh -i ~/.ssh/deploy_key "${SSH_USER}@${HOST}" << PULL_SCRIPT
+                    ssh "${SSH_USER}@${HOST}" << PULL_SCRIPT
                   set -euo pipefail
                   echo "${GHCR_TOKEN}" | docker login ghcr.io -u hung6066 --password-stdin
                   docker pull "${FULL_IMAGE}"
@@ -123,7 +126,7 @@ jobs:
                   SSH_HOST: ${{ secrets.SSH_HOST_MANAGER }}
                   SSH_USER: ${{ secrets.SSH_USER }}
               run: |
-                  CURRENT_IMAGE=$(ssh -i ~/.ssh/deploy_key "${SSH_USER}@${SSH_HOST}" \
+                  CURRENT_IMAGE=$(ssh "${SSH_USER}@${SSH_HOST}" \
                     "docker service inspect ${API_SERVICE} --format '{{.Spec.TaskTemplate.ContainerSpec.Image}}'" 2>/dev/null || echo "unknown")
                   echo "current_image=${CURRENT_IMAGE}" >> "$GITHUB_OUTPUT"
                   echo "Current image: ${CURRENT_IMAGE}"
@@ -137,7 +140,7 @@ jobs:
                   FULL_IMAGE="${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
                   echo "Deploying ${FULL_IMAGE} to ${API_SERVICE}..."
 
-                  ssh -i ~/.ssh/deploy_key "${SSH_USER}@${SSH_HOST}" << DEPLOY_SCRIPT
+                  ssh "${SSH_USER}@${SSH_HOST}" << DEPLOY_SCRIPT
                   set -euo pipefail
 
                   echo "=== Production Rolling Update ==="
@@ -209,7 +212,7 @@ jobs:
                   echo "Running post-deploy health checks..."
                   sleep 10
 
-                  ssh -i ~/.ssh/deploy_key "${SSH_USER}@${SSH_HOST}" << 'HEALTH_SCRIPT'
+                  ssh "${SSH_USER}@${SSH_HOST}" << 'HEALTH_SCRIPT'
                   set -euo pipefail
 
                   MAX_RETRIES=12
@@ -314,7 +317,3 @@ jobs:
                       "timestamp": "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'"
                     }]
                   }' "${{ secrets.DISCORD_WEBHOOK }}" || true
-
-            - name: Cleanup SSH
-              if: always()
-              run: rm -f ~/.ssh/deploy_key
