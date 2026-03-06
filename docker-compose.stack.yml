@@ -7,9 +7,18 @@
 # =====================================================
 
 services:
-  # ─── PostgreSQL (IVF Main DB) ───
+  # ─── PostgreSQL (IVF Main DB — Primary) ───
   db:
     image: postgres:16-alpine
+    command: >
+      postgres
+      -c wal_level=replica
+      -c max_wal_senders=5
+      -c max_replication_slots=5
+      -c wal_keep_size=256MB
+      -c archive_mode=on
+      -c archive_command='cp %p /var/lib/postgresql/archive/%f'
+      -c hot_standby=on
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD_FILE=/run/secrets/ivf_db_password
@@ -35,7 +44,7 @@ services:
 
   # ─── IVF API ───
   api:
-    image: ghcr.io/hung6066/ivf:latest
+    image: ghcr.io/hung6066/ivf:v4-signing
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
       - ASPNETCORE_HTTP_PORTS=8080
@@ -44,8 +53,15 @@ services:
       - JwtSettings__Secret=FILE:/run/secrets/jwt_secret
       - JwtSettings__Issuer=IVF_System
       - JwtSettings__Audience=IVF_Users
-      # Digital signing disabled until EJBCA client certs are provisioned
-      - DigitalSigning__Enabled=false
+      # Digital signing enabled (no mTLS until client certs are provisioned)
+      - DigitalSigning__Enabled=true
+      - DigitalSigning__SkipTlsValidation=true
+      - DigitalSigning__RequireMtls=false
+      - DigitalSigning__ClientCertificatePath=
+      - DigitalSigning__ClientCertificatePasswordFile=
+      - DigitalSigning__TrustedCaCertPath=
+      - DigitalSigning__SignServerUrl=https://signserver:8443/signserver
+      - DigitalSigning__EjbcaUrl=https://ejbca:8443/ejbca
       - Cors__AllowedOrigins__0=https://natra.site
       - MinIO__Endpoint=minio:9000
       - MinIO__AccessKey=FILE:/run/secrets/minio_access_key
@@ -65,16 +81,13 @@ services:
       - ivf-public
       - ivf-data
     deploy:
-      replicas: 1
+      replicas: 2
       update_config:
         parallelism: 1
         delay: 30s
         order: start-first
       rollback_config:
         parallelism: 1
-      placement:
-        constraints:
-          - node.labels.role == primary
       resources:
         limits:
           memory: 1G
@@ -270,7 +283,7 @@ services:
         limits:
           memory: 256M
 
-  # ─── Caddy Reverse Proxy ───
+  # ─── Caddy Reverse Proxy (Global — runs on every node) ───
   caddy:
     image: caddy:2-alpine
     ports:
@@ -289,17 +302,68 @@ services:
     networks:
       - ivf-public
     deploy:
-      placement:
-        constraints:
-          - node.labels.role == primary
+      mode: global
       resources:
         limits:
           memory: 256M
+
+  # ─── PostgreSQL Standby (Streaming Replication) ───
+  db-standby:
+    image: postgres:16-alpine
+    entrypoint: /standby-entrypoint.sh
+    environment:
+      - PRIMARY_HOST=db
+      - PRIMARY_PORT=5432
+      - REPLICATOR_USER=replicator
+      - REPLICATOR_PASSWORD=replicator_pass
+    configs:
+      - source: standby_entrypoint
+        target: /standby-entrypoint.sh
+        mode: 0755
+    volumes:
+      - standby_data:/var/lib/postgresql/data
+    networks:
+      - ivf-data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.labels.role == standby
+      resources:
+        limits:
+          memory: 1G
+
+  # ─── Redis Replica ───
+  redis-replica:
+    image: redis:alpine
+    command: >
+      redis-server
+      --replicaof redis 6379
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+    networks:
+      - ivf-data
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.labels.role == standby
+      resources:
+        limits:
+          memory: 512M
 
 # ─── Docker Configs ───
 configs:
   caddyfile_v2:
     file: ./Caddyfile
+  standby_entrypoint:
+    file: ./docker/postgres/standby-entrypoint.sh
 
 # ─── Docker Secrets ───
 secrets:
@@ -324,6 +388,7 @@ secrets:
 volumes:
   postgres_data:
   postgres_archive:
+  standby_data:
   ejbca_persistent:
   ejbca_db_data:
   signserver_persistent:
