@@ -1,0 +1,32 @@
+natra.site {
+	# API requests
+	handle /api/* {
+		reverse_proxy api:8080
+	}
+
+	# SignalR hubs
+	handle /hubs/* {
+		reverse_proxy api:8080
+	}
+
+	# Swagger
+	handle /swagger/* {
+		reverse_proxy api:8080
+	}
+
+	# Everything else -> Angular frontend
+	handle {
+		reverse_proxy frontend:80
+	}
+
+	# Security headers
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		-Server
+	}
+
+	encode gzip zstd
+}

@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import * as signalR from '@microsoft/signalr';
 import { BehaviorSubject, Observable } from 'rxjs';
+import { environment } from '../../../environments/environment';
 
 export interface SignalRNotification {
     id: string;
@@ -27,7 +28,7 @@ export class SignalRService {
     public notification$ = this.notificationSubject.asObservable();
     public queueUpdate$ = this.queueUpdateSubject.asObservable();
 
-    private readonly baseUrl = 'http://localhost:5000';
+    private readonly baseUrl = environment.production ? '' : 'http://localhost:5000';
 
     constructor() { }
 

@@ -44,22 +44,9 @@ services:
       - JwtSettings__Secret=FILE:/run/secrets/jwt_secret
       - JwtSettings__Issuer=IVF_System
       - JwtSettings__Audience=IVF_Users
-      - DigitalSigning__SignServerUrl=https://signserver:8443/signserver
-      - DigitalSigning__WorkerName=PDFSigner
-      - DigitalSigning__Enabled=true
-      - DigitalSigning__SkipTlsValidation=false
-      - DigitalSigning__ClientCertificatePath=/app/certs/api-client.p12
-      - DigitalSigning__ClientCertificatePasswordFile=/run/secrets/api_cert_password
-      - DigitalSigning__TrustedCaCertPath=/app/certs/ca-chain.pem
-      - DigitalSigning__RequireMtls=true
-      - DigitalSigning__EnableAuditLogging=true
-      - DigitalSigning__CertExpiryWarningDays=30
-      - DigitalSigning__CertExpiryCheckIntervalMinutes=60
-      - DigitalSigning__SigningRateLimitPerMinute=30
-      - DigitalSigning__CryptoTokenType=PKCS11
-      - DigitalSigning__Pkcs11SharedLibraryName=SOFTHSM
-      - DigitalSigning__Pkcs11SlotLabel=SignServerToken
-      - DigitalSigning__Pkcs11PinFile=/run/secrets/softhsm_pin
+      # Digital signing disabled until EJBCA client certs are provisioned
+      - DigitalSigning__Enabled=false
+      - Cors__AllowedOrigins__0=https://natra.site
       - MinIO__Endpoint=minio:9000
       - MinIO__AccessKey=FILE:/run/secrets/minio_access_key
       - MinIO__SecretKey=FILE:/run/secrets/minio_secret_key
@@ -70,15 +57,10 @@ services:
     secrets:
       - ivf_db_password
       - jwt_secret
-      - api_cert_password
       - minio_access_key
       - minio_secret_key
-      - softhsm_pin
-    volumes:
-      - api_certs:/app/certs:ro
     networks:
       - ivf-public
-      - ivf-signing
       - ivf-data
     deploy:
       replicas: 1
@@ -275,17 +257,34 @@ services:
         condition: on-failure
         max_attempts: 3
 
+  # ─── Frontend (Angular) ───
+  frontend:
+    image: ghcr.io/hung6066/ivf-client:latest
+    networks:
+      - ivf-public
+    deploy:
+      replicas: 1
+      update_config:
+        parallelism: 1
+        delay: 10s
+        order: start-first
+      placement:
+        constraints:
+          - node.labels.role == primary
+      resources:
+        limits:
+          memory: 256M
+
   # ─── Caddy Reverse Proxy ───
   caddy:
     image: caddy:2-alpine
-    environment:
-      - ACME_EMAIL=${ACME_EMAIL:-admin@ivf.clinic}
-      - API_UPSTREAM=api:8080
     ports:
       - "80:80"
       - "443:443"
+    configs:
+      - source: caddyfile_v2
+        target: /etc/caddy/Caddyfile
     volumes:
-      - caddy_caddyfile:/etc/caddy:ro
       - caddy_data:/data
       - caddy_config:/config
     networks:
@@ -297,6 +296,11 @@ services:
       resources:
         limits:
           memory: 256M
+
+# ─── Docker Configs ───
+configs:
+  caddyfile_v2:
+    file: ./Caddyfile
 
 # ─── Docker Secrets ───
 secrets:
@@ -333,8 +337,6 @@ volumes:
   minio_data:
   caddy_data:
   caddy_config:
-  caddy_caddyfile:
-  api_certs:
 
 # ─── Networks ───
 networks:
