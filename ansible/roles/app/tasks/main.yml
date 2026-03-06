@@ -58,6 +58,11 @@
   when: not secrets_exist.stat.exists
   become_user: "{{ deploy_user }}"
 
+- name: Tạo keystore password
+  shell: openssl rand -base64 24 > {{ project_dir }}/secrets/keystore_password.txt
+  when: not secrets_exist.stat.exists
+  become_user: "{{ deploy_user }}"
+
 - name: Tạo SoftHSM PINs
   shell: openssl rand -hex 16 > {{ project_dir }}/secrets/{{ item }}
   loop:
@@ -98,6 +103,7 @@
     - { name: minio_access_key, file: minio_access_key.txt }
     - { name: minio_secret_key, file: minio_secret_key.txt }
     - { name: api_cert_password, file: api_cert_password.txt }
+    - { name: keystore_password, file: keystore_password.txt }
     - { name: softhsm_pin, file: softhsm_pin.txt }
     - { name: softhsm_so_pin, file: softhsm_so_pin.txt }
   when: item.name not in existing_secrets.stdout
@@ -112,12 +118,11 @@
 
 - name: Copy stack file
   copy:
-    src: "{{ playbook_dir }}/../docker-compose.production.yml"
+    src: "{{ playbook_dir }}/../docker-compose.stack.yml"
     dest: "{{ project_dir }}/stack.yml"
     owner: "{{ deploy_user }}"
     group: "{{ deploy_group }}"
     mode: "0644"
-  when: not source_exist.stat.exists
 
 # ─── Pull Images từ GHCR ───
 - name: Pull API image

@@ -18,6 +18,9 @@
     <!-- Disable hardware-enforced stack protection for COM interop compatibility -->
     <HardenedStackProtection>false</HardenedStackProtection>
     <UseSpecialUserModeApc>true</UseSpecialUserModeApc>
+    
+    <!-- Allow building on Linux CI (cross-compile) -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
   </PropertyGroup>
 
   <ItemGroup>
