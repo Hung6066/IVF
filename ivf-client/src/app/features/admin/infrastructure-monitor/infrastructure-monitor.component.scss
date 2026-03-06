@@ -474,6 +474,10 @@
     background: #fee2e2;
     color: #991b1b;
   }
+  &.hi-disabled {
+    background: #f3f4f6;
+    color: #6b7280;
+  }
 }
 
 .health-name {
@@ -897,6 +901,10 @@
   &.hc-down {
     border-left: 4px solid #ef4444;
   }
+  &.hc-disabled {
+    border-left: 4px solid #9ca3af;
+    opacity: 0.7;
+  }
 }
 
 .hc-header {
@@ -934,6 +942,10 @@
   &.hi-down {
     background: #fee2e2;
     color: #991b1b;
+  }
+  &.hi-disabled {
+    background: #f3f4f6;
+    color: #6b7280;
   }
 }
 

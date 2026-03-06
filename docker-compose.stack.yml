@@ -59,6 +59,8 @@ services:
       - jwt_secret
       - minio_access_key
       - minio_secret_key
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
       - ivf-public
       - ivf-data
@@ -101,11 +103,9 @@ services:
     environment:
       - DATABASE_JDBC_URL=jdbc:postgresql://ejbca-db:5432/ejbca
       - DATABASE_USER=ejbca
-      - DATABASE_PASSWORD_FILE=/run/secrets/ejbca_db_password
+      - DATABASE_PASSWORD=ejbca
       - TLS_SETUP_ENABLED=later
       - INITIAL_ADMIN=;CertificateAuthenticationToken:WITH_ISSUER_SERIAL;CN=ManagementCA,O=IVF Clinic;${EJBCA_ADMIN_CERT_SERIAL:-0};
-    secrets:
-      - ejbca_db_password
     ports:
       - "8443:8443"
     volumes:
@@ -127,10 +127,8 @@ services:
     image: postgres:16-alpine
     environment:
       - POSTGRES_USER=ejbca
-      - POSTGRES_PASSWORD_FILE=/run/secrets/ejbca_db_password
+      - POSTGRES_PASSWORD=ejbca
       - POSTGRES_DB=ejbca
-    secrets:
-      - ejbca_db_password
     volumes:
       - ejbca_db_data:/var/lib/postgresql/data
     networks:
@@ -152,7 +150,7 @@ services:
     environment:
       - DATABASE_JDBC_URL=jdbc:postgresql://signserver-db:5432/signserver
       - DATABASE_USER=signserver
-      - DATABASE_PASSWORD_FILE=/run/secrets/signserver_db_password
+      - DATABASE_PASSWORD=signserver
       - TLS_SETUP_ENABLED=later
       - INITIAL_ADMIN=;CertificateAuthenticationToken:WITH_ISSUER_SERIAL;CN=ManagementCA,O=IVF Clinic;${SIGNSERVER_ADMIN_CERT_SERIAL:-0};
       - SIGNSERVER_NODEID=node1
@@ -160,7 +158,6 @@ services:
       - SOFTHSM_SO_PIN_FILE=/run/secrets/softhsm_so_pin
       - SOFTHSM_USER_PIN_FILE=/run/secrets/softhsm_pin
     secrets:
-      - signserver_db_password
       - keystore_password
       - softhsm_pin
       - softhsm_so_pin
@@ -186,10 +183,8 @@ services:
     image: postgres:16-alpine
     environment:
       - POSTGRES_USER=signserver
-      - POSTGRES_PASSWORD_FILE=/run/secrets/signserver_db_password
+      - POSTGRES_PASSWORD=signserver
       - POSTGRES_DB=signserver
-    secrets:
-      - signserver_db_password
     volumes:
       - signserver_db_data:/var/lib/postgresql/data
     networks:
@@ -279,8 +274,12 @@ services:
   caddy:
     image: caddy:2-alpine
     ports:
-      - "80:80"
-      - "443:443"
+      - target: 80
+        published: 80
+        mode: host
+      - target: 443
+        published: 443
+        mode: host
     configs:
       - source: caddyfile_v2
         target: /etc/caddy/Caddyfile
@@ -305,10 +304,6 @@ configs:
 # ─── Docker Secrets ───
 secrets:
   ivf_db_password:
-    external: true
-  ejbca_db_password:
-    external: true
-  signserver_db_password:
     external: true
   keystore_password:
     external: true

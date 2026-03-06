@@ -515,13 +515,17 @@ public sealed class InfrastructureMonitorService(
         checks.Add(await CheckMinioAsync(ct));
 
         // 4. EJBCA
-        checks.Add(await CheckHttpServiceAsync("EJBCA", "https://localhost:8443/ejbca/publicweb/healthcheck/ejbcahealth", ct));
+        checks.Add(await CheckHttpServiceAsync("EJBCA", "https://ejbca:8443/ejbca/publicweb/healthcheck/ejbcahealth", ct));
 
         // 5. SignServer
-        checks.Add(await CheckHttpServiceAsync("SignServer", "https://localhost:9443/signserver/healthcheck/signserverhealth", ct));
+        checks.Add(await CheckHttpServiceAsync("SignServer", "https://signserver:8443/signserver/healthcheck/signserverhealth", ct));
 
-        var overallStatus = checks.All(c => c.Status == "healthy") ? "healthy"
-            : checks.Any(c => c.Status == "down") ? "critical"
+        // When digital signing is disabled, EJBCA/SignServer failures don't affect overall status
+        var signingEnabled = configuration.GetValue<bool>("DigitalSigning:Enabled");
+        var overallStatus = checks
+            .Where(c => signingEnabled || (c.Name != "EJBCA" && c.Name != "SignServer"))
+            .All(c => c.Status == "healthy") ? "healthy"
+            : checks.Any(c => c.Status == "down" && (signingEnabled || (c.Name != "EJBCA" && c.Name != "SignServer"))) ? "critical"
             : "degraded";
 
         return new InfraHealthDto(overallStatus, checks, DateTime.UtcNow);

@@ -2,9 +2,11 @@
 
 > **Tài liệu hướng dẫn triển khai chi tiết — từ zero đến production**
 >
-> Phiên bản: 1.0 | Cập nhật: 2026-03-06
+> Phiên bản: 3.0 | Cập nhật: 2026-03-06
 >
 > Áp dụng: IVF Platform v5.0+ | .NET 10 | Angular 21 | PostgreSQL 16
+>
+> Thay đổi v3.0: Caddy host-mode networking (bảo toàn real client IP), Docker CLI trong API container (infrastructure monitoring), IP whitelist fix, HTTPS production domain (natra.site), Caddyfile v2 config versioning
 
 ---
 
@@ -15,19 +17,20 @@
 3. [Chuẩn bị VPS (Cả 2 VPS)](#3-chuẩn-bị-vps-cả-2-vps)
 4. [Thiết lập Docker Swarm Cluster](#4-thiết-lập-docker-swarm-cluster)
 5. [Chuẩn bị Source Code & Secrets](#5-chuẩn-bị-source-code--secrets)
-6. [Build Images](#6-build-images)
+6. [CI/CD & Container Registry (GHCR)](#6-cicd--container-registry-ghcr)
 7. [Tạo Swarm Stack File](#7-tạo-swarm-stack-file)
 8. [Deploy Stack lên Swarm](#8-deploy-stack-lên-swarm)
-9. [Cấu hình PostgreSQL Replication](#9-cấu-hình-postgresql-replication)
-10. [Cấu hình PKI — EJBCA & SignServer](#10-cấu-hình-pki--ejbca--signserver)
-11. [Cấu hình DNS & Caddy SSL](#11-cấu-hình-dns--caddy-ssl)
-12. [Thiết lập AWS S3 Backup](#12-thiết-lập-aws-s3-backup)
-13. [Scripts Backup tự động](#13-scripts-backup-tự-động)
-14. [Restore từ S3](#14-restore-từ-s3)
-15. [Vận hành hàng ngày (Operations)](#15-vận-hành-hàng-ngày-operations)
-16. [Monitoring & Alerting](#16-monitoring--alerting)
-17. [Xử lý Sự cố (Troubleshooting)](#17-xử-lý-sự-cố-troubleshooting)
-18. [Checklist Triển khai](#18-checklist-triển-khai)
+9. [Ansible Automation (Tự động hóa)](#9-ansible-automation-tự-động-hóa)
+10. [Cấu hình PostgreSQL Replication](#10-cấu-hình-postgresql-replication)
+11. [Cấu hình PKI — EJBCA & SignServer](#11-cấu-hình-pki--ejbca--signserver)
+12. [Cấu hình DNS & Caddy SSL](#12-cấu-hình-dns--caddy-ssl)
+13. [Thiết lập AWS S3 Backup](#13-thiết-lập-aws-s3-backup)
+14. [Scripts Backup tự động](#14-scripts-backup-tự-động)
+15. [Restore từ S3](#15-restore-từ-s3)
+16. [Vận hành hàng ngày (Operations)](#16-vận-hành-hàng-ngày-operations)
+17. [Monitoring & Alerting](#17-monitoring--alerting)
+18. [Xử lý Sự cố (Troubleshooting)](#18-xử-lý-sự-cố-troubleshooting)
+19. [Checklist Triển khai](#19-checklist-triển-khai)
 
 ---
 
@@ -38,27 +41,28 @@
                     │                    │
         ┌───────────▼──────┐  ┌──────────▼────────┐
         │ VPS 1 (Manager)  │  │  VPS 2 (Worker)    │       ┌─────────────────┐
-        │ €18/tháng        │  │  €12/tháng         │       │  AWS S3          │
-        │ 8vCPU / 32GB     │  │  6vCPU / 16GB      │       │  ap-southeast-1  │
+        │ $15/tháng        │  │  $4.95/tháng       │       │  AWS S3          │
+        │ 8vCPU / 24GB     │  │  4vCPU / 8GB       │       │  ap-southeast-1  │
         │                  │  │                     │       │  (Singapore)     │
-        │ ┌──────────────┐ │  │ ┌──────────────┐   │       │                  │
-        │ │Caddy (:443)  │◄├──┼─┤Caddy (:443)  │   │       │ ivf-backups/     │
-        │ │ global mode  │ │  │ │ global mode  │   │       │ ├─ daily/        │
-        │ └──────┬───────┘ │  │ └──────┬───────┘   │       │ ├─ wal/          │
-        │        │         │  │        │           │       │ ├─ minio/        │
-        │ ┌──────▼───────┐ │  │ ┌──────▼───────┐   │       │ └─ config/       │
-        │ │ API rep.1    │ │  │ │ API rep.2    │   │       │                  │
-        │ │ .NET 10      │ │  │ │ .NET 10      │   │  3AM  │ Lifecycle:       │
-        │ └──────┬───────┘ │  │ └──────┬───────┘   │ ────► │ 0-30d: Standard  │
-        │        │         │  │        │           │       │ 30-90d: IA       │
-        │ ┌──────▼───────┐ │  │ ┌──────▼───────┐   │       │ 90d+: Glacier    │
-        │ │ PG Primary   │─┼repl┼─│ PG Standby   │   │       │                  │
-        │ │ port 5432    │ │  │ │ port 5432    │   │       │ ~$5/tháng        │
-        │ └──────────────┘ │  │ └──────────────┘   │       │ 99.999999999%    │
-        │                  │  │                     │       └─────────────────┘
-        │ ┌──────────────┐ │  │ ┌──────────────┐   │
-        │ │ Redis        │ │  │ │ Redis Replica│   │
-        │ └──────────────┘ │  │ └──────────────┘   │
+        │ ┌──────────────┐ │  │                     │       │                  │
+        │ │Caddy (:80)   │ │  │                     │       │ ivf-backups/     │
+        │ │ reverse proxy│ │  │                     │       │ ├─ daily/        │
+        │ └──┬────────┬──┘ │  │                     │       │ ├─ wal/          │
+        │    │        │    │  │                     │       │ ├─ minio/        │
+        │ ┌──▼──┐ ┌───▼──┐ │  │                     │       │ └─ config/       │
+        │ │Front│ │ API  │ │  │                     │       │                  │
+        │ │end  │ │:8080 │ │  │                     │  3AM  │ Lifecycle:       │
+        │ │:80  │ │.NET  │ │  │                     │ ────► │ 0-30d: Standard  │
+        │ └─────┘ └──┬───┘ │  │                     │       │ 30-90d: IA       │
+        │            │     │  │                     │       │ 90d+: Glacier    │
+        │ ┌──────────▼───┐ │  │                     │       │                  │
+        │ │ PostgreSQL   │ │  │                     │       │ ~$5/tháng        │
+        │ │ port 5432    │ │  │                     │       │ 99.999999999%    │
+        │ └──────────────┘ │  │                     │       └─────────────────┘
+        │                  │  │                     │
+        │ ┌──────────────┐ │  │                     │
+        │ │ Redis        │ │  │                     │
+        │ └──────────────┘ │  │                     │
         │                  │  │                     │
         │ ┌──────────────┐ │  │                     │
         │ │ MinIO        │ │  │                     │
@@ -75,6 +79,13 @@
         │ ivf-signing(int) │  │                     │
         │ ivf-data(int)    │  │  ivf-data(int)     │
         └──────────────────┘  └─────────────────────┘
+
+        ┌─────── CI/CD (GitHub Actions) ────────┐
+        │ Push main → Build → Test → GHCR Push  │
+        │ ghcr.io/hung6066/ivf:latest (API)     │
+        │ ghcr.io/hung6066/ivf-client:latest    │
+        │ → Auto deploy to Swarm via SSH        │
+        └───────────────────────────────────────┘
 
 Chi phí tổng: ~$25-28/tháng
 ├─ VPS 1: $15 (Cloud VPS 30 — 24 GB)
@@ -119,6 +130,7 @@ Chi phí tổng: ~$25-28/tháng
 ```
 Docker Engine (Swarm mode)    ~150 MB
 Caddy (reverse proxy)         ~30 MB
+Frontend (Angular/Caddy)      ~50 MB
 API (.NET 10, replica 1)      ~500 MB
 PostgreSQL Primary            ~1,000 MB (+ shared_buffers 4-6GB)
 Redis                         ~256 MB
@@ -128,8 +140,8 @@ EJBCA-DB                      ~300 MB
 SignServer                    ~1,200 MB
 SignServer-DB                 ~300 MB
 ──────────────────────────────────────
-Tổng:                         ~5,436 MB (~5.3 GB)
-Còn lại cho OS + buffer:      ~18.7 GB
+Tổng:                         ~5,486 MB (~5.4 GB)
+Còn lại cho OS + buffer:      ~18.6 GB
 ```
 
 ### 2.2 VPS 2 — Worker + Standby Services
@@ -309,9 +321,8 @@ cat > /etc/docker/daemon.json << 'EOF'
     "max-file": "5"
   },
   "storage-driver": "overlay2",
-  "live-restore": true,
   "default-address-pools": [
-    {"base": "172.16.0.0/12", "size": 24}
+    {"base": "172.20.0.0/14", "size": 24}
   ],
   "metrics-addr": "127.0.0.1:9323",
   "experimental": true
@@ -321,6 +332,8 @@ EOF
 systemctl restart docker
 systemctl enable docker
 ```
+
+> **Lưu ý:** KHÔNG dùng `"live-restore": true` — không tương thích với Docker Swarm mode.
 
 ### 3.7 Cài AWS CLI (cho S3 backup)
 
@@ -540,308 +553,354 @@ SETTINGS
 
 ---
 
-## 6. Build Images
+## 6. CI/CD & Container Registry (GHCR)
 
-### 6.1 Build API image (trên VPS 1)
+> **Thay đổi v2.0:** Images không còn build thủ công trên VPS. CI/CD tự động build + push lên GitHub Container Registry (GHCR) khi push code lên `main`.
 
-```bash
-cd /opt/ivf
+### 6.1 Tổng quan CI/CD Pipeline
 
-# Build Angular frontend trước
-cd ivf-client
-npm ci --production=false
-npm run build
-cd ..
-
-# Build .NET API image
-docker build -t ivf-api:latest -f src/IVF.API/Dockerfile .
-
-# Tag với version
-docker tag ivf-api:latest ivf-api:v1.0.0
-
-# Verify
-docker images | grep ivf-api
+```
+Push code → GitHub Actions CI/CD
+  ├─ Backend: dotnet restore → build → test (255 tests)
+  ├─ Frontend: npm ci → lint → build --production
+  ├─ Secret Scanning: Gitleaks v8.21.2
+  ├─ Docker Build + Push:
+  │   ├─ ghcr.io/hung6066/ivf:latest        (API — .NET 10)
+  │   └─ ghcr.io/hung6066/ivf-client:latest  (Frontend — Angular 21)
+  └─ Auto Deploy → SSH vào VPS Manager → docker service update
 ```
 
-### 6.2 Phân phối image sang VPS 2
+**Workflows:**
 
-Docker Swarm cần images có sẵn trên mỗi node nếu không dùng registry. Có 3 cách:
+| File                    | Trigger                         | Mục đích                                                    |
+| ----------------------- | ------------------------------- | ----------------------------------------------------------- |
+| `ci-cd.yml`             | Push `main`/`develop`, PR       | Build, test, push Docker images to GHCR                     |
+| `deploy-production.yml` | CI/CD thành công trên `main`    | Deploy production (backup DB → pull image → rolling update) |
+| `deploy-staging.yml`    | CI/CD thành công trên `develop` | Deploy staging                                              |
+| `security-scan.yml`     | Hàng tuần / thủ công            | Gitleaks secret scanning                                    |
+| `pr-check.yml`          | Pull Request                    | PR validation                                               |
+| `release.yml`           | Tag `v*`                        | Create GitHub Release                                       |
 
-**Cách 1: Docker save/load (đơn giản nhất)**
-
-```bash
-# VPS 1: Export image
-docker save ivf-api:latest | gzip > /tmp/ivf-api.tar.gz
-
-# Copy sang VPS 2
-scp /tmp/ivf-api.tar.gz deploy@<VPS2_IP>:/tmp/
-
-# VPS 2: Import
-ssh deploy@<VPS2_IP> "docker load < /tmp/ivf-api.tar.gz"
-```
-
-**Cách 2: Private Docker Registry (khuyến nghị cho CI/CD)**
+### 6.2 Container Images trên GHCR
 
 ```bash
-# VPS 1: Chạy private registry
-docker service create --name registry --publish 5000:5000 registry:2
+# API image (build từ src/IVF.API/Dockerfile)
+ghcr.io/hung6066/ivf:latest
+ghcr.io/hung6066/ivf:main
+ghcr.io/hung6066/ivf:sha-abc1234
 
-# Build + push
-docker tag ivf-api:latest <VPS1_IP>:5000/ivf-api:latest
-docker push <VPS1_IP>:5000/ivf-api:latest
-
-# Stack file dùng: image: <VPS1_IP>:5000/ivf-api:latest
+# Frontend image (build từ ivf-client/Dockerfile)
+ghcr.io/hung6066/ivf-client:latest
+ghcr.io/hung6066/ivf-client:main
+ghcr.io/hung6066/ivf-client:sha-abc1234
 ```
 
-**Cách 3: Build trên cả 2 VPS**
+### 6.3 GHCR Authentication trên VPS
 
 ```bash
-# Sync source code sang VPS 2
-rsync -avz --exclude 'node_modules' --exclude '.git' \
-  /opt/ivf/ deploy@<VPS2_IP>:/opt/ivf/
+# Login GHCR trên VPS (cần 1 lần, hoặc khi token hết hạn)
+echo "<GHCR_TOKEN>" | docker login ghcr.io -u hung6066 --password-stdin
 
-# VPS 2: Build
-ssh deploy@<VPS2_IP> "cd /opt/ivf && docker build -t ivf-api:latest -f src/IVF.API/Dockerfile ."
+# Pull images thủ công (CI/CD tự pull khi deploy)
+docker pull ghcr.io/hung6066/ivf:latest
+docker pull ghcr.io/hung6066/ivf-client:latest
 ```
 
-> **Khuyến nghị:** Bắt đầu với Cách 1, chuyển sang Cách 2 khi setup CI/CD.
+### 6.4 GitHub Secrets cần thiết
+
+Cấu hình trong repo Settings → Secrets and variables → Actions:
+
+| Secret             | Giá trị                     | Dùng cho                      |
+| ------------------ | --------------------------- | ----------------------------- |
+| `SSH_PRIVATE_KEY`  | ed25519 private key         | SSH vào VPS từ GitHub Actions |
+| `SSH_HOST_MANAGER` | `45.134.226.56` (VPS 1 IP)  | Production deploy target      |
+| `SSH_HOST_WORKER`  | `194.163.181.19` (VPS 2 IP) | Worker node                   |
+| `SSH_USER`         | `root`                      | SSH user                      |
+| `GHCR_TOKEN`       | GitHub PAT (packages:read)  | Pull images trên VPS          |
+| `DISCORD_WEBHOOK`  | Discord webhook URL         | Deploy notifications          |
+
+### 6.5 SSH Deploy Key
+
+```bash
+# Tạo ed25519 deploy key (đã thực hiện)
+ssh-keygen -t ed25519 -C "github-actions-deploy@ivf" -f ~/.ssh/id_deploy -N ""
+
+# Public key đã thêm vào cả 2 VPS (/root/.ssh/authorized_keys)
+# Private key → GitHub Secret SSH_PRIVATE_KEY
+```
+
+### 6.6 Dockerfile — API (.NET 10)
+
+File: `src/IVF.API/Dockerfile` — Multi-stage build:
+
+- Stage 1 (`sdk`): `mcr.microsoft.com/dotnet/sdk:10.0` → restore + build + publish
+- Stage 2 (`runtime`): `mcr.microsoft.com/dotnet/aspnet:10.0` → install Docker CLI + copy published output
+
+> **Quan trọng:** Runtime stage cài `docker-ce-cli` từ Docker official Ubuntu repo. Docker CLI cần thiết cho `InfrastructureMonitorService` — quản lý Swarm services, nodes, events qua Docker socket (`/var/run/docker.sock`) mount vào container.
+
+### 6.7 Dockerfile — Frontend (Angular 21)
+
+File: `ivf-client/Dockerfile` — Multi-stage build:
+
+- Stage 1 (`build`): `node:20-alpine` → npm ci + npm run build --production
+- Stage 2 (`runtime`): `caddy:2-alpine` → copy dist + Caddyfile (SPA serving)
+
+> **Quan trọng:** `Directory.Build.props` ở repo root chứa `<EnableWindowsTargeting>true</EnableWindowsTargeting>` để CI Linux build hỗ trợ `net9.0-windows` project (`IVF.FingerprintClient`).
 
 ---
 
 ## 7. Tạo Swarm Stack File
 
-### 7.1 File `stack.yml`
+> **Thay đổi v2.0:** File đổi tên từ `stack.yml` thành `docker-compose.stack.yml`. Images pull từ GHCR thay vì build local. Secrets dùng `external: true` (tạo trước bằng `docker secret create`). Thêm Frontend service. Bỏ `version: "3.8"` (deprecated). Bỏ `db-standby` (chưa triển khai).
 
-Tạo file này tại `/opt/ivf/stack.yml`:
+### 7.1 File `docker-compose.stack.yml`
 
-```bash
-cd /opt/ivf
-cat > stack.yml << 'STACK'
-version: "3.8"
+File này nằm ở repo root: `docker-compose.stack.yml`. Copy lên VPS tại `/opt/ivf/docker-compose.stack.yml`.
+
+```yaml
+# =====================================================
+# IVF System — Docker Swarm Stack (Self-contained)
+# =====================================================
+# Standalone file for: docker stack deploy -c docker-compose.stack.yml ivf
+# No build, depends_on, container_name, restart, profiles (Swarm-incompatible)
+# =====================================================
 
 services:
-  # ╔══════════════════════════════════════════════════════╗
-  # ║  API — Stateless, replicated across both VPS        ║
-  # ╚══════════════════════════════════════════════════════╝
+  # ─── PostgreSQL (IVF Main DB) ───
+  db:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD_FILE=/run/secrets/ivf_db_password
+    secrets:
+      - ivf_db_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - postgres_archive:/var/lib/postgresql/archive
+    networks:
+      - ivf-data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    deploy:
+      placement:
+        constraints:
+          - node.labels.role == primary
+      resources:
+        limits:
+          memory: 2G
+
+  # ─── IVF API ───
   api:
-    image: ivf-api:latest
+    image: ghcr.io/hung6066/ivf:latest
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
-      - ASPNETCORE_URLS=http://+:8080
-      # Secrets override — đọc từ /run/secrets/
-      - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=ivf_db;Username=postgres;Password_File=/run/secrets/ivf_db_password;SSL Mode=Prefer
+      - ASPNETCORE_HTTP_PORTS=8080
+      - ConnectionStrings__DefaultConnection=Host=db;Database=ivf_db;Username=postgres;Password=FILE:/run/secrets/ivf_db_password
       - ConnectionStrings__Redis=redis:6379,abortConnect=false
-    volumes:
-      - api_keys:/app/keys
-      - api_certs:/app/certs
+      - JwtSettings__Secret=FILE:/run/secrets/jwt_secret
+      - JwtSettings__Issuer=IVF_System
+      - JwtSettings__Audience=IVF_Users
+      # Digital signing disabled until EJBCA client certs are provisioned
+      - DigitalSigning__Enabled=false
+      - Cors__AllowedOrigins__0=https://natra.site
+      - MinIO__Endpoint=minio:9000
+      - MinIO__AccessKey=FILE:/run/secrets/minio_access_key
+      - MinIO__SecretKey=FILE:/run/secrets/minio_secret_key
+      - MinIO__UseSSL=false
+      - MinIO__DocumentsBucket=ivf-documents
+      - MinIO__SignedPdfsBucket=ivf-signed-pdfs
+      - MinIO__MedicalImagesBucket=ivf-medical-images
     secrets:
       - ivf_db_password
       - jwt_secret
       - minio_access_key
       - minio_secret_key
-      - api_cert_password
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro # Infrastructure monitoring (Swarm management)
+    networks:
+      - ivf-public
+      - ivf-data
+    deploy:
+      replicas: 1
+      update_config:
+        parallelism: 1
+        delay: 30s
+        order: start-first
+      rollback_config:
+        parallelism: 1
+      placement:
+        constraints:
+          - node.labels.role == primary
+      resources:
+        limits:
+          memory: 1G
+
+  # ─── Redis ───
+  redis:
+    image: redis:alpine
+    command: >
+      redis-server
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+    networks:
+      - ivf-data
+    deploy:
+      placement:
+        constraints:
+          - node.labels.role == primary
+      resources:
+        limits:
+          memory: 512M
+
+  # ─── EJBCA (Certificate Authority) ───
+  ejbca:
+    image: keyfactor/ejbca-ce:latest
+    hostname: ejbca.ivf.local
+    environment:
+      - DATABASE_JDBC_URL=jdbc:postgresql://ejbca-db:5432/ejbca
+      - DATABASE_USER=ejbca
+      - DATABASE_PASSWORD_FILE=/run/secrets/ejbca_db_password
+      - TLS_SETUP_ENABLED=later
+    secrets:
+      - ejbca_db_password
+    ports:
+      - "8443:8443"
+    volumes:
+      - ejbca_persistent:/opt/keyfactor/persistent
     networks:
       - ivf-public
       - ivf-signing
       - ivf-data
     deploy:
-      replicas: 2
-      update_config:
-        parallelism: 1
-        delay: 30s
-        order: start-first
-        failure_action: rollback
-        monitor: 60s
-      rollback_config:
-        parallelism: 1
-        delay: 10s
-      restart_policy:
-        condition: any
-        delay: 5s
-        max_attempts: 10
-        window: 120s
+      placement:
+        constraints:
+          - node.labels.role == primary
       resources:
         limits:
-          memory: 1G
-          cpus: '2'
-        reservations:
-          memory: 512M
-    healthcheck:
-      test: ["CMD", "wget", "-q", "-O-", "http://localhost:8080/health/live"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 30s
+          memory: 2G
 
-  # ╔══════════════════════════════════════════════════════╗
-  # ║  Caddy — Global mode (1 per VPS), SSL termination   ║
-  # ╚══════════════════════════════════════════════════════╝
-  caddy:
-    image: caddy:2-alpine
-    ports:
-      - target: 80
-        published: 80
-        mode: host
-      - target: 443
-        published: 443
-        mode: host
-    volumes:
-      - caddy_data:/data
-      - caddy_config:/config
-    configs:
-      - source: caddyfile
-        target: /etc/caddy/Caddyfile
-    networks:
-      - ivf-public
-    deploy:
-      mode: global
-      restart_policy:
-        condition: any
-      resources:
-        limits:
-          memory: 256M
-
-  # ╔══════════════════════════════════════════════════════╗
-  # ║  PostgreSQL Primary — Pinned to VPS 1               ║
-  # ╚══════════════════════════════════════════════════════╝
-  db:
+  # ─── EJBCA Database ───
+  ejbca-db:
     image: postgres:16-alpine
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - postgres_archive:/var/lib/postgresql/archive
-    configs:
-      - source: pg_init_replication
-        target: /docker-entrypoint-initdb.d/init-wal-replication.sh
-        mode: 0755
+    environment:
+      - POSTGRES_USER=ejbca
+      - POSTGRES_PASSWORD_FILE=/run/secrets/ejbca_db_password
+      - POSTGRES_DB=ejbca
     secrets:
-      - ivf_db_password
-    environment:
-      POSTGRES_DB: ivf_db
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD_FILE: /run/secrets/ivf_db_password
+      - ejbca_db_password
+    volumes:
+      - ejbca_db_data:/var/lib/postgresql/data
     networks:
       - ivf-data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ejbca"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
     deploy:
-      replicas: 1
       placement:
         constraints:
           - node.labels.role == primary
-      resources:
-        limits:
-          memory: 4G
-          cpus: '2'
-        reservations:
-          memory: 2G
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
 
-  # ╔══════════════════════════════════════════════════════╗
-  # ║  PostgreSQL Standby — Pinned to VPS 2               ║
-  # ╚══════════════════════════════════════════════════════╝
-  db-standby:
-    image: postgres:16-alpine
-    volumes:
-      - postgres_standby:/var/lib/postgresql/data
-    configs:
-      - source: pg_standby_entrypoint
-        target: /docker-entrypoint-initdb.d/standby-entrypoint.sh
-        mode: 0755
+  # ─── SignServer (Document Signing) ───
+  signserver:
+    image: keyfactor/signserver-ce:latest
+    hostname: signserver.ivf.local
     environment:
-      PGDATA: /var/lib/postgresql/data
-    networks:
-      - ivf-data
-    deploy:
-      replicas: 1
-      placement:
-        constraints:
-          - node.labels.role == standby
-      resources:
-        limits:
-          memory: 2G
-      restart_policy:
-        condition: any
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  # ╔══════════════════════════════════════════════════════╗
-  # ║  Redis — Session, cache, rate limiting               ║
-  # ╚══════════════════════════════════════════════════════╝
-  redis:
-    image: redis:7-alpine
-    command: >
-      redis-server
-      --maxmemory 256mb
-      --maxmemory-policy allkeys-lru
-      --save 60 1000
-      --appendonly yes
+      - DATABASE_JDBC_URL=jdbc:postgresql://signserver-db:5432/signserver
+      - DATABASE_USER=signserver
+      - DATABASE_PASSWORD_FILE=/run/secrets/signserver_db_password
+      - TLS_SETUP_ENABLED=later
+    secrets:
+      - signserver_db_password
+      - keystore_password
+      - softhsm_pin
+      - softhsm_so_pin
+    ports:
+      - "9443:8443"
     volumes:
-      - redis_data:/data
+      - signserver_persistent:/opt/keyfactor/persistent
+      - softhsm_tokens:/opt/keyfactor/persistent/softhsm/tokens
     networks:
-      - ivf-data
       - ivf-public
+      - ivf-signing
+      - ivf-data
     deploy:
-      replicas: 1
       placement:
         constraints:
           - node.labels.role == primary
       resources:
         limits:
-          memory: 512M
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 3s
-      retries: 3
+          memory: 2G
 
-  # ╔══════════════════════════════════════════════════════╗
-  # ║  MinIO — S3 object storage, VPS 1                    ║
-  # ╚══════════════════════════════════════════════════════╝
+  # ─── SignServer Database ───
+  signserver-db:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=signserver
+      - POSTGRES_PASSWORD_FILE=/run/secrets/signserver_db_password
+      - POSTGRES_DB=signserver
+    secrets:
+      - signserver_db_password
+    volumes:
+      - signserver_db_data:/var/lib/postgresql/data
+    networks:
+      - ivf-data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U signserver"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    deploy:
+      placement:
+        constraints:
+          - node.labels.role == primary
+
+  # ─── MinIO (Object Storage) ───
   minio:
     image: minio/minio:latest
-    command: server /data --console-address ":9001"
-    volumes:
-      - minio_data:/data
+    environment:
+      - MINIO_ROOT_USER_FILE=/run/secrets/minio_access_key
+      - MINIO_ROOT_PASSWORD_FILE=/run/secrets/minio_secret_key
     secrets:
       - minio_access_key
       - minio_secret_key
-    environment:
-      MINIO_ROOT_USER_FILE: /run/secrets/minio_access_key
-      MINIO_ROOT_PASSWORD_FILE: /run/secrets/minio_secret_key
+    ports:
+      - "9000:9000"
+      - "127.0.0.1:9001:9001"
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
     networks:
       - ivf-data
-      - ivf-public
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     deploy:
-      replicas: 1
       placement:
         constraints:
           - node.labels.role == primary
       resources:
         limits:
           memory: 1G
-    healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
 
-  # MinIO bucket initialization (runs once)
+  # ─── MinIO Init (one-shot) ───
   minio-init:
     image: minio/mc:latest
     entrypoint: >
       /bin/sh -c "
       sleep 10;
-      mc alias set local http://minio:9000 $$(cat /run/secrets/minio_access_key) $$(cat /run/secrets/minio_secret_key);
-      mc mb local/ivf-documents --ignore-existing;
-      mc mb local/ivf-signed-pdfs --ignore-existing;
-      mc mb local/ivf-medical-images --ignore-existing;
-      echo 'Buckets created successfully';
+      mc alias set ivf http://minio:9000 $$(cat /run/secrets/minio_access_key) $$(cat /run/secrets/minio_secret_key);
+      mc mb ivf/ivf-documents --ignore-existing;
+      mc mb ivf/ivf-signed-pdfs --ignore-existing;
+      mc mb ivf/ivf-medical-images --ignore-existing;
+      echo 'MinIO buckets initialized successfully';
+      exit 0;
       "
     secrets:
       - minio_access_key
@@ -849,290 +908,288 @@ services:
     networks:
       - ivf-data
     deploy:
-      replicas: 1
-      placement:
-        constraints:
-          - node.labels.role == primary
       restart_policy:
         condition: on-failure
-        max_attempts: 5
+        max_attempts: 3
 
-  # ╔══════════════════════════════════════════════════════╗
-  # ║  EJBCA — Certificate Authority, VPS 1 only          ║
-  # ╚══════════════════════════════════════════════════════╝
-  ejbca:
-    image: keyfactor/ejbca-ce:latest
-    volumes:
-      - ejbca_persistent:/opt/keyfactor/ejbca-ce
-    secrets:
-      - ejbca_db_password
-    environment:
-      DATABASE_JDBC_URL: jdbc:postgresql://ejbca-db:5432/ejbca
-      DATABASE_USER: postgres
-      LOG_LEVEL_APP: INFO
+  # ─── Frontend (Angular) ───
+  frontend:
+    image: ghcr.io/hung6066/ivf-client:latest
     networks:
-      - ivf-signing
-      - ivf-data
+      - ivf-public
     deploy:
       replicas: 1
+      update_config:
+        parallelism: 1
+        delay: 10s
+        order: start-first
       placement:
         constraints:
           - node.labels.role == primary
       resources:
         limits:
-          memory: 2G
-    healthcheck:
-      test: ["CMD", "curl", "-fsk", "https://localhost:8443/ejbca/publicweb/healthcheck/ejbcahealth"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 120s
+          memory: 256M
 
-  ejbca-db:
-    image: postgres:16-alpine
+  # ─── Caddy Reverse Proxy ───
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - target: 80
+        published: 80
+        mode: host # Preserve real client IP (bypass Swarm ingress NAT)
+      - target: 443
+        published: 443
+        mode: host # Required for IP whitelist / SecurityEnforcementMiddleware
+    configs:
+      - source: caddyfile_v2
+        target: /etc/caddy/Caddyfile
     volumes:
-      - ejbca_db_data:/var/lib/postgresql/data
-    secrets:
-      - ejbca_db_password
-    environment:
-      POSTGRES_DB: ejbca
-      POSTGRES_PASSWORD_FILE: /run/secrets/ejbca_db_password
+      - caddy_data:/data
+      - caddy_config:/config
     networks:
-      - ivf-data
+      - ivf-public
     deploy:
-      replicas: 1
       placement:
         constraints:
           - node.labels.role == primary
       resources:
         limits:
-          memory: 512M
+          memory: 256M
 
-  # ╔══════════════════════════════════════════════════════╗
-  # ║  SignServer — PDF signing, VPS 1 only                ║
-  # ╚══════════════════════════════════════════════════════╝
-  signserver:
-    image: keyfactor/signserver-ce:latest
-    volumes:
-      - signserver_persistent:/opt/keyfactor/signserver-ce
-    secrets:
-      - signserver_db_password
-    environment:
-      DATABASE_JDBC_URL: jdbc:postgresql://signserver-db:5432/signserver
-      DATABASE_USER: postgres
-      LOG_LEVEL_APP: INFO
-    networks:
-      - ivf-signing
-      - ivf-data
-    deploy:
-      replicas: 1
-      placement:
-        constraints:
-          - node.labels.role == primary
-      resources:
-        limits:
-          memory: 2G
-    healthcheck:
-      test: ["CMD", "curl", "-fsk", "https://localhost:8443/signserver/healthcheck/signserverhealth"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 120s
+# ─── Docker Configs ───
+configs:
+  caddyfile_v2:
+    file: ./Caddyfile
 
-  signserver-db:
-    image: postgres:16-alpine
-    volumes:
-      - signserver_db_data:/var/lib/postgresql/data
-    secrets:
-      - signserver_db_password
-    environment:
-      POSTGRES_DB: signserver
-      POSTGRES_PASSWORD_FILE: /run/secrets/signserver_db_password
-    networks:
-      - ivf-data
-    deploy:
-      replicas: 1
-      placement:
-        constraints:
-          - node.labels.role == primary
-      resources:
-        limits:
-          memory: 512M
+# ─── Docker Secrets (external — tạo trước bằng docker secret create) ───
+secrets:
+  ivf_db_password:
+    external: true
+  ejbca_db_password:
+    external: true
+  signserver_db_password:
+    external: true
+  keystore_password:
+    external: true
+  jwt_secret:
+    external: true
+  minio_access_key:
+    external: true
+  minio_secret_key:
+    external: true
+  api_cert_password:
+    external: true
+  softhsm_pin:
+    external: true
+  softhsm_so_pin:
+    external: true
 
-# ╔══════════════════════════════════════════════════════════╗
-# ║  Networks — Encrypted Swarm overlay                     ║
-# ╚══════════════════════════════════════════════════════════╝
+# ─── Volumes ───
+volumes:
+  postgres_data:
+  postgres_archive:
+  ejbca_persistent:
+  ejbca_db_data:
+  signserver_persistent:
+  signserver_db_data:
+  softhsm_tokens:
+  minio_data:
+  caddy_data:
+  caddy_config:
+
+# ─── Networks ───
 networks:
   ivf-public:
     driver: overlay
   ivf-signing:
     driver: overlay
     internal: true
-    driver_opts:
-      encrypted: "true"
   ivf-data:
     driver: overlay
     internal: true
-    driver_opts:
-      encrypted: "true"
-
-# ╔══════════════════════════════════════════════════════════╗
-# ║  Volumes — Local (persistent per-node)                  ║
-# ╚══════════════════════════════════════════════════════════╝
-volumes:
-  postgres_data:
-    driver: local
-  postgres_archive:
-    driver: local
-  postgres_standby:
-    driver: local
-  redis_data:
-    driver: local
-  minio_data:
-    driver: local
-  ejbca_persistent:
-    driver: local
-  ejbca_db_data:
-    driver: local
-  signserver_persistent:
-    driver: local
-  signserver_db_data:
-    driver: local
-  caddy_data:
-    driver: local
-  caddy_config:
-    driver: local
-  api_keys:
-    driver: local
-  api_certs:
-    driver: local
-
-# ╔══════════════════════════════════════════════════════════╗
-# ║  Secrets — Encrypted in Swarm Raft store                ║
-# ╚══════════════════════════════════════════════════════════╝
-secrets:
-  ivf_db_password:
-    file: ./secrets/ivf_db_password.txt
-  ejbca_db_password:
-    file: ./secrets/ejbca_db_password.txt
-  signserver_db_password:
-    file: ./secrets/signserver_db_password.txt
-  jwt_secret:
-    file: ./secrets/jwt_secret.txt
-  minio_access_key:
-    file: ./secrets/minio_access_key.txt
-  minio_secret_key:
-    file: ./secrets/minio_secret_key.txt
-  api_cert_password:
-    file: ./secrets/api_cert_password.txt
-
-# ╔══════════════════════════════════════════════════════════╗
-# ║  Configs — Distributed to containers                    ║
-# ╚══════════════════════════════════════════════════════════╝
-configs:
-  caddyfile:
-    file: ./docker/caddy/Caddyfile
-  pg_init_replication:
-    file: ./docker/postgres/init-wal-replication.sh
-  pg_standby_entrypoint:
-    file: ./docker/postgres/standby-entrypoint.sh
-
-STACK
-
-echo "stack.yml created successfully"
 ```
 
-### 7.2 Giải thích placement constraints
+### 7.2 Caddyfile
+
+File `Caddyfile` nằm ở repo root, được mount vào Caddy container qua Docker configs:
+
+```caddyfile
+natra.site {
+    # API requests
+    handle /api/* {
+        reverse_proxy api:8080
+    }
+
+    # SignalR hubs
+    handle /hubs/* {
+        reverse_proxy api:8080
+    }
+
+    # Swagger UI
+    handle /swagger/* {
+        reverse_proxy api:8080
+    }
+
+    # Everything else -> Angular frontend
+    handle {
+        reverse_proxy frontend:80
+    }
+
+    # Security headers
+    header {
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        Referrer-Policy strict-origin-when-cross-origin
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        -Server
+    }
+
+    # Compression
+    encode gzip zstd
+}
+```
+
+> **Lưu ý:** Sử dụng domain name thay vì `:80` — Caddy tự động xin SSL certificate từ Let's Encrypt và redirect HTTP → HTTPS. HSTS header bật preload.
+
+### 7.3 Khác biệt chính so với v1.0
+
+| Thay đổi         | v1.0 (cũ)                  | v3.0 (hiện tại)                              |
+| ---------------- | -------------------------- | -------------------------------------------- |
+| File name        | `stack.yml`                | `docker-compose.stack.yml`                   |
+| API image        | `ivf-api:latest` (local)   | `ghcr.io/hung6066/ivf:latest` (GHCR)         |
+| API Dockerfile   | Chỉ aspnet runtime         | + Docker CLI (infrastructure monitor)        |
+| API volumes      | Không                      | `/var/run/docker.sock:ro` (Swarm mgmt)       |
+| Frontend         | ❌ Không có                | ✅ `ghcr.io/hung6066/ivf-client:latest`      |
+| Caddy ports      | `"80:80"` (ingress)        | `mode: host` (preserve real client IP)       |
+| Caddy config     | `caddyfile`                | `caddyfile_v2` (versioned, immutable)        |
+| Caddyfile        | `:80` (HTTP only)          | `natra.site` (auto HTTPS + HSTS)             |
+| Caddyfile source | `./docker/caddy/Caddyfile` | `./Caddyfile` (repo root)                    |
+| Caddy routing    | Static files trực tiếp     | Reverse proxy → frontend container           |
+| CORS             | Không cấu hình             | `Cors__AllowedOrigins__0=https://natra.site` |
+| DB Standby       | ✅ `db-standby` service    | ❌ Chưa triển khai                           |
+| API replicas     | 2 (cả 2 VPS)               | 1 (chỉ VPS 1)                                |
+| Secrets          | `file:` (local files)      | `external: true` (Swarm raft store)          |
+| DigitalSigning   | Enabled                    | `Enabled=false` (chưa có client cert)        |
+| PG configs       | WAL replication scripts    | Không cần (chưa có standby)                  |
+| `version` key    | `"3.8"`                    | Bỏ (deprecated trong Docker 25+)             |
+
+### 7.4 Placement constraints hiện tại
 
 ```
-┌────────────────────────────────────┬────────────────────────────┐
-│           VPS 1 (primary)          │      VPS 2 (standby)       │
-├────────────────────────────────────┼────────────────────────────┤
-│ ✅ caddy        (global mode)     │ ✅ caddy      (global)     │
-│ ✅ api          (replica 1 of 2)  │ ✅ api        (replica 2)  │
-│ ✅ db           (primary)         │ ✅ db-standby (standby)    │
-│ ✅ redis        (primary)         │                            │
-│ ✅ minio        (primary)         │                            │
-│ ✅ minio-init   (runs once)       │                            │
-│ ✅ ejbca        (CA server)       │                            │
-│ ✅ ejbca-db                       │                            │
-│ ✅ signserver   (PDF signing)     │                            │
-│ ✅ signserver-db                  │                            │
-├────────────────────────────────────┼────────────────────────────┤
-│  RAM ~5.3 GB / 32 GB              │  RAM ~1.9 GB / 16 GB      │
-│  9 containers                     │  3 containers              │
-└────────────────────────────────────┴────────────────────────────┘
-
-Tại sao PKI (EJBCA + SignServer) chỉ ở VPS 1:
-  1. PKI keys phải ở fixed location (không di chuyển)
-  2. Signing network (ivf-signing) là internal, isolated
-  3. mTLS certificates hardcoded vào VPS 1
-  4. PKI không cần HA (API buffer requests + retry)
+┌──────────────────────────────────────┬──────────────────────────┐
+│       VPS 1 — primary (24 GB)        │   VPS 2 — worker (8 GB)  │
+├──────────────────────────────────────┼──────────────────────────┤
+│ ✅ caddy         (reverse proxy)     │                          │
+│ ✅ frontend      (Angular SPA)       │   (chưa có service)      │
+│ ✅ api           (1 replica)         │                          │
+│ ✅ db            (PostgreSQL 16)     │                          │
+│ ✅ redis         (cache)             │                          │
+│ ✅ minio         (object storage)    │                          │
+│ ✅ minio-init    (one-shot, done)    │                          │
+│ ✅ ejbca         (CA server)         │                          │
+│ ✅ ejbca-db                          │                          │
+│ ⏳ signserver    (cần PKI setup)     │                          │
+│ ✅ signserver-db                     │                          │
+├──────────────────────────────────────┼──────────────────────────┤
+│  RAM ~5.5 GB / 24 GB                │  RAM ~0 GB / 8 GB        │
+│  11 services (9 running)            │  0 services              │
+└──────────────────────────────────────┴──────────────────────────┘
 ```
+
+> **Lưu ý:** Tất cả services hiện tại chạy trên VPS 1. VPS 2 sẵn sàng cho HA (scale API replicas, DB standby) khi cần.
 
 ---
 
 ## 8. Deploy Stack lên Swarm
 
-### 8.1 Deploy lần đầu
+### 8.1 Tạo Secrets (chỉ cần cho lần deploy đầu)
 
 ```bash
-ssh deploy@<VPS1_IP>
+ssh root@45.134.226.56
+
+# Tạo secrets trong Swarm Raft store
+echo "your_db_password" | docker secret create ivf_db_password -
+echo "your_jwt_secret" | docker secret create jwt_secret -
+echo "your_minio_access_key" | docker secret create minio_access_key -
+echo "your_minio_secret_key" | docker secret create minio_secret_key -
+echo "your_ejbca_db_password" | docker secret create ejbca_db_password -
+echo "your_signserver_db_password" | docker secret create signserver_db_password -
+echo "your_keystore_password" | docker secret create keystore_password -
+echo "your_api_cert_password" | docker secret create api_cert_password -
+echo "your_softhsm_pin" | docker secret create softhsm_pin -
+echo "your_softhsm_so_pin" | docker secret create softhsm_so_pin -
+
+# Verify
+docker secret ls
+```
+
+### 8.2 Deploy lần đầu
+
+```bash
 cd /opt/ivf
 
-# Build Angular frontend (nếu chưa build)
-cd ivf-client && npm ci && npm run build && cd ..
-
-# Copy frontend dist vào Caddy volume (sẽ được mount)
-# → Caddy config cần trỏ đến đúng path
+# Login GHCR để pull images
+echo "<GHCR_TOKEN>" | docker login ghcr.io -u hung6066 --password-stdin
 
 # Deploy stack
-docker stack deploy -c stack.yml ivf
+docker stack deploy -c docker-compose.stack.yml ivf
 
 # Theo dõi quá trình deploy
 watch docker service ls
 ```
 
-### 8.2 Kiểm tra services
+### 8.3 Kiểm tra services
 
 ```bash
 # Xem tất cả services
 docker service ls
 
 # Output mong đợi:
-# ID     NAME              MODE       REPLICAS   IMAGE                         PORTS
-# xxx    ivf_api           replicated 2/2        ivf-api:latest
-# xxx    ivf_caddy         global     2/2        caddy:2-alpine                *:80->80, *:443->443
-# xxx    ivf_db            replicated 1/1        postgres:16-alpine
-# xxx    ivf_db-standby    replicated 1/1        postgres:16-alpine
-# xxx    ivf_redis         replicated 1/1        redis:7-alpine
-# xxx    ivf_minio         replicated 1/1        minio/minio:latest
-# xxx    ivf_minio-init    replicated 0/1        minio/mc:latest                (completed)
-# xxx    ivf_ejbca         replicated 1/1        keyfactor/ejbca-ce:latest
-# xxx    ivf_ejbca-db      replicated 1/1        postgres:16-alpine
-# xxx    ivf_signserver    replicated 1/1        keyfactor/signserver-ce:latest
-# xxx    ivf_signserver-db replicated 1/1        postgres:16-alpine
-
-# Xem chi tiết API (2 replicas trên 2 VPS)
-docker service ps ivf_api
-# ID     NAME        IMAGE           NODE    DESIRED STATE   CURRENT STATE
-# xxx    ivf_api.1   ivf-api:latest  vps1    Running         Running 2 minutes ago
-# xxx    ivf_api.2   ivf-api:latest  vps2    Running         Running 2 minutes ago
+# ID     NAME               MODE       REPLICAS  IMAGE                              PORTS
+# xxx    ivf_api            replicated 1/1       ghcr.io/hung6066/ivf:latest
+# xxx    ivf_frontend       replicated 1/1       ghcr.io/hung6066/ivf-client:latest
+# xxx    ivf_caddy          replicated 1/1       caddy:2-alpine                     *:80->80, *:443->443
+# xxx    ivf_db             replicated 1/1       postgres:16-alpine
+# xxx    ivf_redis          replicated 1/1       redis:alpine
+# xxx    ivf_minio          replicated 1/1       minio/minio:latest                 *:9000->9000
+# xxx    ivf_minio-init     replicated 0/1       minio/mc:latest                    (completed)
+# xxx    ivf_ejbca          replicated 1/1       keyfactor/ejbca-ce:latest           *:8443->8443
+# xxx    ivf_ejbca-db       replicated 1/1       postgres:16-alpine
+# xxx    ivf_signserver     replicated 0/1       keyfactor/signserver-ce:latest      *:9443->8443 (needs PKI)
+# xxx    ivf_signserver-db  replicated 1/1       postgres:16-alpine
 
 # Xem logs
 docker service logs -f ivf_api --tail=20
-docker service logs -f ivf_db --tail=20
+docker service logs -f ivf_frontend --tail=20
+docker service logs -f ivf_caddy --tail=20
 ```
 
-### 8.3 Xử lý lỗi deploy thường gặp
+### 8.4 CI/CD Auto-Deploy
+
+Khi push code lên `main`, GitHub Actions tự động:
+
+1. Build + test → Push images lên GHCR
+2. SSH vào VPS Manager (45.134.226.56)
+3. Backup database (nếu DB container tồn tại)
+4. Pull images mới + rolling update
+
+```bash
+# CI/CD chạy lệnh tương đương:
+docker service update --image ghcr.io/hung6066/ivf:latest ivf_api
+docker service update --image ghcr.io/hung6066/ivf-client:latest ivf_frontend
+```
+
+> **Không cần deploy thủ công** khi code đã merge vào `main`. CI/CD tự xử lý.
+
+### 8.5 Xử lý lỗi deploy thường gặp
 
 ```bash
 # Service không start? Xem task errors:
 docker service ps ivf_api --no-trunc
 
-# Image not found trên VPS 2?
-docker service ps ivf_api --format "{{.Node}} {{.Error}}"
-# → Cần sync image sang VPS 2 (xem Section 6.2)
+# GHCR authentication error?
+docker login ghcr.io -u hung6066
+# → Cần GHCR_TOKEN có quyền packages:read
 
 # Container crash loop?
 docker service logs ivf_api --since 5m
@@ -1143,13 +1200,109 @@ docker secret inspect ivf_db_password
 
 # Network không tạo?
 docker network ls | grep ivf
+
+# Force re-deploy (pull latest image):
+docker service update --force --image ghcr.io/hung6066/ivf:latest ivf_api
 ```
 
 ---
 
-## 9. Cấu hình PostgreSQL Replication
+## 9. Ansible Automation (Tùy chọn)
 
-### 9.1 Verify Primary (VPS 1)
+> **Thay đổi v2.0:** Thêm Ansible playbook để tự động hóa toàn bộ quá trình setup VPS + deploy, thay cho các bước thủ công ở Section 3-8.
+
+### 9.1 Tổng quan
+
+Ansible playbook trong thư mục `ansible/` tự động hóa 3 giai đoạn:
+
+```
+Phase 1: common  → Update OS, packages, user deploy, SSH hardening, UFW, fail2ban
+Phase 2: docker  → Cài Docker CE, khởi tạo Swarm cluster, node labels, GHCR login
+Phase 3: app     → Generate secrets, tạo Docker secrets, pull images, deploy stack
+```
+
+### 9.2 Cấu trúc thư mục
+
+```
+ansible/
+├── site.yml                    # Master playbook (3 phases)
+├── hosts.example.yml           # Inventory template
+└── roles/
+    ├── common/tasks/main.yml   # OS setup, SSH, firewall, fail2ban
+    ├── docker/tasks/main.yml   # Docker CE, Swarm init, node labels
+    └── app/tasks/main.yml      # Secrets, clone, deploy stack
+```
+
+### 9.3 Setup
+
+```bash
+# Cần cài Ansible trên máy local (hoặc WSL2)
+pip install ansible
+
+# Copy inventory template
+cd ansible
+cp hosts.example.yml hosts.yml
+
+# Sửa hosts.yml: thay <VPS1_IP> và <VPS2_IP> bằng IP thực
+# VPS1: 45.134.226.56 (manager), VPS2: 194.163.181.19 (worker)
+```
+
+### 9.4 Sử dụng
+
+```bash
+# Setup toàn bộ từ zero (OS + Docker + Deploy)
+ansible-playbook -i hosts.yml site.yml --extra-vars "ghcr_token=ghp_xxx"
+
+# Chỉ setup cơ bản (OS, Docker) — không deploy app
+ansible-playbook -i hosts.yml site.yml --tags setup
+
+# Chỉ deploy app (skip OS/Docker setup)
+ansible-playbook -i hosts.yml site.yml --tags deploy --extra-vars "ghcr_token=ghp_xxx"
+
+# Deploy image cụ thể (version tag)
+ansible-playbook -i hosts.yml site.yml --tags deploy \
+  --extra-vars "ghcr_token=ghp_xxx image_tag=v1.2.0"
+
+# Dry run (xem sẽ làm gì, không thay đổi gì)
+ansible-playbook -i hosts.yml site.yml --check --diff
+```
+
+### 9.5 Chạy từ WSL2
+
+Nếu dùng WSL2 Ubuntu trên Windows, cần bật **mirrored networking** để SSH từ WSL2 tới VPS:
+
+```powershell
+# File: %USERPROFILE%\.wslconfig
+[wsl2]
+networkingMode=mirrored
+```
+
+```bash
+# WSL2: copy SSH key từ Windows
+cp /mnt/c/Users/<username>/.ssh/id_ed25519 ~/.ssh/
+chmod 600 ~/.ssh/id_ed25519
+
+# Test SSH
+ssh -o StrictHostKeyChecking=no root@45.134.226.56 "hostname"
+```
+
+### 9.6 So sánh: Thủ công vs Ansible
+
+| Bước                | Thủ công                           | Ansible                   |
+| ------------------- | ---------------------------------- | ------------------------- |
+| Setup OS + firewall | ~30 phút × 2 VPS                   | `--tags setup` (5 phút)   |
+| Cài Docker + Swarm  | ~20 phút × 2 VPS                   | Tự động trong Phase 2     |
+| Tạo secrets         | Manual `docker secret create` × 10 | Tự động generate + create |
+| Deploy stack        | SSH + `docker stack deploy`        | `--tags deploy` (2 phút)  |
+| **Tổng**            | **~2 giờ**                         | **~10 phút**              |
+
+> **Lưu ý:** Ansible là **tùy chọn**. Bạn có thể setup thủ công theo Section 3-8 hoặc dùng Ansible. CI/CD (Section 6) xử lý deploy hàng ngày — Ansible chỉ cần cho lần setup đầu hoặc khi thêm VPS mới.
+
+---
+
+## 10. Cấu hình PostgreSQL Replication
+
+### 10.1 Verify Primary (VPS 1)
 
 ```bash
 # Exec vào container db trên VPS 1
@@ -1174,7 +1327,7 @@ SELECT slot_name, active FROM pg_replication_slots;
 \q
 ```
 
-### 9.2 Setup Standby (VPS 2)
+### 10.2 Setup Standby (VPS 2)
 
 Nếu standby-entrypoint.sh đã chạy tự động, verify:
 
@@ -1193,7 +1346,7 @@ SELECT status, sender_host, sender_port FROM pg_stat_wal_receiver;
 \q
 ```
 
-### 9.3 Kiểm tra replication từ Primary
+### 10.3 Kiểm tra replication từ Primary
 
 ```bash
 docker exec -it $(docker ps -q -f name=ivf_db.1) psql -U postgres
@@ -1213,9 +1366,9 @@ FROM pg_stat_replication;
 
 ---
 
-## 10. Cấu hình PKI — EJBCA & SignServer
+## 11. Cấu hình PKI — EJBCA & SignServer
 
-### 10.1 Verify EJBCA khởi động
+### 11.1 Verify EJBCA khởi động
 
 ```bash
 # Đợi EJBCA start (mất ~2-3 phút lần đầu)
@@ -1226,7 +1379,7 @@ docker service logs -f ivf_ejbca --tail=20
 docker service ps ivf_ejbca
 ```
 
-### 10.2 Setup mTLS cho SignServer
+### 11.2 Setup mTLS cho SignServer
 
 ```bash
 # Chạy init-mtls script
@@ -1240,7 +1393,7 @@ docker exec $(docker ps -q -f name=ivf_signserver.1) \
 # 4. Register API client cert
 ```
 
-### 10.3 Tạo API client certificate
+### 11.3 Tạo API client certificate
 
 ```bash
 # Export CA cert từ EJBCA
@@ -1259,9 +1412,9 @@ docker cp certs/. $(docker ps -q -f name=ivf_api.1):/app/certs/
 
 ---
 
-## 11. Cấu hình DNS & Caddy SSL
+## 12. Cấu hình DNS & Caddy SSL
 
-### 11.1 Cloudflare DNS Setup
+### 12.1 Cloudflare DNS Setup
 
 ```
 Đăng nhập Cloudflare → DNS Records:
@@ -1280,11 +1433,11 @@ CNAME *.ivf.clinic       → ivf.clinic   (DNS Only ☁️)
 # Failover: automatic
 ```
 
-### 11.2 Caddy Health Check Endpoint
+### 12.2 Caddy Health Check Endpoint
 
 Caddy dùng `api:8080` làm upstream — Swarm DNS tự resolve tới tất cả API replicas.
 
-### 11.3 Custom Tenant Domains
+### 12.3 Custom Tenant Domains
 
 Khi tenant cấu hình custom domain (ví dụ: `fertility.hospital.vn`):
 
@@ -1306,9 +1459,9 @@ Caddy → Let's Encrypt → Issue cert → TLS handshake → Serve request
 
 ---
 
-## 12. Thiết lập AWS S3 Backup
+## 13. Thiết lập AWS S3 Backup
 
-### 12.1 Tạo AWS Account & IAM
+### 13.1 Tạo AWS Account & IAM
 
 ```bash
 # 1. Đăng ký AWS account: https://aws.amazon.com
@@ -1343,7 +1496,7 @@ aws s3api put-public-access-block \
     BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
 ```
 
-### 12.2 S3 Lifecycle Policy (Auto-tier để tiết kiệm)
+### 13.2 S3 Lifecycle Policy (Auto-tier để tiết kiệm)
 
 ```bash
 aws s3api put-bucket-lifecycle-configuration \
@@ -1382,7 +1535,7 @@ aws s3api put-bucket-lifecycle-configuration \
   }'
 ```
 
-### 12.3 Tạo IAM User (Least Privilege)
+### 13.3 Tạo IAM User (Least Privilege)
 
 ```bash
 # Tạo IAM user
@@ -1420,7 +1573,7 @@ aws iam create-access-key --user-name ivf-backup-agent
 # }
 ```
 
-### 12.4 Cấu hình AWS CLI trên VPS 1
+### 13.4 Cấu hình AWS CLI trên VPS 1
 
 ```bash
 ssh deploy@<VPS1_IP>
@@ -1445,7 +1598,7 @@ aws s3 rm s3://ivf-backups-production/test.txt
 rm /tmp/test.txt
 ```
 
-### 12.5 Chi phí ước tính
+### 13.5 Chi phí ước tính
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -1480,9 +1633,9 @@ rm /tmp/test.txt
 
 ---
 
-## 13. Scripts Backup tự động
+## 14. Scripts Backup tự động
 
-### 13.1 Script chính: backup-to-s3.sh
+### 14.1 Script chính: backup-to-s3.sh
 
 ```bash
 cat > /opt/ivf/scripts/backup-to-s3.sh << 'BACKUP_SCRIPT'
@@ -1664,7 +1817,7 @@ BACKUP_SCRIPT
 chmod +x /opt/ivf/scripts/backup-to-s3.sh
 ```
 
-### 13.2 Script WAL sync: sync-wal-s3.sh
+### 14.2 Script WAL sync: sync-wal-s3.sh
 
 ```bash
 cat > /opt/ivf/scripts/sync-wal-s3.sh << 'WAL_SCRIPT'
@@ -1707,7 +1860,7 @@ WAL_SCRIPT
 chmod +x /opt/ivf/scripts/sync-wal-s3.sh
 ```
 
-### 13.3 Cài crontab
+### 14.3 Cài crontab
 
 ```bash
 # Trên VPS 1
@@ -1725,7 +1878,7 @@ sudo crontab -u deploy -e
 0 0 * * 0 find /var/log/ivf/ -name "*.log" -mtime +30 -delete
 ```
 
-### 13.4 Test backup
+### 14.4 Test backup
 
 ```bash
 # Chạy backup thủ công lần đầu
@@ -1742,9 +1895,9 @@ aws s3 ls s3://ivf-backups-production/ --recursive --human-readable
 
 ---
 
-## 14. Restore từ S3
+## 15. Restore từ S3
 
-### 14.1 Restore Database (Full)
+### 15.1 Restore Database (Full)
 
 ```bash
 #!/bin/bash
@@ -1785,7 +1938,7 @@ rm -f /tmp/restore.dump /tmp/restore.sha256 /tmp/restore.dump.gz
 echo "=== Restore completed ==="
 ```
 
-### 14.2 Point-in-Time Recovery (PITR)
+### 15.2 Point-in-Time Recovery (PITR)
 
 ```bash
 # Restore đến thời điểm cụ thể
@@ -1826,7 +1979,7 @@ docker service scale ivf_db=1
 docker service scale ivf_api=2
 ```
 
-### 14.3 Restore MinIO Files
+### 15.3 Restore MinIO Files
 
 ```bash
 # Download từ S3 và restore vào MinIO
@@ -1842,7 +1995,7 @@ for BUCKET_NAME in ivf-documents ivf-signed-pdfs ivf-medical-images; do
 done
 ```
 
-### 14.4 Restore Secrets (GPG encrypted)
+### 15.4 Restore Secrets (GPG encrypted)
 
 ```bash
 aws s3 cp "s3://ivf-backups-production/config/secrets_YYYYMMDD*.tar.gz.gpg" /tmp/secrets.tar.gz.gpg
@@ -1852,7 +2005,7 @@ gpg --decrypt --batch \
   /tmp/secrets.tar.gz.gpg | tar xzf - -C /opt/ivf/
 ```
 
-### 14.5 Full Disaster Recovery (mất cả 2 VPS)
+### 15.5 Full Disaster Recovery (mất cả 2 VPS)
 
 ```
 Scenario: Cả VPS 1 và VPS 2 đồng thời down (datacenter fire)
@@ -1876,94 +2029,95 @@ RTO (downtime):  2-4 giờ (từ khi bắt đầu restore)
 
 ---
 
-## 15. Vận hành hàng ngày (Operations)
+## 16. Vận hành hàng ngày (Operations)
 
-### 15.1 Deploy code mới (Zero-downtime)
+### 16.1 Deploy code mới (Zero-downtime)
+
+> **v2.0:** Deploy tự động qua CI/CD. Push code lên `main` → GitHub Actions build + push images → SSH deploy lên VPS.
+
+**Cách 1: Tự động (CI/CD — khuyến nghị)**
 
 ```bash
-ssh deploy@<VPS1_IP>
-cd /opt/ivf
+# Chỉ cần push code lên main
+git push origin main
 
-# 1. Pull code mới
-git pull origin main
+# GitHub Actions sẽ tự động:
+# 1. Build + test backend (.NET 10)
+# 2. Build frontend (Angular 21)
+# 3. Push images lên GHCR (ghcr.io/hung6066/ivf:latest, ghcr.io/hung6066/ivf-client:latest)
+# 4. SSH vào VPS → backup DB → rolling update services
 
-# 2. Rebuild Angular frontend
-cd ivf-client && npm ci && npm run build && cd ..
+# Theo dõi: GitHub repo → Actions tab
+```
 
-# 3. Rebuild API image
-docker build -t ivf-api:latest -f src/IVF.API/Dockerfile .
+**Cách 2: Thủ công (fallback)**
 
-# 4. Sync image sang VPS 2 (nếu dùng Cách 1)
-docker save ivf-api:latest | gzip | ssh deploy@<VPS2_IP> "docker load"
+```bash
+ssh root@45.134.226.56
 
-# 5. Rolling update (ZERO DOWNTIME)
-docker service update --image ivf-api:latest ivf_api
+# Pull images mới từ GHCR
+docker pull ghcr.io/hung6066/ivf:latest
+docker pull ghcr.io/hung6066/ivf-client:latest
 
-# Swarm sẽ tự:
-# → Start new container trên VPS 1
-# → Health check pass → stop old trên VPS 1
-# → Wait 30s
-# → Start new container trên VPS 2
-# → Health check pass → stop old trên VPS 2
+# Rolling update (ZERO DOWNTIME)
+docker service update --image ghcr.io/hung6066/ivf:latest ivf_api
+docker service update --image ghcr.io/hung6066/ivf-client:latest ivf_frontend
 
-# 6. Verify
+# Verify
 docker service ps ivf_api
+docker service ps ivf_frontend
 docker service logs ivf_api --tail=10
 ```
 
-### 15.2 Rollback nếu lỗi
+### 16.2 Rollback nếu lỗi
 
 ```bash
 # Rollback về version trước (1 lệnh, ~10 giây)
 docker service rollback ivf_api
+docker service rollback ivf_frontend
 
 # Verify
 docker service ps ivf_api
 ```
 
-### 15.3 Scale API
+### 16.3 Scale API
 
 ```bash
-# Tăng lên 3 replicas
-docker service scale ivf_api=3
-
-# Giảm về 2
+# Tăng lên 2 replicas (cần VPS 2 có image)
 docker service scale ivf_api=2
 
 # Scale xuống 0 (maintenance mode)
 docker service scale ivf_api=0
+
+# Trở lại bình thường
+docker service scale ivf_api=1
 ```
 
-### 15.4 Bảo trì VPS (Node drain)
+### 16.4 Bảo trì VPS (Node drain)
 
 ```bash
 # Bảo trì VPS 2 (ví dụ: upgrade kernel)
 docker node update --availability drain <VPS2_NODE_ID>
-# → Swarm tự move containers từ VPS 2 sang VPS 1
-# → API replica 2 được start trên VPS 1
-
-# Kiểm tra
-docker service ps ivf_api
-# Cả 2 replicas đang chạy trên VPS 1
+# → Swarm tự move containers (nếu có) sang VPS 1
 
 # ─── Thực hiện bảo trì VPS 2 ───
-ssh deploy@<VPS2_IP>
+ssh root@194.163.181.19
 sudo apt update && sudo apt upgrade -y
 sudo reboot
 
 # ─── Sau khi VPS 2 online lại ───
 # Trên VPS 1:
 docker node update --availability active <VPS2_NODE_ID>
-
-# Force rebalance (move 1 replica về VPS 2)
-docker service update --force ivf_api
 ```
 
-### 15.5 Xem logs
+### 16.5 Xem logs
 
 ```bash
 # API logs (tất cả replicas)
 docker service logs -f ivf_api --tail=50
+
+# Frontend logs
+docker service logs -f ivf_frontend --tail=20
 
 # Database logs
 docker service logs -f ivf_db --tail=20
@@ -1978,7 +2132,7 @@ docker logs -f $(docker ps -q -f name=ivf_api.1) --tail=50
 docker service logs -f ivf_caddy --tail=20
 ```
 
-### 15.6 Database migrations
+### 16.6 Database migrations
 
 ```bash
 # Chạy EF Core migration
@@ -1994,7 +2148,7 @@ dotnet ef migrations bundle --project src/IVF.Infrastructure --startup-project s
 # Copy + run trên server
 ```
 
-### 15.7 Update Secrets
+### 16.7 Update Secrets
 
 ```bash
 # Secrets trong Swarm KHÔNG thể update — phải recreate
@@ -2016,9 +2170,9 @@ docker secret rm ivf_db_password
 
 ---
 
-## 16. Monitoring & Alerting
+## 17. Monitoring & Alerting
 
-### 16.1 Healthcheck endpoints
+### 17.1 Healthcheck endpoints
 
 ```bash
 # API health
@@ -2029,7 +2183,7 @@ curl -s https://ivf.clinic/health/ready
 # {"status":"Healthy","checks":{"database":"Healthy","redis":"Healthy","minio":"Healthy"}}
 ```
 
-### 16.2 Docker Swarm monitoring
+### 17.2 Docker Swarm monitoring
 
 ```bash
 # ─── Script: /opt/ivf/scripts/health-check.sh ───
@@ -2088,14 +2242,14 @@ if [ -n "$LATEST_BACKUP" ]; then
 fi
 ```
 
-### 16.3 Crontab monitoring
+### 17.3 Crontab monitoring
 
 ```bash
 # Thêm vào crontab (VPS 1)
 */5 * * * * /opt/ivf/scripts/health-check.sh >> /var/log/ivf/health-check.log 2>&1
 ```
 
-### 16.4 Optional: Prometheus + Grafana
+### 17.4 Optional: Prometheus + Grafana
 
 ```bash
 # Thêm services vào stack.yml (optional, thêm ~500 MB RAM)
@@ -2122,9 +2276,9 @@ fi
 
 ---
 
-## 17. Xử lý Sự cố (Troubleshooting)
+## 18. Xử lý Sự cố (Troubleshooting)
 
-### 17.1 Service không start
+### 18.1 Service không start
 
 ```bash
 # Xem lỗi chi tiết
@@ -2132,11 +2286,31 @@ docker service ps <SERVICE_NAME> --no-trunc --format "{{.Error}}"
 
 # Lỗi thường gặp:
 # "no suitable node" → Kiểm tra placement constraints + node labels
-# "image not found"  → Image chưa được build/load trên node đó
+# "image not found"  → Image chưa được pull từ GHCR (cần docker login ghcr.io)
 # "port already in use" → Có process khác chiếm port
 ```
 
-### 17.2 VPS 1 (Manager) down
+### 18.2 API crash — exit code 139 (DigitalSigning)
+
+> **Lỗi đã gặp thực tế.** API crash ngay khi start với exit code 139.
+
+```bash
+# Xem logs
+docker service logs ivf_api --since 10m
+
+# Nếu thấy lỗi:
+# System.InvalidOperationException: Client certificate not found: /app/certs/api-client.p12
+
+# Nguyên nhân: ASPNETCORE_ENVIRONMENT=Production + DigitalSigning__Enabled=true
+#   → ValidateProduction() yêu cầu file /app/certs/api-client.p12
+#   → File không tồn tại → crash
+
+# Fix: Tắt DigitalSigning cho đến khi EJBCA client cert được provisioned
+# Trong docker-compose.stack.yml, API service:
+#   - DigitalSigning__Enabled=false
+```
+
+### 18.3 VPS 1 (Manager) down
 
 ```bash
 # ⚠️ Swarm manager down = không thể quản lý cluster
@@ -2146,20 +2320,14 @@ docker service ps <SERVICE_NAME> --no-trunc --format "{{.Error}}"
 # → Không thể deploy/scale/update
 
 # Cách 2: Promote VPS 2 thành manager mới
-ssh deploy@<VPS2_IP>
-docker swarm init --force-new-cluster --advertise-addr <VPS2_IP>
+ssh root@194.163.181.19
+docker swarm init --force-new-cluster --advertise-addr 194.163.181.19
 
 # → VPS 2 trở thành manager duy nhất
-# → Containers trên VPS 2 tiếp tục chạy
-# → Containers trên VPS 1 (nếu VPS 1 xuống) cần reschedule
-
-# Sau khi VPS 1 phục hồi:
-# VPS 1: join lại cluster như worker
-docker swarm leave --force  # Nếu cần
-docker swarm join --token <NEW_WORKER_TOKEN> <VPS2_IP>:2377
+# → Sau khi VPS 1 phục hồi: join lại cluster
 ```
 
-### 17.3 PostgreSQL Replication broken
+### 18.4 PostgreSQL Replication broken
 
 ```bash
 # Kiểm tra status
@@ -2174,7 +2342,7 @@ docker service scale ivf_db-standby=1
 # → standby-entrypoint.sh sẽ pg_basebackup lại từ đầu
 ```
 
-### 17.4 Disk đầy
+### 18.5 Disk đầy
 
 ```bash
 # Xem disk usage
@@ -2192,7 +2360,7 @@ docker builder prune -af
 find /var/log/ivf/ -name "*.log" -mtime +30 -delete
 ```
 
-### 17.5 SSL/TLS certificate issues
+### 18.6 SSL/TLS certificate issues
 
 ```bash
 # Xem Caddy logs
@@ -2205,7 +2373,7 @@ docker exec $(docker ps -q -f name=ivf_caddy) caddy reload --config /etc/caddy/C
 docker exec $(docker ps -q -f name=ivf_caddy) caddy list-certificates
 ```
 
-### 17.6 API crash loop
+### 18.7 API crash loop (khác)
 
 ```bash
 # Xem crash reason
@@ -2218,22 +2386,142 @@ docker service logs ivf_api --since 10m
 # "Certificate expired"         → Renew mTLS cert (scripts/init-mtls.sh)
 ```
 
+### 18.8 live-restore incompatible with Swarm
+
+```bash
+# Nếu Docker daemon không start hoặc Swarm lỗi:
+# Kiểm tra /etc/docker/daemon.json KHÔNG có "live-restore": true
+# Docker Swarm không tương thích với live-restore
+
+cat /etc/docker/daemon.json
+# Nếu thấy "live-restore": true → xóa dòng đó → restart docker
+sudo systemctl restart docker
+```
+
+### 18.9 GHCR image pull failed
+
+```bash
+# Kiểm tra GHCR authentication
+docker login ghcr.io -u hung6066
+
+# Kiểm tra image tồn tại
+docker pull ghcr.io/hung6066/ivf:latest
+
+# Nếu "denied: permission denied":
+# → GHCR_TOKEN cần quyền packages:read
+# → Token có thể hết hạn, cần tạo mới
+
+# Force update service với image mới:
+docker service update --force --with-registry-auth --image ghcr.io/hung6066/ivf:latest ivf_api
+```
+
+### 18.10 IP Whitelist blocks all requests (IP_NOT_WHITELISTED)
+
+> **Lỗi đã gặp thực tế.** Sau khi bật IP whitelist, tất cả API requests bị block với 403 `IP_NOT_WHITELISTED`.
+
+```bash
+# Nguyên nhân: Docker Swarm ingress NAT thay đổi client IP → API thấy 10.0.0.x
+# thay vì real IP. SecurityEnforcementMiddleware so sánh IP nội bộ với whitelist → block.
+
+# Fix 1 (đã áp dụng): Caddy dùng mode: host để bypass ingress NAT
+# Trong docker-compose.stack.yml → caddy ports:
+#   ports:
+#     - target: 80
+#       published: 80
+#       mode: host
+#     - target: 443
+#       published: 443
+#       mode: host
+
+# Fix 2 (tạm thời): Deactivate whitelist trong DB
+DB=$(docker ps -q -f name=ivf_db)
+docker exec $DB psql -U postgres -d ivf_db -c \
+  'UPDATE "IpWhitelistEntries" SET "IsActive" = false WHERE "IsActive" = true;'
+
+# Kiểm tra IP mà API nhận được
+docker service logs ivf_api --since 5m 2>&1 | grep -i 'blocked\|whitelist'
+# Output nên hiện real IP (115.x.x.x) thay vì Docker IP (10.0.0.x)
+```
+
+### 18.11 Infrastructure Monitor 500 — Docker CLI not found
+
+> **Lỗi đã gặp thực tế.** `/api/admin/infrastructure/swarm/*` endpoints trả về 500.
+> API logs: `docker service ls failed: No such file or directory`
+
+```bash
+# Nguyên nhân: API container không có Docker CLI.
+# InfrastructureMonitorService shells out to `docker service ls`, `docker node ls`, etc.
+
+# Fix: 2 thay đổi cần thiết:
+
+# 1. Dockerfile (src/IVF.API/Dockerfile) — cài docker-ce-cli trong runtime stage:
+#    RUN apt-get update && apt-get install -y --no-install-recommends docker-ce-cli
+
+# 2. docker-compose.stack.yml — mount Docker socket vào API:
+#    api:
+#      volumes:
+#        - /var/run/docker.sock:/var/run/docker.sock:ro
+
+# Verify sau fix:
+API=$(docker ps -q -f name=ivf_api)
+docker exec $API docker --version
+# → Docker version 29.x.x
+docker exec $API docker service ls
+# → Hiện danh sách services
+```
+
+### 18.12 Docker config immutable — "only updates to Labels are allowed"
+
+> **Lỗi đã gặp thực tế.** `docker stack deploy` fail khi thay đổi nội dung Caddyfile.
+
+```bash
+# Nguyên nhân: Docker configs are immutable — không thể update nội dung.
+# Khi đổi `:80` → `natra.site` trong Caddyfile, deploy sẽ fail.
+
+# Fix: Version config name (caddyfile → caddyfile_v2 → caddyfile_v3, ...)
+# Trong docker-compose.stack.yml:
+#   configs:
+#     caddyfile_v2:       # ← đổi tên mỗi khi thay đổi nội dung
+#       file: ./Caddyfile
+#   caddy:
+#     configs:
+#       - source: caddyfile_v2  # ← phải match
+#         target: /etc/caddy/Caddyfile
+
+# Sau khi deploy thành công, xóa config cũ:
+docker config rm caddyfile
+```
+
 ---
 
-## 18. Checklist Triển khai
+## 19. Checklist Triển khai
 
-### 18.1 Pre-deployment
+### 19.1 Pre-deployment
 
 ```
 □ 2 VPS Contabo đã mua, SSH hoạt động
 □ Domain đã đăng ký (ivf.clinic)
 □ Cloudflare đã setup, DNS records đã tạo
 □ AWS account đã tạo, MFA bật, IAM user ready
-□ Source code repository access ready (SSH key / PAT)
+□ GitHub repo access ready (SSH deploy key)
+□ GHCR token tạo (packages:read scope)
 □ SSL wildcard certificate strategy decided (Caddy auto)
 ```
 
-### 18.2 VPS Setup
+### 19.2 CI/CD Pipeline (v2.0)
+
+```
+□ GitHub Actions workflows configured (ci-cd.yml, deploy-production.yml)
+□ GitHub Secrets đã set (SSH_PRIVATE_KEY, SSH_HOST_MANAGER, GHCR_TOKEN)
+□ SSH deploy key (ed25519) thêm vào VPS authorized_keys
+□ GHCR images build + push thành công
+  □ ghcr.io/hung6066/ivf:latest (API)
+  □ ghcr.io/hung6066/ivf-client:latest (Frontend)
+□ Auto-deploy khi push main hoạt động
+□ Discord webhook notifications (tùy chọn)
+```
+
+### 19.3 VPS Setup
 
 ```
 □ Ubuntu 24.04 đã cài, đã update
@@ -2242,12 +2530,13 @@ docker service logs ivf_api --since 10m
 □ UFW firewall configured (22, 80, 443, Swarm ports)
 □ Fail2ban configured
 □ Docker CE installed trên CẢ 2 VPS
-□ Docker daemon.json configured (log rotation, overlay2)
+□ Docker daemon.json configured (log rotation, overlay2, KHÔNG có live-restore)
 □ AWS CLI installed trên VPS 1
 □ Timezone set: Asia/Ho_Chi_Minh
+□ GHCR logged in trên các VPS (docker login ghcr.io)
 ```
 
-### 18.3 Docker Swarm
+### 19.4 Docker Swarm
 
 ```
 □ Swarm init trên VPS 1 (Manager)
@@ -2256,42 +2545,53 @@ docker service logs ivf_api --since 10m
 □ docker node ls shows 2 Ready nodes
 ```
 
-### 18.4 Application
+### 19.5 Ansible (Tùy chọn — v2.0)
 
 ```
-□ Source code cloned tại /opt/ivf
-□ Secrets generated (12 files trong secrets/)
-□ appsettings.Production.json created
-□ Angular frontend built (npm run build)
-□ API Docker image built + loaded trên CẢ 2 VPS
-□ stack.yml verified
-□ Caddyfile verified
+□ Ansible installed trên máy local / WSL2
+□ hosts.yml created từ hosts.example.yml
+□ Test SSH connectivity: ansible -i hosts.yml all -m ping
+□ Dry run thành công: ansible-playbook -i hosts.yml site.yml --check
+□ Full run thành công (nếu setup từ zero)
 ```
 
-### 18.5 Deploy & Verify
+### 19.6 Application
 
 ```
-□ docker stack deploy -c stack.yml ivf
+□ docker-compose.stack.yml verified
+□ Caddyfile verified (repo root)
+□ Secrets tạo trong Swarm raft store (10 secrets)
+□ DigitalSigning__Enabled=false (cho đến khi có EJBCA client cert)
+```
+
+### 19.7 Deploy & Verify
+
+```
+□ docker stack deploy -c docker-compose.stack.yml ivf
 □ Tất cả services Running (docker service ls)
-□ API replicas: 2/2 (1 per VPS)
-□ Caddy: 2/2 (global mode)
+□ API: 1/1 — ghcr.io/hung6066/ivf:latest
+□ Frontend: 1/1 — ghcr.io/hung6066/ivf-client:latest
+□ Caddy: 1/1 — routing /api/* → API, /* → Frontend
 □ DB health check pass (pg_isready)
-□ Redis health check pass (redis-cli ping)
+□ Redis health check pass
 □ MinIO buckets created (3 buckets)
-□ EJBCA healthy (https check)
-□ SignServer healthy (https check)
+□ EJBCA healthy (8443)
+□ SignServer: 0/1 accepted (cần PKI setup)
+□ Web accessible tại http://<VPS1_IP>/ (Angular app loads)
+□ API accessible tại http://<VPS1_IP>/api/* (returns JSON)
 ```
 
-### 18.6 Replication & HA
+### 19.8 Replication & HA (tương lai)
 
 ```
 □ PostgreSQL replication: streaming, lag = 0 bytes
 □ Replication slot created (standby_slot)
 □ WAL archiving active
 □ Standby pg_is_in_recovery() = true
+□ API replicas: 2 (1 per VPS)
 ```
 
-### 18.7 SSL & Domain
+### 19.9 SSL & Domain
 
 ```
 □ https://ivf.clinic accessible
@@ -2301,7 +2601,7 @@ docker service logs ivf_api --since 10m
 □ Security headers verified (CSP, X-Frame-Options, etc.)
 ```
 
-### 18.8 Backup & S3
+### 19.10 Backup & S3
 
 ```
 □ AWS S3 bucket created (ap-southeast-1)
@@ -2318,7 +2618,7 @@ docker service logs ivf_api --since 10m
 □ Restore procedure tested (!!!)
 ```
 
-### 18.9 Monitoring
+### 19.11 Monitoring
 
 ```
 □ health-check.sh configured
@@ -2329,18 +2629,19 @@ docker service logs ivf_api --since 10m
 □ Replication lag monitoring active
 ```
 
-### 18.10 Security Final
+### 19.12 Security Final
 
 ```
 □ Root login disabled trên cả 2 VPS
 □ UFW active, only required ports open
 □ Fail2ban active
 □ Docker secrets in use (not env vars)
-□ PKI mTLS configured (SignServer)
+□ PKI mTLS configured (SignServer) — khi ready
 □ DB ports NOT exposed externally
 □ MinIO console: localhost only (127.0.0.1:9001)
 □ Backup secrets GPG encrypted before S3 upload
 □ S3 bucket: no public access
+□ GHCR_TOKEN rotated định kỳ
 ```
 
 ---
@@ -2348,45 +2649,49 @@ docker service logs ivf_api --since 10m
 ## Appendix A: Thứ tự thực hiện tổng hợp
 
 ```
-Ngày 1 (2-3 giờ):
-  ├─ Mua 2 VPS Contabo
-  ├─ Chuẩn bị VPS (Section 3) — 45 phút
-  ├─ Setup Docker Swarm (Section 4) — 15 phút
-  └─ Clone code + tạo secrets (Section 5) — 30 phút
+Cách 1: Ansible (khuyến nghị, ~30 phút)
+  └─ ansible-playbook -i hosts.yml site.yml --extra-vars "ghcr_token=ghp_xxx"
+     ├─ Phase 1: common (OS, SSH, firewall, fail2ban)
+     ├─ Phase 2: docker (Docker CE, Swarm init, node labels, GHCR login)
+     └─ Phase 3: app (secrets, pull images, deploy stack)
 
-Ngày 1 (tiếp, 2-3 giờ):
-  ├─ Build images (Section 6) — 30 phút
-  ├─ Tạo stack.yml (Section 7) — 15 phút
-  ├─ Deploy stack (Section 8) — 15 phút
-  ├─ Verify replication (Section 9) — 15 phút
-  └─ Setup PKI (Section 10) — 30-60 phút
+Cách 2: Thủ công (~2-3 ngày)
+  Ngày 1 (3-4 giờ):
+    ├─ Mua 2 VPS Contabo
+    ├─ Chuẩn bị VPS (Section 3) — 45 phút
+    ├─ Setup Docker Swarm (Section 4) — 15 phút
+    ├─ Clone code + tạo secrets (Section 5) — 30 phút
+    ├─ Setup CI/CD + GHCR (Section 6) — 30 phút
+    ├─ Copy stack file + Caddyfile (Section 7) — 15 phút
+    └─ Deploy stack (Section 8) — 15 phút
 
-Ngày 2 (2-3 giờ):
-  ├─ DNS + SSL (Section 11) — 30 phút
-  ├─ Setup AWS S3 (Section 12) — 30 phút
-  ├─ Backup scripts (Section 13) — 30 phút
-  ├─ Test restore (Section 14) — 30 phút
-  └─ Monitoring setup (Section 16) — 30 phút
+  Ngày 2 (2-3 giờ):
+    ├─ Setup PKI nếu cần (Section 11) — 30-60 phút
+    ├─ DNS + SSL (Section 12) — 30 phút
+    ├─ Setup AWS S3 (Section 13) — 30 phút
+    ├─ Backup scripts (Section 14) — 30 phút
+    ├─ Test restore (Section 15) — 30 phút
+    └─ Monitoring setup (Section 17) — 30 phút
 
-Ngày 3 (1 giờ):
-  ├─ Chạy Checklist (Section 18) — 30 phút
-  ├─ Stress test
-  └─ Sign-off
-
-Tổng: ~2-3 ngày làm việc
+  Ngày 3 (1 giờ):
+    ├─ Chạy Checklist (Section 19) — 30 phút
+    ├─ Stress test
+    └─ Sign-off
 ```
 
 ## Appendix B: Quick Reference Commands
 
 ```bash
 # ═══ Deploy ═══
-docker stack deploy -c stack.yml ivf        # Deploy/update stack
-docker service update --image X ivf_api     # Rolling update
+docker stack deploy -c docker-compose.stack.yml ivf  # Deploy/update stack
+docker service update --image ghcr.io/hung6066/ivf:latest ivf_api  # Rolling update API
+docker service update --image ghcr.io/hung6066/ivf-client:latest ivf_frontend  # Rolling update Frontend
 docker service rollback ivf_api             # Rollback
 
 # ═══ Monitor ═══
 docker service ls                            # List services
-docker service ps ivf_api                    # API replicas detail
+docker service ps ivf_api                    # API replica detail
+docker service ps ivf_frontend               # Frontend replica detail
 docker service logs -f ivf_api --tail=50    # Live logs
 docker node ls                               # Cluster nodes
 
@@ -2412,4 +2717,4 @@ docker exec -it $(docker ps -q -f name=ivf_api.1) sh
 ---
 
 _Tài liệu triển khai IVF Platform — Docker Swarm + AWS S3_
-_Phiên bản: 1.0 | Ngày: 2026-03-06_
+_Phiên bản: 2.0 | Ngày: 2026-03-07_

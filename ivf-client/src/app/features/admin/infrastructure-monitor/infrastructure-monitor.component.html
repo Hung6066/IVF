@@ -938,7 +938,9 @@
                       ? 'Hoạt động'
                       : check.status === 'degraded'
                         ? 'Chậm'
-                        : 'Không phản hồi'
+                        : check.status === 'disabled'
+                          ? 'Tắt'
+                          : 'Không phản hồi'
                   }}
                 </span>
               </div>
