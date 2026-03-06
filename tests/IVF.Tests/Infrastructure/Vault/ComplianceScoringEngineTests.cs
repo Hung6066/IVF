@@ -85,11 +85,11 @@ public class ComplianceScoringEngineTests
 
         report.Percentage.Should().BeGreaterThan(80);
         report.Grade.Should().BeOneOf("A+", "A", "A-", "B+");
-        report.Frameworks.Should().HaveCount(3);
+        report.Frameworks.Should().HaveCount(6);
     }
 
     [Fact]
-    public async Task Evaluate_ContainsAllThreeFrameworks()
+    public async Task Evaluate_ContainsAllSixFrameworks()
     {
         var report = await _sut.EvaluateAsync();
 
@@ -99,6 +99,9 @@ public class ComplianceScoringEngineTests
                 ComplianceFramework.Hipaa,
                 ComplianceFramework.Soc2,
                 ComplianceFramework.Gdpr,
+                ComplianceFramework.HitrustCsf,
+                ComplianceFramework.NistAiRmf,
+                ComplianceFramework.Iso42001,
             });
     }
 
@@ -112,12 +115,12 @@ public class ComplianceScoringEngineTests
     }
 
     [Fact]
-    public async Task Evaluate_MaxScore_Is380()
+    public async Task Evaluate_MaxScore_Is630()
     {
         var report = await _sut.EvaluateAsync();
 
-        // 15 HIPAA + 12 SOC2 + 11 GDPR = 38 controls × 10 pts
-        report.MaxScore.Should().Be(380);
+        // 15 HIPAA + 12 SOC2 + 11 GDPR + 10 HITRUST + 8 NIST AI + 7 ISO 42001 = 63 controls × 10 pts
+        report.MaxScore.Should().Be(630);
     }
 
     // ─── HIPAA Tests ────────────────────────────────────

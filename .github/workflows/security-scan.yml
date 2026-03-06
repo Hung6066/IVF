@@ -188,6 +188,9 @@ jobs:
 
             - name: Run Gitleaks
               uses: gitleaks/gitleaks-action@v2
+              with:
+                  enable-upload-artifact: false
+                  enable-summary-comment: false
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
