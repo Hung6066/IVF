@@ -1,0 +1,320 @@
+name: Deploy Production
+
+on:
+    workflow_run:
+        workflows: ["IVF System CI/CD"]
+        types: [completed]
+        branches: [main]
+
+    workflow_dispatch:
+        inputs:
+            image_tag:
+                description: "Docker image tag to deploy (e.g. sha-abc1234, v1.2.0)"
+                required: true
+                type: string
+            skip_health_check:
+                description: "Skip post-deploy health check"
+                required: false
+                default: false
+                type: boolean
+
+env:
+    REGISTRY: ghcr.io
+    IMAGE_NAME: ${{ github.repository }}
+    STACK_NAME: ivf
+    API_SERVICE: ivf_api
+
+jobs:
+    deploy-production:
+        name: Deploy to Production
+        runs-on: ubuntu-latest
+        if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+        environment: production
+        timeout-minutes: 15
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Determine image tag
+              id: tag
+              run: |
+                  if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+                    echo "image_tag=${{ inputs.image_tag }}" >> "$GITHUB_OUTPUT"
+                  else
+                    SHORT_SHA=$(echo "${{ github.event.workflow_run.head_sha }}" | cut -c1-7)
+                    echo "image_tag=sha-${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+                  fi
+
+            - name: Discord — Production deploy bắt đầu
+              env:
+                  DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+              run: |
+                  ACTOR="${{ github.event_name == 'workflow_dispatch' && github.actor || github.event.workflow_run.actor.login }}"
+                  curl -sS -H "Content-Type: application/json" -d '{
+                    "embeds": [{
+                      "title": "🚀 Production Deploy bắt đầu",
+                      "color": 16776960,
+                      "fields": [
+                        {"name": "Image", "value": "'"${{ steps.tag.outputs.image_tag }}"'", "inline": true},
+                        {"name": "Actor", "value": "'"${ACTOR}"'", "inline": true},
+                        {"name": "Trigger", "value": "'"${{ github.event_name }}"'", "inline": true}
+                      ],
+                      "timestamp": "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'"
+                    }]
+                  }' "${{ secrets.DISCORD_WEBHOOK }}" || true
+
+            - name: Setup SSH
+              run: |
+                  mkdir -p ~/.ssh
+                  echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+                  chmod 600 ~/.ssh/deploy_key
+                  ssh-keyscan -H "${{ secrets.SSH_HOST_MANAGER }}" >> ~/.ssh/known_hosts 2>/dev/null
+                  ssh-keyscan -H "${{ secrets.SSH_HOST_WORKER }}" >> ~/.ssh/known_hosts 2>/dev/null
+
+            - name: Pre-deploy — Backup database
+              env:
+                  SSH_HOST: ${{ secrets.SSH_HOST_MANAGER }}
+                  SSH_USER: ${{ secrets.SSH_USER }}
+              run: |
+                  echo "Creating pre-deploy database backup..."
+                  ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new \
+                    "${SSH_USER}@${SSH_HOST}" << 'BACKUP_SCRIPT'
+
+                  set -euo pipefail
+                  BACKUP_DIR="/opt/ivf/backups"
+                  TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+                  BACKUP_FILE="${BACKUP_DIR}/pre_deploy_${TIMESTAMP}.sql.gz"
+
+                  mkdir -p "${BACKUP_DIR}"
+
+                  # Backup via Docker
+                  docker exec $(docker ps -q -f name=ivf_db.1) \
+                    pg_dump -U postgres ivf_db | gzip > "${BACKUP_FILE}"
+
+                  echo "✅ Pre-deploy backup created: ${BACKUP_FILE}"
+                  ls -lh "${BACKUP_FILE}"
+                  BACKUP_SCRIPT
+
+            - name: Pull image on all nodes
+              env:
+                  SSH_USER: ${{ secrets.SSH_USER }}
+                  SSH_HOST_MANAGER: ${{ secrets.SSH_HOST_MANAGER }}
+                  SSH_HOST_WORKER: ${{ secrets.SSH_HOST_WORKER }}
+                  IMAGE_TAG: ${{ steps.tag.outputs.image_tag }}
+                  GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+              run: |
+                  FULL_IMAGE="${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
+                  echo "Pulling ${FULL_IMAGE} on all nodes..."
+
+                  for HOST in "${SSH_HOST_MANAGER}" "${SSH_HOST_WORKER}"; do
+                    echo "--- Pulling on ${HOST} ---"
+                    ssh -i ~/.ssh/deploy_key "${SSH_USER}@${HOST}" << PULL_SCRIPT
+                  set -euo pipefail
+                  echo "${GHCR_TOKEN}" | docker login ghcr.io -u hung6066 --password-stdin
+                  docker pull "${FULL_IMAGE}"
+                  echo "✅ Image pulled on $(hostname)"
+                  PULL_SCRIPT
+                  done
+
+            - name: Get current image (for rollback)
+              id: current
+              env:
+                  SSH_HOST: ${{ secrets.SSH_HOST_MANAGER }}
+                  SSH_USER: ${{ secrets.SSH_USER }}
+              run: |
+                  CURRENT_IMAGE=$(ssh -i ~/.ssh/deploy_key "${SSH_USER}@${SSH_HOST}" \
+                    "docker service inspect ${API_SERVICE} --format '{{.Spec.TaskTemplate.ContainerSpec.Image}}'" 2>/dev/null || echo "unknown")
+                  echo "current_image=${CURRENT_IMAGE}" >> "$GITHUB_OUTPUT"
+                  echo "Current image: ${CURRENT_IMAGE}"
+
+            - name: Rolling update API service
+              env:
+                  SSH_HOST: ${{ secrets.SSH_HOST_MANAGER }}
+                  SSH_USER: ${{ secrets.SSH_USER }}
+                  IMAGE_TAG: ${{ steps.tag.outputs.image_tag }}
+              run: |
+                  FULL_IMAGE="${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
+                  echo "Deploying ${FULL_IMAGE} to ${API_SERVICE}..."
+
+                  ssh -i ~/.ssh/deploy_key "${SSH_USER}@${SSH_HOST}" << DEPLOY_SCRIPT
+                  set -euo pipefail
+
+                  echo "=== Production Rolling Update ==="
+                  echo "Image: ${FULL_IMAGE}"
+                  echo "Service: ${API_SERVICE}"
+                  echo "Strategy: start-first, parallelism=1, delay=30s"
+
+                  docker service update \
+                    --image "${FULL_IMAGE}" \
+                    --update-parallelism 1 \
+                    --update-delay 30s \
+                    --update-order start-first \
+                    --update-failure-action rollback \
+                    --update-monitor 60s \
+                    --with-registry-auth \
+                    ${API_SERVICE}
+
+                  echo "=== Rolling Update Command Sent ==="
+
+                  # Wait for update to converge
+                  echo "Waiting for update to converge..."
+                  TIMEOUT=300
+                  ELAPSED=0
+                  while [ \$ELAPSED -lt \$TIMEOUT ]; do
+                    STATE=\$(docker service inspect ${API_SERVICE} \
+                      --format '{{.UpdateStatus.State}}' 2>/dev/null || echo "unknown")
+
+                    case "\$STATE" in
+                      "completed")
+                        echo "✅ Update completed successfully"
+                        break
+                        ;;
+                      "rollback_completed")
+                        echo "❌ Update failed — Swarm rolled back automatically"
+                        exit 1
+                        ;;
+                      "paused")
+                        echo "❌ Update paused due to failure"
+                        docker service update --rollback ${API_SERVICE}
+                        exit 1
+                        ;;
+                      *)
+                        echo "⏳ Update state: \$STATE (${ELAPSED}s/${TIMEOUT}s)"
+                        sleep 10
+                        ELAPSED=\$((ELAPSED + 10))
+                        ;;
+                    esac
+                  done
+
+                  if [ \$ELAPSED -ge \$TIMEOUT ]; then
+                    echo "❌ Update timed out after ${TIMEOUT}s"
+                    docker service update --rollback ${API_SERVICE}
+                    exit 1
+                  fi
+
+                  # Show final service state
+                  echo ""
+                  echo "=== Service Status ==="
+                  docker service ls --filter "name=${API_SERVICE}"
+                  docker service ps ${API_SERVICE} --no-trunc --format "table {{.Name}}\t{{.Image}}\t{{.CurrentState}}\t{{.Error}}" | head -10
+                  DEPLOY_SCRIPT
+
+            - name: Post-deploy health check
+              if: ${{ !inputs.skip_health_check }}
+              env:
+                  SSH_HOST: ${{ secrets.SSH_HOST_MANAGER }}
+                  SSH_USER: ${{ secrets.SSH_USER }}
+              run: |
+                  echo "Running post-deploy health checks..."
+                  sleep 10
+
+                  ssh -i ~/.ssh/deploy_key "${SSH_USER}@${SSH_HOST}" << 'HEALTH_SCRIPT'
+                  set -euo pipefail
+
+                  MAX_RETRIES=12
+                  RETRY_INTERVAL=10
+                  HEALTH_URL="http://localhost:8080/health/live"
+                  READY_URL="http://localhost:8080/health/ready"
+
+                  echo "=== Health Check ==="
+
+                  # 1. Liveness check
+                  echo "--- Liveness Check ---"
+                  LIVE_OK=false
+                  for i in $(seq 1 $MAX_RETRIES); do
+                    HTTP_CODE=$(curl -so /dev/null -w "%{http_code}" \
+                      --max-time 10 "${HEALTH_URL}" 2>/dev/null || echo "000")
+
+                    if [ "$HTTP_CODE" = "200" ]; then
+                      echo "✅ Liveness: OK (attempt $i)"
+                      LIVE_OK=true
+                      break
+                    fi
+                    echo "⏳ Liveness: HTTP $HTTP_CODE (attempt $i/$MAX_RETRIES)"
+                    sleep $RETRY_INTERVAL
+                  done
+
+                  if [ "$LIVE_OK" = "false" ]; then
+                    echo "❌ Liveness check failed"
+                    exit 1
+                  fi
+
+                  # 2. Readiness check (DB + Redis)
+                  echo "--- Readiness Check ---"
+                  READY_CODE=$(curl -so /dev/null -w "%{http_code}" \
+                    --max-time 15 "${READY_URL}" 2>/dev/null || echo "000")
+
+                  if [ "$READY_CODE" = "200" ]; then
+                    echo "✅ Readiness: OK (DB + Redis connected)"
+                  else
+                    echo "⚠️ Readiness: HTTP $READY_CODE (may need investigation)"
+                  fi
+
+                  # 3. Service replicas check
+                  echo "--- Replica Check ---"
+                  REPLICAS=$(docker service ls --format "{{.Replicas}}" --filter "name=ivf_api")
+                  echo "Service replicas: $REPLICAS"
+
+                  RUNNING=$(echo "$REPLICAS" | cut -d'/' -f1)
+                  DESIRED=$(echo "$REPLICAS" | cut -d'/' -f2)
+
+                  if [ "$RUNNING" = "$DESIRED" ]; then
+                    echo "✅ All $DESIRED replicas running"
+                  else
+                    echo "⚠️ Only $RUNNING of $DESIRED replicas running"
+                  fi
+
+                  # 4. No error logs in last 2 minutes
+                  echo "--- Error Log Check ---"
+                  ERROR_COUNT=$(docker service logs ivf_api --since 2m 2>&1 | grep -ci "error\|exception\|fatal" || true)
+                  if [ "$ERROR_COUNT" -le 2 ]; then
+                    echo "✅ Error logs: $ERROR_COUNT (acceptable)"
+                  else
+                    echo "⚠️ Error logs: $ERROR_COUNT detected in last 2 minutes"
+                  fi
+
+                  echo ""
+                  echo "=== Health Check Complete ==="
+                  HEALTH_SCRIPT
+
+            - name: Discord — Deploy thành công
+              if: success()
+              env:
+                  DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+              run: |
+                  curl -sS -H "Content-Type: application/json" -d '{
+                    "embeds": [{
+                      "title": "✅ Production Deploy thành công",
+                      "color": 5763719,
+                      "fields": [
+                        {"name": "Version", "value": "'"${{ steps.tag.outputs.image_tag }}"'", "inline": true},
+                        {"name": "Previous", "value": "'"${{ steps.current.outputs.current_image }}"'", "inline": true},
+                        {"name": "URL", "value": "https://ivf.clinic", "inline": false}
+                      ],
+                      "timestamp": "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'"
+                    }]
+                  }' "${{ secrets.DISCORD_WEBHOOK }}" || true
+
+            - name: Discord — Deploy thất bại
+              if: failure()
+              env:
+                  DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+              run: |
+                  curl -sS -H "Content-Type: application/json" -d '{
+                    "embeds": [{
+                      "title": "❌ Production Deploy THẤT BẠI",
+                      "color": 15548997,
+                      "description": "Deploy đã thất bại hoặc bị rollback. Kiểm tra logs ngay!",
+                      "fields": [
+                        {"name": "Version", "value": "'"${{ steps.tag.outputs.image_tag }}"'", "inline": true},
+                        {"name": "Rollback to", "value": "'"${{ steps.current.outputs.current_image }}"'", "inline": true},
+                        {"name": "Logs", "value": "[Xem chi tiết]('"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"')", "inline": false}
+                      ],
+                      "timestamp": "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'"
+                    }]
+                  }' "${{ secrets.DISCORD_WEBHOOK }}" || true
+
+            - name: Cleanup SSH
+              if: always()
+              run: rm -f ~/.ssh/deploy_key

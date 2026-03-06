@@ -1,0 +1,164 @@
+name: Deploy Staging
+
+on:
+    workflow_run:
+        workflows: ["IVF System CI/CD"]
+        types: [completed]
+        branches: [develop]
+
+env:
+    REGISTRY: ghcr.io
+    IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+    deploy-staging:
+        name: Deploy to Staging
+        runs-on: ubuntu-latest
+        if: ${{ github.event.workflow_run.conclusion == 'success' }}
+        environment: staging
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Get image tag
+              id: tag
+              run: |
+                  SHORT_SHA=$(echo "${{ github.event.workflow_run.head_sha }}" | cut -c1-7)
+                  echo "sha=sha-${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+                  echo "full_sha=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
+
+            - name: Discord — Deploy bắt đầu
+              if: vars.DISCORD_WEBHOOK != ''
+              env:
+                  DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+              run: |
+                  curl -sS -H "Content-Type: application/json" -d '{
+                    "embeds": [{
+                      "title": "🚀 Staging Deploy bắt đầu",
+                      "color": 16776960,
+                      "fields": [
+                        {"name": "Branch", "value": "develop", "inline": true},
+                        {"name": "Commit", "value": "'"${{ steps.tag.outputs.sha }}"'", "inline": true},
+                        {"name": "Actor", "value": "'"${{ github.event.workflow_run.actor.login }}"'", "inline": true}
+                      ],
+                      "timestamp": "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'"
+                    }]
+                  }' "$DISCORD_WEBHOOK"
+
+            - name: Setup SSH
+              run: |
+                  mkdir -p ~/.ssh
+                  echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+                  chmod 600 ~/.ssh/deploy_key
+                  ssh-keyscan -H "${{ secrets.SSH_HOST_STAGING }}" >> ~/.ssh/known_hosts 2>/dev/null
+
+            - name: Deploy to staging server
+              env:
+                  SSH_HOST: ${{ secrets.SSH_HOST_STAGING }}
+                  SSH_USER: ${{ secrets.SSH_USER }}
+                  IMAGE_TAG: ${{ steps.tag.outputs.sha }}
+                  GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+              run: |
+                  ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new \
+                    "${SSH_USER}@${SSH_HOST}" << 'DEPLOY_SCRIPT'
+
+                  set -euo pipefail
+                  echo "=== Staging Deploy Started ==="
+
+                  # Login to GHCR
+                  echo "${GHCR_TOKEN}" | docker login ghcr.io -u hung6066 --password-stdin
+
+                  # Pull new image
+                  IMAGE="ghcr.io/${IMAGE_NAME}:${IMAGE_TAG}"
+                  echo "Pulling image: ${IMAGE}"
+                  docker pull "${IMAGE}"
+
+                  # Update API service
+                  echo "Updating ivf_api service..."
+                  docker service update \
+                    --image "${IMAGE}" \
+                    --update-parallelism 1 \
+                    --update-delay 15s \
+                    --update-order start-first \
+                    --update-failure-action rollback \
+                    --update-monitor 30s \
+                    ivf_api
+
+                  echo "=== Staging Deploy Completed ==="
+                  DEPLOY_SCRIPT
+
+            - name: Health check
+              env:
+                  SSH_HOST: ${{ secrets.SSH_HOST_STAGING }}
+                  SSH_USER: ${{ secrets.SSH_USER }}
+              run: |
+                  echo "Waiting for service to stabilize..."
+                  sleep 15
+
+                  ssh -i ~/.ssh/deploy_key "${SSH_USER}@${SSH_HOST}" << 'HEALTH_SCRIPT'
+                  set -euo pipefail
+                  MAX_RETRIES=10
+                  RETRY_INTERVAL=10
+
+                  for i in $(seq 1 $MAX_RETRIES); do
+                    echo "Health check attempt $i/$MAX_RETRIES..."
+
+                    HTTP_CODE=$(curl -so /dev/null -w "%{http_code}" \
+                      --max-time 10 http://localhost:8080/health/live 2>/dev/null || echo "000")
+
+                    if [ "$HTTP_CODE" = "200" ]; then
+                      echo "✅ Health check passed (HTTP $HTTP_CODE)"
+
+                      # Check service replicas
+                      REPLICAS=$(docker service ls --format "{{.Replicas}}" --filter "name=ivf_api")
+                      echo "Service replicas: $REPLICAS"
+
+                      exit 0
+                    fi
+
+                    echo "⏳ Health check returned HTTP $HTTP_CODE, retrying in ${RETRY_INTERVAL}s..."
+                    sleep $RETRY_INTERVAL
+                  done
+
+                  echo "❌ Health check failed after $MAX_RETRIES attempts"
+                  exit 1
+                  HEALTH_SCRIPT
+
+            - name: Discord — Deploy thành công
+              if: success()
+              env:
+                  DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+              run: |
+                  curl -sS -H "Content-Type: application/json" -d '{
+                    "embeds": [{
+                      "title": "✅ Staging Deploy thành công",
+                      "color": 5763719,
+                      "fields": [
+                        {"name": "Version", "value": "'"${{ steps.tag.outputs.sha }}"'", "inline": true},
+                        {"name": "URL", "value": "https://staging.ivf.clinic", "inline": true}
+                      ],
+                      "timestamp": "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'"
+                    }]
+                  }' "${{ secrets.DISCORD_WEBHOOK }}"
+
+            - name: Discord — Deploy thất bại
+              if: failure()
+              env:
+                  DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+              run: |
+                  curl -sS -H "Content-Type: application/json" -d '{
+                    "embeds": [{
+                      "title": "❌ Staging Deploy thất bại",
+                      "color": 15548997,
+                      "fields": [
+                        {"name": "Version", "value": "'"${{ steps.tag.outputs.sha }}"'", "inline": true},
+                        {"name": "Run", "value": "'"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"'", "inline": false}
+                      ],
+                      "timestamp": "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'"
+                    }]
+                  }' "${{ secrets.DISCORD_WEBHOOK }}"
+
+            - name: Cleanup SSH
+              if: always()
+              run: rm -f ~/.ssh/deploy_key

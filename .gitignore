@@ -67,6 +67,9 @@ certs/
 secrets/
 keys/
 
+# Ansible inventory (contains real IPs)
+ansible/hosts.yml
+
 # Production override env files
 .env.production
 

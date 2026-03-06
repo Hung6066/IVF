@@ -1,0 +1,162 @@
+# ═══════════════════════════════════════════════════════════
+#  Role: app — Tạo secrets, clone source, deploy stack
+#  Chạy trên: manager node only
+#  Tương ứng: swarm_s3_deployment_guide.md Section 5-8
+# ═══════════════════════════════════════════════════════════
+
+# ─── Generate Secrets (chỉ nếu chưa có) ───
+- name: Kiểm tra secrets đã tồn tại
+  stat:
+    path: "{{ project_dir }}/secrets/ivf_db_password.txt"
+  register: secrets_exist
+
+- name: Tạo database passwords
+  shell: openssl rand -base64 32 > {{ project_dir }}/secrets/{{ item }}
+  loop:
+    - ivf_db_password.txt
+    - ejbca_db_password.txt
+    - signserver_db_password.txt
+  when: not secrets_exist.stat.exists
+  become_user: "{{ deploy_user }}"
+
+- name: Tạo JWT RSA private key
+  command: openssl genrsa -out {{ project_dir }}/secrets/jwt_private.pem 2048
+  when: not secrets_exist.stat.exists
+  become_user: "{{ deploy_user }}"
+
+- name: Export JWT RSA public key
+  command: >
+    openssl rsa
+    -in {{ project_dir }}/secrets/jwt_private.pem
+    -pubout
+    -out {{ project_dir }}/secrets/jwt_public.pem
+  when: not secrets_exist.stat.exists
+  become_user: "{{ deploy_user }}"
+
+- name: Copy JWT private key vào jwt_secret.txt
+  copy:
+    src: "{{ project_dir }}/secrets/jwt_private.pem"
+    dest: "{{ project_dir }}/secrets/jwt_secret.txt"
+    remote_src: yes
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0600"
+  when: not secrets_exist.stat.exists
+
+- name: Tạo MinIO access key
+  shell: echo "ivf-admin-$(openssl rand -hex 8)" > {{ project_dir }}/secrets/minio_access_key.txt
+  when: not secrets_exist.stat.exists
+  become_user: "{{ deploy_user }}"
+
+- name: Tạo MinIO secret key
+  shell: openssl rand -base64 32 > {{ project_dir }}/secrets/minio_secret_key.txt
+  when: not secrets_exist.stat.exists
+  become_user: "{{ deploy_user }}"
+
+- name: Tạo API cert password
+  shell: openssl rand -base64 24 > {{ project_dir }}/secrets/api_cert_password.txt
+  when: not secrets_exist.stat.exists
+  become_user: "{{ deploy_user }}"
+
+- name: Tạo SoftHSM PINs
+  shell: openssl rand -hex 16 > {{ project_dir }}/secrets/{{ item }}
+  loop:
+    - softhsm_pin.txt
+    - softhsm_so_pin.txt
+  when: not secrets_exist.stat.exists
+  become_user: "{{ deploy_user }}"
+
+- name: Tạo GPG passphrase
+  shell: openssl rand -base64 32 > {{ project_dir }}/secrets/gpg_passphrase.txt
+  when: not secrets_exist.stat.exists
+  become_user: "{{ deploy_user }}"
+
+- name: Thiết lập permissions cho secrets
+  file:
+    path: "{{ project_dir }}/secrets"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0700"
+    recurse: yes
+
+# ─── Docker Secrets (Swarm Raft store) ───
+- name: Kiểm tra Docker secrets hiện có
+  command: docker secret ls --format '{{ '{{' }}.Name{{ '}}' }}'
+  register: existing_secrets
+  changed_when: false
+
+- name: Tạo Docker Secrets từ files
+  shell: >
+    docker secret create {{ item.name }}
+    {{ project_dir }}/secrets/{{ item.file }}
+  loop:
+    - { name: ivf_db_password, file: ivf_db_password.txt }
+    - { name: ejbca_db_password, file: ejbca_db_password.txt }
+    - { name: signserver_db_password, file: signserver_db_password.txt }
+    - { name: jwt_secret, file: jwt_secret.txt }
+    - { name: minio_access_key, file: minio_access_key.txt }
+    - { name: minio_secret_key, file: minio_secret_key.txt }
+    - { name: api_cert_password, file: api_cert_password.txt }
+    - { name: softhsm_pin, file: softhsm_pin.txt }
+    - { name: softhsm_so_pin, file: softhsm_so_pin.txt }
+  when: item.name not in existing_secrets.stdout
+  loop_control:
+    label: "{{ item.name }}"
+
+# ─── Copy stack file lên VPS ───
+- name: Kiểm tra source code
+  stat:
+    path: "{{ project_dir }}/stack.yml"
+  register: source_exist
+
+- name: Copy stack file
+  copy:
+    src: "{{ playbook_dir }}/../docker-compose.production.yml"
+    dest: "{{ project_dir }}/stack.yml"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0644"
+  when: not source_exist.stat.exists
+
+# ─── Pull Images từ GHCR ───
+- name: Pull API image
+  command: "docker pull ghcr.io/{{ ghcr_user }}/ivf:{{ image_tag | default('main') }}"
+  become_user: "{{ deploy_user }}"
+  when: ghcr_token is defined and ghcr_token | length > 0
+  ignore_errors: true
+
+- name: Pull Frontend image
+  command: "docker pull ghcr.io/{{ ghcr_user }}/ivf-client:{{ image_tag | default('main') }}"
+  become_user: "{{ deploy_user }}"
+  when: ghcr_token is defined and ghcr_token | length > 0
+  ignore_errors: true
+
+# ─── Deploy Stack ───
+- name: Kiểm tra stack đã deploy
+  command: docker stack ls --format '{{ '{{' }}.Name{{ '}}' }}'
+  register: deployed_stacks
+  changed_when: false
+
+- name: Deploy Swarm Stack
+  command: >
+    docker stack deploy
+    -c {{ project_dir }}/stack.yml
+    --with-registry-auth
+    ivf
+  become_user: "{{ deploy_user }}"
+  when: "'ivf' not in deployed_stacks.stdout"
+
+- name: Đợi services khởi động
+  pause:
+    seconds: 30
+  when: "'ivf' not in deployed_stacks.stdout"
+
+- name: Kiểm tra services
+  command: docker service ls
+  register: service_list
+  changed_when: false
+
+- name: Hiện trạng services
+  debug:
+    var: service_list.stdout_lines

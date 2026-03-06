@@ -295,6 +295,14 @@ builder.Services.AddSingleton<IVF.API.Services.EvidenceCollectorService>();
 builder.Services.AddSingleton<IVF.API.Services.ComplianceAuditorService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<IVF.API.Services.WalBackupSchedulerService>());
 
+// ─── Infrastructure Monitoring (VPS metrics, Swarm, S3) ───
+builder.Services.AddSingleton<IVF.API.Services.InfrastructureMonitorService>();
+builder.Services.AddHttpClient<IVF.API.Services.DiscordAlertService>();
+builder.Services.AddSingleton<IVF.API.Services.SwarmAutoHealingService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<IVF.API.Services.SwarmAutoHealingService>());
+builder.Services.AddSingleton<IVF.API.Services.InfrastructureMetricsPusher>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<IVF.API.Services.InfrastructureMetricsPusher>());
+
 // ─── Cloud Backup Provider Factory (dynamic, DB-backed) ───
 {
     var cloudSection = builder.Configuration.GetSection(IVF.API.Services.CloudBackupSettings.SectionName);
@@ -540,6 +548,7 @@ app.MapHub<IVF.API.Hubs.NotificationHub>("/hubs/notifications");
 app.MapHub<IVF.API.Hubs.FingerprintHub>("/hubs/fingerprint");
 app.MapHub<IVF.API.Hubs.BackupHub>("/hubs/backup");
 app.MapHub<IVF.API.Hubs.EvidenceHub>("/hubs/evidence");
+app.MapHub<IVF.API.Hubs.InfrastructureHub>("/hubs/infrastructure");
 
 // Register Endpoints
 app.MapAuthEndpoints();
@@ -594,6 +603,7 @@ app.MapComplianceScheduleEndpoints(); // Phase 4: Ongoing compliance task schedu
 app.MapComplianceMonitoringEndpoints(); // Phase 4: Continuous monitoring, health dashboard, AI alerts
 app.MapTrustPageEndpoints(); // Public trust/security page — no auth required
 app.MapTenantEndpoints(); // Multi-tenant management — platform admin
+app.MapInfrastructureEndpoints(); // Infrastructure monitoring — VPS, Swarm, S3
 
 // ── Config seeders: run in every environment (idempotent, no demo data) ──────
 {

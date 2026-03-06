@@ -265,6 +265,13 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'admin/infrastructure',
+        loadComponent: () =>
+          import('./features/admin/infrastructure-monitor/infrastructure-monitor.component').then(
+            (m) => m.InfrastructureMonitorComponent,
+          ),
+      },
+      {
         path: 'admin/certificates',
         loadComponent: () =>
           import('./features/admin/certificate-management/certificate-management.component').then(

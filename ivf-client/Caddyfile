@@ -1,0 +1,31 @@
+# Caddyfile for containerized frontend (standalone SPA)
+# Used inside Docker container only
+# Production reverse proxy is handled by docker/caddy/Caddyfile
+
+:80 {
+	root * /srv/frontend
+
+	# SPA fallback — all routes → index.html
+	try_files {path} /index.html
+
+	file_server
+
+	# Compression
+	encode gzip zstd
+
+	# Security headers
+	header {
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	# Cache static assets
+	@static path *.js *.css *.png *.jpg *.jpeg *.gif *.svg *.ico *.woff *.woff2
+	header @static Cache-Control "public, max-age=31536000, immutable"
+
+	# No cache for index.html (always get latest)
+	@html path /index.html
+	header @html Cache-Control "no-cache, no-store, must-revalidate"
+}

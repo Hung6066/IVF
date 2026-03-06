@@ -73,8 +73,6 @@ services:
     volumes:
       - ./certs/api/api-client.p12:/app/certs/api-client.p12:ro
       - ./certs/ca-chain.pem:/app/certs/ca-chain.pem:ro
-    ports:
-      - "5000:8080"
     networks:
       - ivf-public
       - ivf-signing
@@ -86,7 +84,6 @@ services:
 
   # ─── Redis ───
   redis:
-    ports: !override [] # Remove host port
     networks:
       - ivf-data
     command: >
@@ -107,8 +104,8 @@ services:
       - INITIAL_ADMIN=;CertificateAuthenticationToken:WITH_ISSUER_SERIAL;CN=ManagementCA,O=IVF Clinic;${EJBCA_ADMIN_CERT_SERIAL:-0};
     secrets:
       - ejbca_db_password
-    ports: !override
-      - "8443:8443" # HTTPS Admin only — restrict with firewall  [host 8443 blocked by Hyper-V]
+    ports:
+      - "8443:8443" # HTTPS Admin only — restrict with firewall
       # REMOVED: 8442:8080 (HTTP enrollment) — not needed externally
     volumes:
       - ejbca_persistent:/opt/keyfactor/persistent
@@ -131,7 +128,6 @@ services:
       - POSTGRES_DB=ejbca
     secrets:
       - ejbca_db_password
-    ports: !override [] # No host port
     networks:
       - ivf-data
 
@@ -157,7 +153,7 @@ services:
       - keystore_password
       - softhsm_pin
       - softhsm_so_pin
-    ports: !override
+    ports:
       - "9443:8443" # HTTPS Admin only — restrict with firewall
       # Port 9080 completely REMOVED (Phase 3)
     volumes:
@@ -195,7 +191,6 @@ services:
       - POSTGRES_DB=signserver
     secrets:
       - signserver_db_password
-    ports: !override [] # No host port
     networks:
       - ivf-data
 
@@ -209,7 +204,7 @@ services:
     secrets:
       - minio_access_key
       - minio_secret_key
-    ports: !override # MinIO API accessible from replica; console localhost-only
+    ports: # MinIO API accessible from replica; console localhost-only
       - "0.0.0.0:9000:9000"
       - "127.0.0.1:9001:9001"
     networks:
@@ -261,10 +256,6 @@ services:
       resources:
         limits:
           memory: 256M
-
-  # ─── API: Remove direct port exposure (Caddy handles TLS termination) ───
-  api:
-    ports: !override [] # No direct host port — all traffic via Caddy
 
 # ─── Docker Secrets ───
 secrets:

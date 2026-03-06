@@ -1,0 +1,66 @@
+# ═══════════════════════════════════════════════════════════
+# IVF Platform — Ansible Inventory
+# ═══════════════════════════════════════════════════════════
+#
+# Sử dụng:
+#   1. Copy file này thành hosts.yml:
+#      cp hosts.example.yml hosts.yml
+#   2. Thay <VPS1_IP> và <VPS2_IP> bằng IP thực
+#   3. Đảm bảo SSH key đã được copy vào VPS:
+#      ssh-copy-id root@<VPS1_IP>
+#      ssh-copy-id root@<VPS2_IP>
+#
+# Chạy:
+#   ansible-playbook -i hosts.yml site.yml
+# ═══════════════════════════════════════════════════════════
+
+all:
+  vars:
+    # ─── User deploy sẽ được tạo trên VPS ───
+    deploy_user: deploy
+    deploy_group: deploy
+
+    # ─── Timezone ───
+    timezone: Asia/Ho_Chi_Minh
+
+    # ─── Docker ───
+    docker_log_max_size: "50m"
+    docker_log_max_file: "5"
+
+    # ─── Project ───
+    project_dir: /opt/ivf
+    github_repo: git@github.com:Hung6066/IVF.git
+    # Hoặc HTTPS: https://github.com/Hung6066/IVF.git
+
+    # ─── GHCR (GitHub Container Registry) ───
+    ghcr_user: hung6066
+    # ghcr_token: set via --extra-vars hoặc vault
+
+    # ─── Domain ───
+    domain: ivf.clinic
+
+  children:
+    managers:
+      hosts:
+        vps1:
+          ansible_host: <VPS1_IP>
+          ansible_user: root
+          ansible_ssh_private_key_file: ~/.ssh/id_ed25519
+          swarm_role: primary
+          node_labels:
+            role: primary
+
+    workers:
+      hosts:
+        vps2:
+          ansible_host: <VPS2_IP>
+          ansible_user: root
+          ansible_ssh_private_key_file: ~/.ssh/id_ed25519
+          swarm_role: standby
+          node_labels:
+            role: standby
+
+    swarm:
+      children:
+        managers:
+        workers:

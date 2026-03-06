@@ -1,0 +1,51 @@
+# ═══════════════════════════════════════════════════════════
+#  IVF Platform — Ansible Master Playbook
+# ═══════════════════════════════════════════════════════════
+#
+#  Tự động hóa toàn bộ quá trình setup VPS & deploy:
+#    1. common  — Update OS, packages, user, SSH, firewall, fail2ban
+#    2. docker  — Cài Docker Engine, khởi tạo Swarm cluster
+#    3. app     — Tạo secrets, clone source, deploy stack
+#
+#  Sử dụng:
+#    # Setup toàn bộ từ zero
+#    ansible-playbook -i hosts.yml site.yml --extra-vars "ghcr_token=ghp_xxx"
+#
+#    # Chỉ setup cơ bản (OS, Docker)
+#    ansible-playbook -i hosts.yml site.yml --tags setup
+#
+#    # Chỉ deploy app
+#    ansible-playbook -i hosts.yml site.yml --tags deploy --extra-vars "ghcr_token=ghp_xxx"
+#
+#    # Deploy image cụ thể
+#    ansible-playbook -i hosts.yml site.yml --tags deploy \
+#      --extra-vars "ghcr_token=ghp_xxx image_tag=v1.2.0"
+#
+#    # Dry run (xem sẽ làm gì)
+#    ansible-playbook -i hosts.yml site.yml --check --diff
+#
+# ═══════════════════════════════════════════════════════════
+
+# ──────────── Phase 1: Setup cơ bản (tất cả VPS) ────────────
+- name: "Phase 1 — Chuẩn bị VPS"
+  hosts: swarm
+  become: true
+  tags: [setup, common]
+  roles:
+    - common
+
+# ──────────── Phase 2: Docker + Swarm (tất cả VPS) ────────────
+- name: "Phase 2 — Docker & Swarm Cluster"
+  hosts: swarm
+  become: true
+  tags: [setup, docker]
+  roles:
+    - docker
+
+# ──────────── Phase 3: Deploy app (manager only) ────────────
+- name: "Phase 3 — Secrets & Deploy Stack"
+  hosts: managers
+  become: true
+  tags: [deploy, app]
+  roles:
+    - app

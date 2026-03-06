@@ -1,0 +1,1148 @@
+<div class="infra-page">
+  <!-- ═══ Header ═══ -->
+  <div class="page-header">
+    <div class="header-left">
+      <h2>Giám sát Hạ tầng</h2>
+      <p class="subtitle">
+        VPS • Docker Swarm • S3 Backup — Realtime
+        @if (connected()) {
+          <span class="conn-dot conn-ok"></span>
+          <span class="conn-label conn-label-ok">Đang kết nối</span>
+        } @else {
+          <span class="conn-dot conn-err"></span>
+          <span class="conn-label conn-label-err">Mất kết nối</span>
+        }
+      </p>
+    </div>
+    <div class="header-right">
+      @if (criticalAlerts().length > 0) {
+        <span class="alert-badge alert-badge-critical">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+          {{ criticalAlerts().length }} Cảnh báo nghiêm trọng
+        </span>
+      }
+      @if (warningAlerts().length > 0) {
+        <span class="alert-badge alert-badge-warning">
+          <i class="fa-solid fa-exclamation"></i>
+          {{ warningAlerts().length }} Cảnh báo
+        </span>
+      }
+    </div>
+  </div>
+
+  <!-- ═══ Alert Banner ═══ -->
+  @if (alerts().length > 0) {
+    <div class="alert-list">
+      @for (alert of alerts(); track alert.source + alert.timestamp) {
+        <div
+          class="alert-row"
+          [ngClass]="alert.level === 'critical' ? 'alert-row-critical' : 'alert-row-warning'"
+        >
+          @if (alert.level === 'critical') {
+            <i class="fa-solid fa-circle-exclamation alert-icon-critical"></i>
+          } @else {
+            <i class="fa-solid fa-triangle-exclamation alert-icon-warning"></i>
+          }
+          <strong class="alert-source">{{ alert.source }}</strong>
+          <span class="alert-msg">{{ alert.message }}</span>
+          <span class="alert-time">{{ alert.timestamp | date: 'HH:mm:ss' }}</span>
+        </div>
+      }
+    </div>
+  }
+
+  <!-- ═══ Tabs ═══ -->
+  <div class="tabs-nav">
+    <button
+      (click)="switchTab('dashboard')"
+      class="tab-btn"
+      [class.active]="activeTab === 'dashboard'"
+    >
+      <i class="fa-solid fa-gauge-high"></i> Tổng quan
+    </button>
+    <button (click)="switchTab('swarm')" class="tab-btn" [class.active]="activeTab === 'swarm'">
+      <i class="fa-brands fa-docker"></i> Docker Swarm
+    </button>
+    <button (click)="switchTab('health')" class="tab-btn" [class.active]="activeTab === 'health'">
+      <i class="fa-solid fa-heart-pulse"></i> Health
+    </button>
+    <button (click)="switchTab('s3')" class="tab-btn" [class.active]="activeTab === 's3'">
+      <i class="fa-solid fa-cloud"></i> S3 Backup
+    </button>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════ -->
+  <!--  TAB: Dashboard (Tổng quan)                         -->
+  <!-- ════════════════════════════════════════════════════ -->
+  @if (activeTab === 'dashboard') {
+    @if (loading() && !metrics()) {
+      <div class="loading-placeholder">
+        <i class="fa-solid fa-spinner fa-spin"></i>
+        <p>Đang tải dữ liệu hạ tầng...</p>
+      </div>
+    } @else {
+      @if (metrics(); as m) {
+        <!-- Stats Grid -->
+        <div class="stats-grid">
+          <!-- CPU -->
+          <div class="stat-card stat-blue">
+            <div class="stat-icon"><i class="fa-solid fa-microchip"></i></div>
+            <div class="stat-info">
+              <div class="stat-value" [ngClass]="getValueColor(m.cpuUsagePercent)">
+                {{ m.cpuUsagePercent }}%
+              </div>
+              <div class="stat-label">CPU · {{ m.cpuCount }} cores</div>
+              <div class="stat-bar">
+                <div
+                  class="stat-bar-fill"
+                  [ngClass]="getBarFillClass(m.cpuUsagePercent)"
+                  [style.width]="getCpuBarWidth()"
+                ></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- RAM -->
+          <div class="stat-card stat-purple">
+            <div class="stat-icon"><i class="fa-solid fa-memory"></i></div>
+            <div class="stat-info">
+              <div class="stat-value" [ngClass]="getValueColor(m.memoryUsagePercent)">
+                {{ m.memoryUsagePercent }}%
+              </div>
+              <div class="stat-label">
+                RAM · {{ formatBytes(m.memoryUsedBytes) }} / {{ formatBytes(m.memoryTotalBytes) }}
+              </div>
+              <div class="stat-bar">
+                <div
+                  class="stat-bar-fill"
+                  [ngClass]="getBarFillClass(m.memoryUsagePercent)"
+                  [style.width]="getRamBarWidth()"
+                ></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Disk -->
+          <div class="stat-card stat-orange">
+            <div class="stat-icon"><i class="fa-solid fa-hard-drive"></i></div>
+            <div class="stat-info">
+              <div class="stat-label" style="margin-bottom: 0.4rem">Disk</div>
+              @for (disk of m.disks; track disk.mountPoint) {
+                <div class="disk-row">
+                  <span class="disk-mount">{{ disk.mountPoint }}</span>
+                  <span class="disk-size"
+                    >{{ formatBytes(disk.usedBytes) }} / {{ formatBytes(disk.totalBytes) }}</span
+                  >
+                  <span class="disk-pct" [ngClass]="getValueColor(disk.usagePercent)"
+                    >{{ disk.usagePercent }}%</span
+                  >
+                  <div class="stat-bar" style="margin-top: 2px">
+                    <div
+                      class="stat-bar-fill"
+                      [ngClass]="getBarFillClass(disk.usagePercent)"
+                      [style.width]="disk.usagePercent + '%'"
+                    ></div>
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+
+          <!-- System info -->
+          <div class="stat-card stat-green">
+            <div class="stat-icon"><i class="fa-solid fa-server"></i></div>
+            <div class="stat-info">
+              <div class="stat-label">Hệ thống</div>
+              <div class="sys-rows">
+                <div class="sys-row">
+                  <span class="sys-key">Hostname</span>
+                  <span class="sys-val code">{{ m.hostname }}</span>
+                </div>
+                <div class="sys-row">
+                  <span class="sys-key">OS</span>
+                  <span class="sys-val" [title]="m.os">{{ m.os }}</span>
+                </div>
+                <div class="sys-row">
+                  <span class="sys-key">Uptime</span>
+                  <span class="sys-val uptime">{{ formatUptime(m.uptimeSeconds) }}</span>
+                </div>
+                <div class="sys-row">
+                  <span class="sys-key">Cập nhật</span>
+                  <span class="sys-val">{{ m.collectedAt | date: 'HH:mm:ss' }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sparkline Charts -->
+        @if (cpuHistory().length > 1 || ramHistory().length > 1) {
+          <div class="charts-grid">
+            @if (cpuHistory().length > 1) {
+              <div class="card">
+                <div class="card-header">
+                  <h3><i class="fa-solid fa-chart-line"></i> CPU History (5 phút)</h3>
+                </div>
+                <div class="card-body chart-area">
+                  <svg viewBox="0 0 200 50" preserveAspectRatio="none" class="sparkline">
+                    <defs>
+                      <linearGradient id="cpuGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.3" />
+                        <stop offset="100%" stop-color="#3b82f6" stop-opacity="0.02" />
+                      </linearGradient>
+                    </defs>
+                    <path [attr.d]="getSparklineArea(cpuHistory())" fill="url(#cpuGrad)" />
+                    <path
+                      [attr.d]="getSparklinePath(cpuHistory(), 50)"
+                      fill="none"
+                      stroke="#3b82f6"
+                      stroke-width="1.5"
+                    />
+                  </svg>
+                </div>
+              </div>
+            }
+            @if (ramHistory().length > 1) {
+              <div class="card">
+                <div class="card-header">
+                  <h3><i class="fa-solid fa-chart-line"></i> RAM History (5 phút)</h3>
+                </div>
+                <div class="card-body chart-area">
+                  <svg viewBox="0 0 200 50" preserveAspectRatio="none" class="sparkline">
+                    <defs>
+                      <linearGradient id="ramGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="#8b5cf6" stop-opacity="0.3" />
+                        <stop offset="100%" stop-color="#8b5cf6" stop-opacity="0.02" />
+                      </linearGradient>
+                    </defs>
+                    <path [attr.d]="getSparklineArea(ramHistory())" fill="url(#ramGrad)" />
+                    <path
+                      [attr.d]="getSparklinePath(ramHistory(), 50)"
+                      fill="none"
+                      stroke="#8b5cf6"
+                      stroke-width="1.5"
+                    />
+                  </svg>
+                </div>
+              </div>
+            }
+          </div>
+        }
+      }
+
+      <!-- Quick Status: Services + Health -->
+      <div class="content-grid">
+        <!-- Services -->
+        <div class="card">
+          <div class="card-header">
+            <h3><i class="fa-brands fa-docker"></i> Docker Services</h3>
+            <span class="badge badge-info">{{ swarmServices().length }}</span>
+          </div>
+          <div class="card-body">
+            @for (svc of swarmServices(); track svc.id) {
+              <div class="svc-row">
+                <span class="svc-dot" [ngClass]="'dot-' + svc.status"></span>
+                <span class="svc-name">{{ svc.name }}</span>
+                <span
+                  class="svc-replicas"
+                  [ngClass]="svc.runningReplicas === svc.desiredReplicas ? 'rep-ok' : 'rep-warn'"
+                >
+                  {{ svc.runningReplicas }}/{{ svc.desiredReplicas }}
+                </span>
+                <button (click)="openScaleDialog(svc)" class="btn-icon" title="Scale">
+                  <i class="fa-solid fa-sliders"></i>
+                </button>
+              </div>
+            } @empty {
+              <div class="empty-placeholder">
+                <span class="empty-icon">🐳</span>
+                <p>Không có dữ liệu Swarm</p>
+              </div>
+            }
+          </div>
+        </div>
+
+        <!-- Health -->
+        <div class="card">
+          <div class="card-header">
+            <h3><i class="fa-solid fa-heart-pulse"></i> Health Check</h3>
+            @if (health(); as h) {
+              <span class="badge" [ngClass]="'badge-' + h.overallStatus">
+                {{
+                  h.overallStatus === 'healthy'
+                    ? 'Tốt'
+                    : h.overallStatus === 'degraded'
+                      ? 'Chậm'
+                      : 'Lỗi'
+                }}
+              </span>
+            }
+          </div>
+          <div class="card-body">
+            @if (health(); as h) {
+              @for (check of h.checks; track check.name) {
+                <div class="health-row">
+                  <div class="health-left">
+                    <span class="health-icon-wrap" [ngClass]="'hi-' + check.status">
+                      <i [ngClass]="getHealthIcon(check.name)"></i>
+                    </span>
+                    <span class="health-name">{{ check.name }}</span>
+                  </div>
+                  <div class="health-right">
+                    @if (check.responseTime) {
+                      <span class="health-time">{{ check.responseTime }}</span>
+                    }
+                    @if (check.error) {
+                      <span class="health-err">{{ check.error }}</span>
+                    }
+                  </div>
+                </div>
+              }
+              <p class="check-time">Kiểm tra lúc {{ h.checkedAt | date: 'HH:mm:ss' }}</p>
+            } @else {
+              <div class="loading-placeholder small">
+                <i class="fa-solid fa-spinner fa-spin"></i>
+                <p>Đang kiểm tra...</p>
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+    }
+  }
+
+  <!-- ════════════════ TAB: Docker Swarm ════════════════ -->
+  @if (activeTab === 'swarm') {
+    <!-- Nodes -->
+    <div class="card">
+      <div class="card-header">
+        <h3><i class="fa-solid fa-server"></i> Swarm Nodes</h3>
+        <span class="badge badge-info">{{ swarmNodes().length }} nodes</span>
+      </div>
+      <div class="card-body table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Node ID</th>
+              <th>Hostname</th>
+              <th>Trạng thái</th>
+              <th>Availability</th>
+              <th>Role</th>
+              <th>Docker Engine</th>
+              <th>Hành động</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (node of swarmNodes(); track node.id) {
+              <tr>
+                <td class="code muted">{{ node.id }}</td>
+                <td class="bold">{{ node.hostname }}</td>
+                <td>
+                  <span
+                    class="badge"
+                    [ngClass]="node.status === 'Ready' ? 'badge-healthy' : 'badge-down'"
+                  >
+                    {{ node.status }}
+                  </span>
+                </td>
+                <td>
+                  <span
+                    class="badge"
+                    [ngClass]="
+                      node.availability === 'Active'
+                        ? 'badge-healthy'
+                        : node.availability === 'Drain'
+                          ? 'badge-warning'
+                          : 'badge-muted'
+                    "
+                  >
+                    {{ node.availability }}
+                  </span>
+                </td>
+                <td>
+                  @if (node.managerStatus) {
+                    <span class="badge badge-info">{{ node.managerStatus }}</span>
+                  } @else {
+                    <span class="muted">Worker</span>
+                  }
+                </td>
+                <td class="code muted">{{ node.engineVersion }}</td>
+                <td class="action-cell">
+                  <div class="action-group">
+                    @if (node.availability === 'Active') {
+                      <button
+                        (click)="openNodeAction(node.id, 'drain')"
+                        class="btn-xs btn-warning"
+                        title="Drain — di chuyển container sang node khác"
+                      >
+                        <i class="fa-solid fa-right-from-bracket"></i> Drain
+                      </button>
+                    } @else {
+                      <button
+                        (click)="openNodeAction(node.id, 'activate')"
+                        class="btn-xs btn-success"
+                        title="Activate — cho phép nhận task"
+                      >
+                        <i class="fa-solid fa-circle-play"></i> Activate
+                      </button>
+                    }
+                    @if (node.managerStatus) {
+                      <button
+                        (click)="openNodeAction(node.id, 'demote')"
+                        class="btn-xs btn-secondary"
+                        title="Demote to Worker"
+                      >
+                        <i class="fa-solid fa-arrow-down"></i>
+                      </button>
+                    } @else {
+                      <button
+                        (click)="openNodeAction(node.id, 'promote')"
+                        class="btn-xs btn-secondary"
+                        title="Promote to Manager"
+                      >
+                        <i class="fa-solid fa-arrow-up"></i>
+                      </button>
+                    }
+                    <button
+                      (click)="openNodeAction(node.id, 'remove')"
+                      class="btn-xs btn-danger"
+                      title="Xoá node"
+                    >
+                      <i class="fa-solid fa-trash"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="7" class="empty-cell">Không có dữ liệu nodes</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Services -->
+    <div class="card">
+      <div class="card-header">
+        <h3><i class="fa-brands fa-docker"></i> Services</h3>
+        <span class="badge badge-info"
+          >{{ healthyServices().length }}/{{ swarmServices().length }} healthy</span
+        >
+      </div>
+      <div class="card-body table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Service</th>
+              <th>Image</th>
+              <th>Mode</th>
+              <th>Replicas</th>
+              <th>Ports</th>
+              <th>Trạng thái</th>
+              <th>Hành động</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (svc of swarmServices(); track svc.id) {
+              <tr>
+                <td class="code bold">{{ svc.name }}</td>
+                <td class="code muted truncate" [title]="svc.image">{{ svc.image }}</td>
+                <td class="muted">{{ svc.mode }}</td>
+                <td>
+                  <span
+                    class="bold"
+                    [ngClass]="
+                      svc.runningReplicas === svc.desiredReplicas ? 'text-ok' : 'text-warn'
+                    "
+                  >
+                    {{ svc.runningReplicas }}/{{ svc.desiredReplicas }}
+                  </span>
+                </td>
+                <td class="code muted">{{ svc.ports || '—' }}</td>
+                <td>
+                  <span class="badge" [ngClass]="'badge-' + svc.status">
+                    {{
+                      svc.status === 'healthy'
+                        ? 'Healthy'
+                        : svc.status === 'degraded'
+                          ? 'Degraded'
+                          : 'Down'
+                    }}
+                  </span>
+                </td>
+                <td class="action-cell">
+                  <div class="action-group">
+                    <button
+                      (click)="openScaleDialog(svc)"
+                      class="btn-xs btn-primary"
+                      title="Scale replicas"
+                    >
+                      <i class="fa-solid fa-sliders"></i>
+                    </button>
+                    <button
+                      (click)="openUpdateImage(svc.name, svc.image)"
+                      class="btn-xs btn-secondary"
+                      title="Update image"
+                    >
+                      <i class="fa-solid fa-cloud-arrow-up"></i>
+                    </button>
+                    <button
+                      (click)="rollbackService(svc.name)"
+                      class="btn-xs btn-warning"
+                      title="Rollback"
+                    >
+                      <i class="fa-solid fa-rotate-left"></i>
+                    </button>
+                    <button
+                      (click)="forceRestartService(svc.name)"
+                      class="btn-xs btn-danger"
+                      title="Force restart"
+                    >
+                      <i class="fa-solid fa-arrows-rotate"></i>
+                    </button>
+                    <button
+                      (click)="viewTasks(svc.name)"
+                      class="btn-xs btn-outline"
+                      title="Xem tasks"
+                    >
+                      <i class="fa-solid fa-list-check"></i>
+                    </button>
+                    <button
+                      (click)="viewLogs(svc.name)"
+                      class="btn-xs btn-outline"
+                      title="Xem logs"
+                    >
+                      <i class="fa-solid fa-file-lines"></i>
+                    </button>
+                    <button
+                      (click)="viewInspect(svc.name)"
+                      class="btn-xs btn-outline"
+                      title="Inspect"
+                    >
+                      <i class="fa-solid fa-circle-info"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="7" class="empty-cell">Không có dữ liệu Docker Swarm</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Swarm Events & Healing in 2 columns -->
+    <div class="swarm-bottom-grid">
+      <!-- Swarm Events -->
+      <div class="card">
+        <div class="card-header">
+          <h3><i class="fa-solid fa-timeline"></i> Sự kiện Swarm</h3>
+          <button (click)="refreshSwarmEvents()" class="btn-xs btn-outline" title="Làm mới">
+            <i class="fa-solid fa-arrows-rotate"></i>
+          </button>
+        </div>
+        <div class="card-body events-list">
+          @for (evt of swarmEvents(); track $index) {
+            <div class="event-item">
+              <span class="event-time">{{ evt.timestamp | date: 'HH:mm:ss' }}</span>
+              <span class="badge badge-muted">{{ evt.type }}</span>
+              <span class="event-action">{{ evt.action }}</span>
+              <span class="event-name code">{{ evt.name || evt.actorId }}</span>
+            </div>
+          } @empty {
+            <div class="empty-events">
+              <i class="fa-solid fa-check-circle"></i> Không có sự kiện gần đây
+            </div>
+          }
+        </div>
+      </div>
+
+      <!-- Auto-Healing Events -->
+      <div class="card">
+        <div class="card-header">
+          <h3><i class="fa-solid fa-heart-pulse"></i> Auto-Healing</h3>
+          <span class="badge badge-info">{{ healingEvents().length }} sự kiện</span>
+        </div>
+        <div class="card-body events-list">
+          @for (heal of healingEvents(); track $index) {
+            <div class="healing-item" [ngClass]="getHealingTypeClass(heal.type)">
+              <div class="healing-header">
+                <i [ngClass]="getHealingTypeIcon(heal.type)"></i>
+                <span class="healing-target bold">{{ heal.target }}</span>
+                <span class="healing-time">{{ heal.timestamp | date: 'HH:mm:ss' }}</span>
+              </div>
+              <div class="healing-body">
+                <span
+                  class="badge"
+                  [ngClass]="heal.result === 'success' ? 'badge-healthy' : 'badge-down'"
+                  >{{ heal.result }}</span
+                >
+                <span class="healing-action">{{ heal.action }}</span>
+              </div>
+              @if (heal.message) {
+                <div class="healing-msg muted">{{ heal.message }}</div>
+              }
+            </div>
+          } @empty {
+            <div class="empty-events">
+              <i class="fa-solid fa-shield-check"></i> Hệ thống ổn định — chưa cần tự sửa
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+
+    <!-- Scale Modal -->
+    @if (scaleServiceName) {
+      <div class="modal-overlay" (click)="cancelScale()">
+        <div class="modal-content" (click)="$event.stopPropagation()">
+          <div class="modal-header">
+            <h3><i class="fa-solid fa-sliders"></i> Scale Service</h3>
+            <button class="btn-close" (click)="cancelScale()">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+          <div class="modal-body">
+            <div class="form-group">
+              <label>Service</label>
+              <div class="form-static code">{{ scaleServiceName }}</div>
+            </div>
+            <div class="form-group">
+              <label>Số replicas</label>
+              <input
+                type="number"
+                [(ngModel)]="scaleReplicas"
+                min="0"
+                max="10"
+                class="form-input"
+              />
+              <small class="form-hint">Từ 0 (tắt) đến 10</small>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button (click)="cancelScale()" class="btn-sm btn-secondary">Huỷ</button>
+            <button (click)="scaleService()" [disabled]="scaleLoading" class="btn-sm btn-primary">
+              @if (scaleLoading) {
+                <i class="fa-solid fa-spinner fa-spin"></i>
+              }
+              Áp dụng
+            </button>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- Node Action Modal -->
+    @if (nodeActionTarget) {
+      <div class="modal-overlay" (click)="cancelNodeAction()">
+        <div
+          class="modal-content"
+          (click)="$event.stopPropagation()"
+          [ngClass]="isNodeActionDangerous() ? 'modal-danger' : ''"
+        >
+          <div class="modal-header">
+            <h3><i class="fa-solid fa-server"></i> {{ getNodeActionLabel() }}</h3>
+            <button class="btn-close" (click)="cancelNodeAction()">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+          <div class="modal-body">
+            <div class="form-group">
+              <label>Node</label>
+              <div class="form-static code">{{ nodeActionTarget }}</div>
+            </div>
+            <p class="action-desc">{{ getNodeActionDescription() }}</p>
+            @if (nodeActionType === 'remove') {
+              <div class="form-group">
+                <label class="checkbox-label">
+                  <input type="checkbox" [(ngModel)]="nodeActionForce" />
+                  Force remove (bỏ qua kiểm tra)
+                </label>
+              </div>
+            }
+            @if (isNodeActionDangerous()) {
+              <div class="danger-notice">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                Hành động này có thể ảnh hưởng đến hệ thống!
+              </div>
+            }
+          </div>
+          <div class="modal-footer">
+            <button (click)="cancelNodeAction()" class="btn-sm btn-secondary">Huỷ</button>
+            <button
+              (click)="confirmNodeAction()"
+              [disabled]="actionLoading()"
+              class="btn-sm"
+              [ngClass]="isNodeActionDangerous() ? 'btn-danger' : 'btn-primary'"
+            >
+              @if (actionLoading()) {
+                <i class="fa-solid fa-spinner fa-spin"></i>
+              }
+              Xác nhận
+            </button>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- Update Image Modal -->
+    @if (updateImageService) {
+      <div class="modal-overlay" (click)="cancelUpdateImage()">
+        <div class="modal-content" (click)="$event.stopPropagation()">
+          <div class="modal-header">
+            <h3><i class="fa-solid fa-cloud-arrow-up"></i> Update Image</h3>
+            <button class="btn-close" (click)="cancelUpdateImage()">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+          <div class="modal-body">
+            <div class="form-group">
+              <label>Service</label>
+              <div class="form-static code">{{ updateImageService }}</div>
+            </div>
+            <div class="form-group">
+              <label>Image mới</label>
+              <input
+                type="text"
+                [(ngModel)]="newImageTag"
+                class="form-input"
+                placeholder="registry/image:tag"
+              />
+              <small class="form-hint">Rolling update sẽ áp dụng — auto rollback nếu lỗi</small>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button (click)="cancelUpdateImage()" class="btn-sm btn-secondary">Huỷ</button>
+            <button
+              (click)="confirmUpdateImage()"
+              [disabled]="actionLoading() || !newImageTag"
+              class="btn-sm btn-primary"
+            >
+              @if (actionLoading()) {
+                <i class="fa-solid fa-spinner fa-spin"></i>
+              }
+              Cập nhật
+            </button>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- Tasks Panel Modal -->
+    @if (tasksForService) {
+      <div class="modal-overlay" (click)="closeTasks()">
+        <div class="modal-content modal-wide" (click)="$event.stopPropagation()">
+          <div class="modal-header">
+            <h3><i class="fa-solid fa-list-check"></i> Tasks — {{ tasksForService }}</h3>
+            <button class="btn-close" (click)="closeTasks()">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+          <div class="modal-body">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Task ID</th>
+                  <th>Name</th>
+                  <th>Node</th>
+                  <th>Desired</th>
+                  <th>Current</th>
+                  <th>Error</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (task of selectedTasks(); track task.id) {
+                  <tr>
+                    <td class="code muted">{{ task.id }}</td>
+                    <td class="bold">{{ task.name }}</td>
+                    <td>{{ task.node }}</td>
+                    <td>
+                      <span class="badge" [ngClass]="getTaskStateClass(task.desiredState)">{{
+                        task.desiredState
+                      }}</span>
+                    </td>
+                    <td>
+                      <span class="badge" [ngClass]="getTaskStateClass(task.currentState)">{{
+                        task.currentState
+                      }}</span>
+                    </td>
+                    <td class="muted">{{ task.error || '—' }}</td>
+                  </tr>
+                } @empty {
+                  <tr>
+                    <td colspan="6" class="empty-cell">Không có task</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- Logs Panel Modal -->
+    @if (logsForService) {
+      <div class="modal-overlay" (click)="closeLogs()">
+        <div class="modal-content modal-wide" (click)="$event.stopPropagation()">
+          <div class="modal-header">
+            <h3><i class="fa-solid fa-file-lines"></i> Logs — {{ logsForService }}</h3>
+            <button class="btn-close" (click)="closeLogs()">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+          <div class="modal-body">
+            @if (selectedLogs(); as logs) {
+              <div class="log-viewer">
+                @for (line of logs.lines; track $index) {
+                  <div class="log-line">{{ line }}</div>
+                } @empty {
+                  <div class="log-empty">Không có logs</div>
+                }
+              </div>
+            } @else {
+              <div class="loading-placeholder">
+                <i class="fa-solid fa-spinner fa-spin"></i> Đang tải logs...
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- Inspect Panel Modal -->
+    @if (inspectForService) {
+      <div class="modal-overlay" (click)="closeInspect()">
+        <div class="modal-content" (click)="$event.stopPropagation()">
+          <div class="modal-header">
+            <h3><i class="fa-solid fa-circle-info"></i> Inspect — {{ inspectForService }}</h3>
+            <button class="btn-close" (click)="closeInspect()">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+          <div class="modal-body">
+            @if (selectedInspect(); as info) {
+              <div class="inspect-grid">
+                <div class="inspect-row">
+                  <span class="inspect-key">Image:</span> <span class="code">{{ info.image }}</span>
+                </div>
+                <div class="inspect-row">
+                  <span class="inspect-key">Desired Replicas:</span>
+                  <span>{{ info.desiredReplicas }}</span>
+                </div>
+                <div class="inspect-row">
+                  <span class="inspect-key">Update Parallelism:</span>
+                  <span>{{ info.updateParallelism }}</span>
+                </div>
+                <div class="inspect-row">
+                  <span class="inspect-key">Update Delay:</span> <span>{{ info.updateDelay }}</span>
+                </div>
+                <div class="inspect-row">
+                  <span class="inspect-key">Failure Action:</span>
+                  <span class="badge badge-warning">{{ info.failureAction }}</span>
+                </div>
+                <div class="inspect-row">
+                  <span class="inspect-key">Rollback Parallelism:</span>
+                  <span>{{ info.rollbackParallelism }}</span>
+                </div>
+                <div class="inspect-row">
+                  <span class="inspect-key">Constraints:</span>
+                  <span class="code">{{ info.constraints || '—' }}</span>
+                </div>
+                <div class="inspect-row">
+                  <span class="inspect-key">Created:</span> <span>{{ info.createdAt }}</span>
+                </div>
+                <div class="inspect-row">
+                  <span class="inspect-key">Updated:</span> <span>{{ info.updatedAt }}</span>
+                </div>
+                @if (info.updateState) {
+                  <div class="inspect-row">
+                    <span class="inspect-key">Update State:</span>
+                    <span
+                      class="badge"
+                      [ngClass]="
+                        info.updateState === 'completed'
+                          ? 'badge-healthy'
+                          : info.updateState === 'updating'
+                            ? 'badge-warning'
+                            : 'badge-down'
+                      "
+                    >
+                      {{ info.updateState }}
+                    </span>
+                  </div>
+                }
+                @if (info.updateMessage) {
+                  <div class="inspect-row">
+                    <span class="inspect-key">Update Message:</span>
+                    <span class="muted">{{ info.updateMessage }}</span>
+                  </div>
+                }
+              </div>
+            } @else {
+              <div class="loading-placeholder">
+                <i class="fa-solid fa-spinner fa-spin"></i> Đang tải...
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+    }
+  }
+
+  <!-- ════════════════ TAB: Health ════════════════ -->
+  @if (activeTab === 'health') {
+    @if (health(); as h) {
+      <!-- Overall Status -->
+      <div class="hero-status" [ngClass]="'hero-' + h.overallStatus">
+        <div class="hero-icon-wrap">
+          @if (h.overallStatus === 'healthy') {
+            <i class="fa-solid fa-check"></i>
+          } @else if (h.overallStatus === 'degraded') {
+            <i class="fa-solid fa-exclamation"></i>
+          } @else {
+            <i class="fa-solid fa-xmark"></i>
+          }
+        </div>
+        <div>
+          <h3>
+            {{
+              h.overallStatus === 'healthy'
+                ? 'Tất cả hoạt động tốt'
+                : h.overallStatus === 'degraded'
+                  ? 'Có service chậm'
+                  : 'Có service lỗi'
+            }}
+          </h3>
+          <p>Kiểm tra lúc {{ h.checkedAt | date: 'dd/MM/yyyy HH:mm:ss' }}</p>
+        </div>
+      </div>
+
+      <!-- Health Cards -->
+      <div class="health-grid">
+        @for (check of h.checks; track check.name) {
+          <div class="health-card" [ngClass]="'hc-' + check.status">
+            <div class="hc-header">
+              <div class="hc-icon" [ngClass]="'hi-' + check.status">
+                <i [ngClass]="getHealthIcon(check.name)"></i>
+              </div>
+              <div>
+                <h4>{{ check.name }}</h4>
+                <span class="hc-status">
+                  {{
+                    check.status === 'healthy'
+                      ? 'Hoạt động'
+                      : check.status === 'degraded'
+                        ? 'Chậm'
+                        : 'Không phản hồi'
+                  }}
+                </span>
+              </div>
+            </div>
+            @if (check.responseTime) {
+              <div class="hc-detail">
+                <span class="hc-key">Phản hồi:</span>
+                <span class="hc-val-ok">{{ check.responseTime }}</span>
+              </div>
+            }
+            @if (check.error) {
+              <div class="hc-error">
+                <i class="fa-solid fa-circle-exclamation"></i> {{ check.error }}
+              </div>
+            }
+          </div>
+        }
+      </div>
+    } @else {
+      <div class="loading-placeholder">
+        <i class="fa-solid fa-spinner fa-spin"></i>
+        <p>Đang kiểm tra health...</p>
+      </div>
+    }
+
+    <!-- Alerts -->
+    @if (alerts().length > 0) {
+      <div class="card" style="margin-top: 1rem">
+        <div class="card-header">
+          <h3><i class="fa-solid fa-bell"></i> Cảnh báo hiện tại</h3>
+          <span class="badge badge-warning">{{ alerts().length }}</span>
+        </div>
+        <div class="card-body">
+          @for (alert of alerts(); track alert.source + alert.timestamp) {
+            <div
+              class="alert-detail-row"
+              [ngClass]="alert.level === 'critical' ? 'adr-critical' : 'adr-warning'"
+            >
+              @if (alert.level === 'critical') {
+                <i class="fa-solid fa-circle-exclamation adr-icon-crit"></i>
+              } @else {
+                <i class="fa-solid fa-triangle-exclamation adr-icon-warn"></i>
+              }
+              <div class="adr-content">
+                <div class="adr-head">
+                  <strong>{{ alert.source }}</strong>
+                  <span
+                    class="adr-level"
+                    [ngClass]="alert.level === 'critical' ? 'adr-lvl-crit' : 'adr-lvl-warn'"
+                  >
+                    {{ alert.level === 'critical' ? 'Nghiêm trọng' : 'Cảnh báo' }}
+                  </span>
+                </div>
+                <p class="adr-msg">{{ alert.message }}</p>
+              </div>
+              <span class="adr-time">{{ alert.timestamp | date: 'HH:mm:ss' }}</span>
+            </div>
+          }
+        </div>
+      </div>
+    }
+  }
+
+  <!-- ════════════════ TAB: S3 Backup ════════════════ -->
+  @if (activeTab === 's3') {
+    @if (s3Loading && !s3Status()) {
+      <div class="loading-placeholder">
+        <i class="fa-solid fa-spinner fa-spin"></i>
+        <p>Đang kết nối S3...</p>
+      </div>
+    } @else {
+      @if (s3Status(); as s3) {
+        <!-- S3 Stats -->
+        <div class="stats-grid">
+          <div class="stat-card" [ngClass]="s3.connected ? 'stat-green' : 'stat-red'">
+            <div class="stat-icon">
+              <i class="fa-solid fa-plug"></i>
+            </div>
+            <div class="stat-info">
+              <div class="stat-value">{{ s3.connected ? 'Đã kết nối' : 'Mất kết nối' }}</div>
+              <div class="stat-label">{{ s3.providerName }}</div>
+            </div>
+          </div>
+          <div class="stat-card stat-blue">
+            <div class="stat-icon"><i class="fa-solid fa-file"></i></div>
+            <div class="stat-info">
+              <div class="stat-value">{{ s3.totalObjects }}</div>
+              <div class="stat-label">Tổng Objects</div>
+            </div>
+          </div>
+          <div class="stat-card stat-purple">
+            <div class="stat-icon"><i class="fa-solid fa-database"></i></div>
+            <div class="stat-info">
+              <div class="stat-value">{{ formatBytes(s3.totalSizeBytes) }}</div>
+              <div class="stat-label">Tổng dung lượng</div>
+            </div>
+          </div>
+          <div class="stat-card stat-orange">
+            <div class="stat-icon"><i class="fa-solid fa-clock"></i></div>
+            <div class="stat-info">
+              @if (s3.latestBackupAt) {
+                <div class="stat-value">{{ s3.latestBackupAt | date: 'dd/MM HH:mm' }}</div>
+              } @else {
+                <div class="stat-value muted">Chưa có</div>
+              }
+              <div class="stat-label">Backup gần nhất</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Folder Breakdown -->
+        @if (s3.buckets.length > 0) {
+          <div class="card">
+            <div class="card-header">
+              <h3><i class="fa-solid fa-folder-tree"></i> Phân loại theo thư mục</h3>
+            </div>
+            <div class="card-body">
+              <div class="folder-grid">
+                @for (bucket of s3.buckets; track bucket.prefix) {
+                  <div class="folder-card" (click)="s3Prefix = bucket.prefix; filterS3Objects()">
+                    <div class="folder-name">
+                      <i class="fa-solid fa-folder"></i> {{ bucket.prefix }}/
+                    </div>
+                    <div class="folder-meta">
+                      <span>{{ bucket.objectCount }} files</span>
+                      <span>{{ formatBytes(bucket.totalSizeBytes) }}</span>
+                    </div>
+                  </div>
+                }
+              </div>
+            </div>
+          </div>
+        }
+      }
+
+      <!-- S3 Objects List -->
+      <div class="card">
+        <div class="card-header">
+          <h3><i class="fa-solid fa-cloud"></i> S3 Objects</h3>
+          <div class="header-actions">
+            <div class="search-wrap">
+              <i class="fa-solid fa-filter"></i>
+              <input
+                type="text"
+                [(ngModel)]="s3Prefix"
+                (keyup.enter)="filterS3Objects()"
+                placeholder="Lọc theo prefix..."
+                class="form-input small"
+              />
+            </div>
+            <button (click)="filterS3Objects()" class="btn-sm btn-primary">
+              <i class="fa-solid fa-search"></i> Lọc
+            </button>
+            <button (click)="loadS3Data()" class="btn-sm btn-secondary">
+              <i class="fa-solid fa-rotate"></i> Tải lại
+            </button>
+          </div>
+        </div>
+        <div class="card-body table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Tên file</th>
+                <th>Key</th>
+                <th>Dung lượng</th>
+                <th>Ngày sửa</th>
+                <th class="text-center">Hành động</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (obj of s3Objects(); track obj.key) {
+                <tr>
+                  <td class="code">{{ obj.fileName }}</td>
+                  <td class="code muted truncate" [title]="obj.key">{{ obj.key }}</td>
+                  <td>{{ formatBytes(obj.sizeBytes) }}</td>
+                  <td>{{ obj.lastModified | date: 'dd/MM/yyyy HH:mm' }}</td>
+                  <td class="text-center">
+                    <div class="action-btns">
+                      <button
+                        (click)="downloadS3Object(obj.key)"
+                        class="btn-icon btn-icon-ok"
+                        title="Tải về"
+                      >
+                        <i class="fa-solid fa-download"></i>
+                      </button>
+                      <button
+                        (click)="deleteS3Object(obj.key)"
+                        class="btn-icon btn-icon-danger"
+                        title="Xoá"
+                      >
+                        <i class="fa-solid fa-trash"></i>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="5" class="empty-cell">Không có objects</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    }
+  }
+</div>

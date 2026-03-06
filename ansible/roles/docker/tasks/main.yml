@@ -1,0 +1,147 @@
+# ═══════════════════════════════════════════════════════════
+#  Role: docker — Cài Docker Engine + Swarm Cluster
+#  Chạy trên: tất cả VPS
+#  Tương ứng: swarm_s3_deployment_guide.md Section 3.5-3.6, 4
+# ═══════════════════════════════════════════════════════════
+
+# ─── Xóa Docker cũ ───
+- name: Gỡ Docker packages cũ (nếu có)
+  apt:
+    name:
+      - docker.io
+      - docker-doc
+      - docker-compose
+      - podman-docker
+      - containerd
+      - runc
+    state: absent
+  ignore_errors: true
+
+# ─── Cài Docker CE ───
+- name: Tạo thư mục keyrings
+  file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: "0755"
+
+- name: Thêm Docker GPG key
+  get_url:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    dest: /etc/apt/keyrings/docker.asc
+    mode: "0644"
+
+- name: Thêm Docker repository
+  apt_repository:
+    repo: >-
+      deb [arch={{ ansible_architecture | regex_replace('x86_64', 'amd64') }}
+      signed-by=/etc/apt/keyrings/docker.asc]
+      https://download.docker.com/linux/ubuntu
+      {{ ansible_distribution_release }} stable
+    state: present
+    filename: docker
+
+- name: Cài Docker CE
+  apt:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
+    state: present
+    update_cache: yes
+
+- name: Thêm deploy user vào docker group
+  user:
+    name: "{{ deploy_user }}"
+    groups: docker
+    append: yes
+
+- name: Cấu hình Docker daemon
+  copy:
+    content: |
+      {
+        "log-driver": "json-file",
+        "log-opts": {
+          "max-size": "{{ docker_log_max_size }}",
+          "max-file": "{{ docker_log_max_file }}"
+        },
+        "storage-driver": "overlay2",
+        "default-address-pools": [
+          {"base": "172.20.0.0/14", "size": 24}
+        ],
+        "metrics-addr": "127.0.0.1:9323",
+        "experimental": true
+      }
+    dest: /etc/docker/daemon.json
+    mode: "0644"
+  notify: restart docker
+
+- name: Bật Docker service
+  service:
+    name: docker
+    state: started
+    enabled: yes
+
+# ─── Docker Swarm ───
+- name: Kiểm tra Swarm status
+  command: docker info --format '{{ '{{' }}.Swarm.LocalNodeState{{ '}}' }}'
+  register: swarm_state
+  changed_when: false
+
+# Chỉ chạy trên manager
+- name: Khởi tạo Swarm (manager only)
+  command: >
+    docker swarm init
+    --advertise-addr {{ ansible_host }}
+  when:
+    - inventory_hostname in groups['managers']
+    - swarm_state.stdout != 'active'
+  register: swarm_init
+
+- name: Lấy worker join token
+  command: docker swarm join-token worker -q
+  register: worker_token
+  changed_when: false
+  when: inventory_hostname in groups['managers']
+
+- name: Join Swarm (worker only)
+  command: >
+    docker swarm join
+    --token {{ hostvars[groups['managers'][0]].worker_token.stdout }}
+    {{ hostvars[groups['managers'][0]].ansible_host }}:2377
+  when:
+    - inventory_hostname in groups['workers']
+    - swarm_state.stdout != 'active'
+
+# ─── Node Labels ───
+- name: Label manager node
+  command: >
+    docker node update --label-add role=primary {{ ansible_hostname }}
+  when: inventory_hostname in groups['managers']
+  ignore_errors: true
+
+- name: Lấy node ID của worker
+  shell: docker node ls --format '{{ '{{' }}.ID{{ '}}' }} {{ '{{' }}.Hostname{{ '}}' }}' | grep -v {{ ansible_hostname }} | awk '{print $1}'
+  register: worker_node_id
+  changed_when: false
+  when: inventory_hostname in groups['managers']
+
+- name: Label worker node
+  command: >
+    docker node update --label-add role=standby {{ worker_node_id.stdout }}
+  when:
+    - inventory_hostname in groups['managers']
+    - worker_node_id.stdout is defined
+    - worker_node_id.stdout | length > 0
+  ignore_errors: true
+
+# ─── GHCR Login ───
+- name: Login GHCR trên tất cả nodes
+  command: >
+    docker login ghcr.io -u {{ ghcr_user }} --password-stdin
+  args:
+    stdin: "{{ ghcr_token }}"
+  when: ghcr_token is defined and ghcr_token | length > 0
+  no_log: true
+  become_user: "{{ deploy_user }}"

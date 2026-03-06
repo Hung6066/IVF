@@ -1,0 +1,209 @@
+# ═══════════════════════════════════════════════════════════
+#  Role: common — Chuẩn bị VPS cơ bản
+#  Chạy trên: tất cả VPS
+#  Tương ứng: swarm_s3_deployment_guide.md Section 3
+# ═══════════════════════════════════════════════════════════
+
+- name: Cập nhật hệ thống
+  apt:
+    update_cache: yes
+    upgrade: dist
+    cache_valid_time: 3600
+
+- name: Cài đặt packages cần thiết
+  apt:
+    name:
+      - curl
+      - wget
+      - git
+      - unzip
+      - htop
+      - iotop
+      - net-tools
+      - dnsutils
+      - apt-transport-https
+      - ca-certificates
+      - gnupg
+      - lsb-release
+      - software-properties-common
+      - jq
+      - tree
+      - fail2ban
+      - ufw
+    state: present
+
+- name: Thiết lập timezone
+  timezone:
+    name: "{{ timezone }}"
+
+# ─── User deploy ───
+- name: Tạo group deploy
+  group:
+    name: "{{ deploy_group }}"
+    state: present
+
+- name: Tạo user deploy
+  user:
+    name: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    groups: sudo
+    shell: /bin/bash
+    create_home: yes
+    state: present
+
+- name: Cho phép deploy sudo không cần password
+  copy:
+    content: "{{ deploy_user }} ALL=(ALL) NOPASSWD:ALL\n"
+    dest: "/etc/sudoers.d/{{ deploy_user }}"
+    mode: "0440"
+    validate: "visudo -cf %s"
+
+- name: Tạo thư mục .ssh cho deploy
+  file:
+    path: "/home/{{ deploy_user }}/.ssh"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0700"
+
+- name: Copy authorized_keys từ root sang deploy
+  copy:
+    src: /root/.ssh/authorized_keys
+    dest: "/home/{{ deploy_user }}/.ssh/authorized_keys"
+    remote_src: yes
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0600"
+
+# ─── SSH Hardening ───
+- name: Tắt root login
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "^#?PermitRootLogin"
+    line: "PermitRootLogin no"
+    state: present
+  notify: restart sshd
+
+- name: Tắt password authentication
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "^#?PasswordAuthentication"
+    line: "PasswordAuthentication no"
+    state: present
+  notify: restart sshd
+
+# ─── Firewall (UFW) ───
+- name: UFW — default deny incoming
+  ufw:
+    direction: incoming
+    policy: deny
+
+- name: UFW — default allow outgoing
+  ufw:
+    direction: outgoing
+    policy: allow
+
+- name: UFW — cho phép SSH
+  ufw:
+    rule: allow
+    port: "22"
+    proto: tcp
+
+- name: UFW — cho phép HTTP
+  ufw:
+    rule: allow
+    port: "80"
+    proto: tcp
+
+- name: UFW — cho phép HTTPS
+  ufw:
+    rule: allow
+    port: "443"
+    proto: tcp
+
+- name: UFW — Swarm management (từ peer VPS)
+  ufw:
+    rule: allow
+    from_ip: "{{ hostvars[item].ansible_host }}"
+    port: "2377"
+    proto: tcp
+  loop: "{{ groups['swarm'] | difference([inventory_hostname]) }}"
+
+- name: UFW — Swarm node TCP (từ peer VPS)
+  ufw:
+    rule: allow
+    from_ip: "{{ hostvars[item].ansible_host }}"
+    port: "7946"
+    proto: tcp
+  loop: "{{ groups['swarm'] | difference([inventory_hostname]) }}"
+
+- name: UFW — Swarm node UDP (từ peer VPS)
+  ufw:
+    rule: allow
+    from_ip: "{{ hostvars[item].ansible_host }}"
+    port: "7946"
+    proto: udp
+  loop: "{{ groups['swarm'] | difference([inventory_hostname]) }}"
+
+- name: UFW — Overlay network VXLAN (từ peer VPS)
+  ufw:
+    rule: allow
+    from_ip: "{{ hostvars[item].ansible_host }}"
+    port: "4789"
+    proto: udp
+  loop: "{{ groups['swarm'] | difference([inventory_hostname]) }}"
+
+- name: UFW — PostgreSQL replication (từ peer VPS)
+  ufw:
+    rule: allow
+    from_ip: "{{ hostvars[item].ansible_host }}"
+    port: "5432"
+    proto: tcp
+  loop: "{{ groups['swarm'] | difference([inventory_hostname]) }}"
+
+- name: Bật UFW
+  ufw:
+    state: enabled
+
+# ─── Fail2ban ───
+- name: Cấu hình Fail2ban
+  copy:
+    content: |
+      [DEFAULT]
+      bantime = 3600
+      findtime = 600
+      maxretry = 5
+
+      [sshd]
+      enabled = true
+      port = 22
+      filter = sshd
+      logpath = /var/log/auth.log
+      maxretry = 3
+      bantime = 86400
+    dest: /etc/fail2ban/jail.local
+    mode: "0644"
+  notify: restart fail2ban
+
+# ─── Thư mục project ───
+- name: Tạo thư mục project
+  file:
+    path: "{{ project_dir }}"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0755"
+
+- name: Tạo thư mục con
+  file:
+    path: "{{ project_dir }}/{{ item }}"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0755"
+  loop:
+    - secrets
+    - certs
+    - backups
+    - scripts
+    - logs
