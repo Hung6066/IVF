@@ -91,8 +91,22 @@ jobs:
 
                   mkdir -p "${BACKUP_DIR}"
 
+                  # Find the database container
+                  DB_CONTAINER=$(docker ps -q -f name=ivf_db.1)
+                  if [ -z "$DB_CONTAINER" ]; then
+                    echo "⚠️ Database container not running — skipping backup"
+                    exit 0
+                  fi
+
+                  # Check if ivf_db database exists
+                  DB_EXISTS=$(docker exec "$DB_CONTAINER" psql -U postgres -tAc "SELECT 1 FROM pg_database WHERE datname='ivf_db'" 2>/dev/null || echo "")
+                  if [ "$DB_EXISTS" != "1" ]; then
+                    echo "⚠️ Database 'ivf_db' does not exist yet (first deploy?) — skipping backup"
+                    exit 0
+                  fi
+
                   # Backup via Docker
-                  docker exec $(docker ps -q -f name=ivf_db.1) \
+                  docker exec "$DB_CONTAINER" \
                     pg_dump -U postgres ivf_db | gzip > "${BACKUP_FILE}"
 
                   echo "✅ Pre-deploy backup created: ${BACKUP_FILE}"
