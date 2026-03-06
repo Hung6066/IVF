@@ -19,15 +19,20 @@ useDefault = true
 [[rules]]
   id = "ivf-jwt-secret"
   description = "IVF JWT Secret in production config"
-  regex = '''JwtSettings.*Secret.*=\s*["'](?!IVF-System-Super-Secret)[^"']{20,}["']'''
+  regex = '''JwtSettings.*Secret.*=\s*["'][^"']{20,}["']'''
   keywords = ["JwtSettings", "Secret"]
+  [rules.allowlist]
+    regexTarget = "match"
+    regexes = ['''IVF-System-Super-Secret''']
 
 [[rules]]
   id = "ivf-db-password"
   description = "Database password (non-default)"
-  regex = '''Password\s*=\s*(?!postgres\b)[A-Za-z0-9@#$%^&*!]{8,}'''
+  regex = '''Password\s*=\s*[A-Za-z0-9@#$%^&*!]{8,}'''
   keywords = ["Password"]
   [rules.allowlist]
+    regexTarget = "match"
+    regexes = ['''postgres''']
     paths = [
       '''appsettings\.json$''',
       '''appsettings\.Development\.json$''',
@@ -37,8 +42,11 @@ useDefault = true
 [[rules]]
   id = "ivf-minio-secret"
   description = "MinIO secret key (non-default)"
-  regex = '''SecretKey.*=\s*["'](?!minioadmin123)[^"']{10,}["']'''
+  regex = '''SecretKey.*=\s*["'][^"']{10,}["']'''
   keywords = ["SecretKey", "MinIO"]
+  [rules.allowlist]
+    regexTarget = "match"
+    regexes = ['''minioadmin123''']
 
 [[rules]]
   id = "ivf-api-key"
