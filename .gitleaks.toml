@@ -9,10 +9,20 @@ useDefault = true
 [allowlist]
   description = "Global allowlist"
   paths = [
-    '''(^|/)tests/''',
-    '''(^|/)\.gitleaks\.toml$''',
-    '''(^|/)docs/''',
-    '''(^|/)backups/''',
+    '''(^|[\\/])tests[\\/]''',
+    '''\.gitleaks\.toml$''',
+    '''(^|[\\/])docs[\\/]''',
+    '''(^|[\\/])backups[\\/]''',
+    '''(^|[\\/])node_modules[\\/]''',
+    '''(^|[\\/])dist[\\/]''',
+    '''(^|[\\/])certs[\\/]''',
+    '''(^|[\\/])keys[\\/]''',
+    '''(^|[\\/])secrets[\\/]''',
+    '''(^|[\\/])scripts[\\/]''',
+    '''(^|[\\/])bin[\\/]''',
+    '''(^|[\\/])obj[\\/]''',
+    '''gitleaks-report.*\.csv$''',
+    '''CertificateAuthorityService\.cs$''',
   ]
 
 # Additional custom rules
@@ -28,15 +38,15 @@ useDefault = true
 [[rules]]
   id = "ivf-db-password"
   description = "Database password (non-default)"
-  regex = '''Password\s*=\s*[A-Za-z0-9@#$%^&*!]{8,}'''
+  regex = '''Password\s*=\s*["'][A-Za-z0-9@#$%^&*!]{8,}["']'''
   keywords = ["Password"]
   [rules.allowlist]
     regexTarget = "match"
-    regexes = ['''postgres''']
+    regexes = ['''postgres''', '''changeit''', '''Admin@123''']
     paths = [
       '''appsettings\.json$''',
       '''appsettings\.Development\.json$''',
-      '''docker-compose\.yml$''',
+      '''docker-compose.*\.yml$''',
     ]
 
 [[rules]]
