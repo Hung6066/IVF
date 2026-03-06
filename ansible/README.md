@@ -38,11 +38,11 @@ Sửa `hosts.yml` — thay `<VPS1_IP>` và `<VPS2_IP>` bằng IP thực:
 managers:
   hosts:
     vps1:
-      ansible_host: 203.0.113.10    # ← IP VPS 1
+      ansible_host: 203.0.113.10 # ← IP VPS 1
 workers:
   hosts:
     vps2:
-      ansible_host: 203.0.113.20    # ← IP VPS 2
+      ansible_host: 203.0.113.20 # ← IP VPS 2
 ```
 
 ## Bước 2: Test kết nối
@@ -108,6 +108,7 @@ ansible/
 ## Playbook thực hiện gì
 
 ### Phase 1: `common` (cả 2 VPS)
+
 - Cập nhật OS, cài packages
 - Tạo user `deploy` với sudo
 - Copy SSH authorized_keys
@@ -117,6 +118,7 @@ ansible/
 - Tạo thư mục `/opt/ivf/{secrets,certs,backups,scripts,logs}`
 
 ### Phase 2: `docker` (cả 2 VPS)
+
 - Cài Docker CE từ official repo
 - Cấu hình Docker daemon (log rotation, overlay2)
 - Khởi tạo Swarm trên VPS 1 (Manager)
@@ -125,6 +127,7 @@ ansible/
 - Login GHCR
 
 ### Phase 3: `app` (manager only)
+
 - Generate secrets (DB passwords, JWT RSA key, MinIO creds, HSM PINs)
 - Tạo Docker Secrets trong Swarm Raft store
 - Clone repository từ GitHub

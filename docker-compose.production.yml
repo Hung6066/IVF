@@ -249,7 +249,7 @@ services:
       - ./docker/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
-      - ./ivf-client/dist/ivf-client/browser:/srv/frontend:ro  # Built Angular SPA
+      - ./ivf-client/dist/ivf-client/browser:/srv/frontend:ro # Built Angular SPA
     networks:
       - ivf-public
     deploy:
