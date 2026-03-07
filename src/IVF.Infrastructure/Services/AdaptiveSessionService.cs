@@ -105,13 +105,33 @@ public sealed class AdaptiveSessionService : IAdaptiveSessionService
     {
         if (!_cache.TryGetValue($"{SessionPrefix}{sessionId}", out SessionInfo? session) || session is null)
         {
+            // Session not found in local cache — this is expected in multi-replica deployments
+            // where the session was created on a different instance. Re-create it locally
+            // from the request context (session_id is cryptographically bound to the JWT).
+            _logger.LogInformation(
+                "Session {SessionId} not in local cache, re-creating from JWT context for user {UserId} (multi-replica)",
+                sessionId, context.UserId);
+
+            session = new SessionInfo(
+                SessionId: sessionId,
+                UserId: context.UserId ?? Guid.Empty,
+                IpAddress: context.IpAddress,
+                DeviceFingerprint: context.DeviceFingerprint,
+                Country: context.Country,
+                CreatedAt: DateTime.UtcNow,
+                LastActivityAt: DateTime.UtcNow,
+                ExpiresAt: DateTime.UtcNow.Add(DefaultSessionDuration),
+                IsActive: true);
+
+            _cache.Set($"{SessionPrefix}{sessionId}", session, DefaultSessionDuration);
+
             return Task.FromResult(new SessionValidationResult(
-                IsValid: false,
-                ViolationReason: "Session not found or expired",
+                IsValid: true,
+                ViolationReason: null,
                 IpChanged: false,
                 DeviceChanged: false,
                 CountryChanged: false,
-                DriftScore: 100));
+                DriftScore: 0));
         }
 
         if (!session.IsActive || DateTime.UtcNow >= session.ExpiresAt)

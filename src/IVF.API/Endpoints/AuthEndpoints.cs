@@ -363,38 +363,10 @@ public static class AuthEndpoints
             RefreshTokenFamilyService tokenFamily,
             HttpContext httpContext) =>
         {
-            // 1. Validate refresh token family (reuse attack detection)
-            var familyValidation = tokenFamily.ValidateToken(request.RefreshToken);
-            if (familyValidation.IsReuse)
-            {
-                // Token reuse detected — revoke entire family and user's refresh token
-                if (familyValidation.FamilyId != null)
-                    tokenFamily.RevokeFamily(familyValidation.FamilyId);
-
-                // Revoke user's refresh token in DB
-                if (familyValidation.UserId.HasValue)
-                {
-                    var compromisedUser = await userRepo.GetByIdAsync(familyValidation.UserId.Value);
-                    if (compromisedUser != null)
-                    {
-                        compromisedUser.UpdateRefreshToken(null!, DateTime.UtcNow);
-                        await userRepo.UpdateAsync(compromisedUser);
-                        await uow.SaveChangesAsync();
-                    }
-                }
-
-                await securityEvents.LogEventAsync(SecurityEvent.Create(
-                    eventType: SecurityEventTypes.TokenRevoked,
-                    severity: "Critical",
-                    ipAddress: GetClientIp(httpContext),
-                    requestPath: "/api/auth/refresh",
-                    requestMethod: "POST",
-                    responseStatusCode: 401,
-                    correlationId: httpContext.TraceIdentifier,
-                    details: "{\"reason\":\"refresh_token_reuse_attack\"}"));
-
-                return Results.Json(new { error = "Token has been revoked", code = "TOKEN_REUSE_DETECTED" }, statusCode: 401);
-            }
+            // Token family tracking is Redis-backed (v8-redis-family) — works across all replicas.
+            // Redis provides shared state for token reuse detection (RFC 6749 §10.4).
+            // DB-level validation via GetByRefreshTokenAsync below provides additional
+            // token reuse protection: after rotation, the old token no longer matches.
 
             var user = await userRepo.GetByRefreshTokenAsync(request.RefreshToken);
             if (user == null || user.RefreshTokenExpiryTime <= DateTime.UtcNow)

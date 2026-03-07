@@ -23,6 +23,7 @@ public class SecurityEnforcementMiddleware
         "/swagger",
         "/api/auth",                    // login/refresh must always be reachable
         "/api/security/advanced",       // admin must be able to manage whitelist
+        "/hubs",                        // SignalR hubs (auth handled by hub itself)
     };
 
     public SecurityEnforcementMiddleware(RequestDelegate next, ILogger<SecurityEnforcementMiddleware> logger)

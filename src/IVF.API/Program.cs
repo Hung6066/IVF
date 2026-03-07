@@ -144,7 +144,10 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(options =
 
 // ─── Enterprise Security Services ───
 builder.Services.AddSingleton<IVF.API.Services.JwtKeyService>();
-builder.Services.AddSingleton<IVF.API.Services.RefreshTokenFamilyService>();
+builder.Services.AddSingleton<IVF.API.Services.RefreshTokenFamilyService>(sp =>
+    new IVF.API.Services.RefreshTokenFamilyService(
+        sp.GetRequiredService<ILogger<IVF.API.Services.RefreshTokenFamilyService>>(),
+        sp.GetService<StackExchange.Redis.IConnectionMultiplexer>()));
 builder.Services.AddSingleton<IVF.API.Services.PasswordPolicyService>();
 
 // JWT Authentication — RS256 Asymmetric (Google/Microsoft standard)

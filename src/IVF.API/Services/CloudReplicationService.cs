@@ -35,7 +35,7 @@ public sealed class CloudReplicationService(
     /// </summary>
     private static string BuildMinioEndpoint(string raw, bool useSsl)
     {
-        var host = raw.StartsWith("http://", StringComparison.OrdinalIgnoreCase)  ? raw[7..]
+        var host = raw.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ? raw[7..]
                  : raw.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ? raw[8..]
                  : raw;
         return $"{(useSsl ? "https" : "http")}://{host}";

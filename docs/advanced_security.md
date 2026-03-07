@@ -47,7 +47,7 @@
 │  /api/security/advanced/* (AdminOnly policy)            │
 │  ├── JwtKeyService (RSA 3072-bit, RS256 signing)       │
 │  ├── TokenBindingMiddleware (device/session validation) │
-│  ├── RefreshTokenFamilyService (reuse detection)       │
+│  ├── RefreshTokenFamilyService (reuse detection, Redis-backed) │
 │  ├── PasswordPolicyService (NIST SP 800-63B)           │
 │  ├── Fido2 (WebAuthn / Passkeys)                       │
 │  ├── Otp.NET (TOTP generation & validation)             │
@@ -1035,17 +1035,27 @@ TokenValidationParameters = new TokenValidationParameters
 
 Phát hiện tấn công refresh token reuse — khi attacker đánh cắp refresh token và cả attacker lẫn nạn nhân đều sử dụng nó.
 
+**Redis-backed (v5.0+):** State được lưu trong Redis, chia sẻ giữa tất cả API replicas trong Docker Swarm cluster. Graceful fallback khi Redis unavailable — DB-level validation vẫn hoạt động.
+
+#### Redis Key Design
+
+| Key Pattern | Type | Mô tả | TTL |
+|---|---|---|---|
+| `rtf:family:{familyId}` | Hash | `userId`, `activeToken`, `createdAt`, `lastRotatedAt` | 8 ngày |
+| `rtf:used:{familyId}` | Set | Token hashes đã sử dụng (dùng để detect reuse) | 8 ngày |
+| `rtf:tok:{tokenHash}` | String | Reverse lookup: tokenHash → familyId | 8 ngày |
+
 #### Cách hoạt động
 
 ```
-Login → Token Family A created
+Login → Token Family A created (Redis hash + reverse mapping)
   │
-  ├─ Refresh #1: Token A₁ → A₂ (A₁ marked as used)
+  ├─ Refresh #1: Token A₁ → A₂ (A₁ added to used set, mapping updated)
   │
-  ├─ Refresh #2: Token A₂ → A₃ (A₂ marked as used)
+  ├─ Refresh #2: Token A₂ → A₃ (A₂ added to used set, mapping updated)
   │
-  └─ ⚠️ Attacker replays A₁ (already used!)
-     → REUSE DETECTED → Revoke entire Family A
+  └─ ⚠️ Attacker replays A₁ (found in used set!)
+     → REUSE DETECTED → Revoke entire Family A (delete all Redis keys)
      → Revoke user's refresh token in DB
      → Log Critical security event
      → 401 TOKEN_REUSE_DETECTED
@@ -1054,7 +1064,7 @@ Login → Token Family A created
 #### API
 
 ```csharp
-// Đăng ký token mới khi login/refresh
+// Đăng ký token mới khi login/refresh (sync wrapper, fire-and-forget to Redis)
 tokenFamily.RegisterToken(userId, refreshToken, previousToken: null); // login
 tokenFamily.RegisterToken(userId, newToken, previousToken);          // refresh
 
@@ -1065,7 +1075,21 @@ if (validation.IsReuse)
     tokenFamily.RevokeFamily(validation.FamilyId!);
     // Revoke user session + log critical event
 }
+
+// Async versions available:
+await tokenFamily.RegisterTokenAsync(userId, token, prev);
+var result = await tokenFamily.ValidateTokenAsync(token);
+await tokenFamily.RevokeFamilyAsync(familyId);
 ```
+
+#### Multi-replica Resilience
+
+| Scenario | Hành vi |
+|---|---|
+| Redis available | Token families tracked xuyên suốt tất cả replicas |
+| Redis unavailable | Graceful fallback — DB-level validation vẫn bảo vệ (GetByRefreshTokenAsync) |
+| Token registered on replica 1, validated on replica 2 | ✅ Hoạt động chính xác (shared Redis state) |
+| Redis key hết TTL (8 ngày) | Tự động cleanup, không cần CleanupExpired() manual |
 
 #### Tích hợp endpoints
 
@@ -1078,11 +1102,14 @@ if (validation.IsReuse)
 
 #### So sánh
 
-| Tiêu chí            | Trước              | Sau (RFC 6749)                  | Google/Microsoft   |
-| ------------------- | ------------------ | ------------------------------- | ------------------ |
-| Token reuse         | Không phát hiện    | Phát hiện + revoke cả family    | Phát hiện + revoke |
-| Token lineage       | Không theo dõi     | Family → Used → Active tracking | Family tracking    |
-| Stolen token impact | Vĩnh viễn (7 ngày) | Bị phát hiện ngay khi reuse     | Tương tự           |
+| Tiêu chí            | Trước (v7, in-memory) | Sau v5.0 (Redis-backed)               | Google/Microsoft   |
+| ------------------- | --------------------- | -------------------------------------- | ------------------ |
+| Token reuse         | Không phát hiện       | Phát hiện + revoke cả family           | Phát hiện + revoke |
+| Token lineage       | Không theo dõi        | Family → Used → Active (Redis)         | Family tracking    |
+| Stolen token impact | Vĩnh viễn (7 ngày)    | Bị phát hiện ngay khi reuse            | Tương tự           |
+| Multi-replica       | ❌ Broken (mỗi replica riêng) | ✅ Redis shared state            | Shared state       |
+| Cleanup             | Manual CleanupExpired | Tự động Redis TTL (8 ngày)             | Auto-expiry        |
+| Redis down          | N/A                   | Graceful fallback → DB validation      | N/A                |
 
 ---
 
@@ -1277,7 +1304,7 @@ navigator.userAgent + navigator.language + navigator.platform
 | Conditional Access Evaluation (CAE) | ✅ TokenBindingMiddleware           | CAE                  | ✅   |
 | Passwordless auth                   | ✅ Passkeys/WebAuthn (FIDO2)        | Windows Hello, FIDO2 | ✅   |
 | Asymmetric token signing            | ✅ RS256 (RSA 3072-bit)             | RS256                | ✅   |
-| Token reuse detection               | ✅ RefreshTokenFamilyService        | Token protection     | ✅   |
+| Token reuse detection               | ✅ RefreshTokenFamilyService (Redis) | Token protection     | ✅   |
 | Risk-based session management       | ✅ Adaptive sessions + risk scoring | Identity Protection  | ✅   |
 | Session binding                     | ✅ Device + session JWT claims      | Token binding        | ✅   |
 

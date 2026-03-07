@@ -2,9 +2,11 @@
 
 > **Tài liệu hướng dẫn triển khai chi tiết — từ zero đến production**
 >
-> Phiên bản: 4.0 | Cập nhật: 2026-03-07
+> Phiên bản: 5.0 | Cập nhật: 2026-03-08
 >
 > Áp dụng: IVF Platform v5.0+ | .NET 10 | Angular 21 | PostgreSQL 16
+>
+> Thay đổi v5.0: RefreshTokenFamilyService chuyển từ in-memory ConcurrentDictionary sang Redis-backed (fix 401 sau login khi multi-replica), AdaptiveSessionService multi-replica fallback, Caddy replicated (1 replica, manager-only — fix TLS cert race condition), `/hubs` SecurityEnforcement exemption
 >
 > Thay đổi v4.0: VPS 2 multi-service deployment (API replica 2, PostgreSQL standby streaming replication, Redis replica, Caddy global mode), CI/CD deploy both nodes, Ansible replication setup, DigitalSigning enabled
 
@@ -2098,6 +2100,11 @@ docker service scale ivf_api=0
 docker service scale ivf_api=1
 ```
 
+> **Lưu ý multi-replica (v5.0+):** Các service sau đã được cập nhật để hoạt động chính xác khi chạy nhiều replicas:
+> - **RefreshTokenFamilyService** — Redis-backed (chia sẻ state qua Redis, TTL 8 ngày)
+> - **AdaptiveSessionService** — Fallback re-create session từ JWT context khi không tìm thấy trong local IMemoryCache
+> - **Redis** là bắt buộc khi chạy ≥2 replicas (token family tracking, session sharing)
+
 ### 16.4 Bảo trì VPS (Node drain)
 
 ```bash
@@ -2497,6 +2504,61 @@ docker exec $API docker service ls
 docker config rm caddyfile
 ```
 
+### 18.13 API 401 sau login khi multi-replica (REFRESH TOKEN REUSE DETECTED)
+
+> **Lỗi đã gặp thực tế (v7).** Login thành công, nhưng sau vài giây các API khác trả 401.
+> Logs hiện `REFRESH TOKEN REUSE DETECTED`, `SESSION_HIJACK_ATTEMPT driftScore=100`.
+
+```bash
+# Nguyên nhân gốc: 3 vấn đề tầng (cascading) khi chạy 2+ API replicas:
+#
+# 1. RefreshTokenFamilyService dùng ConcurrentDictionary (in-memory)
+#    → Token đăng ký trên replica 1, replica 2 không biết → false "reuse" → revoke → logout
+#
+# 2. AdaptiveSessionService dùng IMemoryCache
+#    → Session tạo trên replica 1, replica 2 không thấy → driftScore=100 → 401
+#
+# 3. Auth interceptor (frontend) không dedup concurrent 401
+#    → Nhiều request refresh cùng lúc → chỉ cái đầu thành công → rest fail → logout
+
+# Fix đã áp dụng (v8-redis-family):
+#
+# 1. RefreshTokenFamilyService → Redis-backed (StackExchange.Redis)
+#    Redis keys: rtf:family:{id}, rtf:used:{id}, rtf:tok:{hash}
+#    TTL 8 ngày, graceful fallback khi Redis unavailable
+#
+# 2. AdaptiveSessionService → Fallback re-create session từ JWT context
+#    Khi session không có trong local cache → tạo lại với driftScore=0
+#
+# Verify fix:
+docker service logs ivf_api --since 5m 2>&1 | grep -i 'TOKEN REUSE\|HIJACK'
+# → Không còn false positive
+
+# Kiểm tra Redis token families:
+REDIS=$(docker ps -q -f name=ivf_redis)
+docker exec $REDIS redis-cli KEYS 'rtf:*' | head -20
+```
+
+### 18.14 Caddy TLS cert race condition (multi-node)
+
+> **Lỗi đã gặp thực tế (v7).** ~50% requests fail với TLS internal error.
+
+```bash
+# Nguyên nhân: DNS A record trỏ cả VPS1 + VPS2,
+# Caddy chạy global mode (1 replica mỗi node) → VPS2 cũng nhận ACME challenge
+# → Let's Encrypt rate limit / challenge fail → TLS internal error trên VPS2
+
+# Fix: Caddy chạy replicated mode, 1 replica, constrained to manager node
+docker service update \
+  --replicas 1 \
+  --constraint-add 'node.role==manager' \
+  ivf_caddy
+
+# Verify:
+curl -v https://natra.site/api/health/live 2>&1 | grep 'HTTP/2 200'
+# Chạy 10 lần, phải 100% thành công (không còn 50% fail)
+```
+
 ---
 
 ## 19. Checklist Triển khai
@@ -2722,4 +2784,4 @@ docker exec -it $(docker ps -q -f name=ivf_api.1) sh
 ---
 
 _Tài liệu triển khai IVF Platform — Docker Swarm + AWS S3_
-_Phiên bản: 2.0 | Ngày: 2026-03-07_
+_Phiên bản: 5.0 | Ngày: 2026-03-08_
