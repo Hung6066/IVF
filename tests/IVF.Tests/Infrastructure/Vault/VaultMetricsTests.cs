@@ -148,10 +148,12 @@ public class VaultMetricsTests
         string? operationTag = null;
         string? pathTag = null;
 
+        // Use a unique meter name to avoid cross-test interference
+        var uniqueMeterName = $"IVF.Vault.Test.{Guid.NewGuid():N}";
         using var listener = new MeterListener();
         listener.InstrumentPublished = (instrument, listener) =>
         {
-            if (instrument.Name == "vault.secret.operations")
+            if (instrument.Meter.Name == uniqueMeterName && instrument.Name == "vault.secret.operations")
                 listener.EnableMeasurementEvents(instrument);
         };
         listener.SetMeasurementEventCallback<long>((instrument, value, tags, _) =>
@@ -165,10 +167,10 @@ public class VaultMetricsTests
         });
         listener.Start();
 
-        // Re-create with listener active
+        // Re-create with listener active using unique meter name
         var meterFactoryMock = new Mock<IMeterFactory>();
         meterFactoryMock.Setup(f => f.Create(It.IsAny<MeterOptions>()))
-            .Returns((MeterOptions opts) => new Meter(opts));
+            .Returns((MeterOptions opts) => new Meter(uniqueMeterName));
         var metrics = new VaultMetrics(meterFactoryMock.Object);
         metrics.RecordSecretOperation("put", "config/db/password");
 
@@ -183,10 +185,11 @@ public class VaultMetricsTests
         // Test via RecordSecretOperation which calls GetPrefix internally
         string? pathTag = null;
 
+        var uniqueMeterName = $"IVF.Vault.Test.{Guid.NewGuid():N}";
         using var listener = new MeterListener();
         listener.InstrumentPublished = (instrument, listener) =>
         {
-            if (instrument.Name == "vault.secret.operations")
+            if (instrument.Meter.Name == uniqueMeterName && instrument.Name == "vault.secret.operations")
                 listener.EnableMeasurementEvents(instrument);
         };
         listener.SetMeasurementEventCallback<long>((instrument, value, tags, _) =>
@@ -198,7 +201,7 @@ public class VaultMetricsTests
 
         var meterFactoryMock = new Mock<IMeterFactory>();
         meterFactoryMock.Setup(f => f.Create(It.IsAny<MeterOptions>()))
-            .Returns((MeterOptions opts) => new Meter(opts));
+            .Returns((MeterOptions opts) => new Meter(uniqueMeterName));
         var metrics = new VaultMetrics(meterFactoryMock.Object);
 
         metrics.RecordSecretOperation("get", "secrets/production/api-key");
@@ -210,10 +213,11 @@ public class VaultMetricsTests
     {
         string? pathTag = null;
 
+        var uniqueMeterName = $"IVF.Vault.Test.{Guid.NewGuid():N}";
         using var listener = new MeterListener();
         listener.InstrumentPublished = (instrument, listener) =>
         {
-            if (instrument.Name == "vault.secret.operations")
+            if (instrument.Meter.Name == uniqueMeterName && instrument.Name == "vault.secret.operations")
                 listener.EnableMeasurementEvents(instrument);
         };
         listener.SetMeasurementEventCallback<long>((instrument, value, tags, _) =>
@@ -225,7 +229,7 @@ public class VaultMetricsTests
 
         var meterFactoryMock = new Mock<IMeterFactory>();
         meterFactoryMock.Setup(f => f.Create(It.IsAny<MeterOptions>()))
-            .Returns((MeterOptions opts) => new Meter(opts));
+            .Returns((MeterOptions opts) => new Meter(uniqueMeterName));
         var metrics = new VaultMetrics(meterFactoryMock.Object);
 
         metrics.RecordSecretOperation("get", "standalone-secret");
