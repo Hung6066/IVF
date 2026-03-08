@@ -1,12 +1,16 @@
 server:
   http_listen_port: 9080
   grpc_listen_port: 0
+  log_level: warn
 
 positions:
   filename: /tmp/positions.yaml
 
 clients:
   - url: http://loki:3100/loki/api/v1/push
+    batchwait: 1s
+    batchsize: 1048576
+    tenant_id: ""
 
 scrape_configs:
   # Collect logs from ALL Docker containers on this host
@@ -26,3 +30,19 @@ scrape_configs:
         target_label: "swarm_service"
       - source_labels: ["__meta_docker_container_label_com_docker_stack_namespace"]
         target_label: "stack"
+    pipeline_stages:
+      # Extract .NET log level from structured logs
+      - regex:
+          expression: '(?P<level>(trce|dbug|info|warn|fail|crit|Trace|Debug|Information|Warning|Error|Critical|TRACE|DEBUG|INFO|WARN|ERROR|FATAL))'
+      - labels:
+          level:
+      # Drop noisy health check logs
+      - drop:
+          expression: '(?i)(health|liveness|readiness).*200'
+          drop_counter_reason: "healthcheck_noise"
+      # Extract HTTP method and path from API logs
+      - regex:
+          expression: '(?P<http_method>(GET|POST|PUT|DELETE|PATCH))\s+(?P<http_path>/\S+)\s+.*\s(?P<http_status>\d{3})'
+      - labels:
+          http_method:
+          http_status:

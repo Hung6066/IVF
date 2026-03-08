@@ -1,0 +1,282 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "graphTooltip": 1,
+  "panels": [
+    {
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 100,
+      "title": "🔴 Error Logs — API",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "loki" },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 1 },
+      "id": 1,
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 1 }, { "color": "red", "value": 10 }] }
+        }
+      },
+      "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["sum"] }, "textMode": "auto" },
+      "title": "Errors (last 1h)",
+      "type": "stat",
+      "targets": [{ "expr": "count_over_time({swarm_service=~\"ivf_api.*\"} |~ \"(?i)(exception|error|fail|critical)\" != \"HealthCheck\" != \"errors_total\" [1h])", "legendFormat": "errors" }]
+    },
+    {
+      "datasource": { "type": "loki" },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 1 },
+      "id": 2,
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 1 }, { "color": "red", "value": 5 }] }
+        }
+      },
+      "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["sum"] }, "textMode": "auto" },
+      "title": "Exceptions (last 1h)",
+      "type": "stat",
+      "targets": [{ "expr": "count_over_time({swarm_service=~\"ivf_api.*\"} |~ \"(?i)(exception|unhandled|stacktrace|NullReference|InvalidOperation)\" [1h])", "legendFormat": "exceptions" }]
+    },
+    {
+      "datasource": { "type": "loki" },
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 1 },
+      "id": 3,
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 1 }, { "color": "red", "value": 5 }] }
+        }
+      },
+      "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["sum"] }, "textMode": "auto" },
+      "title": "DB Errors (last 1h)",
+      "type": "stat",
+      "targets": [{ "expr": "count_over_time({swarm_service=~\"ivf_api.*\"} |~ \"(?i)(EntityFramework|Npgsql|deadlock|connection refused|timeout expired)\" [1h])", "legendFormat": "db errors" }]
+    },
+    {
+      "datasource": { "type": "loki" },
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 1 },
+      "id": 4,
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 1 }, { "color": "red", "value": 5 }] }
+        }
+      },
+      "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["sum"] }, "textMode": "auto" },
+      "title": "Auth Failures (last 1h)",
+      "type": "stat",
+      "targets": [{ "expr": "count_over_time({swarm_service=~\"ivf_api.*\"} |~ \"(?i)(401|403|unauthorized|forbidden|authentication failed|invalid token)\" [1h])", "legendFormat": "auth" }]
+    },
+    {
+      "datasource": { "type": "loki" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "lineWidth": 1, "fillOpacity": 30, "stacking": { "mode": "normal" } } } },
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 5 },
+      "id": 10,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "Error Rate Over Time",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "sum(count_over_time({swarm_service=~\"ivf_api.*\"} |~ \"(?i)exception\" [$__interval]))", "legendFormat": "Exceptions" },
+        { "expr": "sum(count_over_time({swarm_service=~\"ivf_api.*\"} |~ \"(?i)error\" != \"errors_total\" [$__interval]))", "legendFormat": "Errors" },
+        { "expr": "sum(count_over_time({swarm_service=~\"ivf_api.*\"} |~ \"(?i)warn\" != \"warning\" [$__interval]))", "legendFormat": "Warnings" }
+      ]
+    },
+    {
+      "datasource": { "type": "loki" },
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 11 },
+      "id": 20,
+      "options": {
+        "showTime": true,
+        "showLabels": true,
+        "showCommonLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "sortOrder": "Descending",
+        "dedupStrategy": "none"
+      },
+      "title": "🔴 API Error Logs",
+      "type": "logs",
+      "targets": [{ "expr": "{swarm_service=~\"ivf_api.*\"} |~ \"(?i)(exception|error|fail|critical)\" != \"HealthCheck\" != \"errors_total\" != \"error_count\"", "legendFormat": "" }]
+    },
+    {
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 },
+      "id": 101,
+      "title": "📋 All API Logs",
+      "type": "row",
+      "collapsed": true,
+      "panels": [
+        {
+          "datasource": { "type": "loki" },
+          "gridPos": { "h": 15, "w": 24, "x": 0, "y": 24 },
+          "id": 30,
+          "options": {
+            "showTime": true,
+            "showLabels": true,
+            "wrapLogMessage": true,
+            "enableLogDetails": true,
+            "sortOrder": "Descending"
+          },
+          "title": "API Logs (all)",
+          "type": "logs",
+          "targets": [{ "expr": "{swarm_service=~\"ivf_api.*\"}", "legendFormat": "" }]
+        }
+      ]
+    },
+    {
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 24 },
+      "id": 102,
+      "title": "🗄️ Database Logs",
+      "type": "row",
+      "collapsed": true,
+      "panels": [
+        {
+          "datasource": { "type": "loki" },
+          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 25 },
+          "id": 31,
+          "options": {
+            "showTime": true,
+            "showLabels": true,
+            "wrapLogMessage": true,
+            "enableLogDetails": true,
+            "sortOrder": "Descending"
+          },
+          "title": "PostgreSQL Logs",
+          "type": "logs",
+          "targets": [{ "expr": "{swarm_service=~\"ivf_db.*\"}", "legendFormat": "" }]
+        },
+        {
+          "datasource": { "type": "loki" },
+          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 35 },
+          "id": 32,
+          "options": {
+            "showTime": true,
+            "showLabels": true,
+            "wrapLogMessage": true,
+            "enableLogDetails": true,
+            "sortOrder": "Descending"
+          },
+          "title": "PostgreSQL Errors",
+          "type": "logs",
+          "targets": [{ "expr": "{swarm_service=~\"ivf_db.*\"} |~ \"(?i)(error|fatal|panic|deadlock)\"", "legendFormat": "" }]
+        }
+      ]
+    },
+    {
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 25 },
+      "id": 103,
+      "title": "🔐 Security & Auth Logs",
+      "type": "row",
+      "collapsed": true,
+      "panels": [
+        {
+          "datasource": { "type": "loki" },
+          "gridPos": { "h": 12, "w": 24, "x": 0, "y": 26 },
+          "id": 40,
+          "options": {
+            "showTime": true,
+            "showLabels": true,
+            "wrapLogMessage": true,
+            "enableLogDetails": true,
+            "sortOrder": "Descending"
+          },
+          "title": "Authentication & Authorization Logs",
+          "type": "logs",
+          "targets": [{ "expr": "{swarm_service=~\"ivf_api.*\"} |~ \"(?i)(login|logout|token|auth|401|403|forbidden|unauthorized|jwt|refresh)\"", "legendFormat": "" }]
+        }
+      ]
+    },
+    {
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 26 },
+      "id": 104,
+      "title": "🌐 Reverse Proxy Logs",
+      "type": "row",
+      "collapsed": true,
+      "panels": [
+        {
+          "datasource": { "type": "loki" },
+          "gridPos": { "h": 12, "w": 24, "x": 0, "y": 27 },
+          "id": 50,
+          "options": {
+            "showTime": true,
+            "showLabels": true,
+            "wrapLogMessage": true,
+            "enableLogDetails": true,
+            "sortOrder": "Descending"
+          },
+          "title": "Caddy Access Logs",
+          "type": "logs",
+          "targets": [{ "expr": "{swarm_service=~\"ivf_caddy.*\"}", "legendFormat": "" }]
+        }
+      ]
+    },
+    {
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 27 },
+      "id": 105,
+      "title": "📦 Storage & Services Logs",
+      "type": "row",
+      "collapsed": true,
+      "panels": [
+        {
+          "datasource": { "type": "loki" },
+          "gridPos": { "h": 10, "w": 12, "x": 0, "y": 28 },
+          "id": 60,
+          "options": { "showTime": true, "showLabels": true, "wrapLogMessage": true, "enableLogDetails": true, "sortOrder": "Descending" },
+          "title": "Redis Logs",
+          "type": "logs",
+          "targets": [{ "expr": "{swarm_service=~\"ivf_redis.*\"}", "legendFormat": "" }]
+        },
+        {
+          "datasource": { "type": "loki" },
+          "gridPos": { "h": 10, "w": 12, "x": 12, "y": 28 },
+          "id": 61,
+          "options": { "showTime": true, "showLabels": true, "wrapLogMessage": true, "enableLogDetails": true, "sortOrder": "Descending" },
+          "title": "MinIO Logs",
+          "type": "logs",
+          "targets": [{ "expr": "{swarm_service=~\"ivf_minio.*\"}", "legendFormat": "" }]
+        },
+        {
+          "datasource": { "type": "loki" },
+          "gridPos": { "h": 10, "w": 12, "x": 0, "y": 38 },
+          "id": 62,
+          "options": { "showTime": true, "showLabels": true, "wrapLogMessage": true, "enableLogDetails": true, "sortOrder": "Descending" },
+          "title": "SignServer Logs",
+          "type": "logs",
+          "targets": [{ "expr": "{swarm_service=~\"ivf_signserver\"}", "legendFormat": "" }]
+        },
+        {
+          "datasource": { "type": "loki" },
+          "gridPos": { "h": 10, "w": 12, "x": 12, "y": 38 },
+          "id": 63,
+          "options": { "showTime": true, "showLabels": true, "wrapLogMessage": true, "enableLogDetails": true, "sortOrder": "Descending" },
+          "title": "EJBCA Logs",
+          "type": "logs",
+          "targets": [{ "expr": "{swarm_service=~\"ivf_ejbca\"}", "legendFormat": "" }]
+        }
+      ]
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["ivf", "logs", "errors", "loki"],
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "Asia/Ho_Chi_Minh",
+  "title": "IVF Logs & Errors",
+  "uid": "ivf-logs-errors",
+  "version": 1
+}

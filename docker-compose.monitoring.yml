@@ -75,6 +75,7 @@ services:
     container_name: ivf-loki
     volumes:
       - ./docker/monitoring/loki-config.yml:/etc/loki/local-config.yaml:ro
+      - ./docker/monitoring/loki-rules:/loki/rules:ro
       - loki_data:/loki
     command: -config.file=/etc/loki/local-config.yaml
     ports:

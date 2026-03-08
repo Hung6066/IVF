@@ -1,0 +1,118 @@
+groups:
+  # ═══════════════════════════════════════════
+  # Log-based alerts — IVF API
+  # ═══════════════════════════════════════════
+  - name: ivf-log-errors
+    rules:
+      # High error log rate
+      - alert: HighErrorLogRate
+        expr: |
+          sum(count_over_time({swarm_service=~"ivf_api.*"} |~ "(?i)(exception|error|fatal)" != "HealthCheck" != "errors_total" [5m])) > 20
+        for: 5m
+        labels:
+          severity: warning
+          service: ivf-api
+        annotations:
+          summary: "High error log rate (>20 errors/5min)"
+          description: "API is generating {{ $value }} error logs in 5 minutes. Check Grafana Logs dashboard."
+
+      # Unhandled exceptions
+      - alert: UnhandledExceptions
+        expr: |
+          sum(count_over_time({swarm_service=~"ivf_api.*"} |~ "(?i)(unhandled.*exception|NullReferenceException|StackOverflowException|OutOfMemoryException)" [5m])) > 0
+        for: 1m
+        labels:
+          severity: critical
+          service: ivf-api
+        annotations:
+          summary: "Unhandled exception detected"
+          description: "{{ $value }} unhandled exceptions in last 5 minutes. These indicate bugs that need immediate fixing."
+
+      # Database connection errors
+      - alert: DatabaseConnectionErrors
+        expr: |
+          sum(count_over_time({swarm_service=~"ivf_api.*"} |~ "(?i)(Npgsql.*Exception|connection refused|connection timed out|too many connections|deadlock detected)" [5m])) > 3
+        for: 2m
+        labels:
+          severity: critical
+          service: postgres
+        annotations:
+          summary: "Database connection errors detected"
+          description: "{{ $value }} DB errors in 5 minutes. Check PostgreSQL status and connection pool."
+
+      # Redis connection errors
+      - alert: RedisConnectionErrors
+        expr: |
+          sum(count_over_time({swarm_service=~"ivf_api.*"} |~ "(?i)(Redis.*Exception|RedisConnectionException|redis.*timed out|backlog)" [5m])) > 5
+        for: 3m
+        labels:
+          severity: warning
+          service: redis
+        annotations:
+          summary: "Redis connection errors"
+          description: "{{ $value }} Redis errors in 5 minutes. Caching may be degraded."
+
+  - name: ivf-log-security
+    rules:
+      # Brute force login attempts
+      - alert: BruteForceAttempt
+        expr: |
+          sum(count_over_time({swarm_service=~"ivf_api.*"} |~ "(?i)(authentication failed|invalid credentials|login failed|401)" [5m])) > 20
+        for: 5m
+        labels:
+          severity: warning
+          service: ivf-api
+          category: security
+        annotations:
+          summary: "Possible brute force login attempt"
+          description: "{{ $value }} auth failures in 5 minutes. Check source IPs in logs."
+
+      # Forbidden access attempts
+      - alert: ForbiddenAccessSpike
+        expr: |
+          sum(count_over_time({swarm_service=~"ivf_api.*"} |~ "(?i)(403|forbidden|access denied|insufficient permissions)" [5m])) > 15
+        for: 5m
+        labels:
+          severity: warning
+          service: ivf-api
+          category: security
+        annotations:
+          summary: "Spike in forbidden access attempts"
+          description: "{{ $value }} forbidden responses in 5 minutes. Possible privilege escalation attempt."
+
+  - name: ivf-log-infrastructure
+    rules:
+      # PostgreSQL fatal/panic
+      - alert: PostgresFatalError
+        expr: |
+          sum(count_over_time({swarm_service=~"ivf_db.*"} |~ "(?i)(FATAL|PANIC)" [5m])) > 0
+        for: 0m
+        labels:
+          severity: critical
+          service: postgres
+        annotations:
+          summary: "PostgreSQL FATAL/PANIC error"
+          description: "PostgreSQL encountered {{ $value }} fatal errors. Database may be crashing."
+
+      # MinIO errors
+      - alert: MinioErrors
+        expr: |
+          sum(count_over_time({swarm_service=~"ivf_minio.*"} |~ "(?i)(error|fatal|panic|disk.*full)" [5m])) > 5
+        for: 5m
+        labels:
+          severity: warning
+          service: minio
+        annotations:
+          summary: "MinIO error logs detected"
+          description: "{{ $value }} MinIO errors in 5 minutes. Check storage health."
+
+      # Container restart detection
+      - alert: ContainerRestarting
+        expr: |
+          sum(count_over_time({swarm_service=~"ivf_.*"} |~ "(?i)(starting|started|restarting)" [10m])) by (swarm_service) > 3
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container {{ $labels.swarm_service }} restarting frequently"
+          description: "{{ $value }} restart events in 10 minutes. Possible crash loop."

@@ -1,40 +1,207 @@
 groups:
-  - name: ivf-api
+  # ═══════════════════════════════════════════
+  # IVF API — Application-level alerts
+  # ═══════════════════════════════════════════
+  - name: ivf-api-availability
     rules:
-      # High error rate
-      - alert: HighErrorRate
-        expr: rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[5m]) / rate(http_server_request_duration_seconds_count[5m]) > 0.05
-        for: 5m
-        labels:
-          severity: critical
-          service: ivf-api
-        annotations:
-          summary: "High HTTP error rate (> 5%)"
-          description: "{{ $labels.instance }} has {{ $value | humanizePercentage }} error rate"
-
-      # Slow response time
-      - alert: SlowResponseTime
-        expr: histogram_quantile(0.95, rate(http_server_request_duration_seconds_bucket[5m])) > 2
-        for: 5m
-        labels:
-          severity: warning
-          service: ivf-api
-        annotations:
-          summary: "P95 latency > 2s"
-          description: "{{ $labels.instance }} P95 latency is {{ $value }}s"
-
-      # API down
+      # API instance down
       - alert: ApiDown
         expr: up{job="ivf-api"} == 0
         for: 1m
         labels:
           severity: critical
           service: ivf-api
+          team: backend
         annotations:
-          summary: "IVF API is down"
-          description: "{{ $labels.instance }} has been down for more than 1 minute"
+          summary: "IVF API instance down"
+          description: "{{ $labels.instance }} has been unreachable for > 1 minute"
+          runbook: "Check docker service logs ivf_api --tail 50"
 
-  - name: infrastructure
+      # No API instances running at all
+      - alert: ApiAllInstancesDown
+        expr: count(up{job="ivf-api"} == 1) == 0 or absent(up{job="ivf-api"})
+        for: 30s
+        labels:
+          severity: critical
+          service: ivf-api
+          team: backend
+        annotations:
+          summary: "ALL IVF API instances are down — complete outage"
+          description: "No healthy API instances detected. Immediate action required."
+
+  - name: ivf-api-latency
+    rules:
+      # P95 latency > 1s (warning)
+      - alert: HighLatencyWarning
+        expr: histogram_quantile(0.95, sum(rate(http_server_request_duration_seconds_bucket{job="ivf-api"}[5m])) by (le)) > 1
+        for: 5m
+        labels:
+          severity: warning
+          service: ivf-api
+        annotations:
+          summary: "P95 latency > 1s"
+          description: "P95 response time is {{ $value | humanizeDuration }}. Investigate slow queries."
+
+      # P95 latency > 3s (critical)
+      - alert: HighLatencyCritical
+        expr: histogram_quantile(0.95, sum(rate(http_server_request_duration_seconds_bucket{job="ivf-api"}[5m])) by (le)) > 3
+        for: 3m
+        labels:
+          severity: critical
+          service: ivf-api
+        annotations:
+          summary: "P95 latency > 3s — degraded performance"
+          description: "P95 response time is {{ $value | humanizeDuration }}. Users are experiencing significant delays."
+
+      # P99 latency > 5s
+      - alert: P99LatencyExtreme
+        expr: histogram_quantile(0.99, sum(rate(http_server_request_duration_seconds_bucket{job="ivf-api"}[5m])) by (le)) > 5
+        for: 5m
+        labels:
+          severity: warning
+          service: ivf-api
+        annotations:
+          summary: "P99 latency > 5s"
+          description: "1% of requests taking > 5s. Check for long-running queries or resource contention."
+
+      # Specific endpoint latency
+      - alert: SlowEndpoint
+        expr: histogram_quantile(0.95, sum(rate(http_server_request_duration_seconds_bucket{job="ivf-api"}[5m])) by (le, http_route)) > 5
+        for: 10m
+        labels:
+          severity: warning
+          service: ivf-api
+        annotations:
+          summary: "Slow endpoint: {{ $labels.http_route }}"
+          description: "Endpoint {{ $labels.http_route }} P95 latency is {{ $value | humanizeDuration }}"
+
+  - name: ivf-api-errors
+    rules:
+      # Error rate > 1% (warning)
+      - alert: ErrorRateWarning
+        expr: |
+          (
+            sum(rate(http_server_request_duration_seconds_count{job="ivf-api", http_response_status_code=~"5.."}[5m]))
+            /
+            sum(rate(http_server_request_duration_seconds_count{job="ivf-api"}[5m]))
+          ) > 0.01
+        for: 5m
+        labels:
+          severity: warning
+          service: ivf-api
+        annotations:
+          summary: "HTTP error rate > 1%"
+          description: "Error rate is {{ $value | humanizePercentage }}. Check logs for details."
+
+      # Error rate > 5% (critical)
+      - alert: ErrorRateCritical
+        expr: |
+          (
+            sum(rate(http_server_request_duration_seconds_count{job="ivf-api", http_response_status_code=~"5.."}[5m]))
+            /
+            sum(rate(http_server_request_duration_seconds_count{job="ivf-api"}[5m]))
+          ) > 0.05
+        for: 3m
+        labels:
+          severity: critical
+          service: ivf-api
+        annotations:
+          summary: "HTTP error rate > 5% — service degraded"
+          description: "Error rate is {{ $value | humanizePercentage }}. Immediate investigation required."
+
+      # High 4xx rate (client errors, might indicate attack or broken client)
+      - alert: High4xxRate
+        expr: |
+          (
+            sum(rate(http_server_request_duration_seconds_count{job="ivf-api", http_response_status_code=~"4.."}[5m]))
+            /
+            sum(rate(http_server_request_duration_seconds_count{job="ivf-api"}[5m]))
+          ) > 0.25
+        for: 10m
+        labels:
+          severity: warning
+          service: ivf-api
+        annotations:
+          summary: "High 4xx client error rate > 25%"
+          description: "{{ $value | humanizePercentage }} of requests returning 4xx. Possible API misuse or attack."
+
+      # Zero traffic (might indicate routing/proxy issue)
+      - alert: NoTraffic
+        expr: sum(rate(http_server_request_duration_seconds_count{job="ivf-api"}[5m])) == 0
+        for: 10m
+        labels:
+          severity: warning
+          service: ivf-api
+        annotations:
+          summary: "No HTTP traffic to API for 10 minutes"
+          description: "API is receiving zero requests. Check Caddy proxy or DNS."
+
+  - name: ivf-api-resources
+    rules:
+      # High memory usage > 800MB (warning)
+      - alert: HighMemoryWarning
+        expr: process_resident_memory_bytes{job="ivf-api"} > 800 * 1024 * 1024
+        for: 10m
+        labels:
+          severity: warning
+          service: ivf-api
+        annotations:
+          summary: "API memory > 800MB"
+          description: "{{ $labels.instance }} using {{ $value | humanize1024 }}B. Monitor for leaks."
+
+      # Critical memory > 950MB (near 1GB limit)
+      - alert: HighMemoryCritical
+        expr: process_resident_memory_bytes{job="ivf-api"} > 950 * 1024 * 1024
+        for: 5m
+        labels:
+          severity: critical
+          service: ivf-api
+        annotations:
+          summary: "API memory > 950MB — near OOM limit"
+          description: "{{ $labels.instance }} at {{ $value | humanize1024 }}B. Container may be killed by OOM."
+
+      # High GC pressure (if available from .NET metrics)
+      - alert: HighGCPressure
+        expr: rate(dotnet_gc_collections_total{job="ivf-api", generation="2"}[5m]) > 0.5
+        for: 10m
+        labels:
+          severity: warning
+          service: ivf-api
+        annotations:
+          summary: "High Gen2 GC frequency"
+          description: "{{ $value }} Gen2 GCs/sec. Possible memory pressure or large object allocations."
+
+      # Thread pool exhaustion
+      - alert: ThreadPoolStarvation
+        expr: dotnet_threadpool_queue_length{job="ivf-api"} > 100
+        for: 5m
+        labels:
+          severity: warning
+          service: ivf-api
+        annotations:
+          summary: "Thread pool queue length > 100"
+          description: "Thread pool queue at {{ $value }}. Requests may be waiting for threads."
+
+  - name: ivf-api-saturation
+    rules:
+      # Request rate spike (3x normal)
+      - alert: TrafficSpike
+        expr: |
+          sum(rate(http_server_request_duration_seconds_count{job="ivf-api"}[5m]))
+          >
+          3 * sum(rate(http_server_request_duration_seconds_count{job="ivf-api"}[1h] offset 1d))
+        for: 10m
+        labels:
+          severity: warning
+          service: ivf-api
+        annotations:
+          summary: "Traffic spike — 3x normal rate"
+          description: "Current rate is {{ $value }} req/s. Could indicate load test, crawler, or DDoS."
+
+  # ═══════════════════════════════════════════
+  # Infrastructure — Database, Cache, Storage
+  # ═══════════════════════════════════════════
+  - name: infrastructure-availability
     rules:
       # PostgreSQL down
       - alert: PostgresDown
@@ -43,8 +210,11 @@ groups:
         labels:
           severity: critical
           service: postgres
+          team: infra
         annotations:
           summary: "PostgreSQL is down"
+          description: "Primary database unreachable. All write operations will fail."
+          runbook: "docker service logs ivf_db --tail 50"
 
       # Redis down
       - alert: RedisDown
@@ -53,8 +223,10 @@ groups:
         labels:
           severity: warning
           service: redis
+          team: infra
         annotations:
           summary: "Redis is down — caching degraded"
+          description: "Cache unavailable. API falls back to DB-only mode. Performance degraded."
 
       # MinIO down
       - alert: MinioDown
@@ -63,16 +235,132 @@ groups:
         labels:
           severity: critical
           service: minio
+          team: infra
         annotations:
           summary: "MinIO object storage is down"
+          description: "File uploads/downloads will fail. Medical images and documents inaccessible."
 
-      # High memory usage
-      - alert: HighMemoryUsage
-        expr: process_resident_memory_bytes{job="ivf-api"} > 800 * 1024 * 1024
+      # Caddy down
+      - alert: CaddyDown
+        expr: up{job="caddy"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: caddy
+          team: infra
+        annotations:
+          summary: "Caddy reverse proxy is down"
+          description: "No traffic can reach the API or frontend. Complete outage for users."
+
+  - name: infrastructure-resources
+    rules:
+      # MinIO disk usage > 80%
+      - alert: MinioHighDiskUsage
+        expr: minio_cluster_usage_total_bytes / minio_cluster_capacity_raw_total_bytes > 0.8
         for: 10m
         labels:
           severity: warning
-          service: ivf-api
+          service: minio
         annotations:
-          summary: "API memory usage > 800MB"
-          description: "{{ $labels.instance }} using {{ $value | humanize1024 }}B"
+          summary: "MinIO disk usage > 80%"
+          description: "Storage at {{ $value | humanizePercentage }}. Plan capacity expansion."
+
+      # MinIO disk usage > 90%
+      - alert: MinioDiskCritical
+        expr: minio_cluster_usage_total_bytes / minio_cluster_capacity_raw_total_bytes > 0.9
+        for: 5m
+        labels:
+          severity: critical
+          service: minio
+        annotations:
+          summary: "MinIO disk usage > 90% — storage nearly full"
+          description: "Storage at {{ $value | humanizePercentage }}. Uploads may fail soon."
+
+  # ═══════════════════════════════════════════
+  # Prometheus self-monitoring
+  # ═══════════════════════════════════════════
+  - name: prometheus-self
+    rules:
+      # Prometheus config reload failed
+      - alert: PrometheusConfigReloadFailed
+        expr: prometheus_config_last_reload_successful == 0
+        for: 5m
+        labels:
+          severity: warning
+          service: prometheus
+        annotations:
+          summary: "Prometheus config reload failed"
+          description: "Check prometheus.yml or alerts.yml syntax."
+
+      # Prometheus scrape failures
+      - alert: PrometheusTargetDown
+        expr: up == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Scrape target {{ $labels.job }} is down"
+          description: "{{ $labels.instance }} (job={{ $labels.job }}) has been down for > 5 minutes."
+
+      # TSDB compaction failures
+      - alert: PrometheusTSDBCompactionsFailing
+        expr: increase(prometheus_tsdb_compactions_failed_total[3h]) > 0
+        for: 0m
+        labels:
+          severity: warning
+          service: prometheus
+        annotations:
+          summary: "Prometheus TSDB compaction failures"
+          description: "{{ $value }} compaction failures in last 3h. Storage may be corrupted."
+
+      # Rule evaluation failures
+      - alert: PrometheusRuleEvaluationFailures
+        expr: increase(prometheus_rule_evaluation_failures_total[5m]) > 0
+        for: 0m
+        labels:
+          severity: warning
+          service: prometheus
+        annotations:
+          summary: "Prometheus rule evaluation failures"
+          description: "{{ $value }} rule evaluation failures. Alert rules may not be functioning."
+
+  # ═══════════════════════════════════════════
+  # Recording Rules — Pre-computed queries for dashboards
+  # ═══════════════════════════════════════════
+  - name: ivf-recording-rules
+    interval: 15s
+    rules:
+      # Request rate per second
+      - record: ivf:http_requests:rate5m
+        expr: sum(rate(http_server_request_duration_seconds_count{job="ivf-api"}[5m]))
+
+      # Request rate by status code
+      - record: ivf:http_requests_by_status:rate5m
+        expr: sum(rate(http_server_request_duration_seconds_count{job="ivf-api"}[5m])) by (http_response_status_code)
+
+      # Request rate by endpoint
+      - record: ivf:http_requests_by_route:rate5m
+        expr: sum(rate(http_server_request_duration_seconds_count{job="ivf-api"}[5m])) by (http_route)
+
+      # Error rate (5xx / total)
+      - record: ivf:http_error_rate:ratio5m
+        expr: |
+          sum(rate(http_server_request_duration_seconds_count{job="ivf-api", http_response_status_code=~"5.."}[5m]))
+          /
+          sum(rate(http_server_request_duration_seconds_count{job="ivf-api"}[5m]))
+
+      # P50 latency
+      - record: ivf:http_latency_p50:5m
+        expr: histogram_quantile(0.50, sum(rate(http_server_request_duration_seconds_bucket{job="ivf-api"}[5m])) by (le))
+
+      # P95 latency
+      - record: ivf:http_latency_p95:5m
+        expr: histogram_quantile(0.95, sum(rate(http_server_request_duration_seconds_bucket{job="ivf-api"}[5m])) by (le))
+
+      # P99 latency
+      - record: ivf:http_latency_p99:5m
+        expr: histogram_quantile(0.99, sum(rate(http_server_request_duration_seconds_bucket{job="ivf-api"}[5m])) by (le))
+
+      # Availability (percentage of targets up)
+      - record: ivf:api_availability:ratio
+        expr: avg(up{job="ivf-api"})
