@@ -1,3 +1,4 @@
+using IVF.Application.Common;
 using IVF.Application.Common.Interfaces;
 using IVF.Domain.Entities;
 using MediatR;
@@ -9,7 +10,8 @@ public sealed class UploadPatientDocumentHandler(
     IPatientRepository patientRepo,
     IObjectStorageService objectStorage,
     IUnitOfWork unitOfWork,
-    ITenantLimitService limitService)
+    ITenantLimitService limitService,
+    ICurrentUserService currentUser)
     : IRequestHandler<UploadPatientDocumentCommand, Result<PatientDocumentDto>>
 {
     public async Task<Result<PatientDocumentDto>> Handle(
@@ -24,8 +26,9 @@ public sealed class UploadPatientDocumentHandler(
             return Result<PatientDocumentDto>.Fail("Không tìm thấy bệnh nhân");
 
         // Build S3 object key: {patientCode}/{documentType}/{year}/{uniqueId}{ext}
-        var objectKey = PatientDocument.BuildObjectKey(
-            patient.PatientCode, request.DocumentType, request.OriginalFileName);
+        var objectKey = TenantStoragePrefix.Prefix(currentUser.TenantId,
+            PatientDocument.BuildObjectKey(
+                patient.PatientCode, request.DocumentType, request.OriginalFileName));
 
         var bucketName = GetBucketForType(request.DocumentType);
 
@@ -74,10 +77,10 @@ public sealed class UploadPatientDocumentHandler(
     {
         return type switch
         {
-            IVF.Domain.Enums.DocumentType.SignedPdf => "ivf-signed-pdfs",
+            IVF.Domain.Enums.DocumentType.SignedPdf => StorageBuckets.SignedPdfs,
             IVF.Domain.Enums.DocumentType.ImagingReport or
-            IVF.Domain.Enums.DocumentType.PathologyReport => "ivf-medical-images",
-            _ => "ivf-documents"
+            IVF.Domain.Enums.DocumentType.PathologyReport => StorageBuckets.MedicalImages,
+            _ => StorageBuckets.Documents
         };
     }
 
@@ -272,7 +275,7 @@ public sealed class SignDocumentHandler(
         var signedKey = $"signed/{doc.ObjectKey}";
         using var signedStream = new MemoryStream(signedPdf);
         await objectStorage.UploadAsync(
-            "ivf-signed-pdfs", signedKey, signedStream,
+            StorageBuckets.SignedPdfs, signedKey, signedStream,
             "application/pdf", signedPdf.Length,
             ct: cancellationToken);
 

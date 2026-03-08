@@ -32,6 +32,10 @@ builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddMemoryCache();
 
+// ─── Health Checks ───
+builder.Services.AddHealthChecks()
+    .AddDbContextCheck<IVF.Infrastructure.Persistence.IvfDbContext>("database", tags: new[] { "db", "ready" });
+
 // ─── Fido2 / WebAuthn ───
 builder.Services.AddFido2(options =>
 {
@@ -554,6 +558,7 @@ app.MapHub<IVF.API.Hubs.EvidenceHub>("/hubs/evidence");
 app.MapHub<IVF.API.Hubs.InfrastructureHub>("/hubs/infrastructure");
 
 // Register Endpoints
+app.MapHealthEndpoints();
 app.MapAuthEndpoints();
 app.MapPatientEndpoints();
 app.MapPatientBiometricsEndpoints();

@@ -534,9 +534,11 @@ Ký phiếu (DocumentSignatureEndpoints)
 
 Export PDF ký số (FormEndpoints/export-pdf?sign=true)
 └─> Generate PDF → Sign qua SignServer
-└─> Upload lên MinIO: ivf-signed-pdfs/{patientCode}/SignedPdf/{year}/{id}.pdf
+└─> Upload lên MinIO: ivf-signed-pdfs/tenants/{tenantId}/{patientCode}/SignedPdf/{year}/{id}.pdf
 └─> Tạo PatientDocument record (type=SignedPdf, formResponseId=...)
 └─> Trả PDF cho client (không chờ upload)
+
+> **Multi-tenant isolation**: Tất cả object key được prefix với `tenants/{tenantId}/` thông qua `TenantStoragePrefix.Prefix()`. Constants bucket trong `StorageBuckets` class (`IVF.Application.Common`).
 
 Download PDF ký số đã lưu (DocumentSignatureEndpoints)
 └─> GET /api/forms/responses/{id}/signed-pdf → stream trực tiếp

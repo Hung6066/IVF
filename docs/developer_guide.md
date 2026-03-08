@@ -928,14 +928,41 @@ public class QueueNotifier(IHubContext<QueueHub> hub)
 
 ### 9.1 File Storage (MinIO / S3)
 
-Three buckets:
+Three buckets (shared across tenants, isolated by prefix):
 
 - `ivf-documents` — Patient documents, uploads
 - `ivf-signed-pdfs` — Digitally signed PDF reports
 - `ivf-medical-images` — Ultrasound images, photos
 
+**Tenant isolation**: All object keys are prefixed with `tenants/{tenantId}/` for multi-tenant data isolation. Centralized constants and helper in `StorageBuckets` / `TenantStoragePrefix` (`IVF.Application.Common`):
+
+```
+Object key structure:
+  tenants/{tenantId}/{patientCode}/{documentType}/{year}/{uniqueId}{ext}
+
+Example:
+  tenants/3fa85f64-5717-4562-b3fc-2c963f66afa6/BN-001/SignedPdf/2026/abc123.pdf
+```
+
 ```csharp
-// Interface
+// Centralized bucket constants
+public static class StorageBuckets
+{
+    public const string Documents = "ivf-documents";
+    public const string SignedPdfs = "ivf-signed-pdfs";
+    public const string MedicalImages = "ivf-medical-images";
+}
+
+// Tenant prefix helper
+public static class TenantStoragePrefix
+{
+    public static string Prefix(Guid? tenantId, string objectKey)
+        => tenantId.HasValue && tenantId != Guid.Empty
+            ? $"tenants/{tenantId.Value}/{objectKey}"
+            : objectKey;
+}
+
+// Low-level interface (no tenant awareness — caller provides full key)
 public interface IObjectStorageService
 {
     Task<string> UploadAsync(string bucket, string objectName, Stream data, string contentType);
@@ -944,6 +971,9 @@ public interface IObjectStorageService
     Task<bool> ExistsAsync(string bucket, string objectName);
 }
 ```
+
+**Write paths** (upload): All handlers inject `ICurrentUserService` and call `TenantStoragePrefix.Prefix(currentUser.TenantId, key)` before uploading.  
+**Read paths** (download): Use `doc.BucketName` + `doc.ObjectKey` from the database — the full tenant-prefixed key is stored, so reads work automatically.
 
 ### 9.2 Digital Signing (SignServer + EJBCA)
 

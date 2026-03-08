@@ -289,6 +289,7 @@ Triple auth pipeline: `VaultToken (X-Vault-Token)` → `ApiKey (X-API-Key)` → 
 7. **ApiService is unused**: Feature services don't extend it — each reads `environment.apiUrl` directly
 8. **Docker required**: PostgreSQL, Redis, MinIO must be running via `docker-compose up -d`
 9. **Auto-migration in dev**: `DatabaseSeeder.SeedAsync()` runs seeders on startup in development mode
+10. **Storage tenant isolation**: All MinIO object keys must be prefixed with `TenantStoragePrefix.Prefix(tenantId, key)`. Use `StorageBuckets` constants (not hardcoded strings) for bucket names. Both in `IVF.Application.Common`.
 
 ## applyTo Patterns
 

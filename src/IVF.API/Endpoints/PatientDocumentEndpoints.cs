@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using IVF.Application.Common;
 using IVF.Application.Common.Interfaces;
 using IVF.Application.Features.Documents.Commands;
 using IVF.Application.Features.Documents.Queries;
@@ -122,7 +123,7 @@ public static class PatientDocumentEndpoints
             if (signed && doc.IsSigned && !string.IsNullOrEmpty(doc.SignedObjectKey))
             {
                 // User wants signed version
-                primaryBucket = "ivf-signed-pdfs";
+                primaryBucket = StorageBuckets.SignedPdfs;
                 primaryKey = doc.SignedObjectKey;
                 // Fallback to original if signed file missing
                 fallbackBucket = doc.BucketName;
@@ -133,7 +134,7 @@ public static class PatientDocumentEndpoints
                 // User wants original, but doc is signed → try original first, fallback to signed
                 primaryBucket = doc.BucketName;
                 primaryKey = doc.ObjectKey;
-                fallbackBucket = "ivf-signed-pdfs";
+                fallbackBucket = StorageBuckets.SignedPdfs;
                 fallbackKey = doc.SignedObjectKey;
             }
             else
@@ -239,23 +240,23 @@ public static class PatientDocumentEndpoints
         {
             try
             {
-                await objectStorage.EnsureBucketExistsAsync("ivf-documents");
-                await objectStorage.EnsureBucketExistsAsync("ivf-signed-pdfs");
+                await objectStorage.EnsureBucketExistsAsync(StorageBuckets.Documents);
+                await objectStorage.EnsureBucketExistsAsync(StorageBuckets.SignedPdfs);
 
                 // Test upload to verify write access
                 var testKey = $"_health_check/{Guid.NewGuid():N}.txt";
                 var testData = System.Text.Encoding.UTF8.GetBytes("health check " + DateTime.UtcNow);
                 using var testStream = new MemoryStream(testData);
-                await objectStorage.UploadAsync("ivf-signed-pdfs", testKey, testStream, "text/plain", testData.Length);
+                await objectStorage.UploadAsync(StorageBuckets.SignedPdfs, testKey, testStream, "text/plain", testData.Length);
 
                 // Verify it exists
-                var exists = await objectStorage.ExistsAsync("ivf-signed-pdfs", testKey);
+                var exists = await objectStorage.ExistsAsync(StorageBuckets.SignedPdfs, testKey);
 
                 // Clean up test file
-                await objectStorage.DeleteAsync("ivf-signed-pdfs", testKey);
+                await objectStorage.DeleteAsync(StorageBuckets.SignedPdfs, testKey);
 
-                var docStats = await objectStorage.GetBucketStatsAsync("ivf-documents");
-                var signedStats = await objectStorage.GetBucketStatsAsync("ivf-signed-pdfs");
+                var docStats = await objectStorage.GetBucketStatsAsync(StorageBuckets.Documents);
+                var signedStats = await objectStorage.GetBucketStatsAsync(StorageBuckets.SignedPdfs);
 
                 return Results.Ok(new
                 {

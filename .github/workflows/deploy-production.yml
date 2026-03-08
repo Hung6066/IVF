@@ -282,8 +282,8 @@ jobs:
 
           MAX_RETRIES=12
           RETRY_INTERVAL=10
-          HEALTH_URL="http://localhost:8080/health/live"
-          READY_URL="http://localhost:8080/health/ready"
+          HEALTH_URL="http://localhost/health/live"
+          READY_URL="http://localhost/health/ready"
 
           echo "=== Health Check ==="
 

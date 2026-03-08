@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text;
+using IVF.Application.Common;
 using IVF.Domain.Entities;
 using IVF.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -26,7 +27,7 @@ public sealed class CloudReplicationService(
         _cachedMinioContainer ??= await DockerContainerResolver.ResolveContainerAsync(["ivf_minio.1", "ivf-minio"], ct)
             ?? throw new InvalidOperationException("MinIO container not found on this node.");
 
-    private static readonly string[] MinioBuckets = ["ivf-documents", "ivf-signed-pdfs", "ivf-medical-images"];
+    private static readonly string[] MinioBuckets = [StorageBuckets.Documents, StorageBuckets.SignedPdfs, StorageBuckets.MedicalImages];
 
     /// <summary>
     /// Builds a clean endpoint URL, stripping any existing scheme from the stored value

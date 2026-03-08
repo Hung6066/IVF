@@ -1,3 +1,4 @@
+using IVF.Application.Common;
 using IVF.Application.Common.Interfaces;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -12,15 +13,18 @@ public class MinioFileStorageService : IFileStorageService
 {
     private readonly IObjectStorageService _objectStorage;
     private readonly MinioOptions _options;
+    private readonly ICurrentUserService _currentUser;
     private readonly ILogger<MinioFileStorageService> _logger;
 
     public MinioFileStorageService(
         IObjectStorageService objectStorage,
         IOptions<MinioOptions> options,
+        ICurrentUserService currentUser,
         ILogger<MinioFileStorageService> logger)
     {
         _objectStorage = objectStorage;
         _options = options.Value;
+        _currentUser = currentUser;
         _logger = logger;
     }
 
@@ -36,6 +40,9 @@ public class MinioFileStorageService : IFileStorageService
         var objectKey = string.IsNullOrEmpty(subfolder)
             ? $"{datePart}/{uniqueName}"
             : $"{subfolder}/{datePart}/{uniqueName}";
+
+        // Add tenant prefix for multi-tenant isolation
+        objectKey = TenantStoragePrefix.Prefix(_currentUser.TenantId, objectKey);
 
         // Calculate size
         long size = stream.Length;

@@ -1,3 +1,4 @@
+using IVF.Application.Common;
 using IVF.Application.Common.Interfaces;
 using IVF.Domain.Entities;
 using IVF.Domain.Enums;
@@ -14,6 +15,7 @@ public sealed class StoreSignedFormPdfHandler(
     IPatientDocumentRepository documentRepo,
     IObjectStorageService objectStorage,
     IUnitOfWork unitOfWork,
+    ICurrentUserService currentUser,
     ILogger<StoreSignedFormPdfHandler> logger)
     : IRequestHandler<StoreSignedFormPdfCommand, Result<PatientDocumentDto>>
 {
@@ -23,26 +25,28 @@ public sealed class StoreSignedFormPdfHandler(
     {
         try
         {
-            const string bucketName = "ivf-signed-pdfs";
+            const string bucketName = StorageBuckets.SignedPdfs;
 
             // ─── Build object key có ngữ nghĩa: phân biệt được form nào, BN nào ───
-            // Cấu trúc: {patientCode}/Forms/{formTemplateId[..8]}/{year}/{formResponseId}.pdf
+            // Cấu trúc: tenants/{tenantId}/{patientCode}/Forms/{formTemplateId[..8]}/{year}/{formResponseId}.pdf
             // Nếu FormResponseId == Guid.Empty → signing trực tiếp, dùng path cũ (random)
             string objectKey;
             string fileName;
             if (request.FormResponseId != Guid.Empty)
             {
-                objectKey = PatientDocument.BuildSignedFormObjectKey(
-                    request.PatientCode, request.FormResponseId, request.FormTemplateCode);
+                objectKey = TenantStoragePrefix.Prefix(currentUser.TenantId,
+                    PatientDocument.BuildSignedFormObjectKey(
+                        request.PatientCode, request.FormResponseId, request.FormTemplateCode));
                 // Filename hiển thị vẫn dùng tên template để user dễ đọc
                 fileName = $"{SanitizeFileName(request.TemplateName)}_{DateTime.UtcNow:yyyyMMdd_HHmmss}.pdf";
             }
             else
             {
                 // Direct signing (không có FormResponse) → dùng path legacy
-                objectKey = PatientDocument.BuildObjectKey(
-                    request.PatientCode, DocumentType.SignedPdf,
-                    $"{SanitizeFileName(request.TemplateName)}.pdf");
+                objectKey = TenantStoragePrefix.Prefix(currentUser.TenantId,
+                    PatientDocument.BuildObjectKey(
+                        request.PatientCode, DocumentType.SignedPdf,
+                        $"{SanitizeFileName(request.TemplateName)}.pdf"));
                 fileName = $"{SanitizeFileName(request.TemplateName)}_{DateTime.UtcNow:yyyyMMdd_HHmmss}.pdf";
             }
 

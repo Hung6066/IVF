@@ -84,7 +84,7 @@ HTTP: `ApiService` is the base HTTP client. JWT token is injected via intercepto
 - **Real-time:** Three SignalR hubs — `/hubs/queue`, `/hubs/notifications`, `/hubs/fingerprint`
 - **Digital Signing:** SignServer + EJBCA PKI via mTLS. `IDigitalSigningService` in Application, implementation in Infrastructure. Rate-limited to 30 ops/min.
 - **Biometrics:** DigitalPersona SDK (server-side matching, Windows only). Falls back to stub on Mac/Linux. `IBiometricMatcher` interface.
-- **File Storage:** MinIO (S3-compatible). Three buckets: `ivf-documents`, `ivf-signed-pdfs`, `ivf-medical-images`.
+- **File Storage:** MinIO (S3-compatible). Three shared buckets: `ivf-documents`, `ivf-signed-pdfs`, `ivf-medical-images`. **Tenant-isolated** via object key prefix `tenants/{tenantId}/`. Constants in `StorageBuckets`, prefix helper `TenantStoragePrefix.Prefix()` (both in `IVF.Application.Common`).
 - **Caching:** Redis via StackExchange.Redis. Degrades gracefully if unavailable.
 - **PDF Generation:** QuestPDF for report/form PDF export.
 - **Audit Logging:** Partitioned PostgreSQL table. Auto-creates future partitions.

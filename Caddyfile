@@ -1,4 +1,9 @@
 natra.site {
+	# Health checks (no auth required)
+	handle /health/* {
+		reverse_proxy api:8080
+	}
+
 	# API requests
 	handle /api/* {
 		reverse_proxy api:8080

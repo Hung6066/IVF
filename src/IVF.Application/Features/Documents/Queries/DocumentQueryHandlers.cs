@@ -1,3 +1,4 @@
+using IVF.Application.Common;
 using IVF.Application.Common.Interfaces;
 using IVF.Application.Features.Documents.Commands;
 using IVF.Domain.Entities;
@@ -125,7 +126,7 @@ public sealed class GetDocumentDownloadUrlHandler(
         string bucket, key;
         if (request.GetSignedVersion && doc.IsSigned && !string.IsNullOrEmpty(doc.SignedObjectKey))
         {
-            bucket = "ivf-signed-pdfs";
+            bucket = StorageBuckets.SignedPdfs;
             key = doc.SignedObjectKey;
         }
         else
@@ -139,7 +140,7 @@ public sealed class GetDocumentDownloadUrlHandler(
         if (!exists && doc.IsSigned && !string.IsNullOrEmpty(doc.SignedObjectKey))
         {
             // Fallback: try the other location
-            bucket = request.GetSignedVersion ? doc.BucketName : "ivf-signed-pdfs";
+            bucket = request.GetSignedVersion ? doc.BucketName : StorageBuckets.SignedPdfs;
             key = request.GetSignedVersion ? doc.ObjectKey : doc.SignedObjectKey;
         }
 
