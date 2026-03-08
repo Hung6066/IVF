@@ -19,12 +19,14 @@ public static class DependencyInjection
         // Register Interceptors
         services.AddScoped<AuditInterceptor>();
         services.AddScoped<VaultEncryptionInterceptor>();
+        services.AddSingleton<ReadReplicaInterceptor>();
 
         // Add DbContext with Interceptors
         services.AddDbContext<IvfDbContext>((sp, options) =>
         {
             var auditInterceptor = sp.GetRequiredService<AuditInterceptor>();
             var encryptionInterceptor = sp.GetRequiredService<VaultEncryptionInterceptor>();
+            var readReplicaInterceptor = sp.GetRequiredService<ReadReplicaInterceptor>();
             options.UseNpgsql(
                 configuration.GetConnectionString("DefaultConnection"),
                 npgsqlOptions =>
@@ -32,7 +34,7 @@ public static class DependencyInjection
                     npgsqlOptions.MigrationsAssembly(typeof(IvfDbContext).Assembly.FullName);
                     npgsqlOptions.EnableRetryOnFailure(3);
                 })
-                .AddInterceptors(auditInterceptor, encryptionInterceptor);
+                .AddInterceptors(auditInterceptor, encryptionInterceptor, readReplicaInterceptor);
         });
 
         // Register Repositories
@@ -155,13 +157,17 @@ public static class DependencyInjection
         });
 
         services.AddSingleton<IObjectStorageService, MinioObjectStorageService>();
-        services.AddSingleton<IFileStorageService, MinioFileStorageService>();
+        services.AddScoped<IFileStorageService, MinioFileStorageService>();
 
         // Partition Maintenance (auto-creates future partitions)
         services.AddHostedService<PartitionMaintenanceService>();
 
         // Vault Lease Maintenance (auto-revoke expired leases, credentials, tokens)
         services.AddHostedService<VaultLeaseMaintenanceService>();
+
+        // Data Retention (daily purge with S3 archival support)
+        services.AddScoped<IDataRetentionService, DataRetentionService>();
+        services.AddHostedService<DataRetentionService>();
 
         // Redis Configuration (High-Performance Matcher Cache)
         var redisConnectionString = configuration.GetConnectionString("Redis") ?? "localhost:6379";
@@ -171,11 +177,31 @@ public static class DependencyInjection
         {
             redisConnectionString += ",abortConnect=false";
         }
+        // Reduce connect timeout for faster fallback when Redis is unavailable
+        if (!redisConnectionString.Contains("connectTimeout=", StringComparison.OrdinalIgnoreCase))
+        {
+            redisConnectionString += ",connectTimeout=2000";
+        }
+        // Reduce sync timeout to avoid blocking request threads
+        if (!redisConnectionString.Contains("syncTimeout=", StringComparison.OrdinalIgnoreCase))
+        {
+            redisConnectionString += ",syncTimeout=2000";
+        }
 
         try
         {
             var multiplexer = StackExchange.Redis.ConnectionMultiplexer.Connect(redisConnectionString);
             services.AddSingleton<StackExchange.Redis.IConnectionMultiplexer>(multiplexer);
+
+            // Distributed Cache (Redis-backed) for multi-replica consistency
+            services.AddStackExchangeRedisCache(opts =>
+            {
+                opts.Configuration = redisConnectionString;
+                opts.InstanceName = "ivf:";
+            });
+
+            // Distributed Lock Service (Redis SETNX-based)
+            services.AddSingleton<IDistributedLockService, DistributedLockService>();
         }
         catch (Exception)
         {

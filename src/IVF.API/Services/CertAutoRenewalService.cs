@@ -8,10 +8,12 @@ namespace IVF.API.Services;
 /// and auto-renews them if AutoRenewEnabled is set.
 /// Runs once per hour, renews certs within their RenewBeforeDays window.
 /// Also publishes escalating expiry warnings at 30/14/7/1-day thresholds.
+/// Uses distributed lock to prevent concurrent execution across replicas.
 /// </summary>
 public sealed class CertAutoRenewalService(
     CertificateAuthorityService caService,
     ISecurityEventPublisher securityEvents,
+    IDistributedLockService lockService,
     ILogger<CertAutoRenewalService> logger) : BackgroundService
 {
     private static readonly TimeSpan CheckInterval = TimeSpan.FromHours(1);
@@ -27,6 +29,15 @@ public sealed class CertAutoRenewalService(
         {
             try
             {
+                // Acquire distributed lock to prevent concurrent cert renewal across replicas
+                await using var lockHandle = await lockService.TryAcquireAsync("lock:cert-auto-renewal", TimeSpan.FromMinutes(10), stoppingToken);
+                if (lockHandle is null)
+                {
+                    logger.LogDebug("Another replica is running cert auto-renewal — skipping");
+                    await Task.Delay(CheckInterval, stoppingToken);
+                    continue;
+                }
+
                 // Check for expiring certificates and publish warnings
                 await PublishExpiryWarningsAsync(stoppingToken);
 

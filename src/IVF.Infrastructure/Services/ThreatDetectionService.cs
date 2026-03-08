@@ -1,12 +1,14 @@
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using IVF.Application.Common.Interfaces;
 using IVF.Domain.Entities;
 using IVF.Domain.Enums;
 using IVF.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 
@@ -20,16 +22,16 @@ namespace IVF.Infrastructure.Services;
 ///
 /// Evaluates every request against multiple threat signals and produces
 /// an aggregated risk score with recommended Zero Trust action.
+///
+/// Uses IDistributedCache (Redis) for multi-replica consistency.
+/// Falls back to IMemoryCache if distributed cache is unavailable.
 /// </summary>
 public sealed partial class ThreatDetectionService : IThreatDetectionService
 {
     private readonly IvfDbContext _context;
-    private readonly IMemoryCache _cache;
+    private readonly IDistributedCache _distributedCache;
+    private readonly IMemoryCache _localCache;
     private readonly ILogger<ThreatDetectionService> _logger;
-
-    // Sliding window for brute force detection
-    private static readonly ConcurrentDictionary<string, List<DateTime>> _failedAttempts = new();
-    private static readonly ConcurrentDictionary<string, List<(DateTime Time, string IpAddress, string? Country)>> _loginHistory = new();
 
     // Threat thresholds
     private const int BruteForceThreshold = 5;
@@ -43,13 +45,17 @@ public sealed partial class ThreatDetectionService : IThreatDetectionService
         "10.0.0.", "172.16.", "192.168." // Private ranges — should not appear in production X-Forwarded-For
     };
 
+    private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+
     public ThreatDetectionService(
         IvfDbContext context,
-        IMemoryCache cache,
+        IDistributedCache distributedCache,
+        IMemoryCache localCache,
         ILogger<ThreatDetectionService> logger)
     {
         _context = context;
-        _cache = cache;
+        _distributedCache = distributedCache;
+        _localCache = localCache;
         _logger = logger;
     }
 
@@ -175,11 +181,11 @@ public sealed partial class ThreatDetectionService : IThreatDetectionService
     {
         var key = $"login_history:{userId}";
 
-        // Get recent login locations from cache or DB
-        if (!_loginHistory.TryGetValue(key, out var history))
-        {
-            history = new List<(DateTime, string, string?)>();
+        // Get recent login locations from distributed cache or DB
+        var history = await GetLoginHistoryAsync(key, ct);
 
+        if (history.Count == 0)
+        {
             var recentEvents = await _context.Set<SecurityEvent>()
                 .AsNoTracking()
                 .Where(e => e.UserId == userId &&
@@ -193,17 +199,18 @@ public sealed partial class ThreatDetectionService : IThreatDetectionService
             foreach (var evt in recentEvents)
             {
                 if (evt.IpAddress is not null)
-                    history.Add((evt.CreatedAt, evt.IpAddress, evt.Country));
+                    history.Add(new LoginHistoryEntry(evt.CreatedAt, evt.IpAddress, evt.Country));
             }
-
-            _loginHistory[key] = history;
         }
 
         // Record current login
-        history.Add((DateTime.UtcNow, ipAddress, country));
+        history.Add(new LoginHistoryEntry(DateTime.UtcNow, ipAddress, country));
 
         // Keep only last 24 hours
         history.RemoveAll(h => h.Time < DateTime.UtcNow.AddHours(-24));
+
+        // Persist back to distributed cache
+        await SetLoginHistoryAsync(key, history, ct);
 
         // Check for impossible travel: different countries within short time windows
         if (history.Count >= 2)
@@ -235,53 +242,60 @@ public sealed partial class ThreatDetectionService : IThreatDetectionService
     public Task<IpIntelligenceResult> CheckIpReputationAsync(string ipAddress, CancellationToken ct = default)
     {
         var cacheKey = $"ip_intel:{ipAddress}";
-        if (_cache.TryGetValue(cacheKey, out IpIntelligenceResult? cached) && cached is not null)
+
+        // IP intel is short-lived and read-heavy — use local cache with distributed cache as backup
+        if (_localCache.TryGetValue(cacheKey, out IpIntelligenceResult? cached) && cached is not null)
             return Task.FromResult(cached);
 
         // Lightweight heuristic-based IP analysis (no external API dependency)
         var result = AnalyzeIpLocally(ipAddress);
-        _cache.Set(cacheKey, result, TimeSpan.FromMinutes(30));
+        _localCache.Set(cacheKey, result, TimeSpan.FromMinutes(30));
         return Task.FromResult(result);
     }
 
-    public Task<bool> DetectBruteForceAsync(string identifier, CancellationToken ct = default)
+    public async Task<bool> DetectBruteForceAsync(string identifier, CancellationToken ct = default)
     {
         var key = $"brute:{identifier}";
         var now = DateTime.UtcNow;
 
-        var attempts = _failedAttempts.GetOrAdd(key, _ => new List<DateTime>());
+        var attempts = await GetBruteForceAttemptsAsync(key, ct);
 
-        lock (attempts)
-        {
-            // Clean old entries
-            attempts.RemoveAll(t => now - t > BruteForceWindow);
-            return Task.FromResult(attempts.Count >= BruteForceThreshold);
-        }
+        // Clean old entries
+        attempts.RemoveAll(t => now - t > BruteForceWindow);
+        await SetBruteForceAttemptsAsync(key, attempts, ct);
+
+        return attempts.Count >= BruteForceThreshold;
     }
 
     /// <summary>
     /// Records a failed login attempt for brute force tracking.
     /// </summary>
-    public void RecordFailedAttempt(string identifier)
+    public async Task RecordFailedAttemptAsync(string identifier, CancellationToken ct = default)
     {
         var key = $"brute:{identifier}";
-        var attempts = _failedAttempts.GetOrAdd(key, _ => new List<DateTime>());
+        var attempts = await GetBruteForceAttemptsAsync(key, ct);
 
-        lock (attempts)
-        {
-            attempts.Add(DateTime.UtcNow);
-            // Trim old entries
-            attempts.RemoveAll(t => DateTime.UtcNow - t > BruteForceWindow);
-        }
+        attempts.Add(DateTime.UtcNow);
+        // Trim old entries
+        attempts.RemoveAll(t => DateTime.UtcNow - t > BruteForceWindow);
+
+        await SetBruteForceAttemptsAsync(key, attempts, ct);
     }
 
     /// <summary>
     /// Clears failed attempts after successful login.
     /// </summary>
-    public void ClearFailedAttempts(string identifier)
+    public async Task ClearFailedAttemptsAsync(string identifier, CancellationToken ct = default)
     {
         var key = $"brute:{identifier}";
-        _failedAttempts.TryRemove(key, out _);
+        try
+        {
+            await _distributedCache.RemoveAsync(key, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to clear brute force attempts from distributed cache");
+        }
     }
 
     public async Task<bool> DetectAnomalousAccessAsync(Guid userId, RequestSecurityContext context, CancellationToken ct = default)
@@ -289,7 +303,9 @@ public sealed partial class ThreatDetectionService : IThreatDetectionService
         var cacheKey = $"user_pattern:{userId}";
 
         // Get user's normal access pattern from cache
-        if (!_cache.TryGetValue(cacheKey, out UserAccessPattern? pattern))
+        var pattern = await GetUserPatternAsync(cacheKey, ct);
+
+        if (pattern is null)
         {
             // Build pattern from last 30 days of security events
             var since = DateTime.UtcNow.AddDays(-30);
@@ -312,7 +328,7 @@ public sealed partial class ThreatDetectionService : IThreatDetectionService
                 TotalLogins = events.Count
             };
 
-            _cache.Set(cacheKey, pattern, TimeSpan.FromHours(1));
+            await SetUserPatternAsync(cacheKey, pattern, ct);
         }
 
         // Check for anomalies against established baseline
@@ -454,7 +470,107 @@ public sealed partial class ThreatDetectionService : IThreatDetectionService
     [GeneratedRegex(@"(nikto|nmap|sqlmap|burp|acunetix|nessus|openvas|dirbuster|gobuster|wfuzz|nuclei|masscan)", RegexOptions.IgnoreCase | RegexOptions.Compiled, matchTimeoutMilliseconds: 1000)]
     private static partial Regex ScannerPattern();
 
+    // ─── Distributed Cache Helpers ───
+
+    private async Task<List<DateTime>> GetBruteForceAttemptsAsync(string key, CancellationToken ct)
+    {
+        try
+        {
+            var json = await _distributedCache.GetStringAsync(key, ct);
+            if (json is not null)
+                return JsonSerializer.Deserialize<List<DateTime>>(json, JsonOptions) ?? [];
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to read brute force attempts from distributed cache");
+        }
+        return [];
+    }
+
+    private async Task SetBruteForceAttemptsAsync(string key, List<DateTime> attempts, CancellationToken ct)
+    {
+        try
+        {
+            var json = JsonSerializer.Serialize(attempts, JsonOptions);
+            await _distributedCache.SetStringAsync(key, json, new DistributedCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = BruteForceWindow
+            }, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to write brute force attempts to distributed cache");
+        }
+    }
+
+    private async Task<List<LoginHistoryEntry>> GetLoginHistoryAsync(string key, CancellationToken ct)
+    {
+        try
+        {
+            var json = await _distributedCache.GetStringAsync(key, ct);
+            if (json is not null)
+                return JsonSerializer.Deserialize<List<LoginHistoryEntry>>(json, JsonOptions) ?? [];
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to read login history from distributed cache");
+        }
+        return [];
+    }
+
+    private async Task SetLoginHistoryAsync(string key, List<LoginHistoryEntry> history, CancellationToken ct)
+    {
+        try
+        {
+            var json = JsonSerializer.Serialize(history, JsonOptions);
+            await _distributedCache.SetStringAsync(key, json, new DistributedCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(24)
+            }, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to write login history to distributed cache");
+        }
+    }
+
+    private async Task<UserAccessPattern?> GetUserPatternAsync(string key, CancellationToken ct)
+    {
+        try
+        {
+            var json = await _distributedCache.GetStringAsync(key, ct);
+            if (json is not null)
+                return JsonSerializer.Deserialize<UserAccessPattern>(json, JsonOptions);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to read user pattern from distributed cache, trying local");
+            if (_localCache.TryGetValue(key, out UserAccessPattern? local))
+                return local;
+        }
+        return null;
+    }
+
+    private async Task SetUserPatternAsync(string key, UserAccessPattern pattern, CancellationToken ct)
+    {
+        try
+        {
+            var json = JsonSerializer.Serialize(pattern, JsonOptions);
+            await _distributedCache.SetStringAsync(key, json, new DistributedCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(1)
+            }, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to write user pattern to distributed cache, using local");
+            _localCache.Set(key, pattern, TimeSpan.FromHours(1));
+        }
+    }
+
     // ─── Internal types ───
+
+    private sealed record LoginHistoryEntry(DateTime Time, string IpAddress, string? Country);
 
     private sealed class UserAccessPattern
     {

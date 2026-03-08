@@ -78,9 +78,26 @@ services:
       - ivf-signing
       - ivf-data
     deploy:
+      replicas: 2
+      update_config:
+        parallelism: 1
+        delay: 30s
+        order: start-first
+      rollback_config:
+        parallelism: 1
+        delay: 15s
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 5
+        window: 120s
       resources:
         limits:
           memory: 1G
+          cpus: "1.0"
+        reservations:
+          memory: 256M
+          cpus: "0.25"
 
   # ─── Redis ───
   redis:
@@ -222,6 +239,7 @@ services:
       mc mb ivf/ivf-documents --ignore-existing;
       mc mb ivf/ivf-signed-pdfs --ignore-existing;
       mc mb ivf/ivf-medical-images --ignore-existing;
+      mc mb ivf/ivf-audit-archive --ignore-existing;
       echo 'MinIO buckets initialized successfully';
       exit 0;
       "

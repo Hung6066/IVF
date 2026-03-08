@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.SignalR;
 using IVF.API.Hubs;
+using IVF.Application.Common.Interfaces;
 
 namespace IVF.API.Services;
 
@@ -7,6 +8,7 @@ namespace IVF.API.Services;
 /// Background service that archives WAL segments every hour.
 /// Copies archived WAL files from the PostgreSQL container to the local backups directory,
 /// optionally uploading to cloud storage for offsite redundancy.
+/// Uses distributed lock to prevent concurrent execution across replicas.
 /// </summary>
 public sealed class WalBackupSchedulerService : BackgroundService
 {
@@ -17,6 +19,7 @@ public sealed class WalBackupSchedulerService : BackgroundService
     private readonly IHubContext<BackupHub> _hubContext;
     private readonly IWebHostEnvironment _env;
     private readonly ILogger<WalBackupSchedulerService> _logger;
+    private readonly IDistributedLockService _lockService;
 
     private static readonly TimeSpan Interval = TimeSpan.FromHours(1);
 
@@ -27,7 +30,8 @@ public sealed class WalBackupSchedulerService : BackgroundService
         BackupCompressionService compressionService,
         IHubContext<BackupHub> hubContext,
         IWebHostEnvironment env,
-        ILogger<WalBackupSchedulerService> logger)
+        ILogger<WalBackupSchedulerService> logger,
+        IDistributedLockService lockService)
     {
         _walService = walService;
         _integrityService = integrityService;
@@ -36,6 +40,7 @@ public sealed class WalBackupSchedulerService : BackgroundService
         _hubContext = hubContext;
         _env = env;
         _logger = logger;
+        _lockService = lockService;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -48,6 +53,15 @@ public sealed class WalBackupSchedulerService : BackgroundService
         {
             try
             {
+                // Acquire distributed lock to prevent concurrent WAL backup across replicas
+                await using var lockHandle = await _lockService.TryAcquireAsync("lock:wal-backup", TimeSpan.FromMinutes(10), stoppingToken);
+                if (lockHandle is null)
+                {
+                    _logger.LogDebug("Another replica is running WAL backup — skipping");
+                    await Task.Delay(Interval, stoppingToken);
+                    continue;
+                }
+
                 await ArchiveWalSegmentsAsync(stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)

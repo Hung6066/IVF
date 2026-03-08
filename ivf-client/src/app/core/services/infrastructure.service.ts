@@ -19,6 +19,10 @@ import {
   ServiceInspect,
   SwarmEvent,
   HealingEvent,
+  RetentionPolicy,
+  RetentionExecutionResult,
+  ReplicaStatus,
+  MonitoringStackStatus,
 } from '../models/infrastructure.model';
 
 @Injectable({ providedIn: 'root' })
@@ -249,5 +253,34 @@ export class InfrastructureService {
 
   getHealingEvents(): Observable<HealingEvent[]> {
     return this.http.get<HealingEvent[]>(`${this.baseUrl}/admin/infrastructure/healing/events`);
+  }
+
+  // ═══ Data Retention ═══
+
+  getRetentionPolicies(): Observable<RetentionPolicy[]> {
+    return this.http.get<RetentionPolicy[]>(
+      `${this.baseUrl}/admin/infrastructure/retention/policies`,
+    );
+  }
+
+  executeRetentionPolicies(): Observable<RetentionExecutionResult> {
+    return this.http.post<RetentionExecutionResult>(
+      `${this.baseUrl}/admin/infrastructure/retention/execute`,
+      {},
+    );
+  }
+
+  // ═══ Read Replica ═══
+
+  getReplicaStatus(): Observable<ReplicaStatus> {
+    return this.http.get<ReplicaStatus>(`${this.baseUrl}/admin/infrastructure/replica/status`);
+  }
+
+  // ═══ Monitoring Stack ═══
+
+  getMonitoringStatus(): Observable<MonitoringStackStatus> {
+    return this.http.get<MonitoringStackStatus>(
+      `${this.baseUrl}/admin/infrastructure/monitoring/status`,
+    );
   }
 }

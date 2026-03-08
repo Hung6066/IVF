@@ -1483,3 +1483,88 @@ svg path {
 .text-warn {
   color: #d97706;
 }
+
+// ─── Retention & Monitoring Tabs ────────────────────
+.alert-row-success {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+  color: #065f46;
+}
+
+.alert-row-warning {
+  background: #fefce8;
+  border-color: #fde68a;
+  color: #92400e;
+}
+
+.stats-grid-sm {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 1rem;
+}
+
+.stat-action {
+  margin-left: auto;
+  flex-shrink: 0;
+
+  .btn-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    color: #6b7280;
+    transition: all 0.15s;
+
+    &:hover {
+      background: #f3f4f6;
+      color: #111827;
+    }
+  }
+}
+
+.quick-links {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.75rem;
+}
+
+.quick-link {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.875rem 1rem;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  transition: all 0.15s;
+  text-decoration: none;
+  color: inherit;
+
+  &:hover {
+    border-color: #818cf8;
+    background: #f5f3ff;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.1);
+  }
+
+  i {
+    font-size: 1.2rem;
+    color: #6366f1;
+    width: 28px;
+    text-align: center;
+  }
+
+  strong {
+    display: block;
+    font-size: 0.85rem;
+    color: #111827;
+  }
+
+  span {
+    display: block;
+    font-size: 0.75rem;
+    color: #9ca3af;
+  }
+}

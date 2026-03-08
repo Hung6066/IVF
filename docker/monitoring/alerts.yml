@@ -1,0 +1,78 @@
+groups:
+  - name: ivf-api
+    rules:
+      # High error rate
+      - alert: HighErrorRate
+        expr: rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[5m]) / rate(http_server_request_duration_seconds_count[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          service: ivf-api
+        annotations:
+          summary: "High HTTP error rate (> 5%)"
+          description: "{{ $labels.instance }} has {{ $value | humanizePercentage }} error rate"
+
+      # Slow response time
+      - alert: SlowResponseTime
+        expr: histogram_quantile(0.95, rate(http_server_request_duration_seconds_bucket[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+          service: ivf-api
+        annotations:
+          summary: "P95 latency > 2s"
+          description: "{{ $labels.instance }} P95 latency is {{ $value }}s"
+
+      # API down
+      - alert: ApiDown
+        expr: up{job="ivf-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: ivf-api
+        annotations:
+          summary: "IVF API is down"
+          description: "{{ $labels.instance }} has been down for more than 1 minute"
+
+  - name: infrastructure
+    rules:
+      # PostgreSQL down
+      - alert: PostgresDown
+        expr: up{job="postgres"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: postgres
+        annotations:
+          summary: "PostgreSQL is down"
+
+      # Redis down
+      - alert: RedisDown
+        expr: up{job="redis"} == 0
+        for: 1m
+        labels:
+          severity: warning
+          service: redis
+        annotations:
+          summary: "Redis is down — caching degraded"
+
+      # MinIO down
+      - alert: MinioDown
+        expr: up{job="minio"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: minio
+        annotations:
+          summary: "MinIO object storage is down"
+
+      # High memory usage
+      - alert: HighMemoryUsage
+        expr: process_resident_memory_bytes{job="ivf-api"} > 800 * 1024 * 1024
+        for: 10m
+        labels:
+          severity: warning
+          service: ivf-api
+        annotations:
+          summary: "API memory usage > 800MB"
+          description: "{{ $labels.instance }} using {{ $value | humanize1024 }}B"

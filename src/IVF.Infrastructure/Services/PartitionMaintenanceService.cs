@@ -1,3 +1,4 @@
+using IVF.Application.Common.Interfaces;
 using IVF.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -9,19 +10,23 @@ namespace IVF.Infrastructure.Services;
 /// <summary>
 /// Background service that automatically creates future partitions for partitioned tables.
 /// Runs daily and ensures partitions exist for the next 3 months ahead.
+/// Uses distributed lock to prevent concurrent execution across replicas.
 /// </summary>
 public class PartitionMaintenanceService : BackgroundService
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<PartitionMaintenanceService> _logger;
+    private readonly IDistributedLockService _lockService;
     private readonly TimeSpan _checkInterval = TimeSpan.FromHours(24);
 
     public PartitionMaintenanceService(
         IServiceScopeFactory scopeFactory,
-        ILogger<PartitionMaintenanceService> logger)
+        ILogger<PartitionMaintenanceService> logger,
+        IDistributedLockService lockService)
     {
         _scopeFactory = scopeFactory;
         _logger = logger;
+        _lockService = lockService;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -33,6 +38,15 @@ public class PartitionMaintenanceService : BackgroundService
         {
             try
             {
+                // Acquire distributed lock to prevent concurrent partition maintenance across replicas
+                await using var lockHandle = await _lockService.TryAcquireAsync("lock:partition-maintenance", TimeSpan.FromMinutes(5), stoppingToken);
+                if (lockHandle is null)
+                {
+                    _logger.LogDebug("Another replica is running partition maintenance — skipping");
+                    await Task.Delay(_checkInterval, stoppingToken);
+                    continue;
+                }
+
                 await EnsurePartitionsExist(stoppingToken);
             }
             catch (Exception ex)

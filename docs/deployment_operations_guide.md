@@ -16,6 +16,8 @@
 12. [Bảo trì Định kỳ](#12-bảo-trì-định-kỳ)
 13. [Checklist Triển khai](#13-checklist-triển-khai)
 
+> **Xem thêm**: [Hướng dẫn Vận hành Hạ tầng Enterprise](infrastructure_operations_guide.md) — Monitoring stack, data retention, read-replica, auto-healing, DR scripts, Admin UI.
+
 ---
 
 ## 1. Tổng quan Kiến trúc Triển khai

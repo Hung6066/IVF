@@ -17,15 +17,18 @@ public class SecurityEventPublisher : ISecurityEventPublisher
 {
     private readonly ILogger<SecurityEventPublisher> _logger;
     private readonly IConfiguration _configuration;
+    private readonly IHttpClientFactory _httpClientFactory;
     private readonly string? _webhookUrl;
     private readonly bool _webhookEnabled;
 
     public SecurityEventPublisher(
         ILogger<SecurityEventPublisher> logger,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IHttpClientFactory httpClientFactory)
     {
         _logger = logger;
         _configuration = configuration;
+        _httpClientFactory = httpClientFactory;
         _webhookUrl = configuration["Siem:WebhookUrl"];
         _webhookEnabled = !string.IsNullOrEmpty(_webhookUrl);
     }
@@ -108,7 +111,8 @@ public class SecurityEventPublisher : ISecurityEventPublisher
     {
         try
         {
-            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+            using var client = _httpClientFactory.CreateClient("SiemWebhook");
+            client.Timeout = TimeSpan.FromSeconds(10);
             var response = await client.PostAsJsonAsync(_webhookUrl, evt, ct);
 
             if (!response.IsSuccessStatusCode)

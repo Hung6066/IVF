@@ -1,4 +1,8 @@
 using IVF.API.Services;
+using IVF.Application.Common.Interfaces;
+using IVF.Domain.Entities;
+using IVF.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 
 namespace IVF.API.Endpoints;
 
@@ -167,6 +171,78 @@ public static class InfrastructureEndpoints
             var deleted = await svc.DeleteS3ObjectAsync(objectKey, ct);
             return deleted ? Results.Ok(new { message = "Đã xoá" }) : Results.NotFound(new { error = "Không tìm thấy object" });
         }).WithName("DeleteS3Object");
+
+        // ═══ Data Retention Policies ═══
+        group.MapGet("/retention/policies", async (IvfDbContext db, CancellationToken ct) =>
+        {
+            var policies = await db.Set<DataRetentionPolicy>()
+                .Where(p => !p.IsDeleted)
+                .OrderBy(p => p.EntityType)
+                .Select(p => new RetentionPolicyDto(
+                    p.Id, p.EntityType, p.RetentionDays, p.Action,
+                    p.IsEnabled, p.LastExecutedAt, p.LastPurgedCount))
+                .ToListAsync(ct);
+            return Results.Ok(policies);
+        }).WithName("GetRetentionPolicies");
+
+        group.MapPost("/retention/execute", async (IDataRetentionService svc, CancellationToken ct) =>
+        {
+            var result = await svc.ExecutePoliciesAsync(ct);
+            return Results.Ok(result);
+        }).WithName("ExecuteRetentionPolicies");
+
+        // ═══ Read Replica Status ═══
+        group.MapGet("/replica/status", async (IvfDbContext db, CancellationToken ct) =>
+        {
+            try
+            {
+                var isReplica = await db.Database.SqlQueryRaw<bool>(
+                    "SELECT pg_is_in_recovery() AS \"Value\"").FirstOrDefaultAsync(ct);
+                var replicationSlots = await db.Database.SqlQueryRaw<int>(
+                    "SELECT COALESCE(count(*)::int, 0) AS \"Value\" FROM pg_replication_slots").FirstOrDefaultAsync(ct);
+                var walReceivers = await db.Database.SqlQueryRaw<int>(
+                    "SELECT COALESCE(count(*)::int, 0) AS \"Value\" FROM pg_stat_replication").FirstOrDefaultAsync(ct);
+
+                return Results.Ok(new ReplicaStatusDto(
+                    IsReplica: isReplica,
+                    ActiveReplicationSlots: replicationSlots,
+                    StreamingReplicas: walReceivers,
+                    ConnectionString: "primary"));
+            }
+            catch
+            {
+                return Results.Ok(new ReplicaStatusDto(false, 0, 0, "unavailable"));
+            }
+        }).WithName("GetReplicaStatus");
+
+        // ═══ Monitoring Stack Status ═══
+        group.MapGet("/monitoring/status", async (IHttpClientFactory httpFactory, CancellationToken ct) =>
+        {
+            var checks = new List<MonitoringServiceStatus>();
+
+            async Task CheckService(string name, string url)
+            {
+                try
+                {
+                    using var client = httpFactory.CreateClient();
+                    client.Timeout = TimeSpan.FromSeconds(3);
+                    var response = await client.GetAsync(url, ct);
+                    checks.Add(new MonitoringServiceStatus(name, response.IsSuccessStatusCode, (int)response.StatusCode));
+                }
+                catch
+                {
+                    checks.Add(new MonitoringServiceStatus(name, false, 0));
+                }
+            }
+
+            await Task.WhenAll(
+                CheckService("Prometheus", "http://prometheus:9090/-/healthy"),
+                CheckService("Grafana", "http://grafana:3000/api/health"),
+                CheckService("Loki", "http://loki:3100/ready")
+            );
+
+            return Results.Ok(new MonitoringStackStatus(checks, DateTime.UtcNow));
+        }).WithName("GetMonitoringStatus");
     }
 }
 
@@ -174,3 +250,12 @@ public static class InfrastructureEndpoints
 public record ScaleServiceRequest(string ServiceName, int Replicas);
 public record S3UploadRequest(string FileName);
 public record S3DownloadRequest(string ObjectKey);
+
+// Response DTOs
+public record RetentionPolicyDto(
+    Guid Id, string EntityType, int RetentionDays, string Action,
+    bool IsEnabled, DateTime? LastExecutedAt, int? LastPurgedCount);
+public record ReplicaStatusDto(
+    bool IsReplica, int ActiveReplicationSlots, int StreamingReplicas, string ConnectionString);
+public record MonitoringServiceStatus(string Name, bool Healthy, int StatusCode);
+public record MonitoringStackStatus(List<MonitoringServiceStatus> Services, DateTime CheckedAt);

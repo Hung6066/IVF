@@ -16,6 +16,10 @@ import {
   ServiceInspect,
   SwarmEvent,
   HealingEvent,
+  RetentionPolicy,
+  RetentionExecutionResult,
+  ReplicaStatus,
+  MonitoringStackStatus,
 } from '../../../core/models/infrastructure.model';
 
 @Component({
@@ -51,6 +55,16 @@ export class InfrastructureMonitorComponent implements OnInit, OnDestroy {
   selectedTasks = signal<ServiceTask[]>([]);
   selectedLogs = signal<ServiceLogs | null>(null);
   selectedInspect = signal<ServiceInspect | null>(null);
+
+  // Data retention state
+  retentionPolicies = signal<RetentionPolicy[]>([]);
+  retentionLoading = signal(false);
+  retentionExecuting = signal(false);
+  lastRetentionResult = signal<RetentionExecutionResult | null>(null);
+
+  // Replica & monitoring state
+  replicaStatus = signal<ReplicaStatus | null>(null);
+  monitoringStatus = signal<MonitoringStackStatus | null>(null);
 
   // Modal/panel state
   tasksForService = '';
@@ -133,6 +147,8 @@ export class InfrastructureMonitorComponent implements OnInit, OnDestroy {
     this.activeTab = tab;
     if (tab === 's3') this.loadS3Data();
     if (tab === 'swarm') this.loadSwarmExtras();
+    if (tab === 'retention') this.loadRetentionData();
+    if (tab === 'monitoring') this.loadMonitoringData();
   }
 
   // ═══ Initial Data Load (REST fallback) ═══
@@ -447,6 +463,89 @@ export class InfrastructureMonitorComponent implements OnInit, OnDestroy {
     this.infraService.deleteS3Object(objectKey).subscribe({
       next: () => this.loadS3Data(),
     });
+  }
+
+  // ═══ Data Retention ═══
+
+  loadRetentionData(): void {
+    this.retentionLoading.set(true);
+    this.infraService.getRetentionPolicies().subscribe({
+      next: (data) => {
+        this.retentionPolicies.set(data);
+        this.retentionLoading.set(false);
+      },
+      error: () => this.retentionLoading.set(false),
+    });
+    this.infraService.getReplicaStatus().subscribe({
+      next: (data) => this.replicaStatus.set(data),
+      error: () => {},
+    });
+  }
+
+  executeRetention(): void {
+    if (!confirm('Thực thi tất cả chính sách lưu trữ ngay bây giờ?')) return;
+    this.retentionExecuting.set(true);
+    this.infraService.executeRetentionPolicies().subscribe({
+      next: (result) => {
+        this.lastRetentionResult.set(result);
+        this.retentionExecuting.set(false);
+        this.loadRetentionData();
+      },
+      error: () => this.retentionExecuting.set(false),
+    });
+  }
+
+  getRetentionActionLabel(action: string): string {
+    const labels: Record<string, string> = {
+      Delete: 'Xoá vĩnh viễn',
+      Anonymize: 'Ẩn danh hoá',
+      Archive: 'Lưu trữ S3',
+    };
+    return labels[action] || action;
+  }
+
+  getRetentionActionClass(action: string): string {
+    switch (action) {
+      case 'Delete':
+        return 'badge-down';
+      case 'Archive':
+        return 'badge-info';
+      case 'Anonymize':
+        return 'badge-warning';
+      default:
+        return 'badge-muted';
+    }
+  }
+
+  // ═══ Monitoring Stack ═══
+
+  loadMonitoringData(): void {
+    this.infraService.getMonitoringStatus().subscribe({
+      next: (data) => this.monitoringStatus.set(data),
+      error: () => {},
+    });
+    this.infraService.getReplicaStatus().subscribe({
+      next: (data) => this.replicaStatus.set(data),
+      error: () => {},
+    });
+  }
+
+  getMonitoringIcon(name: string): string {
+    const icons: Record<string, string> = {
+      Prometheus: 'fa-solid fa-fire',
+      Grafana: 'fa-solid fa-chart-line',
+      Loki: 'fa-solid fa-scroll',
+    };
+    return icons[name] || 'fa-solid fa-server';
+  }
+
+  getMonitoringUrl(name: string): string {
+    const urls: Record<string, string> = {
+      Prometheus: 'http://localhost:9090',
+      Grafana: 'http://localhost:3000',
+      Loki: 'http://localhost:3100',
+    };
+    return urls[name] || '#';
   }
 
   // ═══ Helpers ═══

@@ -1,8 +1,10 @@
+using System.Text.Json;
 using IVF.Application.Common.Interfaces;
 using IVF.Domain.Entities;
 using IVF.Domain.Enums;
 using IVF.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 
@@ -11,20 +13,25 @@ namespace IVF.Infrastructure.Services;
 public class ZeroTrustService : IZeroTrustService
 {
     private readonly IvfDbContext _context;
-    private readonly IMemoryCache _cache;
+    private readonly IDistributedCache _distributedCache;
+    private readonly IMemoryCache _localCache;
     private readonly ILogger<ZeroTrustService> _logger;
     private readonly TimeSpan _policyCacheExpiration = TimeSpan.FromMinutes(15);
     private readonly TimeSpan _freshSessionThreshold = TimeSpan.FromMinutes(15);
 
     private const string PoliciesCacheKey = "zt:policies";
 
+    private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+
     public ZeroTrustService(
         IvfDbContext context,
-        IMemoryCache cache,
+        IDistributedCache distributedCache,
+        IMemoryCache localCache,
         ILogger<ZeroTrustService> logger)
     {
         _context = context;
-        _cache = cache;
+        _distributedCache = distributedCache;
+        _localCache = localCache;
         _logger = logger;
     }
 
@@ -173,32 +180,70 @@ public class ZeroTrustService : IZeroTrustService
         await _context.SaveChangesAsync(ct);
 
         // Invalidate cache
-        _cache.Remove(PoliciesCacheKey);
+        await InvalidatePolicyCacheAsync(ct);
 
         return true;
     }
 
-    public Task RefreshPoliciesAsync(CancellationToken ct = default)
+    public async Task RefreshPoliciesAsync(CancellationToken ct = default)
     {
-        _cache.Remove(PoliciesCacheKey);
+        await InvalidatePolicyCacheAsync(ct);
         _logger.LogInformation("Zero Trust policy cache refreshed");
-        return Task.CompletedTask;
     }
 
     // ─── Private Helpers ───
 
     private async Task<List<ZTPolicy>> GetCachedPoliciesAsync(CancellationToken ct)
     {
-        if (_cache.TryGetValue(PoliciesCacheKey, out List<ZTPolicy>? cached) && cached is not null)
-            return cached;
+        // Try distributed cache first
+        try
+        {
+            var json = await _distributedCache.GetStringAsync(PoliciesCacheKey, ct);
+            if (json is not null)
+                return JsonSerializer.Deserialize<List<ZTPolicy>>(json, JsonOptions) ?? [];
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to read ZT policies from distributed cache, trying local");
+            // Fallback to local cache
+            if (_localCache.TryGetValue(PoliciesCacheKey, out List<ZTPolicy>? localCached) && localCached is not null)
+                return localCached;
+        }
 
         var policies = await _context.ZTPolicies
             .AsNoTracking()
             .Where(p => p.IsActive)
             .ToListAsync(ct);
 
-        _cache.Set(PoliciesCacheKey, policies, _policyCacheExpiration);
+        // Write to distributed cache
+        try
+        {
+            var json = JsonSerializer.Serialize(policies, JsonOptions);
+            await _distributedCache.SetStringAsync(PoliciesCacheKey, json, new DistributedCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = _policyCacheExpiration
+            }, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to write ZT policies to distributed cache, using local");
+            _localCache.Set(PoliciesCacheKey, policies, _policyCacheExpiration);
+        }
+
         return policies;
+    }
+
+    private async Task InvalidatePolicyCacheAsync(CancellationToken ct)
+    {
+        try
+        {
+            await _distributedCache.RemoveAsync(PoliciesCacheKey, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to invalidate ZT policy cache in distributed cache");
+        }
+        _localCache.Remove(PoliciesCacheKey);
     }
 
     private static (RiskLevel Level, decimal Score, string Factors) CalculateDeviceRisk(ZTAccessContext ctx)

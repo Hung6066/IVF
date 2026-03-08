@@ -91,6 +91,7 @@ const FALLBACK_MENU: MenuSection[] = [
         platformAdminOnly: true,
       },
       { icon: '🎨', label: 'UI Library', route: '/ui-library', platformAdminOnly: true },
+      { icon: '🖥️', label: 'Hạ tầng', route: '/admin/infrastructure', platformAdminOnly: true },
     ],
   },
   {

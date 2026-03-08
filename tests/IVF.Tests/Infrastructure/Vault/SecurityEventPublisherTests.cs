@@ -5,6 +5,7 @@ using IVF.Infrastructure.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Moq;
+using System.Net.Http;
 
 namespace IVF.Tests.Infrastructure.Vault;
 
@@ -19,8 +20,10 @@ public class SecurityEventPublisherTests
         var config = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>())
             .Build();
+        var httpClientFactory = new Mock<IHttpClientFactory>();
+        httpClientFactory.Setup(f => f.CreateClient(It.IsAny<string>())).Returns(new HttpClient());
 
-        _sut = new SecurityEventPublisher(_loggerMock.Object, config);
+        _sut = new SecurityEventPublisher(_loggerMock.Object, config, httpClientFactory.Object);
     }
 
     [Fact]

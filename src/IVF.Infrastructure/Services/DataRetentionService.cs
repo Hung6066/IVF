@@ -1,4 +1,6 @@
+using System.Text;
 using System.Text.Json;
+using IVF.Application.Common;
 using IVF.Application.Common.Interfaces;
 using IVF.Domain.Entities;
 using IVF.Infrastructure.Persistence;
@@ -13,6 +15,7 @@ namespace IVF.Infrastructure.Services;
 /// Data retention service — executes automated purging based on retention policies.
 /// Runs daily as a hosted background service.
 /// HIPAA requires 7-year retention for medical audit data; GDPR requires data minimization.
+/// Supports Archive action: exports records to S3 (MinIO) before hard-deleting.
 /// </summary>
 public sealed class DataRetentionService(
     IServiceScopeFactory scopeFactory,
@@ -23,7 +26,6 @@ public sealed class DataRetentionService(
     public Task StartAsync(CancellationToken ct)
     {
         logger.LogInformation("Data retention service starting — will run daily at 2 AM UTC");
-        // Run daily at 2 AM UTC
         var now = DateTime.UtcNow;
         var next2Am = now.Date.AddHours(2);
         if (next2Am <= now) next2Am = next2Am.AddDays(1);
@@ -44,6 +46,17 @@ public sealed class DataRetentionService(
         try
         {
             using var scope = scopeFactory.CreateScope();
+            var lockService = scope.ServiceProvider.GetRequiredService<IDistributedLockService>();
+
+            await using var lockHandle = await lockService.TryAcquireAsync(
+                "data-retention-daily", TimeSpan.FromMinutes(30));
+
+            if (lockHandle is null)
+            {
+                logger.LogInformation("Data retention skipped — another instance holds the lock");
+                return;
+            }
+
             var service = scope.ServiceProvider.GetRequiredService<IDataRetentionService>();
             var result = await service.ExecutePoliciesAsync();
             logger.LogInformation("Data retention completed: {Policies} policies, {Records} records purged",
@@ -59,6 +72,7 @@ public sealed class DataRetentionService(
     {
         using var scope = scopeFactory.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<IvfDbContext>();
+        var storage = scope.ServiceProvider.GetService<IObjectStorageService>();
 
         var policies = await context.Set<DataRetentionPolicy>()
             .Where(p => p.IsEnabled && !p.IsDeleted)
@@ -74,10 +88,10 @@ public sealed class DataRetentionService(
                 var cutoff = DateTime.UtcNow.AddDays(-policy.RetentionDays);
                 var purged = policy.EntityType switch
                 {
-                    "SecurityEvent" => await PurgeSecurityEventsAsync(context, cutoff, policy.Action, ct),
-                    "UserLoginHistory" => await PurgeLoginHistoryAsync(context, cutoff, policy.Action, ct),
+                    "SecurityEvent" => await PurgeSecurityEventsAsync(context, storage, cutoff, policy.Action, ct),
+                    "UserLoginHistory" => await PurgeLoginHistoryAsync(context, storage, cutoff, policy.Action, ct),
                     "UserSession" => await PurgeSessionsAsync(context, cutoff, ct),
-                    "AuditLog" => await PurgeAuditLogsAsync(context, cutoff, policy.Action, ct),
+                    "AuditLog" => await PurgeAuditLogsAsync(context, storage, cutoff, policy.Action, ct),
                     _ => 0
                 };
 
@@ -101,33 +115,82 @@ public sealed class DataRetentionService(
         return new DataRetentionResult(policies.Count, totalPurged, errors);
     }
 
-    private static async Task<int> PurgeSecurityEventsAsync(IvfDbContext db, DateTime cutoff, string action, CancellationToken ct)
+    private static async Task ArchiveToS3Async<T>(
+        IObjectStorageService? storage,
+        string entityType,
+        IReadOnlyList<T> records,
+        CancellationToken ct) where T : class
+    {
+        if (storage is null || records.Count == 0) return;
+
+        await storage.EnsureBucketExistsAsync(StorageBuckets.AuditArchive, ct);
+
+        var date = DateTime.UtcNow;
+        var objectKey = $"retention/{entityType}/{date:yyyy/MM/dd}/{entityType}_{date:yyyyMMdd_HHmmss}.jsonl";
+        var jsonLines = new StringBuilder();
+        foreach (var record in records)
+        {
+            jsonLines.AppendLine(JsonSerializer.Serialize(record));
+        }
+
+        using var stream = new MemoryStream(Encoding.UTF8.GetBytes(jsonLines.ToString()));
+        await storage.UploadAsync(
+            StorageBuckets.AuditArchive,
+            objectKey,
+            stream,
+            "application/x-ndjson",
+            stream.Length,
+            new Dictionary<string, string>
+            {
+                ["x-amz-meta-entity-type"] = entityType,
+                ["x-amz-meta-record-count"] = records.Count.ToString(),
+                ["x-amz-meta-archived-at"] = date.ToString("o")
+            },
+            ct);
+    }
+
+    private static async Task<int> PurgeSecurityEventsAsync(
+        IvfDbContext db, IObjectStorageService? storage, DateTime cutoff, string action, CancellationToken ct)
     {
         var events = await db.SecurityEvents
             .Where(e => e.CreatedAt < cutoff && !e.IsDeleted)
             .ToListAsync(ct);
 
+        if (events.Count == 0) return 0;
+
         if (action == "Anonymize")
         {
-            foreach (var e in events) e.MarkAsDeleted(); // Soft delete = anonymize
+            foreach (var e in events) e.MarkAsDeleted();
             return events.Count;
         }
 
-        // Hard delete
+        if (action == "Archive")
+        {
+            await ArchiveToS3Async(storage, "SecurityEvent", events, ct);
+        }
+
         db.SecurityEvents.RemoveRange(events);
         return events.Count;
     }
 
-    private static async Task<int> PurgeLoginHistoryAsync(IvfDbContext db, DateTime cutoff, string action, CancellationToken ct)
+    private static async Task<int> PurgeLoginHistoryAsync(
+        IvfDbContext db, IObjectStorageService? storage, DateTime cutoff, string action, CancellationToken ct)
     {
         var records = await db.UserLoginHistories
             .Where(h => h.LoginAt < cutoff && !h.IsDeleted)
             .ToListAsync(ct);
 
+        if (records.Count == 0) return 0;
+
         if (action == "Anonymize")
         {
             foreach (var r in records) r.MarkAsDeleted();
             return records.Count;
+        }
+
+        if (action == "Archive")
+        {
+            await ArchiveToS3Async(storage, "UserLoginHistory", records, ct);
         }
 
         db.UserLoginHistories.RemoveRange(records);
@@ -140,20 +203,30 @@ public sealed class DataRetentionService(
             .Where(s => s.ExpiresAt < cutoff && !s.IsDeleted)
             .ToListAsync(ct);
 
+        if (sessions.Count == 0) return 0;
+
         db.UserSessions.RemoveRange(sessions);
         return sessions.Count;
     }
 
-    private static async Task<int> PurgeAuditLogsAsync(IvfDbContext db, DateTime cutoff, string action, CancellationToken ct)
+    private static async Task<int> PurgeAuditLogsAsync(
+        IvfDbContext db, IObjectStorageService? storage, DateTime cutoff, string action, CancellationToken ct)
     {
         var logs = await db.AuditLogs
             .Where(l => l.CreatedAt < cutoff && !l.IsDeleted)
             .ToListAsync(ct);
 
+        if (logs.Count == 0) return 0;
+
         if (action == "Anonymize")
         {
             foreach (var l in logs) l.MarkAsDeleted();
             return logs.Count;
+        }
+
+        if (action == "Archive")
+        {
+            await ArchiveToS3Async(storage, "AuditLog", logs, ct);
         }
 
         db.AuditLogs.RemoveRange(logs);

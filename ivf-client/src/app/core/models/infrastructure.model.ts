@@ -147,3 +147,43 @@ export interface S3DownloadResult {
   sizeBytes: number;
   message: string;
 }
+
+// ═══ Data Retention ═══
+
+export interface RetentionPolicy {
+  id: string;
+  entityType: string;
+  retentionDays: number;
+  action: string;
+  isEnabled: boolean;
+  lastExecutedAt: string | null;
+  lastPurgedCount: number | null;
+}
+
+export interface RetentionExecutionResult {
+  policiesExecuted: number;
+  totalRecordsPurged: number;
+  errors: string[];
+}
+
+// ═══ Read Replica ═══
+
+export interface ReplicaStatus {
+  isReplica: boolean;
+  activeReplicationSlots: number;
+  streamingReplicas: number;
+  connectionString: string;
+}
+
+// ═══ Monitoring Stack ═══
+
+export interface MonitoringServiceStatus {
+  name: string;
+  healthy: boolean;
+  statusCode: number;
+}
+
+export interface MonitoringStackStatus {
+  services: MonitoringServiceStatus[];
+  checkedAt: string;
+}

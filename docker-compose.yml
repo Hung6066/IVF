@@ -342,6 +342,7 @@ services:
       mc mb ivf/ivf-documents --ignore-existing;
       mc mb ivf/ivf-signed-pdfs --ignore-existing;
       mc mb ivf/ivf-medical-images --ignore-existing;
+      mc mb ivf/ivf-audit-archive --ignore-existing;
       mc anonymous set download ivf/ivf-documents;
       echo 'MinIO buckets initialized successfully';
       exit 0;

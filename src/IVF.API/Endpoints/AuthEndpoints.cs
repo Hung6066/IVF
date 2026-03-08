@@ -97,8 +97,7 @@ public static class AuthEndpoints
             if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
             {
                 // Record failed attempt for brute force detection
-                if (threatDetection is ThreatDetectionService tds)
-                    tds.RecordFailedAttempt(request.Username);
+                await threatDetection.RecordFailedAttemptAsync(request.Username);
 
                 await securityEvents.LogEventAsync(SecurityEvent.Create(
                     eventType: SecurityEventTypes.LoginFailed,
@@ -169,8 +168,7 @@ public static class AuthEndpoints
             }
 
             // 4. Clear brute force counter on success
-            if (threatDetection is ThreatDetectionService tdsSuccess)
-                tdsSuccess.ClearFailedAttempts(request.Username);
+            await threatDetection.ClearFailedAttemptsAsync(request.Username);
 
             // 4.5 Check MFA requirement
             var mfaSettings = await db.UserMfaSettings.FirstOrDefaultAsync(m =>

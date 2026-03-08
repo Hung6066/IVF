@@ -1,3 +1,4 @@
+using IVF.Application.Common.Interfaces;
 using IVF.Domain.Entities;
 using IVF.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -8,6 +9,7 @@ namespace IVF.API.Services;
 /// Background service that runs scheduled backups based on a cron expression
 /// and cleans up old backups according to retention policy.
 /// Config and run history persisted in the database.
+/// Uses distributed lock to prevent concurrent execution across replicas.
 /// </summary>
 public sealed class BackupSchedulerService : BackgroundService
 {
@@ -15,6 +17,7 @@ public sealed class BackupSchedulerService : BackgroundService
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<BackupSchedulerService> _logger;
     private readonly IConfiguration _configuration;
+    private readonly IDistributedLockService _lockService;
 
     public DateTime? NextScheduledRun { get; private set; }
 
@@ -22,12 +25,14 @@ public sealed class BackupSchedulerService : BackgroundService
         BackupRestoreService backupService,
         IServiceScopeFactory scopeFactory,
         ILogger<BackupSchedulerService> logger,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IDistributedLockService lockService)
     {
         _backupService = backupService;
         _scopeFactory = scopeFactory;
         _logger = logger;
         _configuration = configuration;
+        _lockService = lockService;
     }
 
     // ─── DB-backed config ───────────────────────────────────
@@ -141,6 +146,15 @@ public sealed class BackupSchedulerService : BackgroundService
 
             try
             {
+                // Acquire distributed lock to prevent concurrent backup across replicas
+                await using var lockHandle = await _lockService.TryAcquireAsync("lock:backup-scheduler", TimeSpan.FromMinutes(15), stoppingToken);
+                if (lockHandle is null)
+                {
+                    _logger.LogInformation("Another replica is running the scheduled backup — skipping");
+                    await Task.Delay(TimeSpan.FromSeconds(61), stoppingToken);
+                    continue;
+                }
+
                 _logger.LogInformation("Starting scheduled backup (keysOnly={KeysOnly})", config.KeysOnly);
                 var operationCode = await _backupService.StartBackupAsync(config.KeysOnly, "scheduler");
 

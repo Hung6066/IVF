@@ -42,10 +42,10 @@ public class MinioObjectStorageService : IObjectStorageService
             .WithObjectSize(size)
             .WithContentType(contentType);
 
-        if (metadata != null && metadata.Count > 0)
-        {
-            putArgs.WithHeaders(metadata);
-        }
+        // Enable server-side encryption (SSE-S3) for encryption-at-rest
+        var headers = metadata != null ? new Dictionary<string, string>(metadata) : new Dictionary<string, string>();
+        headers["X-Amz-Server-Side-Encryption"] = "AES256";
+        putArgs.WithHeaders(headers);
 
         var response = await _client.PutObjectAsync(putArgs, ct);
 

@@ -52,6 +52,16 @@ public interface IThreatDetectionService
     /// Scans request body/headers for injection attacks (SQL, XSS, command injection).
     /// </summary>
     InputValidationResult ValidateInput(string? input);
+
+    /// <summary>
+    /// Records a failed login attempt for brute force tracking.
+    /// </summary>
+    Task RecordFailedAttemptAsync(string identifier, CancellationToken ct = default);
+
+    /// <summary>
+    /// Clears failed attempts after successful login.
+    /// </summary>
+    Task ClearFailedAttemptsAsync(string identifier, CancellationToken ct = default);
 }
 
 /// <summary>

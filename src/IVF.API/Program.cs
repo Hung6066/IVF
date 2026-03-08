@@ -3,6 +3,7 @@ using FluentValidation;
 using IVF.Application.Common.Exceptions;
 using IVF.API.Authorization;
 using IVF.API.Endpoints;
+using IVF.API.Extensions;
 using IVF.API.Middleware;
 using IVF.API.Services;
 using IVF.Application;
@@ -10,6 +11,7 @@ using IVF.Application.Common.Interfaces;
 using IVF.Infrastructure;
 using IVF.Infrastructure.Persistence;
 using IVF.Infrastructure.Seeding;
+using OpenTelemetry.Metrics;
 using IVF.Infrastructure.Services;
 using QuestPDF.Infrastructure;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -34,7 +36,13 @@ builder.Services.AddMemoryCache();
 
 // ─── Health Checks ───
 builder.Services.AddHealthChecks()
-    .AddDbContextCheck<IVF.Infrastructure.Persistence.IvfDbContext>("database", tags: new[] { "db", "ready" });
+    .AddDbContextCheck<IVF.Infrastructure.Persistence.IvfDbContext>("database", tags: new[] { "db", "ready" })
+    .AddCheck<IVF.Infrastructure.HealthChecks.RedisHealthCheck>("redis", tags: new[] { "cache", "ready" })
+    .AddCheck<IVF.Infrastructure.HealthChecks.MinioHealthCheck>("minio", tags: new[] { "storage", "ready" })
+    .AddCheck<IVF.Infrastructure.HealthChecks.SignServerHealthCheck>("signserver", tags: new[] { "signing", "ready" });
+
+// ─── OpenTelemetry (Metrics + Tracing + Prometheus) ───
+builder.Services.AddIvfOpenTelemetry(builder.Configuration);
 
 // ─── Fido2 / WebAuthn ───
 builder.Services.AddFido2(options =>
@@ -559,6 +567,10 @@ app.MapHub<IVF.API.Hubs.InfrastructureHub>("/hubs/infrastructure");
 
 // Register Endpoints
 app.MapHealthEndpoints();
+
+// Prometheus metrics endpoint (scraped by monitoring stack)
+app.MapPrometheusScrapingEndpoint();
+
 app.MapAuthEndpoints();
 app.MapPatientEndpoints();
 app.MapPatientBiometricsEndpoints();

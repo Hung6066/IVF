@@ -1,7 +1,9 @@
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
+using System.Text.Json;
 using IVF.Application.Common.Interfaces;
 using IVF.Domain.Entities;
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 
@@ -15,10 +17,14 @@ namespace IVF.Infrastructure.Services;
 ///
 /// Binds sessions to security context (IP, device, location) and continuously
 /// re-evaluates trust on every request. Detects session hijacking via context drift.
+///
+/// Uses IDistributedCache (Redis) for multi-replica consistency.
+/// Falls back to IMemoryCache if distributed cache is unavailable.
 /// </summary>
 public sealed class AdaptiveSessionService : IAdaptiveSessionService
 {
-    private readonly IMemoryCache _cache;
+    private readonly IDistributedCache _distributedCache;
+    private readonly IMemoryCache _localCache;
     private readonly ISecurityEventService _securityEvents;
     private readonly ILogger<AdaptiveSessionService> _logger;
 
@@ -35,12 +41,16 @@ public sealed class AdaptiveSessionService : IAdaptiveSessionService
     private const decimal CountryChangePenalty = 60m;
     private const decimal DriftBlockThreshold = 60m;
 
+    private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+
     public AdaptiveSessionService(
-        IMemoryCache cache,
+        IDistributedCache distributedCache,
+        IMemoryCache localCache,
         ISecurityEventService securityEvents,
         ILogger<AdaptiveSessionService> logger)
     {
-        _cache = cache;
+        _distributedCache = distributedCache;
+        _localCache = localCache;
         _securityEvents = securityEvents;
         _logger = logger;
     }
@@ -60,17 +70,12 @@ public sealed class AdaptiveSessionService : IAdaptiveSessionService
             ExpiresAt: DateTime.UtcNow.Add(DefaultSessionDuration),
             IsActive: true);
 
-        _cache.Set($"{SessionPrefix}{sessionId}", session, DefaultSessionDuration);
+        await SetSessionAsync($"{SessionPrefix}{sessionId}", session, DefaultSessionDuration, ct);
 
         // Track user's active sessions
-        var userSessions = _cache.GetOrCreate($"{UserSessionsPrefix}{userId}",
-            entry =>
-            {
-                entry.SlidingExpiration = TimeSpan.FromHours(8);
-                return new ConcurrentDictionary<string, DateTime>();
-            })!;
-
+        var userSessions = await GetUserSessionsAsync(userId, ct);
         userSessions[sessionId] = DateTime.UtcNow;
+        await SetUserSessionsAsync(userId, userSessions, ct);
 
         // Enforce concurrent session limit
         if (userSessions.Count > MaxConcurrentSessions)
@@ -81,6 +86,7 @@ public sealed class AdaptiveSessionService : IAdaptiveSessionService
 
             await RevokeSessionAsync(oldestSession.Key, "Exceeded concurrent session limit", ct);
             userSessions.TryRemove(oldestSession.Key, out _);
+            await SetUserSessionsAsync(userId, userSessions, ct);
 
             await _securityEvents.LogEventAsync(SecurityEvent.Create(
                 eventType: SecurityEventTypes.ConcurrentSession,
@@ -101,15 +107,15 @@ public sealed class AdaptiveSessionService : IAdaptiveSessionService
         return session;
     }
 
-    public Task<SessionValidationResult> ValidateSessionAsync(string sessionId, RequestSecurityContext context, CancellationToken ct = default)
+    public async Task<SessionValidationResult> ValidateSessionAsync(string sessionId, RequestSecurityContext context, CancellationToken ct = default)
     {
-        if (!_cache.TryGetValue($"{SessionPrefix}{sessionId}", out SessionInfo? session) || session is null)
+        var session = await GetSessionAsync($"{SessionPrefix}{sessionId}", ct);
+        if (session is null)
         {
-            // Session not found in local cache — this is expected in multi-replica deployments
-            // where the session was created on a different instance. Re-create it locally
-            // from the request context (session_id is cryptographically bound to the JWT).
+            // Session not found in distributed cache — this is expected for first-time
+            // requests or if cache was cleared. Re-create from JWT context.
             _logger.LogInformation(
-                "Session {SessionId} not in local cache, re-creating from JWT context for user {UserId} (multi-replica)",
+                "Session {SessionId} not in cache, re-creating from JWT context for user {UserId}",
                 sessionId, context.UserId);
 
             session = new SessionInfo(
@@ -123,26 +129,26 @@ public sealed class AdaptiveSessionService : IAdaptiveSessionService
                 ExpiresAt: DateTime.UtcNow.Add(DefaultSessionDuration),
                 IsActive: true);
 
-            _cache.Set($"{SessionPrefix}{sessionId}", session, DefaultSessionDuration);
+            await SetSessionAsync($"{SessionPrefix}{sessionId}", session, DefaultSessionDuration, ct);
 
-            return Task.FromResult(new SessionValidationResult(
+            return new SessionValidationResult(
                 IsValid: true,
                 ViolationReason: null,
                 IpChanged: false,
                 DeviceChanged: false,
                 CountryChanged: false,
-                DriftScore: 0));
+                DriftScore: 0);
         }
 
         if (!session.IsActive || DateTime.UtcNow >= session.ExpiresAt)
         {
-            return Task.FromResult(new SessionValidationResult(
+            return new SessionValidationResult(
                 IsValid: false,
                 ViolationReason: "Session expired or revoked",
                 IpChanged: false,
                 DeviceChanged: false,
                 CountryChanged: false,
-                DriftScore: 100));
+                DriftScore: 100);
         }
 
         // Calculate context drift
@@ -175,29 +181,31 @@ public sealed class AdaptiveSessionService : IAdaptiveSessionService
         {
             // Update last activity
             var updatedSession = session with { LastActivityAt = DateTime.UtcNow };
-            _cache.Set($"{SessionPrefix}{sessionId}", updatedSession, session.ExpiresAt - DateTime.UtcNow);
+            var remaining = session.ExpiresAt - DateTime.UtcNow;
+            if (remaining > TimeSpan.Zero)
+                await SetSessionAsync($"{SessionPrefix}{sessionId}", updatedSession, remaining, ct);
         }
 
-        return Task.FromResult(new SessionValidationResult(
+        return new SessionValidationResult(
             IsValid: isValid,
             ViolationReason: violationReason,
             IpChanged: ipChanged,
             DeviceChanged: deviceChanged,
             CountryChanged: countryChanged,
-            DriftScore: driftScore));
+            DriftScore: driftScore);
     }
 
     public async Task RevokeSessionAsync(string sessionId, string reason, CancellationToken ct = default)
     {
-        if (_cache.TryGetValue($"{SessionPrefix}{sessionId}", out SessionInfo? session) && session is not null)
+        var session = await GetSessionAsync($"{SessionPrefix}{sessionId}", ct);
+        if (session is not null)
         {
-            _cache.Remove($"{SessionPrefix}{sessionId}");
+            await _distributedCache.RemoveAsync($"{SessionPrefix}{sessionId}", ct);
 
             // Remove from user's active sessions
-            if (_cache.TryGetValue($"{UserSessionsPrefix}{session.UserId}", out ConcurrentDictionary<string, DateTime>? userSessions))
-            {
-                userSessions?.TryRemove(sessionId, out _);
-            }
+            var userSessions = await GetUserSessionsAsync(session.UserId, ct);
+            userSessions.TryRemove(sessionId, out _);
+            await SetUserSessionsAsync(session.UserId, userSessions, ct);
 
             _logger.LogInformation("Session revoked: SessionId={SessionId}, User={UserId}, Reason={Reason}",
                 sessionId, session.UserId, reason);
@@ -211,22 +219,21 @@ public sealed class AdaptiveSessionService : IAdaptiveSessionService
         }
     }
 
-    public Task<List<SessionInfo>> GetActiveSessionsAsync(Guid userId, CancellationToken ct = default)
+    public async Task<List<SessionInfo>> GetActiveSessionsAsync(Guid userId, CancellationToken ct = default)
     {
         var sessions = new List<SessionInfo>();
+        var userSessions = await GetUserSessionsAsync(userId, ct);
 
-        if (_cache.TryGetValue($"{UserSessionsPrefix}{userId}", out ConcurrentDictionary<string, DateTime>? userSessions) && userSessions is not null)
+        foreach (var kvp in userSessions)
         {
-            foreach (var kvp in userSessions)
+            var session = await GetSessionAsync($"{SessionPrefix}{kvp.Key}", ct);
+            if (session is not null && session.IsActive)
             {
-                if (_cache.TryGetValue($"{SessionPrefix}{kvp.Key}", out SessionInfo? session) && session is not null && session.IsActive)
-                {
-                    sessions.Add(session);
-                }
+                sessions.Add(session);
             }
         }
 
-        return Task.FromResult(sessions);
+        return sessions;
     }
 
     // ─── Private Helpers ───
@@ -235,5 +242,77 @@ public sealed class AdaptiveSessionService : IAdaptiveSessionService
     {
         var bytes = RandomNumberGenerator.GetBytes(32);
         return Convert.ToBase64String(bytes).Replace("+", "-").Replace("/", "_").TrimEnd('=');
+    }
+
+    // ─── Distributed Cache Helpers ───
+
+    private async Task SetSessionAsync(string key, SessionInfo session, TimeSpan expiry, CancellationToken ct)
+    {
+        try
+        {
+            var json = JsonSerializer.Serialize(session, JsonOptions);
+            await _distributedCache.SetStringAsync(key, json, new DistributedCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = expiry
+            }, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to write session to distributed cache, using local cache");
+            _localCache.Set(key, session, expiry);
+        }
+    }
+
+    private async Task<SessionInfo?> GetSessionAsync(string key, CancellationToken ct)
+    {
+        try
+        {
+            var json = await _distributedCache.GetStringAsync(key, ct);
+            if (json is not null)
+                return JsonSerializer.Deserialize<SessionInfo>(json, JsonOptions);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to read session from distributed cache, trying local");
+        }
+
+        // Fallback to local cache
+        return _localCache.TryGetValue(key, out SessionInfo? session) ? session : null;
+    }
+
+    private async Task<ConcurrentDictionary<string, DateTime>> GetUserSessionsAsync(Guid userId, CancellationToken ct)
+    {
+        var key = $"{UserSessionsPrefix}{userId}";
+        try
+        {
+            var json = await _distributedCache.GetStringAsync(key, ct);
+            if (json is not null)
+            {
+                var dict = JsonSerializer.Deserialize<Dictionary<string, DateTime>>(json, JsonOptions);
+                return dict is not null ? new ConcurrentDictionary<string, DateTime>(dict) : new();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to read user sessions from distributed cache");
+        }
+        return new ConcurrentDictionary<string, DateTime>();
+    }
+
+    private async Task SetUserSessionsAsync(Guid userId, ConcurrentDictionary<string, DateTime> sessions, CancellationToken ct)
+    {
+        var key = $"{UserSessionsPrefix}{userId}";
+        try
+        {
+            var json = JsonSerializer.Serialize(sessions, JsonOptions);
+            await _distributedCache.SetStringAsync(key, json, new DistributedCacheEntryOptions
+            {
+                SlidingExpiration = TimeSpan.FromHours(8)
+            }, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to write user sessions to distributed cache");
+        }
     }
 }

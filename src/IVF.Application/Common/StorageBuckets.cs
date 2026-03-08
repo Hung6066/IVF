@@ -9,6 +9,7 @@ public static class StorageBuckets
     public const string Documents = "ivf-documents";
     public const string SignedPdfs = "ivf-signed-pdfs";
     public const string MedicalImages = "ivf-medical-images";
+    public const string AuditArchive = "ivf-audit-archive";
 }
 
 /// <summary>

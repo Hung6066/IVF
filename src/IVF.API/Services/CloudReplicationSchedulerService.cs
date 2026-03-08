@@ -1,11 +1,15 @@
+using IVF.Application.Common.Interfaces;
+
 namespace IVF.API.Services;
 
 /// <summary>
 /// Background service that runs MinIO cloud replication on a cron schedule.
 /// Syncs local MinIO buckets to the configured remote S3-compatible target.
+/// Uses distributed lock to prevent concurrent execution across replicas.
 /// </summary>
 public sealed class CloudReplicationSchedulerService(
     CloudReplicationService replicationService,
+    IDistributedLockService lockService,
     ILogger<CloudReplicationSchedulerService> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -47,6 +51,15 @@ public sealed class CloudReplicationSchedulerService(
                     continue;
 
                 logger.LogInformation("Starting scheduled MinIO cloud sync");
+
+                // Acquire distributed lock to prevent concurrent sync across replicas
+                await using var lockHandle = await lockService.TryAcquireAsync("lock:cloud-replication", TimeSpan.FromMinutes(15), stoppingToken);
+                if (lockHandle is null)
+                {
+                    logger.LogDebug("Another replica is running cloud replication — skipping");
+                    continue;
+                }
+
                 var result = await replicationService.SyncMinioAsync(stoppingToken);
 
                 if (result.Success)
