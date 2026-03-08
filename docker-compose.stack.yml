@@ -44,7 +44,7 @@ services:
 
   # ─── IVF API ───
   api:
-    image: ghcr.io/hung6066/ivf:v4-signing
+    image: ghcr.io/hung6066/ivf:sha-9d2df1f
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
       - ASPNETCORE_HTTP_PORTS=8080
@@ -80,6 +80,7 @@ services:
     networks:
       - ivf-public
       - ivf-data
+      - ivf-monitoring
     deploy:
       replicas: 2
       placement:
@@ -270,7 +271,7 @@ services:
 
   # ─── Frontend (Angular) ───
   frontend:
-    image: ghcr.io/hung6066/ivf-client:latest
+    image: ghcr.io/hung6066/ivf-client:sha-9d2df1f
     networks:
       - ivf-public
     deploy:
@@ -297,13 +298,14 @@ services:
         published: 443
         mode: host
     configs:
-      - source: caddyfile_v2
+      - source: caddyfile_v3
         target: /etc/caddy/Caddyfile
     volumes:
       - caddy_data:/data
       - caddy_config:/config
     networks:
       - ivf-public
+      - ivf-monitoring
     deploy:
       mode: global
       resources:
@@ -363,7 +365,7 @@ services:
 
 # ─── Docker Configs ───
 configs:
-  caddyfile_v2:
+  caddyfile_v3:
     file: ./Caddyfile
   standby_entrypoint:
     file: ./docker/postgres/standby-entrypoint.sh
@@ -413,3 +415,6 @@ networks:
   ivf-data:
     driver: overlay
     internal: true
+
+  ivf-monitoring:
+    external: true
