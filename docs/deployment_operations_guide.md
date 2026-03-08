@@ -2222,99 +2222,100 @@ app.MapPrometheusScrapingEndpoint();
 
 ### 8.4 Prometheus + Grafana Stack
 
+> **Lưu ý**: Cấu hình thực tế production đã được hardening bảo mật. Xem file `docker-compose.monitoring.yml` và `docs/infrastructure_operations_guide.md` để biết chi tiết.
+
 ```yaml
-# docker-compose.monitoring.yml
+# docker-compose.monitoring.yml (simplified — see actual file for full config)
 services:
   prometheus:
     image: prom/prometheus:latest
     container_name: ivf-prometheus
     volumes:
-      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./docker/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./docker/monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - ./docker/monitoring/prometheus-web.yml:/etc/prometheus/web.yml:ro
       - prometheus_data:/prometheus
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.retention.time=30d"
-      - "--storage.tsdb.retention.size=10GB"
+      - "--web.enable-lifecycle"
+      - "--web.config.file=/etc/prometheus/web.yml"
+      - "--web.external-url=https://natra.site/prometheus"
+      - "--web.route-prefix=/prometheus"
     ports:
-      - "9090:9090"
-    networks:
-      - ivf-public
+      - "127.0.0.1:9090:9090"  # localhost only
+    security_opt:
+      - no-new-privileges:true
 
   grafana:
     image: grafana/grafana:latest
     container_name: ivf-grafana
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-      - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-piechart-panel
+      - GF_SECURITY_ADMIN_PASSWORD=<strong-password>
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+      - GF_SERVER_ROOT_URL=https://natra.site/grafana/
+      - GF_SERVER_SERVE_FROM_SUB_PATH=true
     volumes:
       - grafana_data:/var/lib/grafana
-      - ./docker/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
-      - ./docker/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./docker/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
     ports:
-      - "3000:3000"
-    depends_on:
-      - prometheus
-    networks:
-      - ivf-public
+      - "127.0.0.1:3000:3000"  # localhost only
+    security_opt:
+      - no-new-privileges:true
 
   loki:
     image: grafana/loki:latest
     container_name: ivf-loki
-    volumes:
-      - loki_data:/loki
     ports:
-      - "3100:3100"
-    networks:
-      - ivf-public
-
-  jaeger:
-    image: jaegertracing/all-in-one:latest
-    container_name: ivf-jaeger
-    environment:
-      - COLLECTOR_OTLP_ENABLED=true
-    ports:
-      - "16686:16686" # Jaeger UI
-      - "4317:4317" # OTLP gRPC
-      - "4318:4318" # OTLP HTTP
-    networks:
-      - ivf-public
-
-volumes:
-  prometheus_data:
-  grafana_data:
-  loki_data:
+      - "127.0.0.1:3100:3100"  # localhost only
+    security_opt:
+      - no-new-privileges:true
 ```
 
+**Truy cập external** (qua Caddy reverse proxy với basic auth):
+- Grafana: `https://natra.site/grafana/`
+- Prometheus: `https://natra.site/prometheus/`
+- MinIO Console: SSH tunnel only (`ssh -L 9001:localhost:9001 root@VPS_IP`)
+
 ```yaml
-# docker/prometheus/prometheus.yml
+# docker/monitoring/prometheus.yml
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
 
 scrape_configs:
   - job_name: "ivf-api"
-    scrape_interval: 5s
+    scrape_interval: 10s
     static_configs:
-      - targets: ["api:8080"]
+      - targets: ["ivf_api:8080"]
     metrics_path: /metrics
 
   - job_name: "caddy"
     static_configs:
-      - targets: ["caddy:2019"]
+      - targets: ["ivf_caddy:2019"]
     metrics_path: /metrics
 
   - job_name: "postgres"
     static_configs:
-      - targets: ["postgres-exporter:9187"]
+      - targets: ["ivf_postgres-exporter:9187"]
 
   - job_name: "redis"
     static_configs:
-      - targets: ["redis-exporter:9121"]
+      - targets: ["ivf_redis-exporter:9121"]
 
   - job_name: "minio"
     static_configs:
-      - targets: ["minio:9000"]
+      - targets: ["minio-metrics:9000"]
     metrics_path: /minio/v2/metrics/cluster
+
+  - job_name: "prometheus"
+    metrics_path: /prometheus/metrics
+    basic_auth:
+      username: monitor
+      password: "<password>"
+    static_configs:
+      - targets: ["localhost:9090"]
 ```
 
 ### 8.5 Grafana Dashboards (Recommended)

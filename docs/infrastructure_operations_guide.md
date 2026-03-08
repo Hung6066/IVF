@@ -24,7 +24,7 @@ Stack giám sát bao gồm 4 thành phần:
 
 | Service    | Port | Chức năng                     | External Access |
 | ---------- | ---- | ----------------------------- | --------------- |
-| Prometheus | 9090 | Metrics collection & alerting | `127.0.0.1` only + Basic Auth |
+| Prometheus | 9090 | Metrics collection & alerting | `127.0.0.1` only, reverse proxy via Caddy `/prometheus/` |
 | Grafana    | 3000 | Dashboards & visualization    | `127.0.0.1` only, reverse proxy via Caddy `/grafana/` |
 | Loki       | 3100 | Log aggregation               | `127.0.0.1` only |
 | Promtail   | —    | Log shipping từ Docker        | No port exposed |
@@ -41,30 +41,64 @@ Stack giám sát bao gồm 4 thành phần:
 | Grafana    | Built-in login        | `admin:<password>` (changed from default) |
 | Loki       | No auth (localhost only) | N/A                         |
 
-**Truy cập từ xa**: Grafana được reverse proxy qua Caddy tại `https://natra.site/grafana/` với basic auth.
+**Truy cập từ xa**: Grafana và Prometheus được reverse proxy qua Caddy với basic auth. MinIO Console chỉ truy cập qua SSH tunnel.
 
 ```bash
 # Truy cập Grafana từ xa
-https://natra.site/grafana/   # Basic auth: monitor/<password>
+https://natra.site/grafana/       # Basic auth: monitor/<password>
 
-# Truy cập Prometheus qua SSH tunnel
-ssh -L 9090:localhost:9090 root@VPS_IP
-# Mở http://localhost:9090 (cần basic auth: monitor/<password>)
+# Truy cập Prometheus từ xa
+https://natra.site/prometheus/     # Basic auth: monitor/<password>
 
 # Truy cập MinIO Console qua SSH tunnel
 ssh -L 9001:localhost:9001 root@VPS_IP
+# Mở http://localhost:9001
 ```
 
 **Hardening áp dụng**:
 - `--web.enable-admin-api` đã bị **gỡ bỏ** khỏi Prometheus (ngăn xóa data/shutdown từ API)
 - `--web.config.file=/etc/prometheus/web.yml` — Basic Auth via bcrypt hash
+- `--web.route-prefix=/prometheus` — Prometheus UI served under `/prometheus/` path
+- `--web.external-url=https://natra.site/prometheus` — External URL for links/redirects
 - Grafana: `GF_SECURITY_COOKIE_SECURE`, `GF_SECURITY_CONTENT_SECURITY_POLICY`, `GF_SNAPSHOTS_EXTERNAL_ENABLED=false`, disable gravatar, disable sign-up/org-create
 - Caddy admin API: restricted `origins` chỉ cho private networks (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`)
 - MinIO: ports **không publish** — chỉ truy cập qua internal Docker networking
 - `security_opt: no-new-privileges:true` trên tất cả containers
 - Prometheus self-scrape sử dụng basic auth credentials
+- Caddy reverse proxy chuyển tiếp basic auth credentials tới Prometheus upstream via `header_up Authorization`
 
-### 1.2 Triển khai
+### 1.2 Caddy Reverse Proxy cho Monitoring
+
+Caddy reverse proxy cung cấp truy cập external cho Grafana và Prometheus tại `natra.site`:
+
+| Path             | Upstream              | Auth               | Ghi chú                                  |
+| ---------------- | --------------------- | ------------------- | ----------------------------------------- |
+| `/grafana/*`     | `ivf-grafana:3000`    | Caddy basic auth    | Grafana tự handle login sau khi qua auth  |
+| `/prometheus/*`  | `ivf-prometheus:9090` | Caddy + upstream auth | Caddy gửi Authorization header tới Prometheus |
+
+**Cấu hình Caddy** (trong `Caddyfile`, Docker config `caddyfile_v6`):
+
+```caddyfile
+handle /grafana* {
+    basic_auth {
+        monitor <bcrypt-hash>
+    }
+    reverse_proxy ivf-grafana:3000
+}
+
+handle /prometheus* {
+    basic_auth {
+        monitor <bcrypt-hash>
+    }
+    reverse_proxy ivf-prometheus:9090 {
+        header_up Authorization "Basic <base64-credentials>"
+    }
+}
+```
+
+**Lưu ý**: MinIO Console không hỗ trợ sub-path proxy (JS assets sử dụng hardcoded absolute paths). Chỉ truy cập qua SSH tunnel.
+
+### 1.3 Triển khai
 
 ```bash
 # Khởi động monitoring stack
@@ -74,7 +108,7 @@ docker-compose -f docker-compose.monitoring.yml up -d
 docker-compose -f docker-compose.monitoring.yml ps
 ```
 
-### 1.3 Cấu hình
+### 1.4 Cấu hình
 
 Các file cấu hình nằm trong `docker/monitoring/`:
 
@@ -100,7 +134,7 @@ docker/monitoring/
                 └── ivf-infrastructure.json  # Alerts, targets, Prometheus perf
 ```
 
-### 1.4 Prometheus Exporters
+### 1.5 Prometheus Exporters
 
 Hệ thống sử dụng các exporter chuyên dụng để thu thập metrics từ infrastructure services:
 
@@ -111,11 +145,11 @@ Hệ thống sử dụng các exporter chuyên dụng để thu thập metrics t
 | Redis      | `redis-exporter`        | `ivf_redis-exporter`   | 9121 | Kết nối `redis://redis:6379`                       |
 | MinIO      | Built-in                | `minio-metrics`        | 9000 | `/minio/v2/metrics/cluster` (needs `MINIO_PROMETHEUS_AUTH_TYPE=public`) |
 | Caddy      | Built-in                | `ivf_caddy`            | 2019 | Native Prometheus endpoint                         |
-| Prometheus | Self-monitoring         | `ivf-prometheus`       | 9090 | `localhost:9090`                                   |
+| Prometheus | Self-monitoring         | `ivf-prometheus`       | 9090 | `localhost:9090/prometheus/metrics` (route-prefix)  |
 
 **Network**: Tất cả exporters kết nối vào cả `ivf-data` (truy cập services) và `ivf-monitoring` (Prometheus scrape).
 
-### 1.5 Prometheus Scrape Targets
+### 1.6 Prometheus Scrape Targets
 
 | Target     | Endpoint                                   | Interval |
 | ---------- | ------------------------------------------ | -------- |
@@ -124,9 +158,9 @@ Hệ thống sử dụng các exporter chuyên dụng để thu thập metrics t
 | Redis      | `ivf_redis-exporter:9121/metrics`          | 15s      |
 | MinIO      | `minio-metrics:9000/minio/v2/metrics/cluster`  | 15s      |
 | Caddy      | `ivf_caddy:2019/metrics`                   | 15s      |
-| Prometheus | `localhost:9090/metrics`                   | 15s      |
+| Prometheus | `localhost:9090/prometheus/metrics`        | 15s      |
 
-### 1.6 Alert Rules (Prometheus)
+### 1.7 Alert Rules (Prometheus)
 
 **9 nhóm alert, 31 rules + 8 recording rules:**
 
@@ -189,7 +223,7 @@ Hệ thống sử dụng các exporter chuyên dụng để thu thập metrics t
 | `ivf:http_latency_p99:5m`         | P99 latency                  |
 | `ivf:api_availability:ratio`      | % API instances UP           |
 
-### 1.7 Alert Rules (Loki — Log-based)
+### 1.8 Alert Rules (Loki — Log-based)
 
 **3 nhóm, 9 rules** — Dựa trên phân tích log patterns:
 
@@ -205,7 +239,7 @@ Hệ thống sử dụng các exporter chuyên dụng để thu thập metrics t
 | MinioErrors             | MinIO logs      | > 5 errors/5min                   | warning  |
 | ContainerRestarting     | All containers  | > 3 restart events/10min          | warning  |
 
-### 1.8 Grafana Dashboards
+### 1.9 Grafana Dashboards
 
 3 dashboards tự động provisioning vào thư mục **IVF System**:
 
@@ -241,7 +275,7 @@ Hệ thống sử dụng các exporter chuyên dụng để thu thập metrics t
 | Prometheus Perf.    | Scrape duration, Samples scraped, Rule eval duration, TSDB   |
 | Loki Log Volume     | Log volume by swarm_service, Error log volume                |
 
-### 1.9 Promtail Pipeline
+### 1.10 Promtail Pipeline
 
 Promtail thu thập logs từ **tất cả Docker containers** trên host với pipeline stages:
 
@@ -269,7 +303,7 @@ Docker Container Logs
   Loki (3100)
 ```
 
-### 1.10 Loki Config
+### 1.11 Loki Config
 
 | Setting                     | Giá trị     | Mô tả                                |
 | --------------------------- | ----------- | ------------------------------------- |

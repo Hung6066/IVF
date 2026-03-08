@@ -88,6 +88,7 @@ HTTP: `ApiService` is the base HTTP client. JWT token is injected via intercepto
 - **Caching:** Redis via StackExchange.Redis. Degrades gracefully if unavailable.
 - **PDF Generation:** QuestPDF for report/form PDF export.
 - **Audit Logging:** Partitioned PostgreSQL table. Auto-creates future partitions.
+- **Monitoring:** Prometheus + Grafana + Loki + Promtail. All ports `127.0.0.1` only. Grafana at `https://natra.site/grafana/`, Prometheus at `https://natra.site/prometheus/` (basic auth). MinIO Console via SSH tunnel. 6 scrape targets, 31 alert rules, 9 Loki log-based alerts, 3 Grafana dashboards. Config: `docker/monitoring/`. See `docs/infrastructure_operations_guide.md`.
 
 ### API Conventions
 
@@ -119,7 +120,11 @@ Enterprise Security: `ConditionalAccessPolicy`, `SecurityIncident`, `IncidentRes
 - `/docs/advanced_security.md` — advanced security module (Passkeys, MFA, TOTP, SMS OTP, rate limiting, geo-fencing, threats, lockouts, IP whitelist)
 - `/docs/enterprise_security.md` — enterprise security module (conditional access, incident response, data retention, impersonation, permission delegation, behavioral analytics, security notifications, 35 API endpoints)
 - `/docs/enterprise_user_management.md` — enterprise user management (sessions, groups, IAM, login analytics, risk detection, GDPR/HIPAA consent)
+- `/docs/infrastructure_operations_guide.md` — monitoring stack, data retention, read-replica routing, auto-healing, disaster recovery
+- `/docs/deployment_operations_guide.md` — deployment, CI/CD, rolling updates, incident response
+- `/docs/ci_cd_deploy_guide.md` — GitHub Actions CI/CD pipeline, Discord notifications
 - `/docs/form_report_builder.md` — form/report designer architecture
 - `/docs/digital_signing.md` — signing infrastructure
+- `/docs/cloud_kms_deployment_guide.md` — Cloud KMS/HSM deployment (AWS/Azure/GCP)
 - `/docs/matcher_infrastructure_guide.md` — biometric setup (Windows)
 - `/docs/developer_guide.md` — DB schema, workflow state machines, API specs, RBAC matrix
