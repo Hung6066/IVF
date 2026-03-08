@@ -9,13 +9,11 @@ clients:
   - url: http://loki:3100/loki/api/v1/push
 
 scrape_configs:
+  # Collect logs from ALL Docker containers on this host
   - job_name: docker
     docker_sd_configs:
       - host: unix:///var/run/docker.sock
         refresh_interval: 5s
-        filters:
-          - name: label
-            values: ["com.docker.compose.project=ivf"]
     relabel_configs:
       - source_labels: ["__meta_docker_container_name"]
         regex: "/(.*)"
@@ -23,4 +21,8 @@ scrape_configs:
       - source_labels: ["__meta_docker_container_log_stream"]
         target_label: "logstream"
       - source_labels: ["__meta_docker_container_label_com_docker_compose_service"]
-        target_label: "service"
+        target_label: "compose_service"
+      - source_labels: ["__meta_docker_container_label_com_docker_swarm_service_name"]
+        target_label: "swarm_service"
+      - source_labels: ["__meta_docker_container_label_com_docker_stack_namespace"]
+        target_label: "stack"
