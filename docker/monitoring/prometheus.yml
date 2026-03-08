@@ -20,7 +20,7 @@ scrape_configs:
           service: "ivf-api"
           environment: "production"
 
-  # Caddy reverse proxy metrics
+  # Caddy reverse proxy metrics (native Prometheus endpoint)
   - job_name: "caddy"
     metrics_path: "/metrics"
     static_configs:
@@ -28,25 +28,27 @@ scrape_configs:
         labels:
           service: "caddy"
 
-  # PostgreSQL (via pg_exporter sidecar, if added)
+  # PostgreSQL (via postgres-exporter sidecar)
   - job_name: "postgres"
+    metrics_path: "/metrics"
     static_configs:
-      - targets: ["ivf_db:5432"]
+      - targets: ["ivf_postgres-exporter:9187"]
         labels:
           service: "postgres-primary"
 
-  # Redis
+  # Redis (via redis-exporter sidecar)
   - job_name: "redis"
+    metrics_path: "/metrics"
     static_configs:
-      - targets: ["ivf_redis:6379"]
+      - targets: ["ivf_redis-exporter:9121"]
         labels:
           service: "redis"
 
-  # MinIO
+  # MinIO (native Prometheus metrics)
   - job_name: "minio"
     metrics_path: "/minio/v2/metrics/cluster"
     static_configs:
-      - targets: ["ivf_minio:9000"]
+      - targets: ["minio-metrics:9000"]
         labels:
           service: "minio"
 

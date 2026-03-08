@@ -45,46 +45,207 @@ Các file cấu hình nằm trong `docker/monitoring/`:
 
 ```
 docker/monitoring/
-├── prometheus.yml              # Scrape targets
-├── alerts.yml                  # Alert rules
-├── loki-config.yml             # Loki storage & retention
-├── promtail-config.yml         # Docker log shipping
+├── prometheus.yml                          # Scrape targets & global config
+├── alerts.yml                              # 31 alert rules + 8 recording rules
+├── loki-config.yml                         # Loki storage, retention, ruler, cache
+├── promtail-config.yml                     # Docker log shipping + pipeline stages
+├── loki-rules/
+│   └── fake/
+│       └── rules.yml                       # 9 Loki log-based alert rules
 └── grafana/
     └── provisioning/
-        └── datasources/
-            └── datasources.yml # Auto-provision Prometheus + Loki
+        ├── datasources/
+        │   └── datasources.yml             # Auto-provision Prometheus + Loki
+        └── dashboards/
+            ├── dashboards.yml              # Dashboard provisioning config
+            └── json/
+                ├── ivf-system-overview.json # Service health, RED metrics, latency
+                ├── ivf-logs-errors.json     # Log viewer, error tracking
+                └── ivf-infrastructure.json  # Alerts, targets, Prometheus perf
 ```
 
-### 1.4 Prometheus Scrape Targets
+### 1.4 Prometheus Exporters
 
-| Target          | Endpoint             | Interval |
-| --------------- | -------------------- | -------- |
-| IVF API         | ivf-api:8080/metrics | 15s      |
-| Caddy           | caddy:2019/metrics   | 15s      |
-| MinIO           | minio:9000/minio/v2/metrics/cluster | 30s |
-| Redis           | redis-exporter:9121  | 15s      |
-| Prometheus self | localhost:9090       | 15s      |
+Hệ thống sử dụng các exporter chuyên dụng để thu thập metrics từ infrastructure services:
 
-### 1.5 Alert Rules
+| Service    | Exporter                | Swarm Service Name     | Port | Ghi chú                                           |
+| ---------- | ----------------------- | ---------------------- | ---- | -------------------------------------------------- |
+| IVF API    | Built-in (OpenTelemetry)| `ivf_api`              | 8080 | `/metrics` endpoint, scrape 10s                    |
+| PostgreSQL | `postgres-exporter`     | `ivf_postgres-exporter`| 9187 | Kết nối DB qua Docker secret                       |
+| Redis      | `redis-exporter`        | `ivf_redis-exporter`   | 9121 | Kết nối `redis://redis:6379`                       |
+| MinIO      | Built-in                | `minio-metrics`        | 9000 | `/minio/v2/metrics/cluster` (needs `MINIO_PROMETHEUS_AUTH_TYPE=public`) |
+| Caddy      | Built-in                | `ivf_caddy`            | 2019 | Native Prometheus endpoint                         |
+| Prometheus | Self-monitoring         | `ivf-prometheus`       | 9090 | `localhost:9090`                                   |
 
-| Alert              | Điều kiện                | Severity |
-| ------------------ | ------------------------ | -------- |
-| HighErrorRate      | HTTP 5xx > 5% trong 5m   | critical |
-| SlowResponseTime   | P95 > 2s trong 5m        | warning  |
-| ApiDown            | API unreachable 1m       | critical |
-| PostgresDown       | PG unreachable 1m        | critical |
-| RedisDown          | Redis unreachable 1m     | critical |
-| MinioDown          | MinIO unreachable 1m     | critical |
-| HighMemoryUsage    | API memory > 800MB       | warning  |
+**Network**: Tất cả exporters kết nối vào cả `ivf-data` (truy cập services) và `ivf-monitoring` (Prometheus scrape).
 
-### 1.6 Loki Log Retention
+### 1.5 Prometheus Scrape Targets
 
-Loki lưu trữ logs 30 ngày với TSDB storage backend. Cấu hình trong `loki-config.yml`:
+| Target     | Endpoint                                   | Interval |
+| ---------- | ------------------------------------------ | -------- |
+| IVF API    | `ivf_api:8080/metrics`                     | 10s      |
+| PostgreSQL | `ivf_postgres-exporter:9187/metrics`       | 15s      |
+| Redis      | `ivf_redis-exporter:9121/metrics`          | 15s      |
+| MinIO      | `minio-metrics:9000/minio/v2/metrics/cluster`  | 15s      |
+| Caddy      | `ivf_caddy:2019/metrics`                   | 15s      |
+| Prometheus | `localhost:9090/metrics`                   | 15s      |
 
-```yaml
-limits_config:
-  retention_period: 720h  # 30 ngày
+### 1.6 Alert Rules (Prometheus)
+
+**9 nhóm alert, 31 rules + 8 recording rules:**
+
+#### API Alerts
+
+| Alert                | Điều kiện                     | Severity | For  |
+| -------------------- | ----------------------------- | -------- | ---- |
+| ApiDown              | Instance unreachable           | critical | 1m   |
+| ApiAllInstancesDown  | Tất cả instances down          | critical | 30s  |
+| HighLatencyWarning   | P95 > 1s                      | warning  | 5m   |
+| HighLatencyCritical  | P95 > 3s                      | critical | 3m   |
+| P99LatencyExtreme    | P99 > 5s                      | warning  | 5m   |
+| SlowEndpoint         | Endpoint P95 > 5s             | warning  | 10m  |
+| ErrorRateWarning     | 5xx > 1%                      | warning  | 5m   |
+| ErrorRateCritical    | 5xx > 5%                      | critical | 3m   |
+| High4xxRate          | 4xx > 25%                     | warning  | 10m  |
+| NoTraffic            | Zero requests                 | warning  | 10m  |
+| HighMemoryWarning    | Memory > 800MB                | warning  | 10m  |
+| HighMemoryCritical   | Memory > 950MB                | critical | 5m   |
+| HighGCPressure       | Gen2 GC > 0.5/s               | warning  | 10m  |
+| ThreadPoolStarvation | Queue length > 100            | warning  | 5m   |
+| TrafficSpike         | 3x normal rate                | warning  | 10m  |
+
+#### Infrastructure Alerts
+
+| Alert                    | Điều kiện                    | Severity | For  |
+| ------------------------ | ---------------------------- | -------- | ---- |
+| PostgresDown             | PG unreachable               | critical | 1m   |
+| RedisDown                | Redis unreachable            | warning  | 1m   |
+| MinioDown                | MinIO unreachable            | critical | 2m   |
+| CaddyDown                | Caddy unreachable            | critical | 1m   |
+| PostgresHighConnections  | Connections > 80% max        | warning  | 5m   |
+| PostgresReplicationLag   | Replication lag > 100MB      | warning  | 5m   |
+| PostgresDeadlocks        | Deadlocks detected           | warning  | 0m   |
+| RedisHighMemory          | Memory > 80% maxmemory      | warning  | 5m   |
+| RedisHighClients         | Connected clients > 100     | warning  | 5m   |
+| RedisRejectedConnections | Rejected connections         | critical | 0m   |
+| MinioHighDiskUsage       | Disk > 80%                  | warning  | 10m  |
+| MinioDiskCritical        | Disk > 90%                  | critical | 5m   |
+
+#### Prometheus Self-Monitoring
+
+| Alert                           | Điều kiện              | Severity |
+| ------------------------------- | ---------------------- | -------- |
+| PrometheusConfigReloadFailed    | Config reload failed   | warning  |
+| PrometheusTargetDown            | Any target down > 5m   | warning  |
+| PrometheusTSDBCompactionsFailing| TSDB compaction errors | warning  |
+| PrometheusRuleEvaluationFailures| Rule eval failures     | warning  |
+
+#### Recording Rules (Pre-computed queries)
+
+| Rule Name                          | Mô tả                       |
+| ---------------------------------- | ---------------------------- |
+| `ivf:http_requests:rate5m`         | Tổng request rate/s          |
+| `ivf:http_requests_by_status:rate5m`| Request rate theo status code|
+| `ivf:http_requests_by_route:rate5m` | Request rate theo endpoint  |
+| `ivf:http_error_rate:ratio5m`      | Tỉ lệ lỗi 5xx/total        |
+| `ivf:http_latency_p50:5m`         | P50 latency                  |
+| `ivf:http_latency_p95:5m`         | P95 latency                  |
+| `ivf:http_latency_p99:5m`         | P99 latency                  |
+| `ivf:api_availability:ratio`      | % API instances UP           |
+
+### 1.7 Alert Rules (Loki — Log-based)
+
+**3 nhóm, 9 rules** — Dựa trên phân tích log patterns:
+
+| Alert                   | Nguồn log       | Điều kiện                          | Severity |
+| ----------------------- | --------------- | ---------------------------------- | -------- |
+| HighErrorLogRate        | API logs        | > 20 error logs/5min               | warning  |
+| UnhandledExceptions     | API logs        | NullRef/StackOverflow/OOM detected | critical |
+| DatabaseConnectionErrors| API logs        | Npgsql exceptions > 3/5min        | critical |
+| RedisConnectionErrors   | API logs        | Redis exceptions > 5/5min         | warning  |
+| BruteForceAttempt       | API logs        | > 20 auth failures/5min           | warning  |
+| ForbiddenAccessSpike    | API logs        | > 15 forbidden responses/5min     | warning  |
+| PostgresFatalError      | PostgreSQL logs | FATAL/PANIC detected              | critical |
+| MinioErrors             | MinIO logs      | > 5 errors/5min                   | warning  |
+| ContainerRestarting     | All containers  | > 3 restart events/10min          | warning  |
+
+### 1.8 Grafana Dashboards
+
+3 dashboards tự động provisioning vào thư mục **IVF System**:
+
+#### IVF System Overview (`/d/ivf-system-overview`)
+
+| Row               | Panels                                                                |
+| ------------------ | --------------------------------------------------------------------- |
+| Service Health     | 6 stat panels: API, PostgreSQL, Redis, MinIO, Caddy, Prometheus (UP/DOWN) |
+| RED Metrics        | Request Rate, Error Rate (5xx), P95 Latency, API Memory              |
+| HTTP Traffic       | Request rate by status code, Response time percentiles (P50/P95/P99) |
+| Top Endpoints      | Request rate by endpoint (stacked), Slowest endpoints P95 (top 10)   |
+| API Resources      | Process memory (RSS/Virtual/GC Heap), .NET Runtime (GC, threads)     |
+
+#### IVF Logs & Errors (`/d/ivf-logs-errors`)
+
+| Row                | Panels                                                      |
+| ------------------- | ------------------------------------------------------------ |
+| Error Stats         | 4 stat panels: Errors, Exceptions, DB Errors, Auth Failures (last 1h) |
+| Error Timeline      | Error rate over time (Exceptions/Errors/Warnings)           |
+| Error Log Viewer    | Live log panel with error/exception filter                  |
+| All API Logs        | Unfiltered API log stream (collapsed)                       |
+| Database Logs       | PostgreSQL logs + error filter (collapsed)                  |
+| Security & Auth     | Auth/permission logs (collapsed)                            |
+| Reverse Proxy       | Caddy access/error logs (collapsed)                         |
+| Storage & Services  | Redis, MinIO, SignServer, EJBCA logs (collapsed)            |
+
+#### IVF Infrastructure & Alerts (`/d/ivf-infrastructure`)
+
+| Row                | Panels                                                       |
+| ------------------- | ------------------------------------------------------------- |
+| Active Alerts       | Alert list (firing/pending/error states)                     |
+| Prometheus Targets  | Scrape target status table (UP/DOWN per job)                 |
+| Prometheus Perf.    | Scrape duration, Samples scraped, Rule eval duration, TSDB   |
+| Loki Log Volume     | Log volume by swarm_service, Error log volume                |
+
+### 1.9 Promtail Pipeline
+
+Promtail thu thập logs từ **tất cả Docker containers** trên host với pipeline stages:
+
 ```
+Docker Container Logs
+    │
+    ▼
+┌─────────────────────────────────────────────┐
+│  1. Docker Service Discovery                │
+│     Labels: container, compose_service,     │
+│     swarm_service, stack, logstream          │
+├─────────────────────────────────────────────┤
+│  2. Regex: Extract .NET log level           │
+│     (trce/dbug/info/warn/fail/crit)         │
+│     → Label: level                          │
+├─────────────────────────────────────────────┤
+│  3. Drop: Health check noise                │
+│     Pattern: (health|liveness|readiness).*200│
+├─────────────────────────────────────────────┤
+│  4. Regex: Extract HTTP request info        │
+│     → Labels: http_method, http_status      │
+└─────────────────────────────────────────────┘
+    │
+    ▼
+  Loki (3100)
+```
+
+### 1.10 Loki Config
+
+| Setting                     | Giá trị     | Mô tả                                |
+| --------------------------- | ----------- | ------------------------------------- |
+| `retention_period`          | 30d         | Tự động xóa logs cũ hơn 30 ngày      |
+| `schema`                    | v13 (TSDB)  | Storage engine hiệu quả nhất         |
+| `results_cache`             | 100MB       | Embedded cache cho query nhanh hơn     |
+| `ingestion_rate_mb`         | 10 MB/s     | Rate limit ingestion                   |
+| `ingestion_burst_size_mb`   | 20 MB       | Burst ingest cho spike                 |
+| `per_stream_rate_limit`     | 5 MB/s      | Rate limit mỗi stream                 |
+| `max_entries_limit_per_query`| 5000       | Giới hạn kết quả query                |
+| `max_query_series`          | 500         | Giới hạn số series mỗi query          |
+| `ruler`                     | enabled     | Log-based alerting (9 rules)           |
 
 ---
 
@@ -101,12 +262,12 @@ limits_config:
 
 Các chính sách retention được seed tự động trong `DatabaseSeeder`. Entity types phổ biến:
 
-| Entity Type       | Retention | Action  |
-| ----------------- | --------- | ------- |
-| AuditLogEntry     | 365 ngày  | Archive |
-| SecurityEvent     | 180 ngày  | Archive |
-| ApiCallLog        | 90 ngày   | Delete  |
-| UserLoginHistory  | 365 ngày  | Archive |
+| Entity Type      | Retention | Action  |
+| ---------------- | --------- | ------- |
+| AuditLogEntry    | 365 ngày  | Archive |
+| SecurityEvent    | 180 ngày  | Archive |
+| ApiCallLog       | 90 ngày   | Delete  |
+| UserLoginHistory | 365 ngày  | Archive |
 
 ### 2.3 S3 Archival
 
@@ -235,6 +396,7 @@ bash scripts/dr-failover.sh --force
 ```
 
 **Quy trình failover:**
+
 1. Kiểm tra replication lag < 1MB
 2. Promote standby: `pg_ctl promote`
 3. Cập nhật connection string trên API service
@@ -253,6 +415,7 @@ bash scripts/dr-drill.sh --full
 ```
 
 **8 kiểm tra:**
+
 1. Primary PostgreSQL accessible
 2. Standby PostgreSQL accessible
 3. Replication streaming active
@@ -264,11 +427,11 @@ bash scripts/dr-drill.sh --full
 
 ### 5.3 Lịch chạy DR Drill khuyến nghị
 
-| Tần suất       | Loại       | Ghi chú                   |
-| --------------- | ---------- | ------------------------- |
-| Hàng tuần       | Basic      | `dr-drill.sh`             |
-| Hàng tháng      | Full       | `dr-drill.sh --full`      |
-| Sau deploy lớn  | Basic      | Verify sau mỗi deployment |
+| Tần suất       | Loại  | Ghi chú                   |
+| -------------- | ----- | ------------------------- |
+| Hàng tuần      | Basic | `dr-drill.sh`             |
+| Hàng tháng     | Full  | `dr-drill.sh --full`      |
+| Sau deploy lớn | Basic | Verify sau mỗi deployment |
 
 ---
 
@@ -282,14 +445,14 @@ bash scripts/dr-drill.sh --full
 
 ### 6.2 Các Tab
 
-| Tab         | Chức năng                                    |
-| ----------- | -------------------------------------------- |
-| Dashboard   | VPS metrics, CPU/RAM/Disk, alerts            |
-| Swarm       | Docker services, nodes, scale, logs          |
-| Health      | Health checks, component status              |
-| S3          | MinIO bucket browser, upload/download        |
-| Lưu trữ    | Data retention policies, execute, replica    |
-| Giám sát    | Monitoring stack health, quick links         |
+| Tab       | Chức năng                                 |
+| --------- | ----------------------------------------- |
+| Dashboard | VPS metrics, CPU/RAM/Disk, alerts         |
+| Swarm     | Docker services, nodes, scale, logs       |
+| Health    | Health checks, component status           |
+| S3        | MinIO bucket browser, upload/download     |
+| Lưu trữ   | Data retention policies, execute, replica |
+| Giám sát  | Monitoring stack health, quick links      |
 
 ### 6.3 Tab Lưu trữ
 
@@ -312,49 +475,60 @@ Tất cả endpoints yêu cầu JWT authentication với quyền Admin.
 
 ### 7.1 Data Retention
 
-| Method | Path                                          | Mô tả                          |
-| ------ | --------------------------------------------- | ------------------------------- |
-| GET    | `/api/admin/infrastructure/retention/policies` | Lấy danh sách chính sách       |
-| POST   | `/api/admin/infrastructure/retention/execute`  | Thực thi retention thủ công     |
+| Method | Path                                           | Mô tả                       |
+| ------ | ---------------------------------------------- | --------------------------- |
+| GET    | `/api/admin/infrastructure/retention/policies` | Lấy danh sách chính sách    |
+| POST   | `/api/admin/infrastructure/retention/execute`  | Thực thi retention thủ công |
 
 ### 7.2 Read Replica
 
-| Method | Path                                         | Mô tả                    |
-| ------ | -------------------------------------------- | ------------------------- |
-| GET    | `/api/admin/infrastructure/replica/status`    | Trạng thái replication    |
+| Method | Path                                       | Mô tả                  |
+| ------ | ------------------------------------------ | ---------------------- |
+| GET    | `/api/admin/infrastructure/replica/status` | Trạng thái replication |
 
 ### 7.3 Monitoring
 
-| Method | Path                                           | Mô tả                       |
-| ------ | ---------------------------------------------- | ---------------------------- |
-| GET    | `/api/admin/infrastructure/monitoring/status`   | Health check monitoring stack |
+| Method | Path                                          | Mô tả                         |
+| ------ | --------------------------------------------- | ----------------------------- |
+| GET    | `/api/admin/infrastructure/monitoring/status` | Health check monitoring stack |
 
 ### 7.4 Existing Infrastructure Endpoints
 
-| Method | Path                                           | Mô tả                           |
-| ------ | ---------------------------------------------- | -------------------------------- |
-| GET    | `/api/admin/infrastructure/metrics/{vps}`       | VPS metrics (CPU, RAM, Disk)     |
-| GET    | `/api/admin/infrastructure/swarm/services`      | Docker Swarm services            |
-| GET    | `/api/admin/infrastructure/swarm/nodes`          | Docker Swarm nodes               |
-| POST   | `/api/admin/infrastructure/swarm/scale`          | Scale service replicas           |
-| GET    | `/api/admin/infrastructure/health`               | System health checks             |
-| GET    | `/api/admin/infrastructure/s3/status`            | MinIO status                     |
-| GET    | `/api/admin/infrastructure/s3/objects`            | List S3 objects                  |
+| Method | Path                                       | Mô tả                        |
+| ------ | ------------------------------------------ | ---------------------------- |
+| GET    | `/api/admin/infrastructure/metrics/{vps}`  | VPS metrics (CPU, RAM, Disk) |
+| GET    | `/api/admin/infrastructure/swarm/services` | Docker Swarm services        |
+| GET    | `/api/admin/infrastructure/swarm/nodes`    | Docker Swarm nodes           |
+| POST   | `/api/admin/infrastructure/swarm/scale`    | Scale service replicas       |
+| GET    | `/api/admin/infrastructure/health`         | System health checks         |
+| GET    | `/api/admin/infrastructure/s3/status`      | MinIO status                 |
+| GET    | `/api/admin/infrastructure/s3/objects`     | List S3 objects              |
 
 ---
 
 ## Appendix: File Structure
 
 ```
+docker-compose.stack.yml               # Swarm stack (bao gồm exporters)
 docker-compose.monitoring.yml          # Monitoring stack deployment
 docker-compose.production.yml          # Production config (2 replicas, resource limits)
 docker/monitoring/
-├── prometheus.yml                     # Scrape targets
-├── alerts.yml                         # Alert rules (7 rules)
-├── loki-config.yml                    # Log retention 30d
-├── promtail-config.yml                # Docker log shipping
-└── grafana/provisioning/datasources/
-    └── datasources.yml                # Auto-provision data sources
+├── prometheus.yml                     # Scrape targets (6 jobs)
+├── alerts.yml                         # 31 alert rules + 8 recording rules
+├── loki-config.yml                    # Log retention 30d, cache, ruler
+├── promtail-config.yml                # Docker log shipping + pipeline stages
+├── loki-rules/
+│   └── fake/
+│       └── rules.yml                  # 9 Loki log-based alert rules
+└── grafana/provisioning/
+    ├── datasources/
+    │   └── datasources.yml            # Auto-provision Prometheus + Loki
+    └── dashboards/
+        ├── dashboards.yml             # Dashboard auto-provisioning
+        └── json/
+            ├── ivf-system-overview.json   # Service health, RED, latency
+            ├── ivf-logs-errors.json       # Log viewer, error tracking
+            └── ivf-infrastructure.json    # Alerts, targets, Prometheus perf
 
 scripts/
 ├── auto-heal.sh                       # Swarm auto-healing

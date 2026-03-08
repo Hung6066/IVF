@@ -1,3 +1,10 @@
+{
+	admin 0.0.0.0:2019
+	servers {
+		metrics
+	}
+}
+
 natra.site {
 	# Health checks (no auth required)
 	handle /health/* {
