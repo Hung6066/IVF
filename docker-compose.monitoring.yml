@@ -15,15 +15,16 @@ services:
     volumes:
       - ./docker/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./docker/monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - ./docker/monitoring/prometheus-web.yml:/etc/prometheus/web.yml:ro
       - prometheus_data:/prometheus
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.path=/prometheus"
       - "--storage.tsdb.retention.time=30d"
       - "--web.enable-lifecycle"
-      - "--web.enable-admin-api"
+      - "--web.config.file=/etc/prometheus/web.yml"
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"
     networks:
       - ivf-monitoring
     restart: unless-stopped
@@ -37,6 +38,7 @@ services:
           "--no-verbose",
           "--tries=1",
           "--spider",
+          "--header=Authorization: Basic bW9uaXRvcjp3RERhSTh6elNUQlB5emZHcDN3UmM2SmtER2dJdjZaRg==",
           "http://localhost:9090/-/healthy",
         ]
       interval: 15s
@@ -52,14 +54,25 @@ services:
     container_name: ivf-grafana
     environment:
       - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_PASSWORD=wDDaI8zzSTBPyzfGp3wRc6JkDGgIv6ZF
       - GF_USERS_ALLOW_SIGN_UP=false
-      - GF_SERVER_ROOT_URL=http://localhost:3000
+      - GF_USERS_ALLOW_ORG_CREATE=false
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+      - GF_SECURITY_COOKIE_SECURE=true
+      - GF_SECURITY_COOKIE_SAMESITE=strict
+      - GF_SECURITY_DISABLE_GRAVATAR=true
+      - GF_SECURITY_STRICT_TRANSPORT_SECURITY=true
+      - GF_SECURITY_CONTENT_SECURITY_POLICY=true
+      - GF_SECURITY_X_CONTENT_TYPE_OPTIONS=true
+      - GF_SECURITY_X_XSS_PROTECTION=true
+      - GF_SNAPSHOTS_EXTERNAL_ENABLED=false
+      - GF_SERVER_ROOT_URL=https://natra.site/grafana/
+      - GF_SERVER_SERVE_FROM_SUB_PATH=true
     volumes:
       - grafana_data:/var/lib/grafana
       - ./docker/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     depends_on:
       prometheus:
         condition: service_healthy
@@ -76,7 +89,7 @@ services:
           "--no-verbose",
           "--tries=1",
           "--spider",
-          "http://localhost:3000/api/health",
+          "http://localhost:3000/grafana/api/health",
         ]
       interval: 15s
       timeout: 5s
@@ -95,7 +108,7 @@ services:
       - loki_data:/loki
     command: -config.file=/etc/loki/local-config.yaml
     ports:
-      - "3100:3100"
+      - "127.0.0.1:3100:3100"
     networks:
       - ivf-monitoring
     restart: unless-stopped

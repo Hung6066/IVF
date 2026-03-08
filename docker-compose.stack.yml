@@ -261,9 +261,8 @@ services:
     secrets:
       - minio_access_key
       - minio_secret_key
-    ports:
-      - "9000:9000"
-      - "127.0.0.1:9001:9001"
+    # Ports not published — access via internal Docker networking only
+    # Use SSH tunnel for admin: ssh -L 9001:localhost:9001 root@VPS
     volumes:
       - minio_data:/data
     command: server /data --console-address ":9001"
@@ -337,7 +336,7 @@ services:
         published: 443
         mode: host
     configs:
-      - source: caddyfile_v4
+      - source: caddyfile_v5
         target: /etc/caddy/Caddyfile
     volumes:
       - caddy_data:/data
@@ -404,7 +403,7 @@ services:
 
 # ─── Docker Configs ───
 configs:
-  caddyfile_v4:
+  caddyfile_v5:
     file: ./Caddyfile
   standby_entrypoint:
     file: ./docker/postgres/standby-entrypoint.sh

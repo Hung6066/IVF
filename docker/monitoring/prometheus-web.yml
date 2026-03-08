@@ -1,0 +1,5 @@
+# Prometheus basic authentication configuration
+# Username: monitor
+# Password is stored in Docker secrets
+basic_auth_users:
+  monitor: "$2b$12$Q03X09mNZzad63TPVDExZujrFOdXFGz.gg2JehYdJw/3jz6RUMi9u"

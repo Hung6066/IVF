@@ -22,12 +22,47 @@ Tài liệu này mô tả các tính năng hạ tầng enterprise đã triển k
 
 Stack giám sát bao gồm 4 thành phần:
 
-| Service    | Port | Chức năng                     |
-| ---------- | ---- | ----------------------------- |
-| Prometheus | 9090 | Metrics collection & alerting |
-| Grafana    | 3000 | Dashboards & visualization    |
-| Loki       | 3100 | Log aggregation               |
-| Promtail   | —    | Log shipping từ Docker        |
+| Service    | Port | Chức năng                     | External Access |
+| ---------- | ---- | ----------------------------- | --------------- |
+| Prometheus | 9090 | Metrics collection & alerting | `127.0.0.1` only + Basic Auth |
+| Grafana    | 3000 | Dashboards & visualization    | `127.0.0.1` only, reverse proxy via Caddy `/grafana/` |
+| Loki       | 3100 | Log aggregation               | `127.0.0.1` only |
+| Promtail   | —    | Log shipping từ Docker        | No port exposed |
+
+### 1.1.1 Bảo mật Monitoring
+
+**Port Binding**: Tất cả monitoring ports bind `127.0.0.1` only — không thể truy cập từ bên ngoài trực tiếp.
+
+**Authentication**:
+
+| Component  | Auth Method           | Credentials                    |
+| ---------- | --------------------- | ------------------------------ |
+| Prometheus | Basic Auth (`web.yml`)| `monitor:<password>`           |
+| Grafana    | Built-in login        | `admin:<password>` (changed from default) |
+| Loki       | No auth (localhost only) | N/A                         |
+
+**Truy cập từ xa**: Grafana được reverse proxy qua Caddy tại `https://natra.site/grafana/` với basic auth.
+
+```bash
+# Truy cập Grafana từ xa
+https://natra.site/grafana/   # Basic auth: monitor/<password>
+
+# Truy cập Prometheus qua SSH tunnel
+ssh -L 9090:localhost:9090 root@VPS_IP
+# Mở http://localhost:9090 (cần basic auth: monitor/<password>)
+
+# Truy cập MinIO Console qua SSH tunnel
+ssh -L 9001:localhost:9001 root@VPS_IP
+```
+
+**Hardening áp dụng**:
+- `--web.enable-admin-api` đã bị **gỡ bỏ** khỏi Prometheus (ngăn xóa data/shutdown từ API)
+- `--web.config.file=/etc/prometheus/web.yml` — Basic Auth via bcrypt hash
+- Grafana: `GF_SECURITY_COOKIE_SECURE`, `GF_SECURITY_CONTENT_SECURITY_POLICY`, `GF_SNAPSHOTS_EXTERNAL_ENABLED=false`, disable gravatar, disable sign-up/org-create
+- Caddy admin API: restricted `origins` chỉ cho private networks (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`)
+- MinIO: ports **không publish** — chỉ truy cập qua internal Docker networking
+- `security_opt: no-new-privileges:true` trên tất cả containers
+- Prometheus self-scrape sử dụng basic auth credentials
 
 ### 1.2 Triển khai
 
@@ -46,6 +81,7 @@ Các file cấu hình nằm trong `docker/monitoring/`:
 ```
 docker/monitoring/
 ├── prometheus.yml                          # Scrape targets & global config
+├── prometheus-web.yml                      # Basic auth configuration (bcrypt)
 ├── alerts.yml                              # 31 alert rules + 8 recording rules
 ├── loki-config.yml                         # Loki storage, retention, ruler, cache
 ├── promtail-config.yml                     # Docker log shipping + pipeline stages

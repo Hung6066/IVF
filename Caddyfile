@@ -1,7 +1,25 @@
+{
+	# Admin API — only listen on internal overlay network for Prometheus scraping
+	admin 0.0.0.0:2019 {
+		origins 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 127.0.0.1
+	}
+	servers {
+		metrics
+	}
+}
+
 natra.site {
 	# Health checks (no auth required)
 	handle /health/* {
 		reverse_proxy api:8080
+	}
+
+	# Grafana — monitoring dashboard (basic auth protected)
+	handle_path /grafana/* {
+		basic_auth {
+			monitor $2b$12$i27omGvrtGdYIh93svxdZO6.BJRMU6a1Y//ZjK7qMqBSV2E/9srIC
+		}
+		reverse_proxy ivf-grafana:3000
 	}
 
 	# API requests
