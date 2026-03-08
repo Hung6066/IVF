@@ -1312,10 +1312,7 @@
       @if (monitoringStatus(); as ms) {
         <div class="stats-grid">
           @for (svc of ms.services; track svc.name) {
-            <div
-              class="stat-card"
-              [ngClass]="svc.healthy ? 'stat-green' : 'stat-red'"
-            >
+            <div class="stat-card" [ngClass]="svc.healthy ? 'stat-green' : 'stat-red'">
               <div class="stat-icon">
                 <i [ngClass]="getMonitoringIcon(svc.name)"></i>
               </div>
@@ -1365,48 +1362,28 @@
         <h3><i class="fa-solid fa-link"></i> Truy cập nhanh</h3>
       </div>
       <div class="quick-links">
-        <a
-          href="http://localhost:9090"
-          target="_blank"
-          rel="noopener"
-          class="quick-link"
-        >
+        <a href="http://localhost:9090" target="_blank" rel="noopener" class="quick-link">
           <i class="fa-solid fa-fire"></i>
           <div>
             <strong>Prometheus</strong>
             <span>Metrics & Alerts</span>
           </div>
         </a>
-        <a
-          href="http://localhost:3000"
-          target="_blank"
-          rel="noopener"
-          class="quick-link"
-        >
+        <a href="http://localhost:3000" target="_blank" rel="noopener" class="quick-link">
           <i class="fa-solid fa-chart-line"></i>
           <div>
             <strong>Grafana</strong>
             <span>Dashboards & Visualization</span>
           </div>
         </a>
-        <a
-          href="http://localhost:3100"
-          target="_blank"
-          rel="noopener"
-          class="quick-link"
-        >
+        <a href="http://localhost:3100" target="_blank" rel="noopener" class="quick-link">
           <i class="fa-solid fa-scroll"></i>
           <div>
             <strong>Loki</strong>
             <span>Log Aggregation</span>
           </div>
         </a>
-        <a
-          href="/metrics"
-          target="_blank"
-          rel="noopener"
-          class="quick-link"
-        >
+        <a href="/metrics" target="_blank" rel="noopener" class="quick-link">
           <i class="fa-solid fa-gauge-high"></i>
           <div>
             <strong>API Metrics</strong>
