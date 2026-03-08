@@ -23,6 +23,8 @@ services:
       - "--storage.tsdb.retention.time=30d"
       - "--web.enable-lifecycle"
       - "--web.config.file=/etc/prometheus/web.yml"
+      - "--web.external-url=https://natra.site/prometheus"
+      - "--web.route-prefix=/prometheus"
     ports:
       - "127.0.0.1:9090:9090"
     networks:
@@ -39,7 +41,7 @@ services:
           "--tries=1",
           "--spider",
           "--header=Authorization: Basic bW9uaXRvcjp3RERhSTh6elNUQlB5emZHcDN3UmM2SmtER2dJdjZaRg==",
-          "http://localhost:9090/-/healthy",
+          "http://localhost:9090/prometheus/-/healthy",
         ]
       interval: 15s
       timeout: 5s

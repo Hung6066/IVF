@@ -15,12 +15,26 @@ natra.site {
 	}
 
 	# Grafana — monitoring dashboard (basic auth protected)
-	handle_path /grafana/* {
+	handle /grafana* {
 		basic_auth {
 			monitor $2b$12$i27omGvrtGdYIh93svxdZO6.BJRMU6a1Y//ZjK7qMqBSV2E/9srIC
 		}
 		reverse_proxy ivf-grafana:3000
 	}
+
+	# Prometheus — metrics (basic auth protected, proxied with upstream auth)
+	handle /prometheus* {
+		basic_auth {
+			monitor $2b$12$i27omGvrtGdYIh93svxdZO6.BJRMU6a1Y//ZjK7qMqBSV2E/9srIC
+		}
+		reverse_proxy ivf-prometheus:9090 {
+			header_up Authorization "Basic bW9uaXRvcjp3RERhSTh6elNUQlB5emZHcDN3UmM2SmtER2dJdjZaRg=="
+		}
+	}
+
+	# MinIO Console — access via SSH tunnel only:
+	# ssh -L 9001:localhost:9001 root@45.134.226.56
+	# Then open http://localhost:9001
 
 	# API requests
 	handle /api/* {

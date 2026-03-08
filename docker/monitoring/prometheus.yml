@@ -54,6 +54,7 @@ scrape_configs:
 
   # Prometheus self-monitoring
   - job_name: "prometheus"
+    metrics_path: "/prometheus/metrics"
     basic_auth:
       username: monitor
       password: "wDDaI8zzSTBPyzfGp3wRc6JkDGgIv6ZF"

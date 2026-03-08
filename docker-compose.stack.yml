@@ -336,7 +336,7 @@ services:
         published: 443
         mode: host
     configs:
-      - source: caddyfile_v5
+      - source: caddyfile_v6
         target: /etc/caddy/Caddyfile
     volumes:
       - caddy_data:/data
@@ -403,7 +403,7 @@ services:
 
 # ─── Docker Configs ───
 configs:
-  caddyfile_v5:
+  caddyfile_v6:
     file: ./Caddyfile
   standby_entrypoint:
     file: ./docker/postgres/standby-entrypoint.sh
