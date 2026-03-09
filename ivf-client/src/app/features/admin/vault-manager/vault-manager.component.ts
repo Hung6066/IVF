@@ -13,6 +13,7 @@ import { VaultDrTabComponent } from './tabs/vault-dr-tab.component';
 import { SiemTabComponent } from './tabs/siem-tab.component';
 import { MultiUnsealTabComponent } from './tabs/multi-unseal-tab.component';
 import { VaultMetricsTabComponent } from './tabs/vault-metrics-tab.component';
+import { WebhookTabComponent } from './tabs/webhook-tab.component';
 import {
   VaultStatus,
   ApiKeyResponse,
@@ -65,7 +66,8 @@ type VaultTab =
   | 'settings'
   | 'multi-unseal'
   | 'vault-dr'
-  | 'db-rotation';
+  | 'db-rotation'
+  | 'webhook';
 
 interface TabGroup {
   key: string;
@@ -88,6 +90,7 @@ interface TabGroup {
     SiemTabComponent,
     MultiUnsealTabComponent,
     VaultMetricsTabComponent,
+    WebhookTabComponent,
   ],
   templateUrl: './vault-manager.component.html',
   styleUrls: ['./vault-manager.component.scss'],
@@ -321,6 +324,7 @@ export class VaultManagerComponent implements OnInit {
         { key: 'history', label: 'Audit Log' },
         { key: 'siem', label: 'SIEM' },
         { key: 'compliance', label: 'Compliance' },
+        { key: 'webhook', label: 'Webhook' },
       ],
     },
     {
@@ -408,6 +412,7 @@ export class VaultManagerComponent implements OnInit {
       case 'siem':
       case 'multi-unseal':
       case 'vault-metrics':
+      case 'webhook':
         break;
     }
   }

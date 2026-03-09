@@ -85,6 +85,8 @@ public class IvfDbContext : DbContext
     // Digital Signing
     public DbSet<UserSignature> UserSignatures => Set<UserSignature>();
     public DbSet<DocumentSignature> DocumentSignatures => Set<DocumentSignature>();
+    public DbSet<SignedDocumentAmendment> SignedDocumentAmendments => Set<SignedDocumentAmendment>();
+    public DbSet<AmendmentFieldChange> AmendmentFieldChanges => Set<AmendmentFieldChange>();
 
     // Patient Document Storage (MinIO S3)
     public DbSet<PatientDocument> PatientDocuments => Set<PatientDocument>();

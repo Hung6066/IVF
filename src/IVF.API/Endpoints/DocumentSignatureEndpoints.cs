@@ -24,6 +24,7 @@ public static class DocumentSignatureEndpoints
             ClaimsPrincipal principal,
             IvfDbContext db,
             IMediator m,
+            IUserPermissionRepository permRepo,
             SignedPdfGenerationService pdfGenService) =>
         {
             var userId = Guid.TryParse(
@@ -31,6 +32,16 @@ public static class DocumentSignatureEndpoints
 
             if (!userId.HasValue)
                 return Results.BadRequest(new { error = "Không xác định được người dùng. Vui lòng đăng nhập lại." });
+
+            // ─── Permission check: must have SignDocuments permission ───
+            var userRole = principal.FindFirst(ClaimTypes.Role)?.Value;
+            var isPlatformAdmin = principal.FindFirst("platform_admin")?.Value == "true";
+            if (!isPlatformAdmin && !string.Equals(userRole, "Admin", StringComparison.OrdinalIgnoreCase))
+            {
+                var hasSignPerm = await permRepo.HasPermissionAsync(userId.Value, "SignDocuments");
+                if (!hasSignPerm)
+                    return Results.Json(new { error = "Bạn không có quyền ký tài liệu." }, statusCode: 403);
+            }
 
             // Check response exists
             var response = await db.FormResponses
@@ -155,9 +166,17 @@ public static class DocumentSignatureEndpoints
         // ─── Get signing status for a form response ───
         group.MapGet("/{responseId:guid}/signing-status", async (
             Guid responseId,
+            ClaimsPrincipal principal,
             IvfDbContext db,
-            IMediator m) =>
+            IMediator m,
+            IUserPermissionRepository permRepo) =>
         {
+            var userId = Guid.TryParse(
+                principal.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var uid) ? uid : (Guid?)null;
+            var userRole = principal.FindFirst(ClaimTypes.Role)?.Value;
+            var isPlatformAdmin = principal.FindFirst("platform_admin")?.Value == "true";
+            var isAdmin = string.Equals(userRole, "Admin", StringComparison.OrdinalIgnoreCase);
+
             var response = await db.FormResponses
                 .Include(r => r.FormTemplate)
                 .FirstOrDefaultAsync(r => r.Id == responseId && !r.IsDeleted);
@@ -219,13 +238,36 @@ public static class DocumentSignatureEndpoints
             // ─── Check if signed PDF exists in MinIO ───
             var storedPdf = await m.Send(new GetStoredSignedPdfQuery(responseId));
 
+            // ─── Compute user permissions for frontend ───
+            var canSign = isPlatformAdmin || isAdmin;
+            var canRevoke = isPlatformAdmin || isAdmin;
+            var canRequestAmendment = isPlatformAdmin || isAdmin;
+            var canApproveAmendment = isPlatformAdmin || isAdmin;
+
+            if (userId.HasValue && !isPlatformAdmin && !isAdmin)
+            {
+                canSign = await permRepo.HasPermissionAsync(userId.Value, "SignDocuments");
+                canRevoke = await permRepo.HasPermissionAsync(userId.Value, "RevokeSignature");
+                canRequestAmendment = await permRepo.HasPermissionAsync(userId.Value, "RequestAmendment");
+                canApproveAmendment = await permRepo.HasPermissionAsync(userId.Value, "ApproveAmendment");
+            }
+
             return Results.Ok(new
             {
                 formResponseId = responseId,
+                currentUserId = userId,
                 signatures,
                 requiredRoles,
                 pendingRoles = requiredRoles.Where(r => !signedRoles.Contains(r)).ToList(),
                 isFullySigned = requiredRoles.Count > 0 && requiredRoles.All(r => signedRoles.Contains(r)),
+                permissions = new
+                {
+                    canSign,
+                    canRevoke,
+                    canRequestAmendment,
+                    canApproveAmendment,
+                    isAdmin = isPlatformAdmin || isAdmin
+                },
                 storedSignedPdf = storedPdf != null ? new
                 {
                     documentId = storedPdf.DocumentId,
@@ -300,11 +342,19 @@ public static class DocumentSignatureEndpoints
             if (docSig == null)
                 return Results.NotFound(new { error = "Không tìm thấy chữ ký." });
 
-            // Only the signer can revoke their own signature
-            if (docSig.UserId != userId.Value)
-                return Results.Forbid();
+            // Only the signer can revoke their own signature, except platform admin or Admin role
+            var userRole = principal.FindFirst(ClaimTypes.Role)?.Value;
+            var isPlatformAdmin = principal.FindFirst("platform_admin")?.Value == "true";
+            var isAdmin = string.Equals(userRole, "Admin", StringComparison.OrdinalIgnoreCase);
 
-            docSig.Revoke("Người ký đã thu hồi chữ ký");
+            if (docSig.UserId != userId.Value && !isPlatformAdmin && !isAdmin)
+                return Results.Json(new { error = "Chỉ người ký hoặc quản trị viên mới được thu hồi chữ ký." }, statusCode: 403);
+
+            var revokeReason = docSig.UserId == userId.Value
+                ? "Người ký đã thu hồi chữ ký"
+                : $"Quản trị viên đã thu hồi chữ ký";
+
+            docSig.Revoke(revokeReason);
             await db.SaveChangesAsync();
 
             // ─── Invalidate stored signed PDF (chữ ký thu hồi → PDF cũ không còn hợp lệ) ───

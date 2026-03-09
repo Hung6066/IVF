@@ -2118,11 +2118,13 @@ header @html Cache-Control "no-cache, must-revalidate"
 API đã sử dụng Serilog với `RenderedCompactJsonFormatter` để xuất structured JSON logs. Xem chi tiết tại `docs/infrastructure_operations_guide.md` Section 2.
 
 **Các middleware logging:**
+
 - `CorrelationIdMiddleware` — Tự động gắn `X-Correlation-Id` cho mỗi request
 - `LogContextEnrichmentMiddleware` — Enrich `TenantId`, `UserId`, `UserName`, `ClientIp`
 - `LoggingBehavior` (MediatR) — Log tữ động mọi CQRS command/query với duration
 
 **Packages đã cài:**
+
 ```bash
 Serilog.AspNetCore
 Serilog.Formatting.Compact
@@ -2195,7 +2197,7 @@ services:
       - "--web.external-url=https://natra.site/prometheus"
       - "--web.route-prefix=/prometheus"
     ports:
-      - "127.0.0.1:9090:9090"  # localhost only
+      - "127.0.0.1:9090:9090" # localhost only
     security_opt:
       - no-new-privileges:true
 
@@ -2212,7 +2214,7 @@ services:
       - grafana_data:/var/lib/grafana
       - ./docker/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
     ports:
-      - "127.0.0.1:3000:3000"  # localhost only
+      - "127.0.0.1:3000:3000" # localhost only
     security_opt:
       - no-new-privileges:true
 
@@ -2220,12 +2222,13 @@ services:
     image: grafana/loki:latest
     container_name: ivf-loki
     ports:
-      - "127.0.0.1:3100:3100"  # localhost only
+      - "127.0.0.1:3100:3100" # localhost only
     security_opt:
       - no-new-privileges:true
 ```
 
 **Truy cập external** (qua Caddy reverse proxy với basic auth):
+
 - Grafana: `https://natra.site/grafana/`
 - Prometheus: `https://natra.site/prometheus/`
 - MinIO Console: SSH tunnel only (`ssh -L 9001:localhost:9001 root@VPS_IP`)
@@ -2274,12 +2277,12 @@ scrape_configs:
 
 4 dashboards tự động provisioning vào thư mục **IVF System**:
 
-| Dashboard                        | Path                           | Nội dung chính                                                |
-| -------------------------------- | ------------------------------ | ------------------------------------------------------------ |
-| **IVF System Overview**          | `/d/ivf-system-overview`       | Service health (6 stat panels), RED metrics, HTTP traffic, top endpoints, API resources |
-| **IVF API Monitoring**           | `/d/ivf-api-monitoring`        | API health, traffic, errors & exceptions, security, .NET runtime, active alerts, live logs |
-| **IVF Logs & Errors**            | `/d/ivf-logs-errors`           | Error stats, timeline, log viewer (API, DB, security, proxy, storage) |
-| **IVF Infrastructure & Alerts**  | `/d/ivf-infrastructure`        | Active alerts, Prometheus targets, scrape perf, Loki log volume |
+| Dashboard                       | Path                     | Nội dung chính                                                                             |
+| ------------------------------- | ------------------------ | ------------------------------------------------------------------------------------------ |
+| **IVF System Overview**         | `/d/ivf-system-overview` | Service health (6 stat panels), RED metrics, HTTP traffic, top endpoints, API resources    |
+| **IVF API Monitoring**          | `/d/ivf-api-monitoring`  | API health, traffic, errors & exceptions, security, .NET runtime, active alerts, live logs |
+| **IVF Logs & Errors**           | `/d/ivf-logs-errors`     | Error stats, timeline, log viewer (API, DB, security, proxy, storage)                      |
+| **IVF Infrastructure & Alerts** | `/d/ivf-infrastructure`  | Active alerts, Prometheus targets, scrape perf, Loki log volume                            |
 
 **Truy cập**: `https://natra.site/grafana/` (basic auth: `monitor/<password>`)
 
@@ -2317,7 +2320,7 @@ app.MapHealthChecks("/health", new()
 
 | Cơ chế                | Dữ liệu                                                         | Truy vấn                                                                        |
 | --------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| **Serilog JSON Logs** | CorrelationId, TenantId, UserId, RequestPath, StatusCode        | Grafana → Explore → Loki: `{compose_service="ivf-api"} \|= "correlation-id"` |
+| **Serilog JSON Logs** | CorrelationId, TenantId, UserId, RequestPath, StatusCode        | Grafana → Explore → Loki: `{compose_service="ivf-api"} \|= "correlation-id"`    |
 | **API Call Logging**  | Method, Path, Status, Duration, IP, UserAgent, UserId, TenantId | `SELECT * FROM api_call_logs WHERE status_code >= 500 ORDER BY created_at DESC` |
 | **Audit Log**         | Partitioned by month, UserId, Action, Entity, TenantId          | `SELECT * FROM audit_logs WHERE action = 'Error' AND tenant_id = ?`             |
 | **Exception Handler** | Validation, TenantLimit, FeatureNotEnabled → structured JSON    | Client receives structured error codes                                          |
@@ -2742,11 +2745,11 @@ echo "=== Deployment Complete — Zero Downtime ==="
 
 **Tóm tắt hệ thống alert (đã triển khai):**
 
-| Engine    | Số rules | Config file                                      |
-| --------- | -------- | ------------------------------------------------ |
-| Prometheus| 31       | `docker/monitoring/alerts.yml`                   |
-| Loki      | 9        | `docker/monitoring/loki-rules/fake/rules.yml`    |
-| Grafana   | 25       | `docker/monitoring/grafana/provisioning/alerting/rules.yml` |
+| Engine     | Số rules | Config file                                                 |
+| ---------- | -------- | ----------------------------------------------------------- |
+| Prometheus | 31       | `docker/monitoring/alerts.yml`                              |
+| Loki       | 9        | `docker/monitoring/loki-rules/fake/rules.yml`               |
+| Grafana    | 25       | `docker/monitoring/grafana/provisioning/alerting/rules.yml` |
 
 **Notification**: Tất cả Grafana unified alerts → Discord webhook qua contact point `discord-ivf`.
 
@@ -2759,12 +2762,12 @@ echo "=== Deployment Complete — Zero Downtime ==="
 
 ```yaml
 # Prometheus alerts (docker/monitoring/alerts.yml)
-- alert: ApiDown                    # API instance unreachable (critical, 1m)
-- alert: ErrorRateCritical          # 5xx > 5% (critical, 3m)
-- alert: HighLatencyCritical        # P95 > 3s (critical, 3m)
-- alert: PostgresDown               # PostgreSQL unreachable (critical, 1m)
-- alert: RedisRejectedConnections   # Redis rejecting (critical, 0m)
-- alert: MinioDiskCritical          # Disk > 90% (critical, 5m)
+- alert: ApiDown # API instance unreachable (critical, 1m)
+- alert: ErrorRateCritical # 5xx > 5% (critical, 3m)
+- alert: HighLatencyCritical # P95 > 3s (critical, 3m)
+- alert: PostgresDown # PostgreSQL unreachable (critical, 1m)
+- alert: RedisRejectedConnections # Redis rejecting (critical, 0m)
+- alert: MinioDiskCritical # Disk > 90% (critical, 5m)
 ```
 
 ---

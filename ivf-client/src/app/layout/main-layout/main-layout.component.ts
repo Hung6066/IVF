@@ -62,6 +62,7 @@ const FALLBACK_MENU: MenuSection[] = [
     items: [
       { icon: '👥', label: 'Người dùng', route: '/admin/users', permission: 'ManageUsers' },
       { icon: '🔐', label: 'Phân quyền', route: '/admin/permissions', adminOnly: true },
+      { icon: '⚙️', label: 'Cấu hình quyền', route: '/admin/permission-config', adminOnly: true },
       { icon: '📋', label: 'Danh mục DV', route: '/admin/services', adminOnly: true },
       { icon: '📝', label: 'Biểu mẫu', route: '/forms', adminOnly: true },
       { icon: '📁', label: 'Danh mục BM', route: '/forms/categories', adminOnly: true },

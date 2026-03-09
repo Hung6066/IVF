@@ -12,6 +12,7 @@
           <option [value]="g">{{ g }}</option>
         }
       </select>
+      <button class="btn btn-success" (click)="openQuickGroup()">⚡ Tạo nhanh nhóm</button>
       <button class="btn btn-primary" (click)="openAdd()"><span>＋</span> Thêm quyền</button>
     </div>
   </div>
@@ -68,6 +69,43 @@
                 </td>
               </tr>
             }
+            <!-- Inline quick-add row -->
+            <tr class="quick-add-row">
+              <td class="col-code">
+                <input
+                  type="text"
+                  class="inline-input"
+                  [(ngModel)]="inlineAdd[group.groupCode + '_code']"
+                  placeholder="Mã quyền"
+                  (keyup.enter)="quickAddToGroup(group)"
+                />
+              </td>
+              <td class="col-name">
+                <input
+                  type="text"
+                  class="inline-input flex-fill"
+                  [(ngModel)]="inlineAdd[group.groupCode + '_name']"
+                  placeholder="Tên hiển thị..."
+                  (keyup.enter)="quickAddToGroup(group)"
+                />
+              </td>
+              <td class="col-sort"></td>
+              <td class="col-status"></td>
+              <td class="col-actions">
+                <button
+                  class="btn-icon btn-add-inline"
+                  title="Thêm nhanh"
+                  (click)="quickAddToGroup(group)"
+                  [disabled]="
+                    !inlineAdd[group.groupCode + '_code'] ||
+                    !inlineAdd[group.groupCode + '_name'] ||
+                    saving()
+                  "
+                >
+                  ➕
+                </button>
+              </td>
+            </tr>
           </tbody>
         </table>
       </div>
@@ -80,6 +118,130 @@
     </div>
   }
 </div>
+
+<!-- Quick Group Modal -->
+@if (showQuickGroupModal) {
+  <div class="modal-backdrop" (click)="closeQuickGroup()">
+    <div class="modal-content modal-large" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>⚡ Tạo nhanh nhóm quyền</h3>
+        <button class="btn-close" (click)="closeQuickGroup()">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Group info -->
+        <div class="quick-group-info">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Icon nhóm</label>
+              <input
+                type="text"
+                [(ngModel)]="quickGroupData.groupIcon"
+                placeholder="📋"
+                class="form-control icon-input"
+              />
+            </div>
+            <div class="form-group flex-2">
+              <label>Tên nhóm <span class="required">*</span></label>
+              <input
+                type="text"
+                [(ngModel)]="quickGroupData.groupDisplayName"
+                placeholder="VD: Quản lý bệnh nhân"
+                class="form-control"
+                (ngModelChange)="autoGenerateGroupCode()"
+              />
+            </div>
+            <div class="form-group">
+              <label>Mã nhóm <span class="required">*</span></label>
+              <input
+                type="text"
+                [(ngModel)]="quickGroupData.groupCode"
+                placeholder="VD: patient"
+                class="form-control"
+              />
+            </div>
+            <div class="form-group">
+              <label>Thứ tự nhóm</label>
+              <input
+                type="number"
+                [(ngModel)]="quickGroupData.groupSortOrder"
+                class="form-control"
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- Permissions list -->
+        <div class="quick-perms-header">
+          <h4>🔑 Danh sách quyền ({{ quickGroupData.permissions.length }})</h4>
+          <button class="btn btn-sm btn-secondary" (click)="addQuickPermission()">
+            + Thêm quyền
+          </button>
+        </div>
+
+        <div class="quick-perms-list">
+          @for (perm of quickGroupData.permissions; track $index) {
+            <div class="quick-perm-row">
+              <span class="perm-index">{{ $index + 1 }}</span>
+              <input
+                type="text"
+                [(ngModel)]="perm.code"
+                placeholder="ViewPatients"
+                class="form-control"
+              />
+              <input
+                type="text"
+                [(ngModel)]="perm.displayName"
+                placeholder="Xem bệnh nhân"
+                class="form-control flex-2"
+              />
+              <button
+                class="btn-icon btn-danger"
+                title="Xoá"
+                (click)="removeQuickPermission($index)"
+                [disabled]="quickGroupData.permissions.length <= 1"
+              >
+                ✕
+              </button>
+            </div>
+          }
+        </div>
+
+        <!-- Quick templates -->
+        <div class="quick-templates">
+          <span class="template-label">Tạo nhanh:</span>
+          <button class="btn btn-sm btn-outline" (click)="applyTemplate('crud')">
+            CRUD (Xem + Quản lý)
+          </button>
+          <button class="btn btn-sm btn-outline" (click)="applyTemplate('full')">
+            Đầy đủ (Xem + Tạo + Sửa + Xoá)
+          </button>
+          <button class="btn btn-sm btn-outline" (click)="applyTemplate('report')">
+            Báo cáo (Xem + Xuất)
+          </button>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <span class="quick-summary" [class.error]="!isQuickGroupValid()">
+          @if (isQuickGroupValid()) {
+            ✅ {{ quickGroupData.permissions.length }} quyền sẵn sàng
+          } @else {
+            ⚠️ Điền đầy đủ thông tin nhóm và ít nhất 1 quyền
+          }
+        </span>
+        <button class="btn btn-secondary" (click)="closeQuickGroup()">Huỷ</button>
+        <button
+          class="btn btn-primary"
+          (click)="saveQuickGroup()"
+          [disabled]="saving() || !isQuickGroupValid()"
+        >
+          {{ saving() ? 'Đang tạo...' : '⚡ Tạo ' + quickGroupData.permissions.length + ' quyền' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
 
 <!-- Modal -->
 @if (showModal) {

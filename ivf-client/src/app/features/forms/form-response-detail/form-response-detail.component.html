@@ -52,6 +52,15 @@
           Ký số
         </button>
         <button class="btn btn-danger-outline" (click)="deleteResponse()">🗑️ Xóa</button>
+        @if (
+          signingStatus &&
+          signingStatus.signatures.length > 0 &&
+          signingStatus.permissions?.canRequestAmendment
+        ) {
+          <button class="btn btn-warning" (click)="showAmendmentRequest = true">
+            📝 Yêu cầu chỉnh sửa
+          </button>
+        }
       </div>
     </header>
 
@@ -119,19 +128,21 @@
               </div>
               <div class="role-actions">
                 @if (!isRoleSigned(role)) {
-                  <button
-                    class="btn btn-primary btn-sm"
-                    (click)="signForRole(role)"
-                    [disabled]="isSigning"
-                  >
-                    @if (isSigning) {
-                      <span class="btn-spinner"></span>
-                    }
-                    Ký
-                  </button>
+                  @if (signingStatus.permissions?.canSign) {
+                    <button
+                      class="btn btn-primary btn-sm"
+                      (click)="signForRole(role)"
+                      [disabled]="isSigning"
+                    >
+                      @if (isSigning) {
+                        <span class="btn-spinner"></span>
+                      }
+                      Ký
+                    </button>
+                  }
                 } @else {
                   @let signerForRevoke = getSignerForRole(role);
-                  @if (signerForRevoke) {
+                  @if (signerForRevoke && canRevokeSignature(signerForRevoke)) {
                     <button
                       class="btn btn-danger-outline btn-sm"
                       (click)="revokeSignature(signerForRevoke)"
@@ -146,6 +157,11 @@
           }
         </div>
       </div>
+    }
+
+    <!-- Amendment History -->
+    @if (response) {
+      <app-amendment-history [formResponseId]="response.id"></app-amendment-history>
     }
 
     @if (
@@ -240,6 +256,17 @@
           </div>
         </div>
       </div>
+    }
+
+    <!-- Amendment Request Modal -->
+    @if (showAmendmentRequest && response && template) {
+      <app-amendment-request
+        [formResponseId]="response.id"
+        [fields]="template.fields || []"
+        [fieldValues]="response.fieldValues || []"
+        (closed)="showAmendmentRequest = false"
+        (submitted)="onAmendmentSubmitted()"
+      ></app-amendment-request>
     }
   } @else {
     <div class="loading">

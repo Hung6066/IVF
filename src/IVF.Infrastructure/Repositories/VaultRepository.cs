@@ -312,7 +312,7 @@ public class VaultRepository : IVaultRepository
     {
         var query = _db.VaultAuditLogs.AsQueryable();
         if (!string.IsNullOrEmpty(action))
-            query = query.Where(a => a.Action == action);
+            query = query.Where(a => a.Action.StartsWith(action));
         return await query
             .OrderByDescending(a => a.CreatedAt)
             .Skip((page - 1) * pageSize)
@@ -330,7 +330,7 @@ public class VaultRepository : IVaultRepository
     {
         var query = _db.VaultAuditLogs.AsQueryable();
         if (!string.IsNullOrEmpty(action))
-            query = query.Where(a => a.Action == action);
+            query = query.Where(a => a.Action.StartsWith(action));
         return await query.CountAsync(ct);
     }
 

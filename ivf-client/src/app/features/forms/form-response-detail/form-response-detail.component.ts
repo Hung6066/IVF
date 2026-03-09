@@ -14,11 +14,19 @@ import {
   SigningStatus,
   DocumentSignatureInfo,
 } from '../forms.service';
+import { AmendmentHistoryComponent } from '../amendment-history/amendment-history.component';
+import { AmendmentRequestComponent } from '../amendment-request/amendment-request.component';
 
 @Component({
   selector: 'app-form-response-detail',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [
+    CommonModule,
+    FormsModule,
+    RouterLink,
+    AmendmentHistoryComponent,
+    AmendmentRequestComponent,
+  ],
   templateUrl: './form-response-detail.component.html',
   styleUrls: ['./form-response-detail.component.scss'],
 })
@@ -48,6 +56,9 @@ export class FormResponseDetailComponent implements OnInit {
   signingStatus: SigningStatus | null = null;
   isSigning = false;
   showSigningPanel = false;
+
+  // Amendment
+  showAmendmentRequest = false;
 
   // Status workflow steps
   get workflowSteps() {
@@ -136,6 +147,13 @@ export class FormResponseDetailComponent implements OnInit {
     });
   }
 
+  onAmendmentSubmitted() {
+    this.showAmendmentRequest = false;
+    if (this.response) {
+      this.loadSigningStatus(this.response.id);
+    }
+  }
+
   getRoleLabel(role: string): string {
     const labels: Record<string, string> = {
       technician: 'Kỹ thuật viên',
@@ -149,6 +167,15 @@ export class FormResponseDetailComponent implements OnInit {
 
   isRoleSigned(role: string): boolean {
     return this.signingStatus?.signatures?.some((s) => s.signatureRole === role) ?? false;
+  }
+
+  canRevokeSignature(sig: DocumentSignatureInfo): boolean {
+    if (!this.signingStatus?.permissions) return false;
+    const perms = this.signingStatus.permissions;
+    // Admin can revoke any signature
+    if (perms.isAdmin) return true;
+    // User can revoke their own signature if they have revoke permission
+    return perms.canRevoke && sig.userId === this.signingStatus.currentUserId;
   }
 
   getSignerForRole(role: string): DocumentSignatureInfo | undefined {

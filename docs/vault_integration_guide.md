@@ -38,6 +38,7 @@
 28. [Vault Disaster Recovery](#28-vault-disaster-recovery)
 29. [Multi-Provider Unseal](#29-multi-provider-unseal)
 30. [Test Coverage](#30-test-coverage)
+31. [Webhook Alert Authentication & Auto-Rotation](#31-webhook-alert-authentication--auto-rotation)
 
 ---
 
@@ -188,6 +189,7 @@
 | -------------------------------- | -------- | ------------------------------------------------------------------------------- |
 | **VaultLeaseMaintenanceService** | Hosted   | Auto-revoke expired leases, credentials, tokens mỗi 5 phút                      |
 | **CertAutoRenewalService**       | Hosted   | Kiểm tra certificate expiry, escalating warnings (30/14/7/1 ngày), auto-renewal |
+| **WebhookKeyRotationService**    | Hosted   | Tự động tạo và xoay vault token cho webhook alerts (mặc định 24h)               |
 
 ### Mô hình mã hóa (Envelope Encryption)
 
@@ -1871,6 +1873,17 @@ Tất cả endpoint thuộc nhóm `/api/keyvault/` yêu cầu **AdminOnly** auth
 | `GET`  | `/settings` | Đọc cấu hình vault + Azure KV              |
 | `POST` | `/settings` | Cập nhật settings (clientSecret encrypted) |
 
+### Alert Webhooks (Vault Token — `X-Webhook-Token`)
+
+| Method | Path                              | Mô tả                                               |
+| ------ | --------------------------------- | --------------------------------------------------- |
+| `POST` | `/api/webhooks/alerts/grafana`    | Nhận alert từ Grafana unified alerting → Discord    |
+| `POST` | `/api/webhooks/alerts/prometheus` | Nhận alert từ Prometheus Alertmanager → Discord     |
+| `POST` | `/api/webhooks/alerts/`           | Generic alert `{source, message, level}` hoặc array |
+| `GET`  | `/api/webhooks/alerts/health`     | Health check webhook endpoint                       |
+
+> **Xác thực**: Header `X-Webhook-Token` với vault token có policy `webhook-alerts`. Token được tự động tạo và xoay bởi `WebhookKeyRotationService`. Lấy token hiện tại: `GET /api/keyvault/secrets` → path `webhooks/alert-token`.
+
 ### Auto-Unseal (AdminOnly)
 
 | Method | Path                     | Mô tả                  |
@@ -3136,3 +3149,644 @@ dotnet test --filter "FullyQualifiedName~ComplianceScoringEngine"
 # Chạy test với coverage
 dotnet test --collect:"XPlat Code Coverage"
 ```
+
+---
+
+## 31. Webhook Alert Authentication & Auto-Rotation
+
+### 31.1 Tổng quan
+
+> **⚠️ Trạng thái hiện tại**: Webhook là kênh **bổ sung tùy chọn** (optional supplementary channel), **chưa được áp dụng** trong hệ thống production. Hiện tại các kênh alert đang hoạt động là:
+>
+> - **Grafana Unified Alerting** (25 rules) → gửi **trực tiếp** tới Discord qua contact point `discord-ivf`
+> - **App-level** (`InfrastructureMetricsPusher`) → gửi **trực tiếp** tới Discord qua `DiscordAlertService` mỗi 15s
+> - **Prometheus** (31 rules) → chỉ evaluate, **chưa deploy Alertmanager** (Grafana đã duplicate coverage)
+
+> **⚠️ Lưu ý quan trọng**: Webhook **KHÔNG phù hợp** cho Grafana/Prometheus vì chúng lưu static token trong config — mỗi lần token rotation phải cập nhật config thủ công. Webhook chỉ thực sự hữu ích khi client có khả năng **tự pull token** trước khi gửi alert (custom script, CI/CD pipeline, hoặc hệ thống ngoài gọi API).
+
+Hệ thống expose các webhook endpoint tại `/api/webhooks/alerts/*` để nhận alert từ **programmatic clients** — các hệ thống có khả năng tự lấy token qua API trước khi gửi alert. Alert được forward tới Discord qua `DiscordAlertService`.
+
+**Luồng 2 bước (pull-then-send)**:
+
+1. Client gọi `GET /api/keyvault/secrets/webhooks%2Falert-token` (cần JWT) → lấy token hiện tại
+2. Client gọi `POST /api/webhooks/alerts/` với header `X-Webhook-Token: <token>` → gửi alert
+
+Webhook được bảo vệ bằng **Vault Token** — thay vì JWT hay API Key — với tính năng **tự động xoay token** (auto-rotation) mỗi 24h. Client tự pull token mới trước mỗi lần gửi → không bao giờ bị lỗi do token hết hạn.
+
+**Files liên quan**:
+
+| File                                              | Mô tả                                 |
+| ------------------------------------------------- | ------------------------------------- |
+| `IVF.API/Endpoints/AlertWebhookEndpoints.cs`      | 4 endpoints nhận alert từ bên ngoài   |
+| `IVF.API/Services/WebhookKeyRotationService.cs`   | Background service tự động xoay token |
+| `IVF.API/Services/DiscordAlertService.cs`         | Gửi alert tới Discord (rate-limited)  |
+| `IVF.Application/Interfaces/IVaultTokenValidator` | Validate vault token (SHA-256 hash)   |
+| `IVF.Domain/Entities/VaultToken.cs`               | Entity token với TTL, policies, uses  |
+
+### 31.2 Kiến trúc tổng thể
+
+```
+┌──────────────────────────────────────────────────┐
+│   Programmatic Client                             │
+│   (Custom script, CI/CD pipeline, external system)│
+└────────┬─────────────────────────────────────────┘
+         │
+         │  STEP 1: GET /api/keyvault/secrets/webhooks%2Falert-token
+         │          Header: Authorization: Bearer <JWT>
+         │          → Response: { "value": "<current-token>" }
+         │
+         │  STEP 2: POST /api/webhooks/alerts/
+         │          Header: X-Webhook-Token: <current-token>
+         │          Body: { source, message, level }
+         │
+         ▼
+┌──────────────────────────────────────────────────────────────────┐
+│  /api/webhooks/alerts/{grafana|prometheus|}                      │
+│  AlertWebhookEndpoints.cs                                       │
+│                                                                  │
+│  1. Validate X-Webhook-Token → IVaultTokenValidator              │
+│  2. Check policy 'webhook-alerts'                                │
+│  3. Parse alert payload (Grafana/Prometheus/Generic format)      │
+│  4. Forward → DiscordAlertService → Discord Channel              │
+└──────────────────────────────────────────────────────────────────┘
+         ▲
+         │ Token auto-created & rotated
+┌────────┴─────────────────────────────────────────────────────────┐
+│  WebhookKeyRotationService (BackgroundService)                   │
+│                                                                  │
+│  • Startup: tạo vault token + lưu vào vault secret               │
+│  • Mỗi 24h: tạo token mới → cập nhật secret → revoke token cũ   │
+│  • Token TTL: 48h (overlap để tránh gap khi rotation)            │
+│  • Secret path: webhooks/alert-token                             │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+### 31.3 Luồng xử lý chi tiết
+
+#### 31.3.1 Luồng khởi động (Startup Flow)
+
+```
+App Start
+    │
+    ▼ (15s delay — chờ DB, Vault sẵn sàng)
+WebhookKeyRotationService.ExecuteAsync()
+    │
+    ▼
+EnsureWebhookTokenAsync()
+    │
+    ├─ GetSecretAsync("webhooks/alert-token")
+    │       │
+    │       ├─ Secret tồn tại?
+    │       │   ├─ YES → SHA-256(secret.Value) → GetTokenByHashAsync()
+    │       │   │         ├─ Token IsValid? → YES → Log & return (giữ nguyên)
+    │       │   │         └─ Token hết hạn/revoked → tạo mới ↓
+    │       │   └─ NO → tạo mới ↓
+    │       │
+    │       ▼
+    │  CreateNewWebhookTokenAsync()
+    │       │
+    │       ├─ 1. RandomNumberGenerator.GetBytes(32) → Base64 rawToken
+    │       ├─ 2. SHA-256 hash → tokenHash
+    │       ├─ 3. VaultToken.Create(tokenHash, "webhook-alert-token",
+    │       │         policies: ["webhook-alerts"], TTL: 48h)
+    │       ├─ 4. repo.AddTokenAsync(token) → lưu DB
+    │       ├─ 5. secretService.PutSecretAsync("webhooks/alert-token", rawToken)
+    │       │         → mã hóa AES-256-GCM → lưu DB (auto-version)
+    │       └─ 6. Audit log: "webhook-token.create"
+    │
+    ▼
+Task.Delay(24h) → chờ tới chu kỳ rotation tiếp theo
+```
+
+#### 31.3.2 Luồng xoay token (Rotation Flow — mỗi 24h)
+
+```
+RotateWebhookTokenAsync()
+    │
+    ├─ 1. Lấy tất cả token chưa revoke có displayName = "webhook-alert-token"
+    │
+    ├─ 2. CreateNewWebhookTokenAsync() → tạo token MỚI trước
+    │     (đảm bảo không có khoảng trống — token cũ vẫn valid)
+    │
+    ├─ 3. Revoke tất cả token CŨ (repo.RevokeTokenAsync)
+    │     → token.Revoked = true, token.RevokedAt = now
+    │
+    ├─ 4. Audit log: "webhook-token.rotate" + revokedCount
+    │
+    └─ 5. Log: "Webhook token rotated successfully"
+```
+
+**Timeline minh họa**:
+
+```
+ T=0          T=24h         T=48h         T=72h
+  │            │              │              │
+  ▼            ▼              ▼              ▼
+Token A ─────[TTL 48h]───────X (expire)
+  ├── active ──┤
+               │
+         Token B ─────[TTL 48h]───────X
+           ├── active ──┤
+               │  ↑
+               │  Token A revoked tại đây
+               │
+                     Token C ─────[TTL 48h]───X
+                       ├── active ──┤
+
+Overlap 24h: vừa đủ cho external systems cập nhật token mới
+```
+
+#### 31.3.3 Luồng nhận alert (Request Flow)
+
+```
+External System (Grafana/Prometheus/Custom)
+    │
+    │  POST /api/webhooks/alerts/grafana
+    │  Header: X-Webhook-Token: <rawToken>
+    │  Body: { "status": "firing", "alerts": [...] }
+    │
+    ▼
+AlertWebhookEndpoints.HandleGrafanaWebhook()
+    │
+    ├─ STEP 1: ValidateWebhookToken()
+    │     ├─ Đọc header X-Webhook-Token
+    │     │   └─ Thiếu? → 401 + log warning (IP)
+    │     │
+    │     ├─ IVaultTokenValidator.ValidateTokenAsync(rawToken)
+    │     │   ├─ SHA-256(rawToken) → tokenHash
+    │     │   ├─ repo.GetTokenByHashAsync(tokenHash)
+    │     │   ├─ Kiểm tra: !Revoked && !IsExpired && !IsExhausted
+    │     │   ├─ token.IncrementUse() → UsesCount++, LastUsedAt = now
+    │     │   └─ Invalid? → 401 + log warning (IP)
+    │     │
+    │     └─ Kiểm tra policies chứa "webhook-alerts"
+    │         └─ Missing? → 401 + log warning (Accessor, IP)
+    │
+    ├─ STEP 2: Parse payload
+    │     ├─ body.alerts[] → iterate
+    │     ├─ Mỗi alert:
+    │     │   ├─ labels.alertname → source name
+    │     │   ├─ labels.severity → "critical" | "warning"
+    │     │   ├─ annotations.summary → message (ưu tiên)
+    │     │   ├─ annotations.description → message (fallback)
+    │     │   └─ status → "firing" | "resolved"
+    │     │
+    │     └─ Resolved alerts: prefix "✅ ĐÃ KHẮC PHỤC: "
+    │
+    ├─ STEP 3: Forward tới Discord
+    │     ├─ DiscordAlertService.SendAlertAsync(source, message, level)
+    │     │   ├─ Discord disabled? → skip
+    │     │   ├─ MinLevel filter: Discord:MinLevel = "warning"
+    │     │   │   └─ MinLevel = "critical" → chỉ gửi critical
+    │     │   ├─ Rate limit: 1 alert/source/5 phút (CooldownPeriod)
+    │     │   │   └─ Trùng source trong 5 phút → skip (tránh flood)
+    │     │   └─ Gửi Discord embed:
+    │     │       ├─ 🔴 NGHIÊM TRỌNG (critical, color: #DC2626)
+    │     │       └─ ⚠️ CẢNH BÁO (warning, color: #F59E0B)
+    │     │
+    │     └─ Footer: "IVF Infrastructure Monitor", fields: Nguồn, Mức độ, Hostname
+    │
+    └─ STEP 4: Response
+          ├─ 200 OK: { success: true, processed: N, status: "firing" }
+          ├─ 400 Bad Request: thiếu alerts array
+          └─ 500 Internal Error: exception khi parse
+```
+
+#### 31.3.4 Discord Embed Output
+
+Khi alert được gửi thành công, Discord sẽ hiển thị embed:
+
+```
+┌─────────────────────────────────────────────────┐
+│ 🔴 NGHIÊM TRỌNG: Grafana: APIDown              │
+│                                                  │
+│ API instance unreachable for more than 1 minute  │
+│                                                  │
+│ Nguồn: Grafana: APIDown  │ Mức độ: NGHIÊM TRỌNG │
+│ Hostname: ivf-api-prod                           │
+│                                                  │
+│     IVF Infrastructure Monitor • 2026-03-09T10:00│
+└─────────────────────────────────────────────────┘
+```
+
+Khi alert resolved:
+
+```
+┌─────────────────────────────────────────────────┐
+│ ⚠️ CẢNH BÁO: Grafana: APIDown                   │
+│                                                  │
+│ ✅ ĐÃ KHẮC PHỤC: API instance is back online    │
+│                                                  │
+│ Nguồn: Grafana: APIDown  │ Mức độ: CẢNH BÁO     │
+│ Hostname: ivf-api-prod                           │
+│                                                  │
+│     IVF Infrastructure Monitor • 2026-03-09T10:05│
+└─────────────────────────────────────────────────┘
+```
+
+### 31.4 Webhook Endpoints
+
+| Method | Path                              | Auth              | Mô tả                              |
+| ------ | --------------------------------- | ----------------- | ---------------------------------- |
+| `POST` | `/api/webhooks/alerts/grafana`    | `X-Webhook-Token` | Grafana unified alerting           |
+| `POST` | `/api/webhooks/alerts/prometheus` | `X-Webhook-Token` | Prometheus Alertmanager            |
+| `POST` | `/api/webhooks/alerts/`           | `X-Webhook-Token` | Generic `{source, message, level}` |
+| `GET`  | `/api/webhooks/alerts/health`     | Không cần         | Health check                       |
+
+#### Grafana Webhook (`POST /api/webhooks/alerts/grafana`)
+
+Nhận payload từ Grafana unified alerting:
+
+```json
+{
+  "status": "firing",
+  "alerts": [
+    {
+      "status": "firing",
+      "labels": { "alertname": "APIDown", "severity": "critical" },
+      "annotations": {
+        "summary": "API instance unreachable",
+        "description": "Instance api:5000 has been down for more than 1 minute"
+      },
+      "startsAt": "2026-03-09T10:00:00Z",
+      "endsAt": "0001-01-01T00:00:00Z"
+    }
+  ]
+}
+```
+
+**Xử lý**:
+
+- `labels.alertname` → tên nguồn (source) cho Discord
+- `labels.severity` → `"critical"` hoặc `"warning"` (mặc định warning)
+- `annotations.summary` → message (ưu tiên), fallback `annotations.description`
+- `status = "resolved"` → prefix `"✅ ĐÃ KHẮC PHỤC: "` trước message
+
+**Response**:
+
+```json
+{ "success": true, "processed": 1, "status": "firing" }
+```
+
+#### Prometheus Alertmanager Webhook (`POST /api/webhooks/alerts/prometheus`)
+
+Cùng format với Grafana (Alertmanager webhook format tương tự). Xử lý giống hệt, chỉ khác prefix source: `"Prometheus: {alertname}"` thay vì `"Grafana: {alertname}"`.
+
+#### Generic Webhook (`POST /api/webhooks/alerts/`)
+
+Đơn giản hóa cho custom integrations:
+
+```json
+{
+  "source": "Custom Monitor",
+  "message": "Disk full on backup server",
+  "level": "critical"
+}
+```
+
+Hoặc array:
+
+```json
+[
+  { "source": "Monitor A", "message": "Alert 1", "level": "warning" },
+  { "source": "Monitor B", "message": "Alert 2", "level": "critical" }
+]
+```
+
+**Fields**:
+
+| Field     | Required | Mặc định     | Mô tả                         |
+| --------- | -------- | ------------ | ----------------------------- |
+| `source`  | Không    | `"External"` | Tên nguồn gửi alert           |
+| `message` | Có       | —            | Nội dung alert                |
+| `level`   | Không    | `"warning"`  | `"warning"` hoặc `"critical"` |
+
+### 31.5 Xác thực Webhook Token
+
+Mọi request tới `/api/webhooks/alerts/*` (trừ `/health`) phải kèm header:
+
+```
+X-Webhook-Token: <vault-token>
+```
+
+#### Quy trình validate (ValidateWebhookToken)
+
+```csharp
+// 1. Đọc header
+var token = ctx.Request.Headers["X-Webhook-Token"].FirstOrDefault();
+// Thiếu? → log warning + return false → 401
+
+// 2. Validate qua IVaultTokenValidator
+var result = await validator.ValidateTokenAsync(token);
+//   Bên trong:
+//   - SHA-256(rawToken) → tokenHash
+//   - SELECT FROM vault_tokens WHERE token_hash = @tokenHash
+//   - Check: !Revoked && !IsExpired && !IsExhausted
+//   - token.IncrementUse() → UsesCount++, LastUsedAt = now
+//   - Save changes
+// Invalid? → log warning + return false → 401
+
+// 3. Kiểm tra policy
+if (!result.Policies.Contains("webhook-alerts"))
+//   → log warning + return false → 401
+```
+
+#### Tại sao dùng AllowAnonymous + handler-level auth?
+
+- Endpoint **không thể dùng JWT** vì caller là hệ thống monitoring bên ngoài (Grafana, Prometheus), không có user session
+- Endpoint **không dùng VaultTokenMiddleware** vì middleware đó áp dụng cho mọi request và tạo ClaimsPrincipal — webhook chỉ cần kiểm tra token đúng policy
+- Auth logic **nằm trong handler** để kiểm tra chính xác policy `webhook-alerts`, không cần full middleware pipeline
+
+### 31.6 Auto-Rotation
+
+**File**: `IVF.API/Services/WebhookKeyRotationService.cs`
+
+#### Cấu hình
+
+| Key (appsettings.json)          | Mặc định | Mô tả                                        |
+| ------------------------------- | -------- | -------------------------------------------- |
+| `Webhook:RotationIntervalHours` | 24       | Chu kỳ xoay token (giờ)                      |
+| `Webhook:TokenTtlHours`         | 48       | TTL của token (giờ) — **> RotationInterval** |
+
+```json
+// appsettings.json (tùy chọn — không bắt buộc, có mặc định)
+{
+  "Webhook": {
+    "RotationIntervalHours": 24,
+    "TokenTtlHours": 48
+  }
+}
+```
+
+> **Quan trọng**: `TokenTtlHours` phải > `RotationIntervalHours` để luôn có overlap. Mặc định 48 > 24 → 24h overlap.
+
+#### Quy trình xoay chi tiết
+
+**Bước 1 — Startup (EnsureWebhookTokenAsync)**:
+
+```
+1. Tạo DI scope mới (scoped services: IVaultRepository, IVaultSecretService)
+2. GetSecretAsync("webhooks/alert-token")
+   → Giải mã (AES-256-GCM envelope encryption) → lấy rawToken plaintext
+3. SHA-256(rawToken) → tokenHash
+4. GetTokenByHashAsync(tokenHash) → tìm token entity trong DB
+5. Nếu token.IsValid == true → giữ nguyên, log info, return
+6. Nếu token hết hạn/revoked/không tồn tại → CreateNewWebhookTokenAsync()
+```
+
+**Bước 2 — Tạo token mới (CreateNewWebhookTokenAsync)**:
+
+```
+1. rawToken = Base64(RandomNumberGenerator.GetBytes(32))     // 32 bytes = 256 bit entropy
+2. tokenHash = Hex(SHA-256(rawToken))                         // Chỉ lưu hash, không lưu plaintext
+3. VaultToken.Create(tokenHash, "webhook-alert-token",
+     policies: ["webhook-alerts"], type: "service", ttl: 172800s)
+4. repo.AddTokenAsync(token)                                  // Lưu vào vault_tokens
+5. secretService.PutSecretAsync("webhooks/alert-token", rawToken)
+     → DEK encrypt (AES-256-GCM) → KEK wrap → lưu vào vault_secrets
+     → Auto-version (v1, v2, v3...)
+6. Audit log: { action: "webhook-token.create", accessor, ttl }
+```
+
+**Bước 3 — Rotation (RotateWebhookTokenAsync — mỗi 24h)**:
+
+```
+1. Lấy danh sách token cũ:
+   repo.GetTokensAsync(includeRevoked: false)
+     .Where(t => t.DisplayName == "webhook-alert-token" && t.IsValid)
+
+2. Tạo token MỚI trước (zero-downtime):
+   CreateNewWebhookTokenAsync() → token mới active
+   (Token cũ vẫn valid → external systems vẫn hoạt động)
+
+3. Revoke token cũ:
+   foreach (old in oldTokens)
+     repo.RevokeTokenAsync(old.Id) → Revoked=true, RevokedAt=now
+
+4. Audit log: { action: "webhook-token.rotate", revokedCount: N }
+```
+
+### 31.7 Cách áp dụng — Hướng dẫn từng bước
+
+#### Bước 1: Đảm bảo prerequisites
+
+```bash
+# 1a. Discord webhook đã cấu hình
+grep -q "Discord:Enabled" src/IVF.API/appsettings.json
+# Cần:
+# "Discord": { "Enabled": true, "WebhookUrl": "https://discord.com/api/webhooks/...", "MinLevel": "warning" }
+
+# 1b. Vault đã khởi tạo (có master key)
+curl -s http://localhost:5000/api/keyvault/health -H "Authorization: Bearer $JWT"
+# → { "connected": true }
+```
+
+#### Bước 2: Khởi động API — token tự động tạo
+
+Khi API khởi động, `WebhookKeyRotationService` tự động:
+
+- Chờ 15s (đợi DB sẵn sàng)
+- Kiểm tra/tạo vault token với policy `webhook-alerts`
+- Lưu token plaintext vào vault secret `webhooks/alert-token`
+
+```bash
+# Kiểm tra token đã được tạo:
+curl -s http://localhost:5000/api/keyvault/tokens \
+  -H "Authorization: Bearer $JWT" | jq '.[] | select(.displayName == "webhook-alert-token")'
+
+# Output:
+# {
+#   "id": "...",
+#   "accessor": "accessor_a1b2c3d4e...",
+#   "displayName": "webhook-alert-token",
+#   "policies": ["webhook-alerts"],
+#   "tokenType": "service",
+#   "ttl": 172800,
+#   "expiresAt": "2026-03-11T10:00:15Z",
+#   "isValid": true
+# }
+```
+
+#### Bước 3: Lấy webhook token
+
+```bash
+# Lấy token plaintext (cần JWT admin)
+WEBHOOK_TOKEN=$(curl -s http://localhost:5000/api/keyvault/secrets/webhooks%2Falert-token \
+  -H "Authorization: Bearer $JWT" | jq -r '.value')
+
+echo $WEBHOOK_TOKEN
+# → aBcDeFgHiJkLmNoPqRsTuVwXyZ0123456789ABCD
+```
+
+#### Bước 4: Sử dụng webhook (pull-then-send pattern)
+
+Webhook được thiết kế cho **programmatic clients** — các hệ thống có khả năng tự lấy token qua API trước khi gửi alert.
+
+> **⚠️ KHÔNG dùng cho Grafana/Prometheus**: Các tool này lưu static token trong config, không tự pull token mới khi rotation. Grafana đã gửi trực tiếp tới Discord qua contact point `discord-ivf` — không cần webhook.
+
+**Script mẫu (bash — pull token → send alert)**:
+
+```bash
+#!/bin/bash
+# pull-and-alert.sh — Lấy token mới nhất rồi gửi alert
+# Dùng trong: cron job, CI/CD pipeline, custom monitoring script
+
+API_URL="https://natra.site"
+JWT="<admin-jwt-token>"
+
+# STEP 1: Pull token hiện tại từ vault
+WEBHOOK_TOKEN=$(curl -sf "$API_URL/api/keyvault/secrets/webhooks%2Falert-token" \
+  -H "Authorization: Bearer $JWT" | jq -r '.value')
+
+if [ -z "$WEBHOOK_TOKEN" ] || [ "$WEBHOOK_TOKEN" = "null" ]; then
+  echo "ERROR: Cannot retrieve webhook token"
+  exit 1
+fi
+
+# STEP 2: Gửi alert với token vừa lấy
+curl -sf -X POST "$API_URL/api/webhooks/alerts/" \
+  -H "Content-Type: application/json" \
+  -H "X-Webhook-Token: $WEBHOOK_TOKEN" \
+  -d '{
+    "source": "Custom Monitor",
+    "message": "Disk usage > 90% on backup server",
+    "level": "critical"
+  }'
+# → Discord nhận embed 🔴 NGHIÊM TRỌNG: Custom Monitor
+```
+
+**Script mẫu (PowerShell)**:
+
+```powershell
+# pull-and-alert.ps1
+$ApiUrl = "https://natra.site"
+$Jwt = "<admin-jwt-token>"
+
+# STEP 1: Pull token
+$secret = Invoke-RestMethod -Uri "$ApiUrl/api/keyvault/secrets/webhooks%2Falert-token" `
+  -Headers @{ Authorization = "Bearer $Jwt" }
+$token = $secret.value
+
+# STEP 2: Send alert
+Invoke-RestMethod -Uri "$ApiUrl/api/webhooks/alerts/" -Method POST `
+  -Headers @{ 'X-Webhook-Token' = $token; 'Content-Type' = 'application/json' } `
+  -Body (@{ source = 'CI/CD Pipeline'; message = 'Deploy failed: ivf-api'; level = 'critical' } | ConvertTo-Json)
+```
+
+**Tại sao pattern này an toàn?**
+
+- Token rotation mỗi 24h → client luôn pull token mới nhất trước khi gửi
+- Không cần cập nhật config thủ công khi token xoay
+- JWT dùng để pull token → chỉ admin/service account có quyền
+- Webhook token chỉ dùng để authenticate alert request → tách biệt quyền
+
+#### Bước 5: Test webhook thủ công
+
+```bash
+# Lấy token trước (STEP 1)
+WEBHOOK_TOKEN=$(curl -s http://localhost:5000/api/keyvault/secrets/webhooks%2Falert-token \
+  -H "Authorization: Bearer $JWT" | jq -r '.value')
+
+# Test generic format (STEP 2)
+curl -X POST http://localhost:5000/api/webhooks/alerts/ \
+  -H "Content-Type: application/json" \
+  -H "X-Webhook-Token: $WEBHOOK_TOKEN" \
+  -d '{ "source": "Manual Test", "message": "Test thủ công webhook", "level": "critical" }'
+# → Discord nhận embed 🔴 NGHIÊM TRỌNG: Manual Test
+
+# Test Grafana format (nếu cần test parsing)
+curl -X POST http://localhost:5000/api/webhooks/alerts/grafana \
+  -H "Content-Type: application/json" \
+  -H "X-Webhook-Token: $WEBHOOK_TOKEN" \
+  -d '{
+    "status": "firing",
+    "alerts": [{
+      "status": "firing",
+      "labels": { "alertname": "TestAlert", "severity": "warning" },
+      "annotations": { "summary": "Đây là alert test từ webhook" }
+    }]
+  }'
+# → { "success": true, "processed": 1, "status": "firing" }
+
+# Test với token sai → 401
+curl -X POST http://localhost:5000/api/webhooks/alerts/ \
+  -H "Content-Type: application/json" \
+  -H "X-Webhook-Token: invalid-token" \
+  -d '{"source":"test","message":"test","level":"warning"}'
+# → 401 Unauthorized
+
+# Test health (không cần token)
+curl http://localhost:5000/api/webhooks/alerts/health
+# → { "status": "healthy", "timestamp": "2026-03-09T10:00:00Z" }
+```
+
+#### Bước 6: Xác nhận rotation hoạt động
+
+```bash
+# Xem audit log rotation
+curl -s "http://localhost:5000/api/keyvault/audit-logs?action=webhook-token" \
+  -H "Authorization: Bearer $JWT" | jq '.items[] | { action, createdAt, details }'
+
+# Output:
+# { "action": "webhook-token.create", "createdAt": "2026-03-09T10:00:15Z", "details": "{\"accessor\":\"accessor_abc...\",\"ttl\":172800}" }
+# { "action": "webhook-token.rotate", "createdAt": "2026-03-10T10:00:15Z", "details": "{\"revokedCount\":1}" }
+
+# Xem lịch sử versions của secret
+curl -s "http://localhost:5000/api/keyvault/secrets-versions/webhooks%2Falert-token" \
+  -H "Authorization: Bearer $JWT" | jq '.[] | { version, createdAt }'
+# → v1 (initial), v2 (1st rotation), v3 (2nd rotation)...
+```
+
+### 31.8 Rate Limiting & Deduplication
+
+`DiscordAlertService` áp dụng rate limiting tự động:
+
+| Cơ chế           | Chi tiết                                                               |
+| ---------------- | ---------------------------------------------------------------------- |
+| **Per-source**   | Tối đa 1 alert/source/5 phút (CooldownPeriod = 5 min)                  |
+| **Level filter** | Cấu hình `Discord:MinLevel` = `"warning"` (mặc định) hoặc `"critical"` |
+| **Dedup key**    | `source` string: `"Grafana: APIDown"`, `"Prometheus: HighLatency"`     |
+
+**Ví dụ**: Nếu Grafana gửi alert `APIDown` 10 lần trong 5 phút → Discord chỉ nhận **1 lần** (9 lần bị skip vì cooldown).
+
+### 31.9 Audit Trail
+
+Mọi thao tác webhook token được ghi vào `vault_audit_logs`:
+
+| Action                 | ResourceType | Trigger            | Chi tiết audit                         |
+| ---------------------- | ------------ | ------------------ | -------------------------------------- |
+| `webhook-token.create` | `Token`      | Startup / Rotation | `accessor`, `ttl`                      |
+| `webhook-token.rotate` | `Token`      | Mỗi 24h (định kỳ)  | `revokedCount` — số token cũ bị revoke |
+
+Ngoài ra, mỗi lần token được dùng để validate webhook request, `VaultToken.IncrementUse()` cập nhật:
+
+- `UsesCount` += 1
+- `LastUsedAt` = now
+
+→ Admin có thể theo dõi tần suất sử dụng qua `GET /api/keyvault/tokens`.
+
+### 31.10 Bảo mật
+
+| Lớp bảo mật                | Chi tiết                                                              |
+| -------------------------- | --------------------------------------------------------------------- |
+| **Token generation**       | `RandomNumberGenerator.GetBytes(32)` — 256-bit entropy (CSPRNG)       |
+| **Token storage (DB)**     | Chỉ lưu SHA-256 hash — plaintext **không bao giờ** lưu trực tiếp      |
+| **Token storage (Secret)** | Plaintext lưu trong vault secret (AES-256-GCM envelope encryption)    |
+| **TTL overlap**            | TTL 48h > rotation 24h → 24h overlap, tránh gap khi xoay              |
+| **Zero-downtime rotation** | Tạo token mới TRƯỚC, revoke cũ SAU → không gián đoạn                  |
+| **Policy enforcement**     | Token phải có policy `webhook-alerts` — token khác bị từ chối         |
+| **Endpoint isolation**     | `AllowAnonymous` nhưng auth trong handler — tách biệt khỏi JWT/ApiKey |
+| **Request logging**        | Mọi request thất bại đều log IP + reason                              |
+| **Audit trail**            | Tạo/xoay/sử dụng token đều ghi vào `vault_audit_logs`                 |
+
+### 31.11 Xử lý sự cố (Troubleshooting)
+
+| Triệu chứng                       | Nguyên nhân                                     | Giải pháp                                                |
+| --------------------------------- | ----------------------------------------------- | -------------------------------------------------------- |
+| `401` khi gọi webhook             | Token hết hạn hoặc bị revoke                    | Pull token mới từ API, hoặc restart API để tạo token mới |
+| Discord không nhận alert          | `Discord:Enabled = false` hoặc WebhookUrl trống | Kiểm tra `appsettings.json` section `Discord`            |
+| Alert bị skip (không gửi Discord) | Rate limited (cùng source < 5 phút)             | Đợi hết cooldown hoặc đổi source name                    |
+| Chỉ nhận critical, bỏ warning     | `Discord:MinLevel = "critical"`                 | Đổi thành `"warning"` trong config                       |
+| Token không tự tạo khi startup    | Vault chưa khởi tạo (chưa có KEK)               | Khởi tạo vault trước: `POST /api/keyvault/init`          |
+| Client không pull được token      | JWT hết hạn hoặc không có quyền                 | Refresh JWT, kiểm tra role admin                         |
+| Audit log trống cho webhook-token | API vừa start, chưa qua rotation                | Chờ 24h hoặc restart API để trigger EnsureToken          |

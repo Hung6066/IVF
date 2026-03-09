@@ -1,0 +1,115 @@
+<div class="amendment-history">
+  <h3 class="section-title">
+    <i class="fa-solid fa-clock-rotate-left"></i>
+    Lịch sử chỉnh sửa
+  </h3>
+
+  @if (loading()) {
+    <div class="loading-state"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải...</div>
+  } @else if (amendments().length === 0) {
+    <div class="empty-state">
+      <i class="fa-solid fa-check-circle"></i>
+      <p>Chưa có chỉnh sửa nào</p>
+    </div>
+  } @else {
+    <div class="timeline">
+      @for (amendment of amendments(); track amendment.id) {
+        <div class="timeline-item" [class.expanded]="expandedId() === amendment.id">
+          <!-- Timeline header -->
+          <div class="timeline-header" (click)="toggleExpand(amendment.id)">
+            <div class="timeline-marker">
+              <span class="version-badge">v{{ amendment.version }}</span>
+            </div>
+            <div class="timeline-summary">
+              <div class="summary-top">
+                <span class="status-badge" [ngClass]="getStatusClass(amendment.status)">
+                  {{ getStatusLabel(amendment.status) }}
+                </span>
+                <span class="change-count"> {{ amendment.fieldChanges.length }} thay đổi </span>
+              </div>
+              <div class="summary-info">
+                <span class="requester">
+                  <i class="fa-solid fa-user"></i>
+                  {{ amendment.requestedByName || 'Không rõ' }}
+                </span>
+                <span class="timestamp">
+                  <i class="fa-regular fa-clock"></i>
+                  {{ formatDate(amendment.createdAt) }}
+                </span>
+              </div>
+              <div class="reason-text">{{ amendment.reason }}</div>
+            </div>
+            <div class="expand-icon">
+              <i
+                class="fa-solid"
+                [ngClass]="expandedId() === amendment.id ? 'fa-chevron-up' : 'fa-chevron-down'"
+              ></i>
+            </div>
+          </div>
+
+          <!-- Expanded detail with diff -->
+          @if (expandedId() === amendment.id) {
+            <div class="timeline-detail">
+              <!-- Review info -->
+              @if (amendment.reviewedByName) {
+                <div class="review-info">
+                  <div class="reviewer">
+                    <i class="fa-solid fa-user-check"></i>
+                    <strong>Người duyệt:</strong> {{ amendment.reviewedByName }}
+                    @if (amendment.reviewedAt) {
+                      <span class="review-time">- {{ formatDate(amendment.reviewedAt) }}</span>
+                    }
+                  </div>
+                  @if (amendment.reviewNotes) {
+                    <div class="review-notes">
+                      <i class="fa-solid fa-comment"></i>
+                      {{ amendment.reviewNotes }}
+                    </div>
+                  }
+                </div>
+              }
+
+              <!-- Field changes diff table -->
+              <div class="diff-table-wrapper">
+                <table class="diff-table">
+                  <thead>
+                    <tr>
+                      <th class="col-field">Trường dữ liệu</th>
+                      <th class="col-type">Loại</th>
+                      <th class="col-old">Dữ liệu cũ</th>
+                      <th class="col-diff">Nội dung thay đổi</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (fc of amendment.fieldChanges; track fc.id) {
+                      <tr [ngClass]="getChangeTypeClass(fc.changeType)">
+                        <td class="col-field">
+                          <span class="field-label">{{ fc.fieldLabel }}</span>
+                          <span class="field-key">{{ fc.fieldKey }}</span>
+                        </td>
+                        <td class="col-type">
+                          <span
+                            class="change-type-badge"
+                            [ngClass]="getChangeTypeClass(fc.changeType)"
+                          >
+                            {{ getChangeTypeLabel(fc.changeType) }}
+                          </span>
+                        </td>
+                        <td class="col-old">
+                          <div class="old-value">{{ getDisplayValue(fc, 'old') || '(trống)' }}</div>
+                        </td>
+                        <td class="col-diff">
+                          <div class="diff-inline" [innerHTML]="getInlineDiffHtml(fc)"></div>
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          }
+        </div>
+      }
+    </div>
+  }
+</div>

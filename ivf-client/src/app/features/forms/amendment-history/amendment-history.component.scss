@@ -1,0 +1,322 @@
+.amendment-history {
+  .section-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 1rem;
+
+    i {
+      color: var(--primary);
+    }
+  }
+
+  .loading-state,
+  .empty-state {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-secondary);
+
+    i {
+      font-size: 1.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    p {
+      margin: 0;
+    }
+  }
+}
+
+// ─── Timeline ───────────────────────────────────────────────
+
+.timeline {
+  position: relative;
+  padding-left: 2rem;
+
+  &::before {
+    content: '';
+    position: absolute;
+    left: 1rem;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--border-color, #e5e7eb);
+  }
+}
+
+.timeline-item {
+  position: relative;
+  margin-bottom: 1rem;
+  background: var(--card-bg, #fff);
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 0.5rem;
+  overflow: hidden;
+  transition: box-shadow 0.2s;
+
+  &.expanded {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  }
+}
+
+.timeline-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--hover-bg, #f9fafb);
+  }
+}
+
+.timeline-marker {
+  flex-shrink: 0;
+}
+
+.version-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  background: var(--primary, #3b82f6);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.timeline-summary {
+  flex: 1;
+  min-width: 0;
+}
+
+.summary-top {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.summary-info {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary, #6b7280);
+  margin-bottom: 0.25rem;
+
+  i {
+    margin-right: 0.25rem;
+  }
+}
+
+.reason-text {
+  font-size: 0.85rem;
+  color: var(--text-primary, #374151);
+  line-height: 1.4;
+}
+
+.expand-icon {
+  flex-shrink: 0;
+  color: var(--text-secondary, #6b7280);
+  padding: 0.25rem;
+}
+
+// ─── Status badges ──────────────────────────────────────────
+
+.status-badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+
+  &.status-pending {
+    background: #fef3c7;
+    color: #92400e;
+  }
+
+  &.status-approved {
+    background: #d1fae5;
+    color: #065f46;
+  }
+
+  &.status-rejected {
+    background: #fee2e2;
+    color: #991b1b;
+  }
+}
+
+.change-count {
+  font-size: 0.75rem;
+  color: var(--text-secondary, #6b7280);
+}
+
+// ─── Detail panel ───────────────────────────────────────────
+
+.timeline-detail {
+  border-top: 1px solid var(--border-color, #e5e7eb);
+  padding: 1rem;
+}
+
+.review-info {
+  background: var(--info-bg, #eff6ff);
+  border-radius: 0.375rem;
+  padding: 0.75rem;
+  margin-bottom: 1rem;
+  font-size: 0.85rem;
+
+  .reviewer {
+    margin-bottom: 0.25rem;
+
+    i {
+      color: var(--primary, #3b82f6);
+      margin-right: 0.25rem;
+    }
+  }
+
+  .review-notes {
+    color: var(--text-secondary, #6b7280);
+    margin-top: 0.25rem;
+
+    i {
+      margin-right: 0.25rem;
+    }
+  }
+}
+
+// ─── Diff table ─────────────────────────────────────────────
+
+.diff-table-wrapper {
+  overflow-x: auto;
+}
+
+.diff-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+
+  th,
+  td {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border-color, #e5e7eb);
+    vertical-align: top;
+  }
+
+  thead th {
+    background: var(--table-header-bg, #f9fafb);
+    font-weight: 600;
+    text-align: left;
+    white-space: nowrap;
+  }
+
+  .col-field {
+    min-width: 140px;
+  }
+
+  .col-type {
+    width: 80px;
+    text-align: center;
+  }
+
+  .col-diff {
+    min-width: 250px;
+  }
+
+  .col-old {
+    min-width: 150px;
+  }
+}
+
+.field-label {
+  display: block;
+  font-weight: 500;
+}
+
+.field-key {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-secondary, #6b7280);
+  font-family: monospace;
+}
+
+.old-value {
+  word-break: break-word;
+  max-width: 300px;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  background: #f9fafb;
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.85rem;
+}
+
+// ─── Inline diff ────────────────────────────────────────────
+
+.diff-inline {
+  word-break: break-word;
+  line-height: 1.6;
+  font-size: 0.85rem;
+}
+
+::ng-deep .diff-added {
+  background: #d1fae5;
+  color: #065f46;
+  padding: 0.1rem 0.25rem;
+  border-radius: 0.15rem;
+  text-decoration: none;
+}
+
+::ng-deep .diff-removed {
+  background: #fee2e2;
+  color: #991b1b;
+  padding: 0.1rem 0.25rem;
+  border-radius: 0.15rem;
+  text-decoration: line-through;
+}
+
+::ng-deep .diff-empty {
+  color: var(--text-secondary, #9ca3af);
+  font-style: italic;
+}
+
+// Row background per change type
+tr.change-modified {
+  ::ng-deep .diff-added {
+    background: #dbeafe;
+    color: #1e40af;
+  }
+
+  ::ng-deep .diff-removed {
+    background: #fee2e2;
+    color: #991b1b;
+  }
+}
+
+// ─── Change type badges ─────────────────────────────────────
+
+.change-type-badge {
+  display: inline-block;
+  padding: 0.1rem 0.4rem;
+  border-radius: 0.25rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+
+  &.change-modified {
+    background: #dbeafe;
+    color: #1e40af;
+  }
+
+  &.change-added {
+    background: #d1fae5;
+    color: #065f46;
+  }
+
+  &.change-removed {
+    background: #fee2e2;
+    color: #991b1b;
+  }
+}

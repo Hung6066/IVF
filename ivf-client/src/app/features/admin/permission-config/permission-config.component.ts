@@ -26,6 +26,13 @@ export class PermissionConfigComponent implements OnInit {
   // Filter
   groupFilter = '';
 
+  // Quick Group Modal
+  showQuickGroupModal = false;
+  quickGroupData = this.getEmptyQuickGroup();
+
+  // Inline quick-add per group
+  inlineAdd: Record<string, string> = {};
+
   constructor(private permDefService: PermissionDefinitionService) {}
 
   ngOnInit() {
@@ -177,6 +184,159 @@ export class PermissionConfigComponent implements OnInit {
     });
   }
 
+  quickAddToGroup(group: {
+    groupCode: string;
+    groupName: string;
+    groupIcon: string;
+    items: PermissionDefinitionAdmin[];
+  }) {
+    const code = this.inlineAdd[group.groupCode + '_code']?.trim();
+    const name = this.inlineAdd[group.groupCode + '_name']?.trim();
+    if (!code || !name) return;
+
+    const maxSort = group.items.reduce((max, i) => Math.max(max, i.sortOrder), 0);
+    const groupSortOrder = group.items[0]?.groupSortOrder ?? 1;
+
+    this.saving.set(true);
+    this.permDefService
+      .create({
+        code,
+        displayName: name,
+        groupCode: group.groupCode,
+        groupDisplayName: group.groupName,
+        groupIcon: group.groupIcon,
+        sortOrder: maxSort + 1,
+        groupSortOrder,
+      })
+      .subscribe({
+        next: () => {
+          this.inlineAdd[group.groupCode + '_code'] = '';
+          this.inlineAdd[group.groupCode + '_name'] = '';
+          this.saving.set(false);
+          this.loadItems();
+        },
+        error: (err) => {
+          this.saving.set(false);
+          if (err.status === 409) alert('Mã quyền đã tồn tại!');
+        },
+      });
+  }
+
+  // ─── Quick Group ───
+
+  openQuickGroup() {
+    this.quickGroupData = this.getEmptyQuickGroup();
+    this.showQuickGroupModal = true;
+  }
+
+  closeQuickGroup() {
+    this.showQuickGroupModal = false;
+  }
+
+  addQuickPermission() {
+    this.quickGroupData.permissions.push({ code: '', displayName: '' });
+  }
+
+  removeQuickPermission(index: number) {
+    this.quickGroupData.permissions.splice(index, 1);
+  }
+
+  autoGenerateGroupCode() {
+    const name = this.quickGroupData.groupDisplayName;
+    if (!name) return;
+    // Simple Vietnamese-to-code: remove diacritics, lowercase, replace spaces with _
+    this.quickGroupData.groupCode = name
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/đ/gi, 'd')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_|_$/g, '');
+  }
+
+  applyTemplate(type: 'crud' | 'full' | 'report') {
+    const prefix = this.quickGroupData.groupCode
+      ? this.quickGroupData.groupCode.charAt(0).toUpperCase() +
+        this.quickGroupData.groupCode
+          .slice(1)
+          .replace(/_([a-z])/g, (_, c: string) => c.toUpperCase())
+      : 'Item';
+    const groupName = this.quickGroupData.groupDisplayName || 'mục';
+
+    const templates: Record<string, { code: string; displayName: string }[]> = {
+      crud: [
+        { code: `View${prefix}`, displayName: `Xem ${groupName}` },
+        { code: `Manage${prefix}`, displayName: `Quản lý ${groupName}` },
+      ],
+      full: [
+        { code: `View${prefix}`, displayName: `Xem ${groupName}` },
+        { code: `Create${prefix}`, displayName: `Tạo ${groupName}` },
+        { code: `Edit${prefix}`, displayName: `Sửa ${groupName}` },
+        { code: `Delete${prefix}`, displayName: `Xoá ${groupName}` },
+      ],
+      report: [
+        { code: `View${prefix}`, displayName: `Xem ${groupName}` },
+        { code: `Export${prefix}`, displayName: `Xuất ${groupName}` },
+      ],
+    };
+
+    this.quickGroupData.permissions = templates[type].map((t, i) => ({
+      code: t.code,
+      displayName: t.displayName,
+    }));
+  }
+
+  isQuickGroupValid(): boolean {
+    if (!this.quickGroupData.groupCode || !this.quickGroupData.groupDisplayName) return false;
+    return this.quickGroupData.permissions.some((p) => p.code && p.displayName);
+  }
+
+  saveQuickGroup() {
+    if (!this.isQuickGroupValid()) return;
+    this.saving.set(true);
+
+    const validPerms = this.quickGroupData.permissions.filter((p) => p.code && p.displayName);
+    let completed = 0;
+    let errors = 0;
+
+    for (let i = 0; i < validPerms.length; i++) {
+      const perm = validPerms[i];
+      this.permDefService
+        .create({
+          code: perm.code,
+          displayName: perm.displayName,
+          groupCode: this.quickGroupData.groupCode,
+          groupDisplayName: this.quickGroupData.groupDisplayName,
+          groupIcon: this.quickGroupData.groupIcon,
+          sortOrder: i + 1,
+          groupSortOrder: this.quickGroupData.groupSortOrder,
+        })
+        .subscribe({
+          next: () => {
+            completed++;
+            if (completed + errors === validPerms.length) {
+              this.saving.set(false);
+              if (errors === 0) {
+                this.showQuickGroupModal = false;
+                this.loadItems();
+              } else {
+                alert(`Tạo xong ${completed}/${validPerms.length} quyền (${errors} lỗi`);
+                this.loadItems();
+              }
+            }
+          },
+          error: () => {
+            errors++;
+            if (completed + errors === validPerms.length) {
+              this.saving.set(false);
+              alert(`Tạo xong ${completed}/${validPerms.length} quyền (${errors} lỗi)`);
+              this.loadItems();
+            }
+          },
+        });
+    }
+  }
+
   private getEmptyForm() {
     return {
       code: '',
@@ -186,6 +346,17 @@ export class PermissionConfigComponent implements OnInit {
       groupIcon: '',
       sortOrder: 1,
       groupSortOrder: 1,
+    };
+  }
+
+  private getEmptyQuickGroup() {
+    const maxGroupSort = this.items().reduce((max, i) => Math.max(max, i.groupSortOrder), 0);
+    return {
+      groupCode: '',
+      groupDisplayName: '',
+      groupIcon: '📋',
+      groupSortOrder: maxGroupSort + 1,
+      permissions: [{ code: '', displayName: '' }] as { code: string; displayName: string }[],
     };
   }
 }

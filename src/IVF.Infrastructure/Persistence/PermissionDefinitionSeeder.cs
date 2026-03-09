@@ -89,6 +89,9 @@ public static class PermissionDefinitionSeeder
             P("ViewDigitalSigning",  "Xem ký số",        "signing", "Ký số",              "🔏", 1, 16),
             P("ManageDigitalSigning","Quản lý ký số",    "signing", "Ký số",              "🔏", 2, 16),
             P("SignDocuments",       "Ký tài liệu",      "signing", "Ký số",              "🔏", 3, 16),
+            P("RevokeSignature",     "Thu hồi chữ ký",   "signing", "Ký số",              "🔏", 4, 16),
+            P("RequestAmendment",   "Yêu cầu chỉnh sửa","signing", "Ký số",              "🔏", 5, 16),
+            P("ApproveAmendment",   "Phê duyệt chỉnh sửa","signing","Ký số",             "🔏", 6, 16),
 
             // ── Quản trị (Admin) ──
             P("ManageUsers",     "Quản lý người dùng",  "admin",   "Quản trị",           "⚙️", 1, 17),

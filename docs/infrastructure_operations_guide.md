@@ -24,12 +24,12 @@ Tài liệu này mô tả các tính năng hạ tầng enterprise đã triển k
 
 Stack giám sát bao gồm 4 thành phần:
 
-| Service    | Port | Chức năng                     | External Access |
-| ---------- | ---- | ----------------------------- | --------------- |
+| Service    | Port | Chức năng                     | External Access                                          |
+| ---------- | ---- | ----------------------------- | -------------------------------------------------------- |
 | Prometheus | 9090 | Metrics collection & alerting | `127.0.0.1` only, reverse proxy via Caddy `/prometheus/` |
-| Grafana    | 3000 | Dashboards & visualization    | `127.0.0.1` only, reverse proxy via Caddy `/grafana/` |
-| Loki       | 3100 | Log aggregation               | `127.0.0.1` only |
-| Promtail   | —    | Log shipping từ Docker        | No port exposed |
+| Grafana    | 3000 | Dashboards & visualization    | `127.0.0.1` only, reverse proxy via Caddy `/grafana/`    |
+| Loki       | 3100 | Log aggregation               | `127.0.0.1` only                                         |
+| Promtail   | —    | Log shipping từ Docker        | No port exposed                                          |
 
 ### 1.1.1 Bảo mật Monitoring
 
@@ -37,11 +37,11 @@ Stack giám sát bao gồm 4 thành phần:
 
 **Authentication**:
 
-| Component  | Auth Method           | Credentials                    |
-| ---------- | --------------------- | ------------------------------ |
-| Prometheus | Basic Auth (`web.yml`)| `monitor:<password>`           |
-| Grafana    | Built-in login        | `admin:<password>` (changed from default) |
-| Loki       | No auth (localhost only) | N/A                         |
+| Component  | Auth Method              | Credentials                               |
+| ---------- | ------------------------ | ----------------------------------------- |
+| Prometheus | Basic Auth (`web.yml`)   | `monitor:<password>`                      |
+| Grafana    | Built-in login           | `admin:<password>` (changed from default) |
+| Loki       | No auth (localhost only) | N/A                                       |
 
 **Truy cập từ xa**: Grafana và Prometheus được reverse proxy qua Caddy với basic auth. MinIO Console chỉ truy cập qua SSH tunnel.
 
@@ -58,6 +58,7 @@ ssh -L 9001:localhost:9001 root@VPS_IP
 ```
 
 **Hardening áp dụng**:
+
 - `--web.enable-admin-api` đã bị **gỡ bỏ** khỏi Prometheus (ngăn xóa data/shutdown từ API)
 - `--web.config.file=/etc/prometheus/web.yml` — Basic Auth via bcrypt hash
 - `--web.route-prefix=/prometheus` — Prometheus UI served under `/prometheus/` path
@@ -73,10 +74,10 @@ ssh -L 9001:localhost:9001 root@VPS_IP
 
 Caddy reverse proxy cung cấp truy cập external cho Grafana và Prometheus tại `natra.site`:
 
-| Path             | Upstream              | Auth               | Ghi chú                                  |
-| ---------------- | --------------------- | ------------------- | ----------------------------------------- |
-| `/grafana/*`     | `ivf-grafana:3000`    | Caddy basic auth    | Grafana tự handle login sau khi qua auth  |
-| `/prometheus/*`  | `ivf-prometheus:9090` | Caddy + upstream auth | Caddy gửi Authorization header tới Prometheus |
+| Path            | Upstream              | Auth                  | Ghi chú                                       |
+| --------------- | --------------------- | --------------------- | --------------------------------------------- |
+| `/grafana/*`    | `ivf-grafana:3000`    | Caddy basic auth      | Grafana tự handle login sau khi qua auth      |
+| `/prometheus/*` | `ivf-prometheus:9090` | Caddy + upstream auth | Caddy gửi Authorization header tới Prometheus |
 
 **Cấu hình Caddy** (trong `Caddyfile`, Docker config `caddyfile_v6`):
 
@@ -143,27 +144,27 @@ docker/monitoring/
 
 Hệ thống sử dụng các exporter chuyên dụng để thu thập metrics từ infrastructure services:
 
-| Service    | Exporter                | Swarm Service Name     | Port | Ghi chú                                           |
-| ---------- | ----------------------- | ---------------------- | ---- | -------------------------------------------------- |
-| IVF API    | Built-in (OpenTelemetry)| `ivf_api`              | 8080 | `/metrics` endpoint, scrape 10s                    |
-| PostgreSQL | `postgres-exporter`     | `ivf_postgres-exporter`| 9187 | Kết nối DB qua Docker secret                       |
-| Redis      | `redis-exporter`        | `ivf_redis-exporter`   | 9121 | Kết nối `redis://redis:6379`                       |
-| MinIO      | Built-in                | `minio-metrics`        | 9000 | `/minio/v2/metrics/cluster` (needs `MINIO_PROMETHEUS_AUTH_TYPE=public`) |
-| Caddy      | Built-in                | `ivf_caddy`            | 2019 | Native Prometheus endpoint                         |
-| Prometheus | Self-monitoring         | `ivf-prometheus`       | 9090 | `localhost:9090/prometheus/metrics` (route-prefix)  |
+| Service    | Exporter                 | Swarm Service Name      | Port | Ghi chú                                                                 |
+| ---------- | ------------------------ | ----------------------- | ---- | ----------------------------------------------------------------------- |
+| IVF API    | Built-in (OpenTelemetry) | `ivf_api`               | 8080 | `/metrics` endpoint, scrape 10s                                         |
+| PostgreSQL | `postgres-exporter`      | `ivf_postgres-exporter` | 9187 | Kết nối DB qua Docker secret                                            |
+| Redis      | `redis-exporter`         | `ivf_redis-exporter`    | 9121 | Kết nối `redis://redis:6379`                                            |
+| MinIO      | Built-in                 | `minio-metrics`         | 9000 | `/minio/v2/metrics/cluster` (needs `MINIO_PROMETHEUS_AUTH_TYPE=public`) |
+| Caddy      | Built-in                 | `ivf_caddy`             | 2019 | Native Prometheus endpoint                                              |
+| Prometheus | Self-monitoring          | `ivf-prometheus`        | 9090 | `localhost:9090/prometheus/metrics` (route-prefix)                      |
 
 **Network**: Tất cả exporters kết nối vào cả `ivf-data` (truy cập services) và `ivf-monitoring` (Prometheus scrape).
 
 ### 1.6 Prometheus Scrape Targets
 
-| Target     | Endpoint                                   | Interval |
-| ---------- | ------------------------------------------ | -------- |
-| IVF API    | `ivf_api:8080/metrics`                     | 10s      |
-| PostgreSQL | `ivf_postgres-exporter:9187/metrics`       | 15s      |
-| Redis      | `ivf_redis-exporter:9121/metrics`          | 15s      |
-| MinIO      | `minio-metrics:9000/minio/v2/metrics/cluster`  | 15s      |
-| Caddy      | `ivf_caddy:2019/metrics`                   | 15s      |
-| Prometheus | `localhost:9090/prometheus/metrics`        | 15s      |
+| Target     | Endpoint                                      | Interval |
+| ---------- | --------------------------------------------- | -------- |
+| IVF API    | `ivf_api:8080/metrics`                        | 10s      |
+| PostgreSQL | `ivf_postgres-exporter:9187/metrics`          | 15s      |
+| Redis      | `ivf_redis-exporter:9121/metrics`             | 15s      |
+| MinIO      | `minio-metrics:9000/minio/v2/metrics/cluster` | 15s      |
+| Caddy      | `ivf_caddy:2019/metrics`                      | 15s      |
+| Prometheus | `localhost:9090/prometheus/metrics`           | 15s      |
 
 ### 1.7 Alert Rules (Prometheus)
 
@@ -171,78 +172,78 @@ Hệ thống sử dụng các exporter chuyên dụng để thu thập metrics t
 
 #### API Alerts
 
-| Alert                | Điều kiện                     | Severity | For  |
-| -------------------- | ----------------------------- | -------- | ---- |
-| ApiDown              | Instance unreachable           | critical | 1m   |
-| ApiAllInstancesDown  | Tất cả instances down          | critical | 30s  |
-| HighLatencyWarning   | P95 > 1s                      | warning  | 5m   |
-| HighLatencyCritical  | P95 > 3s                      | critical | 3m   |
-| P99LatencyExtreme    | P99 > 5s                      | warning  | 5m   |
-| SlowEndpoint         | Endpoint P95 > 5s             | warning  | 10m  |
-| ErrorRateWarning     | 5xx > 1%                      | warning  | 5m   |
-| ErrorRateCritical    | 5xx > 5%                      | critical | 3m   |
-| High4xxRate          | 4xx > 25%                     | warning  | 10m  |
-| NoTraffic            | Zero requests                 | warning  | 10m  |
-| HighMemoryWarning    | Memory > 800MB                | warning  | 10m  |
-| HighMemoryCritical   | Memory > 950MB                | critical | 5m   |
-| HighGCPressure       | Gen2 GC > 0.5/s               | warning  | 10m  |
-| ThreadPoolStarvation | Queue length > 100            | warning  | 5m   |
-| TrafficSpike         | 3x normal rate                | warning  | 10m  |
+| Alert                | Điều kiện             | Severity | For |
+| -------------------- | --------------------- | -------- | --- |
+| ApiDown              | Instance unreachable  | critical | 1m  |
+| ApiAllInstancesDown  | Tất cả instances down | critical | 30s |
+| HighLatencyWarning   | P95 > 1s              | warning  | 5m  |
+| HighLatencyCritical  | P95 > 3s              | critical | 3m  |
+| P99LatencyExtreme    | P99 > 5s              | warning  | 5m  |
+| SlowEndpoint         | Endpoint P95 > 5s     | warning  | 10m |
+| ErrorRateWarning     | 5xx > 1%              | warning  | 5m  |
+| ErrorRateCritical    | 5xx > 5%              | critical | 3m  |
+| High4xxRate          | 4xx > 25%             | warning  | 10m |
+| NoTraffic            | Zero requests         | warning  | 10m |
+| HighMemoryWarning    | Memory > 800MB        | warning  | 10m |
+| HighMemoryCritical   | Memory > 950MB        | critical | 5m  |
+| HighGCPressure       | Gen2 GC > 0.5/s       | warning  | 10m |
+| ThreadPoolStarvation | Queue length > 100    | warning  | 5m  |
+| TrafficSpike         | 3x normal rate        | warning  | 10m |
 
 #### Infrastructure Alerts
 
-| Alert                    | Điều kiện                    | Severity | For  |
-| ------------------------ | ---------------------------- | -------- | ---- |
-| PostgresDown             | PG unreachable               | critical | 1m   |
-| RedisDown                | Redis unreachable            | warning  | 1m   |
-| MinioDown                | MinIO unreachable            | critical | 2m   |
-| CaddyDown                | Caddy unreachable            | critical | 1m   |
-| PostgresHighConnections  | Connections > 80% max        | warning  | 5m   |
-| PostgresReplicationLag   | Replication lag > 100MB      | warning  | 5m   |
-| PostgresDeadlocks        | Deadlocks detected           | warning  | 0m   |
-| RedisHighMemory          | Memory > 80% maxmemory      | warning  | 5m   |
-| RedisHighClients         | Connected clients > 100     | warning  | 5m   |
-| RedisRejectedConnections | Rejected connections         | critical | 0m   |
-| MinioHighDiskUsage       | Disk > 80%                  | warning  | 10m  |
-| MinioDiskCritical        | Disk > 90%                  | critical | 5m   |
+| Alert                    | Điều kiện               | Severity | For |
+| ------------------------ | ----------------------- | -------- | --- |
+| PostgresDown             | PG unreachable          | critical | 1m  |
+| RedisDown                | Redis unreachable       | warning  | 1m  |
+| MinioDown                | MinIO unreachable       | critical | 2m  |
+| CaddyDown                | Caddy unreachable       | critical | 1m  |
+| PostgresHighConnections  | Connections > 80% max   | warning  | 5m  |
+| PostgresReplicationLag   | Replication lag > 100MB | warning  | 5m  |
+| PostgresDeadlocks        | Deadlocks detected      | warning  | 0m  |
+| RedisHighMemory          | Memory > 80% maxmemory  | warning  | 5m  |
+| RedisHighClients         | Connected clients > 100 | warning  | 5m  |
+| RedisRejectedConnections | Rejected connections    | critical | 0m  |
+| MinioHighDiskUsage       | Disk > 80%              | warning  | 10m |
+| MinioDiskCritical        | Disk > 90%              | critical | 5m  |
 
 #### Prometheus Self-Monitoring
 
-| Alert                           | Điều kiện              | Severity |
-| ------------------------------- | ---------------------- | -------- |
-| PrometheusConfigReloadFailed    | Config reload failed   | warning  |
-| PrometheusTargetDown            | Any target down > 5m   | warning  |
-| PrometheusTSDBCompactionsFailing| TSDB compaction errors | warning  |
-| PrometheusRuleEvaluationFailures| Rule eval failures     | warning  |
+| Alert                            | Điều kiện              | Severity |
+| -------------------------------- | ---------------------- | -------- |
+| PrometheusConfigReloadFailed     | Config reload failed   | warning  |
+| PrometheusTargetDown             | Any target down > 5m   | warning  |
+| PrometheusTSDBCompactionsFailing | TSDB compaction errors | warning  |
+| PrometheusRuleEvaluationFailures | Rule eval failures     | warning  |
 
 #### Recording Rules (Pre-computed queries)
 
-| Rule Name                          | Mô tả                       |
-| ---------------------------------- | ---------------------------- |
-| `ivf:http_requests:rate5m`         | Tổng request rate/s          |
-| `ivf:http_requests_by_status:rate5m`| Request rate theo status code|
-| `ivf:http_requests_by_route:rate5m` | Request rate theo endpoint  |
-| `ivf:http_error_rate:ratio5m`      | Tỉ lệ lỗi 5xx/total        |
-| `ivf:http_latency_p50:5m`         | P50 latency                  |
-| `ivf:http_latency_p95:5m`         | P95 latency                  |
-| `ivf:http_latency_p99:5m`         | P99 latency                  |
-| `ivf:api_availability:ratio`      | % API instances UP           |
+| Rule Name                            | Mô tả                         |
+| ------------------------------------ | ----------------------------- |
+| `ivf:http_requests:rate5m`           | Tổng request rate/s           |
+| `ivf:http_requests_by_status:rate5m` | Request rate theo status code |
+| `ivf:http_requests_by_route:rate5m`  | Request rate theo endpoint    |
+| `ivf:http_error_rate:ratio5m`        | Tỉ lệ lỗi 5xx/total           |
+| `ivf:http_latency_p50:5m`            | P50 latency                   |
+| `ivf:http_latency_p95:5m`            | P95 latency                   |
+| `ivf:http_latency_p99:5m`            | P99 latency                   |
+| `ivf:api_availability:ratio`         | % API instances UP            |
 
 ### 1.8 Alert Rules (Loki — Log-based)
 
 **3 nhóm, 9 rules** — Dựa trên phân tích log patterns:
 
-| Alert                   | Nguồn log       | Điều kiện                          | Severity |
-| ----------------------- | --------------- | ---------------------------------- | -------- |
-| HighErrorLogRate        | API logs        | > 20 error logs/5min               | warning  |
-| UnhandledExceptions     | API logs        | NullRef/StackOverflow/OOM detected | critical |
-| DatabaseConnectionErrors| API logs        | Npgsql exceptions > 3/5min        | critical |
-| RedisConnectionErrors   | API logs        | Redis exceptions > 5/5min         | warning  |
-| BruteForceAttempt       | API logs        | > 20 auth failures/5min           | warning  |
-| ForbiddenAccessSpike    | API logs        | > 15 forbidden responses/5min     | warning  |
-| PostgresFatalError      | PostgreSQL logs | FATAL/PANIC detected              | critical |
-| MinioErrors             | MinIO logs      | > 5 errors/5min                   | warning  |
-| ContainerRestarting     | All containers  | > 3 restart events/10min          | warning  |
+| Alert                    | Nguồn log       | Điều kiện                          | Severity |
+| ------------------------ | --------------- | ---------------------------------- | -------- |
+| HighErrorLogRate         | API logs        | > 20 error logs/5min               | warning  |
+| UnhandledExceptions      | API logs        | NullRef/StackOverflow/OOM detected | critical |
+| DatabaseConnectionErrors | API logs        | Npgsql exceptions > 3/5min         | critical |
+| RedisConnectionErrors    | API logs        | Redis exceptions > 5/5min          | warning  |
+| BruteForceAttempt        | API logs        | > 20 auth failures/5min            | warning  |
+| ForbiddenAccessSpike     | API logs        | > 15 forbidden responses/5min      | warning  |
+| PostgresFatalError       | PostgreSQL logs | FATAL/PANIC detected               | critical |
+| MinioErrors              | MinIO logs      | > 5 errors/5min                    | warning  |
+| ContainerRestarting      | All containers  | > 3 restart events/10min           | warning  |
 
 ### 1.9 Grafana Dashboards
 
@@ -250,50 +251,50 @@ Hệ thống sử dụng các exporter chuyên dụng để thu thập metrics t
 
 #### IVF System Overview (`/d/ivf-system-overview`)
 
-| Row               | Panels                                                                |
-| ------------------ | --------------------------------------------------------------------- |
-| Service Health     | 6 stat panels: API, PostgreSQL, Redis, MinIO, Caddy, Prometheus (UP/DOWN) |
-| RED Metrics        | Request Rate, Error Rate (5xx), P95 Latency, API Memory              |
-| HTTP Traffic       | Request rate by status code, Response time percentiles (P50/P95/P99) |
-| Top Endpoints      | Request rate by endpoint (stacked), Slowest endpoints P95 (top 10)   |
-| API Resources      | Process memory (RSS/Virtual/GC Heap), .NET Runtime (GC, threads)     |
+| Row            | Panels                                                                    |
+| -------------- | ------------------------------------------------------------------------- |
+| Service Health | 6 stat panels: API, PostgreSQL, Redis, MinIO, Caddy, Prometheus (UP/DOWN) |
+| RED Metrics    | Request Rate, Error Rate (5xx), P95 Latency, API Memory                   |
+| HTTP Traffic   | Request rate by status code, Response time percentiles (P50/P95/P99)      |
+| Top Endpoints  | Request rate by endpoint (stacked), Slowest endpoints P95 (top 10)        |
+| API Resources  | Process memory (RSS/Virtual/GC Heap), .NET Runtime (GC, threads)          |
 
 #### IVF API Monitoring (`/d/ivf-api-monitoring`)
 
 Dashboard giám sát toàn diện API — tập trung vào usage, errors, logs, alerts cho IVF API.
 
-| Row                    | Panels                                                                             |
-| ----------------------- | ---------------------------------------------------------------------------------- |
-| API Health & Availability | API Status (UP/DOWN), Availability %, Instances Online, Request Rate, Error Rate, P95 Latency |
-| HTTP Traffic & Latency | Request rate by status code, Response time percentiles (P50/P95/P99), Request rate by endpoint (top 10), Slowest endpoints P95 (top 10) |
-| HTTP Request Breakdown | Request rate by HTTP method (GET/POST/PUT/DELETE), Today vs Yesterday comparison, Response status distribution (pie chart), Latency heatmap |
-| Errors & Exceptions    | 6 stat panels: Errors, Exceptions, DB Errors, Auth Failures, Redis Errors, Active Alerts (1h). Error timeline (Exceptions/Errors/Warnings), 5xx by endpoint, 4xx by endpoint |
-| Security & Auth        | Authentication events (login success/failed, 401/403), Security events (rate limited, blocked, impersonation) |
-| .NET Runtime & Resources | Process memory (RSS/Virtual/GC Heap), .NET Runtime (GC/threads), CPU usage, GC pause duration |
-| Active Alerts          | Alert list (firing/pending), Alert history timeline                                  |
-| API Logs (Live)        | Error & exception log stream, All API logs (collapsed)                               |
+| Row                       | Panels                                                                                                                                                                       |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| API Health & Availability | API Status (UP/DOWN), Availability %, Instances Online, Request Rate, Error Rate, P95 Latency                                                                                |
+| HTTP Traffic & Latency    | Request rate by status code, Response time percentiles (P50/P95/P99), Request rate by endpoint (top 10), Slowest endpoints P95 (top 10)                                      |
+| HTTP Request Breakdown    | Request rate by HTTP method (GET/POST/PUT/DELETE), Today vs Yesterday comparison, Response status distribution (pie chart), Latency heatmap                                  |
+| Errors & Exceptions       | 6 stat panels: Errors, Exceptions, DB Errors, Auth Failures, Redis Errors, Active Alerts (1h). Error timeline (Exceptions/Errors/Warnings), 5xx by endpoint, 4xx by endpoint |
+| Security & Auth           | Authentication events (login success/failed, 401/403), Security events (rate limited, blocked, impersonation)                                                                |
+| .NET Runtime & Resources  | Process memory (RSS/Virtual/GC Heap), .NET Runtime (GC/threads), CPU usage, GC pause duration                                                                                |
+| Active Alerts             | Alert list (firing/pending), Alert history timeline                                                                                                                          |
+| API Logs (Live)           | Error & exception log stream, All API logs (collapsed)                                                                                                                       |
 
 #### IVF Logs & Errors (`/d/ivf-logs-errors`)
 
-| Row                | Panels                                                      |
-| ------------------- | ------------------------------------------------------------ |
-| Error Stats         | 4 stat panels: Errors, Exceptions, DB Errors, Auth Failures (last 1h) |
-| Error Timeline      | Error rate over time (Exceptions/Errors/Warnings)           |
-| Error Log Viewer    | Live log panel with error/exception filter                  |
-| All API Logs        | Unfiltered API log stream (collapsed)                       |
-| Database Logs       | PostgreSQL logs + error filter (collapsed)                  |
-| Security & Auth     | Auth/permission logs (collapsed)                            |
-| Reverse Proxy       | Caddy access/error logs (collapsed)                         |
-| Storage & Services  | Redis, MinIO, SignServer, EJBCA logs (collapsed)            |
+| Row                | Panels                                                                |
+| ------------------ | --------------------------------------------------------------------- |
+| Error Stats        | 4 stat panels: Errors, Exceptions, DB Errors, Auth Failures (last 1h) |
+| Error Timeline     | Error rate over time (Exceptions/Errors/Warnings)                     |
+| Error Log Viewer   | Live log panel with error/exception filter                            |
+| All API Logs       | Unfiltered API log stream (collapsed)                                 |
+| Database Logs      | PostgreSQL logs + error filter (collapsed)                            |
+| Security & Auth    | Auth/permission logs (collapsed)                                      |
+| Reverse Proxy      | Caddy access/error logs (collapsed)                                   |
+| Storage & Services | Redis, MinIO, SignServer, EJBCA logs (collapsed)                      |
 
 #### IVF Infrastructure & Alerts (`/d/ivf-infrastructure`)
 
-| Row                | Panels                                                       |
-| ------------------- | ------------------------------------------------------------- |
-| Active Alerts       | Alert list (firing/pending/error states)                     |
-| Prometheus Targets  | Scrape target status table (UP/DOWN per job)                 |
-| Prometheus Perf.    | Scrape duration, Samples scraped, Rule eval duration, TSDB   |
-| Loki Log Volume     | Log volume by swarm_service, Error log volume                |
+| Row                | Panels                                                     |
+| ------------------ | ---------------------------------------------------------- |
+| Active Alerts      | Alert list (firing/pending/error states)                   |
+| Prometheus Targets | Scrape target status table (UP/DOWN per job)               |
+| Prometheus Perf.   | Scrape duration, Samples scraped, Rule eval duration, TSDB |
+| Loki Log Volume    | Log volume by swarm_service, Error log volume              |
 
 ### 1.10 Promtail Pipeline
 
@@ -332,17 +333,17 @@ Docker Container Logs
 
 ### 1.11 Loki Config
 
-| Setting                     | Giá trị     | Mô tả                                |
-| --------------------------- | ----------- | ------------------------------------- |
-| `retention_period`          | 30d         | Tự động xóa logs cũ hơn 30 ngày      |
-| `schema`                    | v13 (TSDB)  | Storage engine hiệu quả nhất         |
-| `results_cache`             | 100MB       | Embedded cache cho query nhanh hơn     |
-| `ingestion_rate_mb`         | 10 MB/s     | Rate limit ingestion                   |
-| `ingestion_burst_size_mb`   | 20 MB       | Burst ingest cho spike                 |
-| `per_stream_rate_limit`     | 5 MB/s      | Rate limit mỗi stream                 |
-| `max_entries_limit_per_query`| 5000       | Giới hạn kết quả query                |
-| `max_query_series`          | 500         | Giới hạn số series mỗi query          |
-| `ruler`                     | enabled     | Log-based alerting (9 rules)           |
+| Setting                       | Giá trị    | Mô tả                              |
+| ----------------------------- | ---------- | ---------------------------------- |
+| `retention_period`            | 30d        | Tự động xóa logs cũ hơn 30 ngày    |
+| `schema`                      | v13 (TSDB) | Storage engine hiệu quả nhất       |
+| `results_cache`               | 100MB      | Embedded cache cho query nhanh hơn |
+| `ingestion_rate_mb`           | 10 MB/s    | Rate limit ingestion               |
+| `ingestion_burst_size_mb`     | 20 MB      | Burst ingest cho spike             |
+| `per_stream_rate_limit`       | 5 MB/s     | Rate limit mỗi stream              |
+| `max_entries_limit_per_query` | 5000       | Giới hạn kết quả query             |
+| `max_query_series`            | 500        | Giới hạn số series mỗi query       |
+| `ruler`                       | enabled    | Log-based alerting (9 rules)       |
 
 ---
 
@@ -362,12 +363,12 @@ API Request → Serilog Structured JSON → Docker stdout → Promtail → Loki 
 
 Mỗi log entry được tự động enrich với context:
 
-| Enricher                        | Properties                                        | Source                         |
-| ------------------------------- | ------------------------------------------------- | ------------------------------ |
-| **CorrelationIdMiddleware**     | `CorrelationId`                                   | `X-Correlation-Id` header hoặc auto-generated |
-| **LogContextEnrichmentMiddleware** | `TenantId`, `UserId`, `UserName`, `RequestPath`, `RequestMethod`, `ClientIp` | HttpContext |
-| **Serilog Built-in Enrichers**  | `MachineName`, `Environment`, `ProcessId`, `ThreadId` | System               |
-| **Application Constants**       | `Application` = "IVF.API", `Version`              | Assembly info                  |
+| Enricher                           | Properties                                                                   | Source                                        |
+| ---------------------------------- | ---------------------------------------------------------------------------- | --------------------------------------------- |
+| **CorrelationIdMiddleware**        | `CorrelationId`                                                              | `X-Correlation-Id` header hoặc auto-generated |
+| **LogContextEnrichmentMiddleware** | `TenantId`, `UserId`, `UserName`, `RequestPath`, `RequestMethod`, `ClientIp` | HttpContext                                   |
+| **Serilog Built-in Enrichers**     | `MachineName`, `Environment`, `ProcessId`, `ThreadId`                        | System                                        |
+| **Application Constants**          | `Application` = "IVF.API", `Version`                                         | Assembly info                                 |
 
 ### 2.3 Log Format (JSON)
 
@@ -404,12 +405,12 @@ Mọi CQRS command/query được log tự động:
 
 HTTP request logging với dynamic log level:
 
-| Status Code | Log Level   | Ghi chú                        |
-| ----------- | ----------- | ------------------------------- |
-| 2xx, 3xx    | Information | Normal operations               |
-| 4xx         | Warning     | Client errors (validation, 404) |
-| 5xx         | Error       | Server errors                   |
-| Health check| Suppressed  | `/health/*` endpoints excluded  |
+| Status Code  | Log Level   | Ghi chú                         |
+| ------------ | ----------- | ------------------------------- |
+| 2xx, 3xx     | Information | Normal operations               |
+| 4xx          | Warning     | Client errors (validation, 404) |
+| 5xx          | Error       | Server errors                   |
+| Health check | Suppressed  | `/health/*` endpoints excluded  |
 
 ### 2.6 Log Level Configuration
 
@@ -453,11 +454,11 @@ curl -v https://natra.site/api/patients
 
 Hệ thống alerting gồm 3 tầng, tất cả route tới **Discord**:
 
-| Tầng                    | Engine        | Số rules | Chức năng                          |
-| ----------------------- | ------------- | -------- | ---------------------------------- |
-| Prometheus Alert Rules  | Prometheus    | 31       | Metrics-based alerts (real-time)   |
-| Loki Alert Rules        | Loki Ruler    | 9        | Log-based alerts (pattern matching)|
-| Grafana Unified Alerts  | Grafana 12    | 25       | Combined metrics + logs (Discord)  |
+| Tầng                   | Engine     | Số rules | Chức năng                           |
+| ---------------------- | ---------- | -------- | ----------------------------------- |
+| Prometheus Alert Rules | Prometheus | 31       | Metrics-based alerts (real-time)    |
+| Loki Alert Rules       | Loki Ruler | 9        | Log-based alerts (pattern matching) |
+| Grafana Unified Alerts | Grafana 12 | 25       | Combined metrics + logs (Discord)   |
 
 ### 3.2 Discord Integration
 
@@ -465,11 +466,11 @@ Hệ thống alerting gồm 3 tầng, tất cả route tới **Discord**:
 
 **Notification Policy**:
 
-| Severity   | Group Wait | Group Interval | Repeat Interval |
-| ---------- | ---------- | -------------- | --------------- |
-| **Critical**| 10s       | 1m             | 1h              |
-| **Warning** | 30s       | 5m             | 4h              |
-| **Default** | 15s       | 1m             | 4h              |
+| Severity     | Group Wait | Group Interval | Repeat Interval |
+| ------------ | ---------- | -------------- | --------------- |
+| **Critical** | 10s        | 1m             | 1h              |
+| **Warning**  | 30s        | 5m             | 4h              |
+| **Default**  | 15s        | 1m             | 4h              |
 
 **Cấu hình**: Contact point và notification policy được tạo qua Grafana API (không provisioning file) vì Grafana không hỗ trợ env var trong webhook URL.
 
@@ -487,6 +488,7 @@ Hệ thống alerting gồm 3 tầng, tất cả route tới **Discord**:
 ```
 
 **Tạo Discord Webhook**:
+
 1. Discord → Server Settings → Integrations → Webhooks
 2. New Webhook → chọn channel → Copy URL
 3. Chạy: `./scripts/setup-discord-alerts.sh <url>`
@@ -497,54 +499,64 @@ Provisioned tự động qua `docker/monitoring/grafana/provisioning/alerting/ru
 
 #### API Alerts
 
-| Alert                       | Điều kiện                | Severity | For  |
-| --------------------------- | ------------------------ | -------- | ---- |
-| API Instance Down           | Instance unreachable     | critical | 1m   |
-| ALL API Instances Down      | Tất cả instances down    | critical | 30s  |
-| P95 Latency > 1s            | P95 response time > 1s  | warning  | 5m   |
-| P95 Latency > 3s            | P95 response time > 3s  | critical | 3m   |
-| Error Rate > 1%             | 5xx > 1% of requests    | warning  | 5m   |
-| Error Rate > 5%             | 5xx > 5% of requests    | critical | 3m   |
-| No API Traffic              | Zero requests            | warning  | 10m  |
-| API Memory > 800MB          | Process memory > 800MB  | warning  | 10m  |
-| API Memory > 950MB (OOM)    | Process memory > 950MB  | critical | 5m   |
-| High GC Pressure            | Gen2 GC > 0.5/s         | warning  | 10m  |
+| Alert                    | Điều kiện              | Severity | For |
+| ------------------------ | ---------------------- | -------- | --- |
+| API Instance Down        | Instance unreachable   | critical | 1m  |
+| ALL API Instances Down   | Tất cả instances down  | critical | 30s |
+| P95 Latency > 1s         | P95 response time > 1s | warning  | 5m  |
+| P95 Latency > 3s         | P95 response time > 3s | critical | 3m  |
+| Error Rate > 1%          | 5xx > 1% of requests   | warning  | 5m  |
+| Error Rate > 5%          | 5xx > 5% of requests   | critical | 3m  |
+| No API Traffic           | Zero requests          | warning  | 10m |
+| API Memory > 800MB       | Process memory > 800MB | warning  | 10m |
+| API Memory > 950MB (OOM) | Process memory > 950MB | critical | 5m  |
+| High GC Pressure         | Gen2 GC > 0.5/s        | warning  | 10m |
 
 #### Infrastructure Alerts
 
-| Alert                       | Điều kiện                | Severity | For  |
-| --------------------------- | ------------------------ | -------- | ---- |
-| PostgreSQL Down             | PG unreachable           | critical | 1m   |
-| PostgreSQL Replication Lag  | Lag > 100MB              | warning  | 5m   |
-| PostgreSQL Deadlock         | Deadlocks detected       | warning  | 0m   |
-| Redis Down                  | Redis unreachable        | warning  | 1m   |
-| Redis Memory > 80%          | Memory > 80%             | warning  | 5m   |
-| Redis Rejecting Connections | Rejected connections     | critical | 0m   |
-| MinIO Down                  | MinIO unreachable        | critical | 2m   |
-| MinIO Disk > 90%            | Disk usage > 90%        | critical | 5m   |
-| Caddy Reverse Proxy Down    | Caddy unreachable        | critical | 1m   |
-| Scrape Target Down          | Any Prometheus target down| warning | 5m   |
+| Alert                       | Điều kiện                  | Severity | For |
+| --------------------------- | -------------------------- | -------- | --- |
+| PostgreSQL Down             | PG unreachable             | critical | 1m  |
+| PostgreSQL Replication Lag  | Lag > 100MB                | warning  | 5m  |
+| PostgreSQL Deadlock         | Deadlocks detected         | warning  | 0m  |
+| Redis Down                  | Redis unreachable          | warning  | 1m  |
+| Redis Memory > 80%          | Memory > 80%               | warning  | 5m  |
+| Redis Rejecting Connections | Rejected connections       | critical | 0m  |
+| MinIO Down                  | MinIO unreachable          | critical | 2m  |
+| MinIO Disk > 90%            | Disk usage > 90%           | critical | 5m  |
+| Caddy Reverse Proxy Down    | Caddy unreachable          | critical | 1m  |
+| Scrape Target Down          | Any Prometheus target down | warning  | 5m  |
 
 #### Log-based Alerts (Loki)
 
-| Alert                       | Nguồn    | Điều kiện                         | Severity |
-| --------------------------- | -------- | --------------------------------- | -------- |
-| Exception Spike             | API logs | > 10 exceptions/5min              | critical |
-| Authentication Failures     | API logs | > 20 auth failures/5min           | warning  |
-| Database Error Spike        | API logs | > 5 DB errors/3min                | critical |
-| Security Event Detected     | API logs | > 5 security events/1min          | critical |
-| Service Crash/Restart Loop  | All logs | > 4 container restarts/10min      | critical |
+| Alert                      | Nguồn    | Điều kiện                    | Severity |
+| -------------------------- | -------- | ---------------------------- | -------- |
+| Exception Spike            | API logs | > 10 exceptions/5min         | critical |
+| Authentication Failures    | API logs | > 20 auth failures/5min      | warning  |
+| Database Error Spike       | API logs | > 5 DB errors/3min           | critical |
+| Security Event Detected    | API logs | > 5 security events/1min     | critical |
+| Service Crash/Restart Loop | All logs | > 4 container restarts/10min | critical |
 
 ### 3.5 Alert Flow
 
 ```
 Metrics/Logs
     │
-    ├─→ Prometheus (31 rules) ──→ AlertManager ──→ [future: webhook]
+    ├─→ Prometheus (31 rules) ──→ [evaluate only, chưa deploy Alertmanager]
     ├─→ Loki Ruler (9 rules) ──→ [evaluates log patterns]
-    └─→ Grafana Unified (25 rules) ──→ discord-ivf ──→ Discord Channel
-         ├── Critical: repeat mỗi 1h
-         └── Warning: repeat mỗi 4h
+    ├─→ Grafana Unified (25 rules) ──→ discord-ivf ──→ Discord Channel  ← ĐANG HOẠT ĐỘNG
+    │    ├── Critical: repeat mỗi 1h
+    │    └── Warning: repeat mỗi 4h
+    └─→ App-level (InfrastructureMetricsPusher, mỗi 15s)
+         └─→ DiscordAlertService ──→ Discord Channel  ← ĐANG HOẠT ĐỘNG
+
+[TÙY CHỌN — chưa áp dụng]
+API Webhook: POST /api/webhooks/alerts/{grafana|prometheus}
+  Dành cho: programmatic clients có khả năng tự pull token (custom script, CI/CD)
+  KHÔNG dùng cho Grafana/Prometheus (static config, không tự pull)
+  Luồng: GET token từ vault API (JWT) → POST alert với X-Webhook-Token
+  Token auto-rotation: mỗi 24h bởi WebhookKeyRotationService
+  Token secret: webhooks/alert-token (lấy qua /api/keyvault/secrets)
 ```
 
 ### 3.6 Quản lý Alerts
@@ -691,12 +703,43 @@ bash scripts/auto-heal.sh --dry-run
 
 ### 6.4 Webhook Alert
 
+#### Auto-heal webhook (legacy)
+
 Set biến `ALERT_WEBHOOK` để nhận thông báo:
 
 ```bash
 export ALERT_WEBHOOK="https://hooks.slack.com/services/..."
 bash scripts/auto-heal.sh
 ```
+
+#### API Alert Webhook (Vault-secured) — Tùy chọn, chưa áp dụng
+
+> **Lưu ý**: Webhook **KHÔNG phù hợp** cho Grafana/Prometheus vì chúng lưu static token trong config. Webhook dành cho **programmatic clients** có khả năng tự pull token qua API trước khi gửi alert (custom script, CI/CD pipeline, hệ thống ngoài).
+
+IVF API expose webhook endpoint cho bất kỳ hệ thống nào có khả năng tự pull token:
+
+| Endpoint                               | Source                   |
+| -------------------------------------- | ------------------------ |
+| `POST /api/webhooks/alerts/grafana`    | Grafana Unified Alerting |
+| `POST /api/webhooks/alerts/prometheus` | Prometheus Alertmanager  |
+| `POST /api/webhooks/alerts/`           | Generic (custom tools)   |
+
+**Luồng sử dụng (pull-then-send)**:
+
+1. Client gọi `GET /api/keyvault/secrets/webhooks%2Falert-token` (cần JWT) → lấy token
+2. Client gọi `POST /api/webhooks/alerts/` với header `X-Webhook-Token` → gửi alert
+
+**Xác thực**: Header `X-Webhook-Token` — vault token với policy `webhook-alerts`.
+
+**Token auto-rotation**: `WebhookKeyRotationService` tự động xoay token mỗi 24h. Client tự pull token mới nhất trước mỗi lần gửi.
+
+```bash
+# Lấy webhook token hiện tại
+curl -s http://localhost:5000/api/keyvault/secrets/webhooks%2Falert-token \
+  -H "Authorization: Bearer $JWT" | jq -r '.value'
+```
+
+> **Chi tiết đầy đủ**: Xem `docs/vault_integration_guide.md` — Section 31 (Webhook Alert Authentication & Auto-Rotation).
 
 ---
 

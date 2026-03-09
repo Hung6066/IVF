@@ -247,16 +247,16 @@ Pure **service + RxJS + signals** — no NgRx/NGXS.
 
 ## Key Infrastructure
 
-| Service                | Purpose                        | Config                                                                              |
-| ---------------------- | ------------------------------ | ----------------------------------------------------------------------------------- |
-| **PostgreSQL**         | Primary DB                     | `localhost:5433`, `ivf_db`                                                          |
-| **Redis**              | Caching (graceful fallback)    | `localhost:6379`                                                                    |
-| **MinIO**              | Object storage (S3-compatible) | `localhost:9000`, buckets: `ivf-documents`, `ivf-signed-pdfs`, `ivf-medical-images` |
-| **SignServer + EJBCA** | Digital PDF signing (PKI)      | mTLS, rate-limited 30 ops/min                                                       |
-| **Prometheus**         | Metrics collection & alerting  | `127.0.0.1:9090`, external: `https://natra.site/prometheus/` (basic auth)           |
-| **Grafana**            | Dashboards, unified alerting, Discord notifications | `127.0.0.1:3000`, external: `https://natra.site/grafana/` (basic auth) |
-| **Loki + Promtail**    | Log aggregation & shipping     | `127.0.0.1:3100`, config: `docker/monitoring/`                                      |
-| **Serilog**            | Structured JSON logging        | `RenderedCompactJsonFormatter`, enriched: CorrelationId, TenantId, UserId           |
+| Service                | Purpose                                             | Config                                                                              |
+| ---------------------- | --------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| **PostgreSQL**         | Primary DB                                          | `localhost:5433`, `ivf_db`                                                          |
+| **Redis**              | Caching (graceful fallback)                         | `localhost:6379`                                                                    |
+| **MinIO**              | Object storage (S3-compatible)                      | `localhost:9000`, buckets: `ivf-documents`, `ivf-signed-pdfs`, `ivf-medical-images` |
+| **SignServer + EJBCA** | Digital PDF signing (PKI)                           | mTLS, rate-limited 30 ops/min                                                       |
+| **Prometheus**         | Metrics collection & alerting                       | `127.0.0.1:9090`, external: `https://natra.site/prometheus/` (basic auth)           |
+| **Grafana**            | Dashboards, unified alerting, Discord notifications | `127.0.0.1:3000`, external: `https://natra.site/grafana/` (basic auth)              |
+| **Loki + Promtail**    | Log aggregation & shipping                          | `127.0.0.1:3100`, config: `docker/monitoring/`                                      |
+| **Serilog**            | Structured JSON logging                             | `RenderedCompactJsonFormatter`, enriched: CorrelationId, TenantId, UserId           |
 
 ### Authentication Stack
 
@@ -270,6 +270,18 @@ Triple auth pipeline: `VaultToken (X-Vault-Token)` → `ApiKey (X-API-Key)` → 
 - `/hubs/queue` — Real-time queue management
 - `/hubs/notifications` — Push notifications
 - `/hubs/fingerprint` — Biometric device events
+
+### Alert Webhooks (Optional — chưa áp dụng)
+
+> Kênh bổ sung cho **programmatic clients** có khả năng tự pull token (custom script, CI/CD, hệ thống ngoài). KHÔNG dùng cho Grafana/Prometheus (static config). Hiện tại Grafana gửi trực tiếp tới Discord qua `discord-ivf`, app-level dùng `InfrastructureMetricsPusher` → `DiscordAlertService`.
+
+- Luồng: `GET /api/keyvault/secrets/webhooks%2Falert-token` (JWT) → `POST /api/webhooks/alerts/` (X-Webhook-Token)
+
+- `POST /api/webhooks/alerts/grafana` — Grafana unified alerting → Discord
+- `POST /api/webhooks/alerts/prometheus` — Prometheus Alertmanager → Discord
+- `POST /api/webhooks/alerts/` — Generic `{source, message, level}` → Discord
+- Auth: `X-Webhook-Token` header (vault token, policy `webhook-alerts`)
+- Token auto-rotation: `WebhookKeyRotationService` (24h cycle, vault secret `webhooks/alert-token`)
 
 ---
 

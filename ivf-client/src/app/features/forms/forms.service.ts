@@ -889,10 +889,20 @@ export class FormsService {
 
 export interface SigningStatus {
   formResponseId: string;
+  currentUserId?: string;
   signatures: DocumentSignatureInfo[];
   requiredRoles: string[];
   pendingRoles: string[];
   isFullySigned: boolean;
+  permissions?: SigningPermissions;
+}
+
+export interface SigningPermissions {
+  canSign: boolean;
+  canRevoke: boolean;
+  canRequestAmendment: boolean;
+  canApproveAmendment: boolean;
+  isAdmin: boolean;
 }
 
 export interface DocumentSignatureInfo {

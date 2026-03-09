@@ -1,0 +1,148 @@
+<div class="modal-overlay" (click)="close()">
+  <div class="modal-content modal-lg" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h2>
+        <i class="fa-solid fa-pen-to-square"></i>
+        Yêu cầu chỉnh sửa phiếu đã ký
+      </h2>
+      <button class="close-btn" (click)="close()">×</button>
+    </div>
+
+    <form (ngSubmit)="submit()">
+      <div class="modal-body">
+        <!-- Error message -->
+        @if (error()) {
+          <div class="alert alert-error">
+            <i class="fa-solid fa-circle-exclamation"></i>
+            {{ error() }}
+          </div>
+        }
+
+        <!-- Reason -->
+        <div class="form-group">
+          <label class="form-label required">Lý do chỉnh sửa</label>
+          <textarea
+            class="form-control"
+            [(ngModel)]="reason"
+            name="reason"
+            rows="3"
+            placeholder="Nhập lý do cần chỉnh sửa dữ liệu..."
+            maxlength="1000"
+          ></textarea>
+          <span class="char-count">{{ reason.length }}/1000</span>
+        </div>
+
+        <!-- Fields to edit -->
+        <div class="fields-section">
+          <h3 class="section-label">Chỉnh sửa dữ liệu</h3>
+          <p class="section-hint">
+            Thay đổi giá trị các trường cần sửa. Chỉ những trường thay đổi mới được ghi nhận.
+          </p>
+
+          <div class="fields-grid">
+            @for (ef of editableFields; track ef.field.id) {
+              <div class="field-edit-row" [class.changed]="ef.isChanged">
+                <div class="field-info">
+                  <span class="field-label">{{ ef.field.label }}</span>
+                  <span class="current-value">
+                    Hiện tại: <strong>{{ getCurrentDisplayValue(ef) }}</strong>
+                  </span>
+                </div>
+                <div class="field-input">
+                  @switch (ef.field.fieldType) {
+                    @case (3) {
+                      <!-- Number -->
+                      <input
+                        type="number"
+                        class="form-control"
+                        [(ngModel)]="ef.newNumericValue"
+                        [name]="'field_' + ef.field.id"
+                        (ngModelChange)="markChanged(ef)"
+                        placeholder="Giá trị mới..."
+                      />
+                    }
+                    @case (4) {
+                      <!-- Date -->
+                      <input
+                        type="date"
+                        class="form-control"
+                        [(ngModel)]="ef.newDateValue"
+                        [name]="'field_' + ef.field.id"
+                        (ngModelChange)="markChanged(ef)"
+                      />
+                    }
+                    @case (5) {
+                      <!-- Boolean / Checkbox -->
+                      <label class="checkbox-label">
+                        <input
+                          type="checkbox"
+                          [(ngModel)]="ef.newBooleanValue"
+                          [name]="'field_' + ef.field.id"
+                          (ngModelChange)="markChanged(ef)"
+                        />
+                        <span>Có</span>
+                      </label>
+                    }
+                    @case (7) {
+                      <!-- Textarea -->
+                      <textarea
+                        class="form-control"
+                        [(ngModel)]="ef.newTextValue"
+                        [name]="'field_' + ef.field.id"
+                        (ngModelChange)="markChanged(ef)"
+                        rows="2"
+                        placeholder="Giá trị mới..."
+                      ></textarea>
+                    }
+                    @default {
+                      <!-- Text / default -->
+                      <input
+                        type="text"
+                        class="form-control"
+                        [(ngModel)]="ef.newTextValue"
+                        [name]="'field_' + ef.field.id"
+                        (ngModelChange)="markChanged(ef)"
+                        placeholder="Giá trị mới..."
+                      />
+                    }
+                  }
+                  @if (ef.isChanged) {
+                    <span class="changed-indicator">
+                      <i class="fa-solid fa-pen"></i> Đã thay đổi
+                    </span>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+
+        <!-- Summary -->
+        @if (getChangedFields().length > 0) {
+          <div class="change-summary">
+            <i class="fa-solid fa-info-circle"></i>
+            Có <strong>{{ getChangedFields().length }}</strong> trường sẽ được gửi yêu cầu chỉnh
+            sửa.
+          </div>
+        }
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" (click)="close()" [disabled]="submitting()">
+          Huỷ bỏ
+        </button>
+        <button
+          type="submit"
+          class="btn btn-primary"
+          [disabled]="submitting() || getChangedFields().length === 0"
+        >
+          @if (submitting()) {
+            <i class="fa-solid fa-spinner fa-spin"></i> Đang gửi...
+          } @else {
+            <i class="fa-solid fa-paper-plane"></i> Gửi yêu cầu chỉnh sửa
+          }
+        </button>
+      </div>
+    </form>
+  </div>
+</div>

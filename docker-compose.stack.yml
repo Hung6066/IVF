@@ -46,7 +46,12 @@ services:
   # ─── PostgreSQL Exporter (Prometheus metrics) ───
   postgres-exporter:
     image: prometheuscommunity/postgres-exporter:latest
-    entrypoint: ["/bin/sh", "-c", "export DATA_SOURCE_NAME=\"postgresql://postgres:$$(cat /run/secrets/ivf_db_password)@db:5432/ivf_db?sslmode=disable\" && /bin/postgres_exporter"]
+    entrypoint:
+      [
+        "/bin/sh",
+        "-c",
+        'export DATA_SOURCE_NAME="postgresql://postgres:$$(cat /run/secrets/ivf_db_password)@db:5432/ivf_db?sslmode=disable" && /bin/postgres_exporter',
+      ]
     secrets:
       - ivf_db_password
     networks:
@@ -304,8 +309,8 @@ services:
       - ivf-data
     deploy:
       restart_policy:
-        condition: on-failure
-        max_attempts: 3
+        condition: none
+      replicas: 1
 
   # ─── Frontend (Angular) ───
   frontend:

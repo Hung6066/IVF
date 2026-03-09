@@ -73,4 +73,11 @@ export const FORMS_ROUTES: Routes = [
     loadComponent: () =>
       import('./report-designer/report-designer.component').then((m) => m.ReportDesignerComponent),
   },
+  {
+    path: 'amendments/pending',
+    loadComponent: () =>
+      import('./amendment-review/amendment-review.component').then(
+        (m) => m.AmendmentReviewComponent,
+      ),
+  },
 ];

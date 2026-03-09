@@ -1,0 +1,257 @@
+<div class="p-6">
+  <!-- Page header -->
+  <header class="page-header">
+    <div class="header-content">
+      <h1>
+        <i class="fa-solid fa-file-pen"></i>
+        Duyệt yêu cầu chỉnh sửa phiếu ký số
+      </h1>
+      <p>Xem xét và phê duyệt các yêu cầu chỉnh sửa dữ liệu trên phiếu đã ký số</p>
+    </div>
+  </header>
+
+  <!-- Action result -->
+  @if (actionResult()) {
+    <div class="alert" [ngClass]="actionResult()!.success ? 'alert-success' : 'alert-error'">
+      <i
+        class="fa-solid"
+        [ngClass]="actionResult()!.success ? 'fa-check-circle' : 'fa-circle-exclamation'"
+      ></i>
+      {{ actionResult()!.message }}
+    </div>
+  }
+
+  <div class="content-layout">
+    <!-- Left panel: pending list -->
+    <div class="list-panel">
+      <div class="panel-header">
+        <h2>Đang chờ duyệt ({{ totalCount() }})</h2>
+      </div>
+
+      @if (loading()) {
+        <div class="loading-state"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải...</div>
+      } @else if (pendingAmendments().length === 0) {
+        <div class="empty-state">
+          <i class="fa-solid fa-check-circle"></i>
+          <p>Không có yêu cầu nào đang chờ duyệt</p>
+        </div>
+      } @else {
+        <div class="amendment-list">
+          @for (item of pendingAmendments(); track item.id) {
+            <div
+              class="amendment-card"
+              [class.selected]="selectedAmendment()?.id === item.id"
+              (click)="selectAmendment(item)"
+            >
+              <div class="card-top">
+                <span class="version-badge">v{{ item.version }}</span>
+                <span class="change-count">{{ item.fieldChanges.length }} thay đổi</span>
+              </div>
+              <div class="card-info">
+                <div class="requester">
+                  <i class="fa-solid fa-user"></i>
+                  {{ item.requestedByName || 'Không rõ' }}
+                </div>
+                <div class="timestamp">
+                  <i class="fa-regular fa-clock"></i>
+                  {{ formatDate(item.createdAt) }}
+                </div>
+              </div>
+              <div class="card-reason">{{ item.reason }}</div>
+            </div>
+          }
+        </div>
+
+        <!-- Pagination -->
+        @if (totalCount() > pageSize) {
+          <div class="pagination">
+            <button [disabled]="page() <= 1" (click)="changePage(page() - 1)">← Trước</button>
+            <span>Trang {{ page() }}</span>
+            <button
+              [disabled]="pendingAmendments().length < pageSize"
+              (click)="changePage(page() + 1)"
+            >
+              Sau →
+            </button>
+          </div>
+        }
+      }
+    </div>
+
+    <!-- Right panel: detail view -->
+    <div class="detail-panel">
+      @if (!selectedAmendment()) {
+        <div class="empty-detail">
+          <i class="fa-solid fa-hand-pointer"></i>
+          <p>Chọn một yêu cầu chỉnh sửa để xem chi tiết</p>
+        </div>
+      } @else if (loadingDetail()) {
+        <div class="loading-state">
+          <i class="fa-solid fa-spinner fa-spin"></i> Đang tải chi tiết...
+        </div>
+      } @else {
+        <div class="detail-content">
+          <!-- Detail header -->
+          <div class="detail-header">
+            <div>
+              <h3>Chi tiết yêu cầu chỉnh sửa - Phiên bản {{ selectedAmendment()!.version }}</h3>
+              <p class="detail-meta">
+                <span
+                  ><i class="fa-solid fa-user"></i> {{ selectedAmendment()!.requestedByName }}</span
+                >
+                <span
+                  ><i class="fa-regular fa-clock"></i>
+                  {{ formatDate(selectedAmendment()!.createdAt) }}</span
+                >
+              </p>
+            </div>
+            <div class="detail-actions">
+              @if (canApproveAmendment) {
+                <button class="btn btn-success" (click)="openApproveModal()">
+                  <i class="fa-solid fa-check"></i> Phê duyệt
+                </button>
+                <button class="btn btn-danger" (click)="openRejectModal()">
+                  <i class="fa-solid fa-xmark"></i> Từ chối
+                </button>
+              } @else {
+                <span class="text-muted">Bạn không có quyền phê duyệt chỉnh sửa.</span>
+              }
+            </div>
+          </div>
+
+          <!-- Reason -->
+          <div class="reason-box">
+            <strong>Lý do chỉnh sửa:</strong>
+            <p>{{ selectedAmendment()!.reason }}</p>
+          </div>
+
+          <!-- Diff table -->
+          <div class="diff-section">
+            <h4>So sánh thay đổi</h4>
+            <div class="diff-table-wrapper">
+              <table class="diff-table">
+                <thead>
+                  <tr>
+                    <th>Trường dữ liệu</th>
+                    <th>Loại thay đổi</th>
+                    <th class="col-old">Dữ liệu cũ (đã ký)</th>
+                    <th class="col-diff">Nội dung thay đổi</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (fc of selectedAmendment()!.fieldChanges; track fc.id) {
+                    <tr [ngClass]="getChangeTypeClass(fc.changeType)">
+                      <td>
+                        <span class="field-label">{{ fc.fieldLabel }}</span>
+                        <span class="field-key">{{ fc.fieldKey }}</span>
+                      </td>
+                      <td class="text-center">
+                        <span
+                          class="change-type-badge"
+                          [ngClass]="getChangeTypeClass(fc.changeType)"
+                        >
+                          {{ getChangeTypeLabel(fc.changeType) }}
+                        </span>
+                      </td>
+                      <td class="col-old">
+                        <div class="old-value">{{ getDisplayValue(fc, 'old') || '(trống)' }}</div>
+                      </td>
+                      <td class="col-diff">
+                        <div class="diff-inline" [innerHTML]="getInlineDiffHtml(fc)"></div>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      }
+    </div>
+  </div>
+</div>
+
+<!-- Approve modal -->
+@if (showApproveModal) {
+  <div class="modal-overlay" (click)="showApproveModal = false">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2><i class="fa-solid fa-check-circle"></i> Phê duyệt chỉnh sửa</h2>
+        <button class="close-btn" (click)="showApproveModal = false">×</button>
+      </div>
+      <div class="modal-body">
+        <p>Sau khi phê duyệt:</p>
+        <ul class="approve-info">
+          <li><i class="fa-solid fa-pen"></i> Dữ liệu phiếu sẽ được cập nhật theo thay đổi</li>
+          <li><i class="fa-solid fa-ban"></i> Tất cả chữ ký cũ sẽ bị thu hồi</li>
+          <li><i class="fa-solid fa-file-pdf"></i> PDF ký số cũ sẽ bị vô hiệu hóa</li>
+          <li><i class="fa-solid fa-signature"></i> Cần ký số lại sau khi chỉnh sửa</li>
+        </ul>
+        <div class="form-group">
+          <label class="form-label">Ghi chú phê duyệt (tuỳ chọn)</label>
+          <textarea
+            class="form-control"
+            [(ngModel)]="reviewNotes"
+            rows="2"
+            placeholder="Nhập ghi chú nếu cần..."
+          ></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button
+          class="btn btn-secondary"
+          (click)="showApproveModal = false"
+          [disabled]="processing()"
+        >
+          Huỷ
+        </button>
+        <button class="btn btn-success" (click)="approve()" [disabled]="processing()">
+          @if (processing()) {
+            <i class="fa-solid fa-spinner fa-spin"></i> Đang xử lý...
+          } @else {
+            <i class="fa-solid fa-check"></i> Xác nhận phê duyệt
+          }
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Reject modal -->
+@if (showRejectModal) {
+  <div class="modal-overlay" (click)="showRejectModal = false">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2><i class="fa-solid fa-xmark-circle"></i> Từ chối chỉnh sửa</h2>
+        <button class="close-btn" (click)="showRejectModal = false">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label required">Lý do từ chối</label>
+          <textarea
+            class="form-control"
+            [(ngModel)]="reviewNotes"
+            rows="3"
+            placeholder="Nhập lý do từ chối yêu cầu chỉnh sửa..."
+          ></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button
+          class="btn btn-secondary"
+          (click)="showRejectModal = false"
+          [disabled]="processing()"
+        >
+          Huỷ
+        </button>
+        <button class="btn btn-danger" (click)="reject()" [disabled]="processing()">
+          @if (processing()) {
+            <i class="fa-solid fa-spinner fa-spin"></i> Đang xử lý...
+          } @else {
+            <i class="fa-solid fa-xmark"></i> Xác nhận từ chối
+          }
+        </button>
+      </div>
+    </div>
+  </div>
+}

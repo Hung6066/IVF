@@ -2073,6 +2073,11 @@
     <app-vault-metrics-tab />
   }
 
+  <!-- ═══ TAB: Webhook ═══ -->
+  @if (activeTab() === 'webhook') {
+    <app-webhook-tab />
+  }
+
   <!-- ═══ Toast ═══ -->
   @if (statusMessage()) {
     <div
