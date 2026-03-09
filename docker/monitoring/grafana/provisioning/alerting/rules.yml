@@ -1,0 +1,941 @@
+# ═══════════════════════════════════════════════════════════
+# Grafana Alerting — Alert Rules
+# Combines Prometheus metric alerts + Loki log-based alerts
+# ALL routed to Discord via unified alerting
+# ═══════════════════════════════════════════════════════════
+apiVersion: 1
+
+groups:
+  # ─────────────────────────────────────
+  # API Availability & Health
+  # ─────────────────────────────────────
+  - orgId: 1
+    name: API Availability
+    folder: IVF Alerts
+    interval: 1m
+    rules:
+      - uid: alert-api-down
+        title: "API Instance Down"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: up{job="ivf-api"} == 0
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+              refId: C
+        for: 1m
+        labels:
+          severity: critical
+          service: ivf-api
+        annotations:
+          summary: "IVF API instance down"
+          description: "API instance không phản hồi hơn 1 phút"
+          runbook_url: "https://natra.site/grafana/d/ivf-system-overview"
+
+      - uid: alert-api-all-down
+        title: "ALL API Instances Down"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: count(up{job="ivf-api"} == 1) == 0 or absent(up{job="ivf-api"})
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+              refId: C
+        for: 30s
+        labels:
+          severity: critical
+          service: ivf-api
+        annotations:
+          summary: "TẤT CẢ API instances đều down — outage hoàn toàn"
+          description: "Không có API instance nào hoạt động. Cần xử lý ngay!"
+
+  # ─────────────────────────────────────
+  # API Latency
+  # ─────────────────────────────────────
+  - orgId: 1
+    name: API Latency
+    folder: IVF Alerts
+    interval: 1m
+    rules:
+      - uid: alert-latency-warning
+        title: "P95 Latency > 1s"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: histogram_quantile(0.95, sum(rate(http_server_request_duration_seconds_bucket{job="ivf-api"}[5m])) by (le))
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [1]
+              refId: C
+        for: 5m
+        labels:
+          severity: warning
+          service: ivf-api
+        annotations:
+          summary: "P95 latency > 1 giây"
+          description: "Thời gian phản hồi P95 vượt 1s. Kiểm tra slow queries."
+
+      - uid: alert-latency-critical
+        title: "P95 Latency > 3s"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: histogram_quantile(0.95, sum(rate(http_server_request_duration_seconds_bucket{job="ivf-api"}[5m])) by (le))
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [3]
+              refId: C
+        for: 3m
+        labels:
+          severity: critical
+          service: ivf-api
+        annotations:
+          summary: "P95 latency > 3 giây — hiệu suất suy giảm"
+          description: "Người dùng đang gặp độ trễ nghiêm trọng."
+
+  # ─────────────────────────────────────
+  # API Error Rate
+  # ─────────────────────────────────────
+  - orgId: 1
+    name: API Errors
+    folder: IVF Alerts
+    interval: 1m
+    rules:
+      - uid: alert-error-rate-warning
+        title: "Error Rate > 1%"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: |
+                sum(rate(http_server_request_duration_seconds_count{job="ivf-api", http_response_status_code=~"5.."}[5m]))
+                /
+                sum(rate(http_server_request_duration_seconds_count{job="ivf-api"}[5m]))
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0.01]
+              refId: C
+        for: 5m
+        labels:
+          severity: warning
+          service: ivf-api
+        annotations:
+          summary: "Tỉ lệ lỗi HTTP > 1%"
+          description: "Kiểm tra logs để tìm nguyên nhân lỗi 5xx."
+
+      - uid: alert-error-rate-critical
+        title: "Error Rate > 5%"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: |
+                sum(rate(http_server_request_duration_seconds_count{job="ivf-api", http_response_status_code=~"5.."}[5m]))
+                /
+                sum(rate(http_server_request_duration_seconds_count{job="ivf-api"}[5m]))
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0.05]
+              refId: C
+        for: 3m
+        labels:
+          severity: critical
+          service: ivf-api
+        annotations:
+          summary: "Tỉ lệ lỗi HTTP > 5% — dịch vụ suy giảm"
+          description: "Cần xử lý ngay. Hơn 5% requests trả về lỗi 5xx."
+
+      - uid: alert-no-traffic
+        title: "No API Traffic"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: sum(rate(http_server_request_duration_seconds_count{job="ivf-api"}[5m])) == 0
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+              refId: C
+        for: 10m
+        labels:
+          severity: warning
+          service: ivf-api
+        annotations:
+          summary: "Không có traffic đến API trong 10 phút"
+          description: "API không nhận request nào. Kiểm tra Caddy proxy hoặc DNS."
+
+  # ─────────────────────────────────────
+  # API Resources (Memory, CPU, GC)
+  # ─────────────────────────────────────
+  - orgId: 1
+    name: API Resources
+    folder: IVF Alerts
+    interval: 1m
+    rules:
+      - uid: alert-memory-warning
+        title: "API Memory > 800MB"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: process_resident_memory_bytes{job="ivf-api"} / 1024 / 1024
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [800]
+              refId: C
+        for: 10m
+        labels:
+          severity: warning
+          service: ivf-api
+        annotations:
+          summary: "API memory > 800MB"
+          description: "RAM đang sử dụng cao. Theo dõi memory leak."
+
+      - uid: alert-memory-critical
+        title: "API Memory > 950MB — Near OOM"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: process_resident_memory_bytes{job="ivf-api"} / 1024 / 1024
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [950]
+              refId: C
+        for: 5m
+        labels:
+          severity: critical
+          service: ivf-api
+        annotations:
+          summary: "API memory > 950MB — sắp OOM"
+          description: "Container có thể bị kill do hết bộ nhớ."
+
+      - uid: alert-gc-pressure
+        title: "High GC Pressure"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: rate(dotnet_gc_collections_total{job="ivf-api", generation="2"}[5m])
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0.5]
+              refId: C
+        for: 10m
+        labels:
+          severity: warning
+          service: ivf-api
+        annotations:
+          summary: "Gen2 GC frequency cao"
+          description: "Memory pressure hoặc large object allocations quá nhiều."
+
+  # ─────────────────────────────────────
+  # Infrastructure — PostgreSQL
+  # ─────────────────────────────────────
+  - orgId: 1
+    name: PostgreSQL
+    folder: IVF Alerts
+    interval: 1m
+    rules:
+      - uid: alert-postgres-down
+        title: "PostgreSQL Down"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: up{job="postgres"} == 0
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+              refId: C
+        for: 1m
+        labels:
+          severity: critical
+          service: postgres
+        annotations:
+          summary: "PostgreSQL đã down"
+          description: "Database chính không phản hồi. Mọi thao tác ghi sẽ thất bại."
+
+      - uid: alert-postgres-replication-lag
+        title: "PostgreSQL Replication Lag > 100MB"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: pg_replication_lag_bytes / 1024 / 1024
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [100]
+              refId: C
+        for: 5m
+        labels:
+          severity: warning
+          service: postgres
+        annotations:
+          summary: "PG replication lag > 100MB"
+          description: "Standby đang bị tụt lại. Kiểm tra I/O và network."
+
+      - uid: alert-postgres-deadlocks
+        title: "PostgreSQL Deadlock Detected"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: increase(pg_stat_database_deadlocks{datname="ivf_db"}[5m])
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+              refId: C
+        for: 0s
+        labels:
+          severity: warning
+          service: postgres
+        annotations:
+          summary: "Deadlock detected trong PostgreSQL"
+          description: "Phát hiện deadlock trên database ivf_db."
+
+  # ─────────────────────────────────────
+  # Infrastructure — Redis
+  # ─────────────────────────────────────
+  - orgId: 1
+    name: Redis
+    folder: IVF Alerts
+    interval: 1m
+    rules:
+      - uid: alert-redis-down
+        title: "Redis Down"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: up{job="redis"} == 0
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+              refId: C
+        for: 1m
+        labels:
+          severity: warning
+          service: redis
+        annotations:
+          summary: "Redis đã down"
+          description: "Cache không khả dụng. API tự động fallback sang DB-only mode."
+
+      - uid: alert-redis-high-memory
+        title: "Redis Memory > 80%"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: redis_memory_used_bytes / redis_memory_max_bytes * 100
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [80]
+              refId: C
+        for: 5m
+        labels:
+          severity: warning
+          service: redis
+        annotations:
+          summary: "Redis memory > 80%"
+          description: "Redis sắp hết bộ nhớ. Evictions có thể tăng."
+
+      - uid: alert-redis-rejected
+        title: "Redis Rejecting Connections"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: increase(redis_rejected_connections_total[5m])
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+              refId: C
+        for: 0s
+        labels:
+          severity: critical
+          service: redis
+        annotations:
+          summary: "Redis đang từ chối kết nối"
+          description: "maxclients limit đã đạt. Kết nối mới bị reject."
+
+  # ─────────────────────────────────────
+  # Infrastructure — MinIO & Caddy
+  # ─────────────────────────────────────
+  - orgId: 1
+    name: Storage & Proxy
+    folder: IVF Alerts
+    interval: 1m
+    rules:
+      - uid: alert-minio-down
+        title: "MinIO Down"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: up{job="minio"} == 0
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+              refId: C
+        for: 2m
+        labels:
+          severity: critical
+          service: minio
+        annotations:
+          summary: "MinIO storage đã down"
+          description: "Upload/download file sẽ thất bại. Ảnh y khoa và tài liệu không truy cập được."
+
+      - uid: alert-minio-disk-critical
+        title: "MinIO Disk > 90%"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: minio_cluster_usage_total_bytes / minio_cluster_capacity_raw_total_bytes * 100
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [90]
+              refId: C
+        for: 5m
+        labels:
+          severity: critical
+          service: minio
+        annotations:
+          summary: "MinIO disk > 90% — sắp đầy"
+          description: "Storage gần đầy. Upload có thể thất bại."
+
+      - uid: alert-caddy-down
+        title: "Caddy Reverse Proxy Down"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: up{job="caddy"} == 0
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+              refId: C
+        for: 1m
+        labels:
+          severity: critical
+          service: caddy
+        annotations:
+          summary: "Caddy proxy đã down"
+          description: "Không có traffic nào đến được API hoặc frontend. Outage hoàn toàn."
+
+  # ─────────────────────────────────────
+  # Loki Log-Based Alerts
+  # ─────────────────────────────────────
+  - orgId: 1
+    name: Log Alerts
+    folder: IVF Alerts
+    interval: 1m
+    rules:
+      - uid: alert-log-exceptions
+        title: "Exception Spike in API Logs"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: loki
+            model:
+              expr: 'sum(count_over_time({swarm_service=~"ivf_api.*"} |~ "(?i)exception|unhandled|fatal" [5m]))'
+              instant: false
+              range: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [10]
+              refId: C
+        for: 5m
+        labels:
+          severity: warning
+          service: ivf-api
+        annotations:
+          summary: "Exception spike trong API logs"
+          description: "Hơn 10 exceptions trong 5 phút. Kiểm tra logs chi tiết."
+
+      - uid: alert-log-auth-failures
+        title: "Authentication Failures Spike"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: loki
+            model:
+              expr: 'sum(count_over_time({swarm_service=~"ivf_api.*"} |~ "(?i)authentication failed|unauthorized|401|invalid token|login failed" [5m]))'
+              instant: false
+              range: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [20]
+              refId: C
+        for: 5m
+        labels:
+          severity: warning
+          service: ivf-api
+        annotations:
+          summary: "Authentication failures spike"
+          description: "Hơn 20 lần xác thực thất bại trong 5 phút. Có thể là brute-force attack."
+
+      - uid: alert-log-db-errors
+        title: "Database Error Spike"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: loki
+            model:
+              expr: 'sum(count_over_time({swarm_service=~"ivf_api.*"} |~ "(?i)npgsql|database|connection refused|timeout expired|deadlock" [5m]))'
+              instant: false
+              range: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [5]
+              refId: C
+        for: 3m
+        labels:
+          severity: critical
+          service: postgres
+        annotations:
+          summary: "Database error spike"
+          description: "Nhiều lỗi database trong logs. Kiểm tra kết nối PostgreSQL."
+
+      - uid: alert-log-security
+        title: "Security Event Detected"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: loki
+            model:
+              expr: 'sum(count_over_time({swarm_service=~"ivf_api.*"} |~ "(?i)rate.?limit|blocked|suspicious|security.?incident|ip.?blocked" [5m]))'
+              instant: false
+              range: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [5]
+              refId: C
+        for: 1m
+        labels:
+          severity: critical
+          service: ivf-api
+        annotations:
+          summary: "Security event detected"
+          description: "Phát hiện sự kiện bảo mật: rate-limit, blocked IP, hoặc suspicious activity."
+
+      - uid: alert-log-service-crash
+        title: "Service Crash/Restart Loop"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: loki
+            model:
+              expr: 'sum(count_over_time({swarm_service=~"ivf_api.*"} |~ "(?i)IVF API starting up|Application is shutting down" [10m]))'
+              instant: false
+              range: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [4]
+              refId: C
+        for: 1m
+        labels:
+          severity: critical
+          service: ivf-api
+        annotations:
+          summary: "API đang restart liên tục (crash loop)"
+          description: "API khởi động/tắt hơn 4 lần trong 10 phút. Có thể là crash loop."
+
+  # ─────────────────────────────────────
+  # Prometheus Self-Monitoring
+  # ─────────────────────────────────────
+  - orgId: 1
+    name: Prometheus
+    folder: IVF Alerts
+    interval: 1m
+    rules:
+      - uid: alert-scrape-target-down
+        title: "Scrape Target Down"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: up == 0
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+              refId: C
+        for: 5m
+        labels:
+          severity: warning
+          service: prometheus
+        annotations:
+          summary: "Scrape target down"
+          description: "Một target Prometheus không phản hồi trong 5 phút."

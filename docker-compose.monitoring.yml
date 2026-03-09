@@ -70,6 +70,10 @@ services:
       - GF_SNAPSHOTS_EXTERNAL_ENABLED=false
       - GF_SERVER_ROOT_URL=https://natra.site/grafana/
       - GF_SERVER_SERVE_FROM_SUB_PATH=true
+      # ── Unified Alerting (Discord) ──
+      - GF_UNIFIED_ALERTING_ENABLED=true
+      - GF_ALERTING_ENABLED=false
+      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL:-}
     volumes:
       - grafana_data:/var/lib/grafana
       - ./docker/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro

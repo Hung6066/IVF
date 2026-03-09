@@ -8,6 +8,7 @@ deleteDatasources:
 
 datasources:
   - name: Prometheus
+    uid: prometheus
     type: prometheus
     access: proxy
     url: http://prometheus:9090/prometheus
@@ -22,6 +23,7 @@ datasources:
       httpMethod: POST
 
   - name: Loki
+    uid: loki
     type: loki
     access: proxy
     url: http://loki:3100
