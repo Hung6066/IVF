@@ -33,26 +33,33 @@ scrape_configs:
     pipeline_stages:
       # ─── Serilog RenderedCompactJsonFormatter Detection ───
       # Parse structured JSON logs from IVF API (Serilog compact JSON format)
-      # Fields: @t (timestamp), @l (level), @m (message), @x (exception),
-      #         @r (renderings), CorrelationId, TenantId, UserId, etc.
-      - json:
-          expressions:
-            level: '@l'
-            message: '@m'
-            exception: '@x'
-            correlation_id: CorrelationId
-            tenant_id: TenantId
-            user_id: UserId
-            request_method: RequestMethod
-            request_path: RequestPath
-            status_code: StatusCode
-            elapsed: Elapsed
-            source_context: SourceContext
-            application: Application
+      # Uses regex to extract @-prefixed fields since JMESPath doesn't support @ keys
+      - regex:
+          expression: '"@l":"(?P<level>[^"]*)"'
+      - regex:
+          expression: '"@m":"(?P<message>[^"]*)"'
+      - regex:
+          expression: '"@x":"(?P<exception>[^"]*)"'
+      - regex:
+          expression: '"CorrelationId":"(?P<correlation_id>[^"]*)"'
+      - regex:
+          expression: '"TenantId":"(?P<tenant_id>[^"]*)"'
+      - regex:
+          expression: '"UserId":"(?P<user_id>[^"]*)"'
+      - regex:
+          expression: '"RequestMethod":"(?P<request_method>[^"]*)"'
+      - regex:
+          expression: '"RequestPath":"(?P<request_path>[^"]*)"'
+      - regex:
+          expression: '"StatusCode":(?P<status_code>\d+)'
+      - regex:
+          expression: '"Elapsed":(?P<elapsed>[0-9.]+)'
+      - regex:
+          expression: '"SourceContext":"(?P<source_context>[^"]*)"'
+      - regex:
+          expression: '"Application":"(?P<application>[^"]*)"'
       - labels:
           level:
-          correlation_id:
-          tenant_id:
           source_context:
           application:
 
