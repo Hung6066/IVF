@@ -87,21 +87,22 @@ export class FingerprintHubService {
     /**
      * Connect to the FingerprintHub with JWT authentication
      */
-    async connect(accessToken: string): Promise<boolean> {
+    async connect(): Promise<boolean> {
         if (this.hubConnection?.state === signalR.HubConnectionState.Connected) {
             console.log('[FingerprintHub] Already connected');
             return true;
         }
 
+        const accessToken = localStorage.getItem('ivf_access_token');
         if (!accessToken) {
-            console.warn('[FingerprintHub] Cannot connect: No access token provided');
+            console.warn('[FingerprintHub] Cannot connect: No access token found');
             return false;
         }
 
         try {
             this.hubConnection = new signalR.HubConnectionBuilder()
                 .withUrl(this.hubUrl, {
-                    accessTokenFactory: () => accessToken
+                    accessTokenFactory: () => localStorage.getItem('ivf_access_token') || ''
                 })
                 .withAutomaticReconnect([0, 2000, 5000, 10000, 30000])
                 .configureLogging(signalR.LogLevel.Information)

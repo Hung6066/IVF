@@ -51,12 +51,12 @@ export class InfrastructureService {
   // ═══ SignalR Connection ═══
 
   connectHub(): void {
-    const token = localStorage.getItem('access_token');
+    const token = localStorage.getItem('ivf_access_token');
     if (!token || this.hubConnection?.state === signalR.HubConnectionState.Connected) return;
 
     this.hubConnection = new signalR.HubConnectionBuilder()
       .withUrl(`${this.getHubBaseUrl()}/hubs/infrastructure`, {
-        accessTokenFactory: () => localStorage.getItem('access_token') || '',
+        accessTokenFactory: () => localStorage.getItem('ivf_access_token') || '',
       })
       .withAutomaticReconnect([0, 2000, 5000, 10000, 30000])
       .build();

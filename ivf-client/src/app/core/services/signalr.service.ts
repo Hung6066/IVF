@@ -32,10 +32,10 @@ export class SignalRService {
 
   constructor() {}
 
-  async startNotificationConnection(token: string): Promise<void> {
+  async startNotificationConnection(): Promise<void> {
     this.notificationHubConnection = new signalR.HubConnectionBuilder()
       .withUrl(`${this.baseUrl}/hubs/notifications`, {
-        accessTokenFactory: () => token,
+        accessTokenFactory: () => localStorage.getItem('ivf_access_token') || '',
         skipNegotiation: false,
         transport: signalR.HttpTransportType.WebSockets | signalR.HttpTransportType.LongPolling,
       })
@@ -68,14 +68,14 @@ export class SignalRService {
       console.log('✅ Connected to NotificationHub');
     } catch (err) {
       console.error('❌ NotificationHub connection error:', err);
-      setTimeout(() => this.startNotificationConnection(token), 5000);
+      setTimeout(() => this.startNotificationConnection(), 5000);
     }
   }
 
-  async startQueueConnection(token: string): Promise<void> {
+  async startQueueConnection(): Promise<void> {
     this.queueHubConnection = new signalR.HubConnectionBuilder()
       .withUrl(`${this.baseUrl}/hubs/queue`, {
-        accessTokenFactory: () => token,
+        accessTokenFactory: () => localStorage.getItem('ivf_access_token') || '',
         skipNegotiation: false,
         transport: signalR.HttpTransportType.WebSockets | signalR.HttpTransportType.LongPolling,
       })
@@ -110,7 +110,7 @@ export class SignalRService {
       console.log('✅ Connected to QueueHub');
     } catch (err) {
       console.error('❌ QueueHub connection error:', err);
-      setTimeout(() => this.startQueueConnection(token), 5000);
+      setTimeout(() => this.startQueueConnection(), 5000);
     }
   }
 

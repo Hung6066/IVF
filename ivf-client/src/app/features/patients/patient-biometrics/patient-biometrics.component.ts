@@ -79,7 +79,7 @@ export class PatientBiometricsComponent implements OnInit, OnDestroy {
                 // Initialize SignalR after patientId is set
                 if (this.useSignalR()) {
                     // Connect first (if not already), then join group
-                    this.fingerprintHub.connect(this.authService.getToken() || '')
+                    this.fingerprintHub.connect()
                         .then(() => {
                             if (this.fingerprintHub.isConnected()) {
                                 this.fingerprintHub.joinPatientCapture(id);
@@ -364,7 +364,7 @@ export class PatientBiometricsComponent implements OnInit, OnDestroy {
                 return;
             }
 
-            const connected = await this.fingerprintHub.connect(token);
+            const connected = await this.fingerprintHub.connect();
             if (connected) {
                 await this.fingerprintHub.joinPatientCapture(this.patientId());
                 this.signalRConnected.set(true);
