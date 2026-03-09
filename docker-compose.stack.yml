@@ -107,6 +107,8 @@ services:
     deploy:
       replicas: 2
       placement:
+        constraints:
+          - node.role == manager
         preferences:
           - spread: node.id
       update_config:
