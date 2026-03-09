@@ -3,6 +3,7 @@ using FluentValidation;
 using IVF.Application.Common.Exceptions;
 using IVF.API.Authorization;
 using IVF.API.Endpoints;
+using IVF.API.Extensions;
 using IVF.API.Middleware;
 using IVF.API.Services;
 using IVF.Application;
@@ -345,6 +346,9 @@ try
     // ─── Webhook Key Auto-Rotation ───
     builder.Services.AddHostedService<IVF.API.Services.WebhookKeyRotationService>();
 
+    // ─── OpenTelemetry + Prometheus metrics ───
+    builder.Services.AddIvfOpenTelemetry(builder.Configuration);
+
     // ─── Cloud Backup Provider Factory (dynamic, DB-backed) ───
     {
         var cloudSection = builder.Configuration.GetSection(IVF.API.Services.CloudBackupSettings.SectionName);
@@ -674,6 +678,9 @@ try
     app.UseTokenBinding(); // Token binding enforcement — validate device/session claims (Microsoft CAE)
     app.UseZeroTrust(); // Zero Trust continuous verification (Google BeyondCorp + Microsoft CAE + AWS GuardDuty)
     app.UseMiddleware<IVF.API.Middleware.ApiCallLoggingMiddleware>(); // Per-tenant API call logging
+
+    // ─── Prometheus metrics endpoint (/metrics) ───
+    app.MapPrometheusScrapingEndpoint();
 
     // SignalR Hubs
     app.MapHub<IVF.API.Hubs.QueueHub>("/hubs/queue");
