@@ -541,9 +541,9 @@ export class InfrastructureMonitorComponent implements OnInit, OnDestroy {
 
   getMonitoringUrl(name: string): string {
     const urls: Record<string, string> = {
-      Prometheus: 'http://localhost:9090',
-      Grafana: 'http://localhost:3000',
-      Loki: 'http://localhost:3100',
+      Prometheus: 'https://natra.site/prometheus',
+      Grafana: 'https://natra.site/grafana',
+      Loki: 'https://natra.site/loki',
     };
     return urls[name] || '#';
   }

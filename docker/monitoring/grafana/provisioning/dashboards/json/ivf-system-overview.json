@@ -200,7 +200,7 @@
       "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "auto" },
       "title": "API Memory",
       "type": "stat",
-      "targets": [{ "expr": "process_resident_memory_bytes{job=\"ivf-api\"}", "legendFormat": "memory" }]
+      "targets": [{ "expr": "dotnet_process_memory_working_set_bytes{job=\"ivf-api\"}", "legendFormat": "memory" }]
     },
     {
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 11 },
@@ -292,9 +292,9 @@
       "title": "Process Memory",
       "type": "timeseries",
       "targets": [
-        { "expr": "process_resident_memory_bytes{job=\"ivf-api\"}", "legendFormat": "RSS {{ instance }}" },
-        { "expr": "process_virtual_memory_bytes{job=\"ivf-api\"}", "legendFormat": "Virtual {{ instance }}" },
-        { "expr": "dotnet_gc_heap_size_bytes{job=\"ivf-api\"}", "legendFormat": "GC Heap {{ instance }}" }
+        { "expr": "dotnet_process_memory_working_set_bytes{job=\"ivf-api\"}", "legendFormat": "Working Set" },
+        { "expr": "dotnet_gc_last_collection_memory_committed_size_bytes{job=\"ivf-api\"}", "legendFormat": "Committed" },
+        { "expr": "dotnet_gc_last_collection_heap_size_bytes{job=\"ivf-api\"}", "legendFormat": "GC Heap" }
       ]
     },
     {
@@ -308,9 +308,9 @@
       "title": ".NET Runtime",
       "type": "timeseries",
       "targets": [
-        { "expr": "rate(dotnet_gc_collections_total{job=\"ivf-api\"}[5m])", "legendFormat": "GC Gen{{ generation }}/s" },
-        { "expr": "process_num_threads{job=\"ivf-api\"}", "legendFormat": "Threads {{ instance }}" },
-        { "expr": "dotnet_threadpool_queue_length{job=\"ivf-api\"}", "legendFormat": "TP Queue {{ instance }}" }
+        { "expr": "rate(dotnet_gc_collections_total{job=\"ivf-api\"}[5m])", "legendFormat": "GC Gen{{ gc_heap_generation }}/s" },
+        { "expr": "dotnet_thread_pool_thread_count_total{job=\"ivf-api\"}", "legendFormat": "Threads" },
+        { "expr": "dotnet_thread_pool_queue_length_total{job=\"ivf-api\"}", "legendFormat": "TP Queue" }
       ]
     }
   ],
