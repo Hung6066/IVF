@@ -19,8 +19,40 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.IdentityModel.Tokens;
 using Fido2NetLib;
+using Serilog;
+using Serilog.Events;
+using Serilog.Formatting.Compact;
+
+// ─── Serilog Bootstrap Logger (captures startup/shutdown errors) ───
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
+    .Enrich.FromLogContext()
+    .WriteTo.Console(new RenderedCompactJsonFormatter())
+    .CreateBootstrapLogger();
+
+try
+{
+    Log.Information("IVF API starting up — Environment: {Environment}",
+        Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Production");
 
 var builder = WebApplication.CreateBuilder(args);
+
+// ─── Serilog: Replace default .NET logging with structured Serilog ───
+builder.Host.UseSerilog((context, services, loggerConfig) =>
+{
+    loggerConfig
+        .ReadFrom.Configuration(context.Configuration)
+        .ReadFrom.Services(services)
+        .Enrich.FromLogContext()
+        .Enrich.WithMachineName()
+        .Enrich.WithEnvironmentName()
+        .Enrich.WithProcessId()
+        .Enrich.WithProcessName()
+        .Enrich.WithThreadId()
+        .Enrich.WithProperty("Application", "IVF.API")
+        .Enrich.WithProperty("Version", typeof(Program).Assembly.GetName().Version?.ToString() ?? "1.0.0")
+        .WriteTo.Console(new RenderedCompactJsonFormatter());
+});
 
 // ─── Resolve Docker Secrets in configuration ───
 // Replace FILE:/path references with actual file contents (for connection strings, etc.)
@@ -421,22 +453,77 @@ var app = builder.Build();
 // Enable CORS immediately
 app.UseCors("AllowAngular");
 
+// ─── Correlation ID: generate/propagate X-Correlation-Id (must be first) ───
+app.UseCorrelationId();
+
+// ─── Serilog structured HTTP request logging ───
+app.UseSerilogRequestLogging(options =>
+{
+    options.EnrichDiagnosticContext = (diagnosticContext, httpContext) =>
+    {
+        diagnosticContext.Set("RequestScheme", httpContext.Request.Scheme);
+        diagnosticContext.Set("RequestHost", httpContext.Request.Host.Value ?? "unknown");
+        diagnosticContext.Set("UserAgent", httpContext.Request.Headers.UserAgent.ToString());
+        diagnosticContext.Set("ClientIp", httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown");
+
+        var correlationId = httpContext.Items["CorrelationId"]?.ToString();
+        if (correlationId is not null)
+            diagnosticContext.Set("CorrelationId", correlationId);
+
+        var userId = httpContext.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (userId is not null)
+            diagnosticContext.Set("UserId", userId);
+
+        var tenantId = httpContext.User.FindFirst("tenant_id")?.Value;
+        if (tenantId is not null)
+            diagnosticContext.Set("TenantId", tenantId);
+    };
+
+    // Custom message template for structured log lines
+    options.MessageTemplate = "HTTP {RequestMethod} {RequestPath} responded {StatusCode} in {Elapsed:0.0000}ms";
+
+    // Log 4xx as Warning, 5xx as Error, rest as Information
+    options.GetLevel = (httpContext, elapsed, ex) =>
+    {
+        if (ex is not null) return LogEventLevel.Error;
+        if (httpContext.Response.StatusCode >= 500) return LogEventLevel.Error;
+        if (httpContext.Response.StatusCode >= 400) return LogEventLevel.Warning;
+        if (elapsed > 5000) return LogEventLevel.Warning;
+        // Suppress health check noise
+        if (httpContext.Request.Path.StartsWithSegments("/health")
+            || httpContext.Request.Path.StartsWithSegments("/metrics"))
+            return LogEventLevel.Verbose;
+        return LogEventLevel.Information;
+    };
+});
+
 // Validation exception handler
 app.UseExceptionHandler(appBuilder =>
 {
     appBuilder.Run(async context =>
     {
         var exception = context.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>()?.Error;
+        var correlationId = context.Items["CorrelationId"]?.ToString() ?? context.TraceIdentifier;
+
         if (exception is ValidationException validationException)
         {
+            Log.Warning(exception,
+                "Validation failed for {RequestMethod} {RequestPath} — {ErrorCount} errors [CorrelationId={CorrelationId}]",
+                context.Request.Method, context.Request.Path, validationException.Errors.Count(), correlationId);
+
             context.Response.StatusCode = 400;
             await context.Response.WriteAsJsonAsync(new
             {
-                errors = validationException.Errors.Select(e => new { e.PropertyName, e.ErrorMessage })
+                errors = validationException.Errors.Select(e => new { e.PropertyName, e.ErrorMessage }),
+                correlationId
             });
         }
         else if (exception is TenantLimitExceededException limitEx)
         {
+            Log.Warning(exception,
+                "Tenant limit exceeded: {LimitType} ({CurrentCount}/{MaxAllowed}) [CorrelationId={CorrelationId}]",
+                limitEx.LimitType, limitEx.CurrentCount, limitEx.MaxAllowed, correlationId);
+
             context.Response.StatusCode = 403;
             await context.Response.WriteAsJsonAsync(new
             {
@@ -444,17 +531,52 @@ app.UseExceptionHandler(appBuilder =>
                 limitType = limitEx.LimitType,
                 currentCount = limitEx.CurrentCount,
                 maxAllowed = limitEx.MaxAllowed,
-                message = limitEx.Message
+                message = limitEx.Message,
+                correlationId
             });
         }
         else if (exception is FeatureNotEnabledException featureEx)
         {
+            Log.Warning(exception,
+                "Feature not enabled: {FeatureCode} [CorrelationId={CorrelationId}]",
+                featureEx.FeatureCode, correlationId);
+
             context.Response.StatusCode = 403;
             await context.Response.WriteAsJsonAsync(new
             {
                 code = "FEATURE_NOT_ENABLED",
                 featureCode = featureEx.FeatureCode,
-                message = featureEx.Message
+                message = featureEx.Message,
+                correlationId
+            });
+        }
+        else if (exception is UnauthorizedAccessException)
+        {
+            Log.Warning(exception,
+                "Unauthorized access: {RequestMethod} {RequestPath} [CorrelationId={CorrelationId}]",
+                context.Request.Method, context.Request.Path, correlationId);
+
+            context.Response.StatusCode = 403;
+            await context.Response.WriteAsJsonAsync(new
+            {
+                code = "ACCESS_DENIED",
+                message = "Access denied",
+                correlationId
+            });
+        }
+        else if (exception is not null)
+        {
+            Log.Error(exception,
+                "Unhandled exception on {RequestMethod} {RequestPath} — {ExceptionType}: {ExceptionMessage} [CorrelationId={CorrelationId}]",
+                context.Request.Method, context.Request.Path,
+                exception.GetType().Name, exception.Message, correlationId);
+
+            context.Response.StatusCode = 500;
+            await context.Response.WriteAsJsonAsync(new
+            {
+                code = "INTERNAL_ERROR",
+                message = app.Environment.IsDevelopment() ? exception.Message : "An internal error occurred",
+                correlationId
             });
         }
     });
@@ -544,6 +666,7 @@ app.UseApiKeyAuth(); // API key authentication (X-API-Key header or apiKey query
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseTenantResolution(); // Multi-tenant row-level isolation — resolve tenant from JWT claims
+app.UseLogContextEnrichment(); // Enrich Serilog LogContext with UserId, TenantId, Role, ClientIp
 app.UseConsentEnforcement(); // GDPR/HIPAA consent enforcement — block access to sensitive data without consent
 app.UseTokenBinding(); // Token binding enforcement — validate device/session claims (Microsoft CAE)
 app.UseZeroTrust(); // Zero Trust continuous verification (Google BeyondCorp + Microsoft CAE + AWS GuardDuty)
@@ -596,6 +719,7 @@ app.MapCertificateAuthorityEndpoints();
 app.MapUserSignatureEndpoints();
 app.MapPatientDocumentEndpoints();
 app.MapDocumentSignatureEndpoints();
+app.MapAmendmentEndpoints();
 app.MapKeyVaultEndpoints();
 app.MapZeroTrustEndpoints();
 app.MapSecurityEventEndpoints(); // Zero Trust security monitoring dashboard
@@ -682,7 +806,22 @@ catch (Exception ex)
     app.Logger.LogWarning(ex, "Vault configuration provider failed to initialize — using static config");
 }
 
+Log.Information("IVF API started successfully — listening on {Urls}",
+    string.Join(", ", app.Urls.DefaultIfEmpty("default")));
+
 app.Run();
+
+}
+catch (Exception ex) when (ex is not HostAbortedException)
+{
+    Log.Fatal(ex, "IVF API terminated unexpectedly — {ExceptionType}: {Message}",
+        ex.GetType().Name, ex.Message);
+}
+finally
+{
+    Log.Information("IVF API shutting down");
+    await Log.CloseAndFlushAsync();
+}
 
 // ─── Helper: Resolve FILE:/path references in configuration ───
 static void ResolveDockerSecrets(IConfigurationRoot configuration)

@@ -31,16 +31,50 @@ scrape_configs:
       - source_labels: ["__meta_docker_container_label_com_docker_stack_namespace"]
         target_label: "stack"
     pipeline_stages:
-      # Extract .NET log level from structured logs
-      - regex:
-          expression: '(?P<level>(trce|dbug|info|warn|fail|crit|Trace|Debug|Information|Warning|Error|Critical|TRACE|DEBUG|INFO|WARN|ERROR|FATAL))'
+      # ─── Serilog RenderedCompactJsonFormatter Detection ───
+      # Parse structured JSON logs from IVF API (Serilog compact JSON format)
+      # Fields: @t (timestamp), @l (level), @m (message), @x (exception),
+      #         @r (renderings), CorrelationId, TenantId, UserId, etc.
+      - json:
+          expressions:
+            level: '@l'
+            message: '@m'
+            exception: '@x'
+            correlation_id: CorrelationId
+            tenant_id: TenantId
+            user_id: UserId
+            request_method: RequestMethod
+            request_path: RequestPath
+            status_code: StatusCode
+            elapsed: Elapsed
+            source_context: SourceContext
+            application: Application
       - labels:
           level:
+          correlation_id:
+          tenant_id:
+          source_context:
+          application:
+
+      # ─── Fallback: Extract log level from plain-text .NET logs ───
+      - regex:
+          expression: '(?P<level_text>(trce|dbug|info|warn|fail|crit|Trace|Debug|Information|Warning|Error|Critical|TRACE|DEBUG|INFO|WARN|ERROR|FATAL))'
+      - labels:
+          level_text:
+
+      # ─── Normalize log levels to single format ───
+      - template:
+          source: level
+          template: '{{ if .level }}{{ .level }}{{ else }}{{ .level_text }}{{ end }}'
+      - labels:
+          level:
+
       # Drop noisy health check logs
       - drop:
           expression: '(?i)(health|liveness|readiness).*200'
           drop_counter_reason: "healthcheck_noise"
-      # Extract HTTP method and path from API logs
+
+      # Extract HTTP method and path from plain-text API logs (fallback)
       - regex:
           expression: '(?P<http_method>(GET|POST|PUT|DELETE|PATCH))\s+(?P<http_path>/\S+)\s+.*\s(?P<http_status>\d{3})'
       - labels:

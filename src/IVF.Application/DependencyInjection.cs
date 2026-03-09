@@ -13,7 +13,8 @@ public static class DependencyInjection
         services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(Assembly.GetExecutingAssembly()));
         services.AddValidatorsFromAssembly(Assembly.GetExecutingAssembly());
 
-        // Add pipeline behaviors
+        // Add pipeline behaviors (order matters: logging wraps everything)
+        services.AddTransient(typeof(IPipelineBehavior<,>), typeof(LoggingBehavior<,>));
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(FeatureGateBehavior<,>));
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(VaultPolicyBehavior<,>));
