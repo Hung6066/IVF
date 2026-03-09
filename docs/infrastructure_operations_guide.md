@@ -130,6 +130,7 @@ docker/monitoring/
             ├── dashboards.yml              # Dashboard provisioning config
             └── json/
                 ├── ivf-system-overview.json # Service health, RED metrics, latency
+                ├── ivf-api-monitoring.json  # API usage, errors, logs, alerts
                 ├── ivf-logs-errors.json     # Log viewer, error tracking
                 └── ivf-infrastructure.json  # Alerts, targets, Prometheus perf
 ```
@@ -241,7 +242,7 @@ Hệ thống sử dụng các exporter chuyên dụng để thu thập metrics t
 
 ### 1.9 Grafana Dashboards
 
-3 dashboards tự động provisioning vào thư mục **IVF System**:
+4 dashboards tự động provisioning vào thư mục **IVF System**:
 
 #### IVF System Overview (`/d/ivf-system-overview`)
 
@@ -252,6 +253,21 @@ Hệ thống sử dụng các exporter chuyên dụng để thu thập metrics t
 | HTTP Traffic       | Request rate by status code, Response time percentiles (P50/P95/P99) |
 | Top Endpoints      | Request rate by endpoint (stacked), Slowest endpoints P95 (top 10)   |
 | API Resources      | Process memory (RSS/Virtual/GC Heap), .NET Runtime (GC, threads)     |
+
+#### IVF API Monitoring (`/d/ivf-api-monitoring`)
+
+Dashboard giám sát toàn diện API — tập trung vào usage, errors, logs, alerts cho IVF API.
+
+| Row                    | Panels                                                                             |
+| ----------------------- | ---------------------------------------------------------------------------------- |
+| API Health & Availability | API Status (UP/DOWN), Availability %, Instances Online, Request Rate, Error Rate, P95 Latency |
+| HTTP Traffic & Latency | Request rate by status code, Response time percentiles (P50/P95/P99), Request rate by endpoint (top 10), Slowest endpoints P95 (top 10) |
+| HTTP Request Breakdown | Request rate by HTTP method (GET/POST/PUT/DELETE), Today vs Yesterday comparison, Response status distribution (pie chart), Latency heatmap |
+| Errors & Exceptions    | 6 stat panels: Errors, Exceptions, DB Errors, Auth Failures, Redis Errors, Active Alerts (1h). Error timeline (Exceptions/Errors/Warnings), 5xx by endpoint, 4xx by endpoint |
+| Security & Auth        | Authentication events (login success/failed, 401/403), Security events (rate limited, blocked, impersonation) |
+| .NET Runtime & Resources | Process memory (RSS/Virtual/GC Heap), .NET Runtime (GC/threads), CPU usage, GC pause duration |
+| Active Alerts          | Alert list (firing/pending), Alert history timeline                                  |
+| API Logs (Live)        | Error & exception log stream, All API logs (collapsed)                               |
 
 #### IVF Logs & Errors (`/d/ivf-logs-errors`)
 
@@ -597,6 +613,7 @@ docker/monitoring/
         ├── dashboards.yml             # Dashboard auto-provisioning
         └── json/
             ├── ivf-system-overview.json   # Service health, RED, latency
+            ├── ivf-api-monitoring.json    # API usage, errors, logs, alerts
             ├── ivf-logs-errors.json       # Log viewer, error tracking
             └── ivf-infrastructure.json    # Alerts, targets, Prometheus perf
 

@@ -1,0 +1,639 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "Giám sát toàn diện IVF API — sử dụng hệ thống, lưu lượng, lỗi, logs, runtime, alerts",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "links": [
+    { "asDropdown": false, "icon": "external link", "includeVars": false, "keepTime": true, "tags": ["ivf"], "targetBlank": true, "title": "IVF Dashboards", "type": "dashboards" }
+  ],
+  "panels": [
+    {
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 200,
+      "title": "🟢 API Health & Availability",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [
+            { "options": { "0": { "color": "red", "text": "DOWN" }, "1": { "color": "green", "text": "UP" } }, "type": "value" }
+          ],
+          "thresholds": { "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] }
+        }
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 1 },
+      "id": 1,
+      "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "auto" },
+      "title": "API Status",
+      "type": "stat",
+      "targets": [{ "expr": "up{job=\"ivf-api\"}", "legendFormat": "API", "instant": true }]
+    },
+    {
+      "datasource": { "type": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "unit": "percentunit",
+          "decimals": 2,
+          "thresholds": { "steps": [{ "color": "red", "value": null }, { "color": "yellow", "value": 0.5 }, { "color": "green", "value": 0.99 }] },
+          "min": 0, "max": 1
+        }
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 1 },
+      "id": 2,
+      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "center", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "auto" },
+      "title": "Availability",
+      "type": "stat",
+      "targets": [{ "expr": "ivf:api_availability:ratio or avg(up{job=\"ivf-api\"})", "legendFormat": "availability", "instant": true }]
+    },
+    {
+      "datasource": { "type": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "unit": "short",
+          "thresholds": { "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] }
+        }
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 1 },
+      "id": 3,
+      "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "center", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "auto" },
+      "title": "Instances Online",
+      "type": "stat",
+      "targets": [{ "expr": "count(up{job=\"ivf-api\"} == 1)", "legendFormat": "instances", "instant": true }]
+    },
+    {
+      "datasource": { "type": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "unit": "reqps",
+          "decimals": 1,
+          "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 50 }, { "color": "red", "value": 100 }] }
+        }
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 1 },
+      "id": 4,
+      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "center", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "auto" },
+      "title": "Request Rate",
+      "type": "stat",
+      "targets": [{ "expr": "ivf:http_requests:rate5m or sum(rate(http_server_request_duration_seconds_count{job=\"ivf-api\"}[5m]))", "legendFormat": "req/s" }]
+    },
+    {
+      "datasource": { "type": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "unit": "percentunit",
+          "decimals": 2,
+          "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 0.01 }, { "color": "red", "value": 0.05 }] },
+          "min": 0, "max": 1
+        }
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 1 },
+      "id": 5,
+      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "center", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "auto" },
+      "title": "Error Rate (5xx)",
+      "type": "stat",
+      "targets": [{ "expr": "ivf:http_error_rate:ratio5m or (sum(rate(http_server_request_duration_seconds_count{job=\"ivf-api\", http_response_status_code=~\"5..\"}[5m])) / sum(rate(http_server_request_duration_seconds_count{job=\"ivf-api\"}[5m])))", "legendFormat": "error %" }]
+    },
+    {
+      "datasource": { "type": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "unit": "s",
+          "decimals": 3,
+          "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 0.5 }, { "color": "red", "value": 2 }] }
+        }
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 1 },
+      "id": 6,
+      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "center", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "auto" },
+      "title": "P95 Latency",
+      "type": "stat",
+      "targets": [{ "expr": "ivf:http_latency_p95:5m or histogram_quantile(0.95, sum(rate(http_server_request_duration_seconds_bucket{job=\"ivf-api\"}[5m])) by (le))", "legendFormat": "P95" }]
+    },
+
+    {
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+      "id": 201,
+      "title": "📈 HTTP Traffic & Latency",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "unit": "reqps", "custom": { "lineWidth": 2, "fillOpacity": 15, "showPoints": "never", "spanNulls": true } }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+      "id": 10,
+      "options": { "legend": { "displayMode": "table", "calcs": ["mean", "max", "lastNotNull"], "placement": "bottom" }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "title": "Request Rate by Status Code",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "sum(rate(http_server_request_duration_seconds_count{job=\"ivf-api\", http_response_status_code=~\"2..\"}[5m]))", "legendFormat": "2xx Success" },
+        { "expr": "sum(rate(http_server_request_duration_seconds_count{job=\"ivf-api\", http_response_status_code=~\"3..\"}[5m]))", "legendFormat": "3xx Redirect" },
+        { "expr": "sum(rate(http_server_request_duration_seconds_count{job=\"ivf-api\", http_response_status_code=~\"4..\"}[5m]))", "legendFormat": "4xx Client Error" },
+        { "expr": "sum(rate(http_server_request_duration_seconds_count{job=\"ivf-api\", http_response_status_code=~\"5..\"}[5m]))", "legendFormat": "5xx Server Error" }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "unit": "s", "custom": { "lineWidth": 2, "fillOpacity": 10, "showPoints": "never", "spanNulls": true } }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+      "id": 11,
+      "options": { "legend": { "displayMode": "table", "calcs": ["mean", "max", "lastNotNull"], "placement": "bottom" }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "title": "Response Time Percentiles",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "ivf:http_latency_p50:5m or histogram_quantile(0.50, sum(rate(http_server_request_duration_seconds_bucket{job=\"ivf-api\"}[5m])) by (le))", "legendFormat": "P50 (Median)" },
+        { "expr": "ivf:http_latency_p95:5m or histogram_quantile(0.95, sum(rate(http_server_request_duration_seconds_bucket{job=\"ivf-api\"}[5m])) by (le))", "legendFormat": "P95" },
+        { "expr": "ivf:http_latency_p99:5m or histogram_quantile(0.99, sum(rate(http_server_request_duration_seconds_bucket{job=\"ivf-api\"}[5m])) by (le))", "legendFormat": "P99" }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "unit": "reqps", "custom": { "lineWidth": 1, "fillOpacity": 30, "showPoints": "never", "stacking": { "mode": "normal" } } }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 14 },
+      "id": 12,
+      "options": { "legend": { "displayMode": "table", "calcs": ["mean", "max"], "placement": "bottom" }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "title": "Request Rate by Endpoint (Top 10)",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "topk(10, sum(rate(http_server_request_duration_seconds_count{job=\"ivf-api\"}[5m])) by (http_route))", "legendFormat": "{{http_route}}" }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "unit": "s", "custom": { "lineWidth": 2, "fillOpacity": 5, "showPoints": "never" } }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 14 },
+      "id": 13,
+      "options": { "legend": { "displayMode": "table", "calcs": ["mean", "max"], "placement": "bottom" }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "title": "Slowest Endpoints P95 (Top 10)",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "topk(10, histogram_quantile(0.95, sum(rate(http_server_request_duration_seconds_bucket{job=\"ivf-api\"}[5m])) by (le, http_route)))", "legendFormat": "{{http_route}}" }
+      ]
+    },
+
+    {
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 22 },
+      "id": 202,
+      "title": "📊 HTTP Request Breakdown",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "unit": "reqps", "custom": { "lineWidth": 1, "fillOpacity": 20, "showPoints": "never", "stacking": { "mode": "normal" } } }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 23 },
+      "id": 14,
+      "options": { "legend": { "displayMode": "table", "calcs": ["mean", "lastNotNull"], "placement": "bottom" }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "title": "Request Rate by HTTP Method",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "sum(rate(http_server_request_duration_seconds_count{job=\"ivf-api\"}[5m])) by (http_request_method)", "legendFormat": "{{http_request_method}}" }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "unit": "reqps", "custom": { "lineWidth": 2, "fillOpacity": 15, "showPoints": "never" } }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 23 },
+      "id": 15,
+      "options": { "legend": { "displayMode": "table", "calcs": ["mean", "max", "lastNotNull"], "placement": "bottom" }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "title": "Request Rate vs Yesterday",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "sum(rate(http_server_request_duration_seconds_count{job=\"ivf-api\"}[5m]))", "legendFormat": "Today" },
+        { "expr": "sum(rate(http_server_request_duration_seconds_count{job=\"ivf-api\"}[5m] offset 1d))", "legendFormat": "Yesterday" }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "hideFrom": { "legend": false, "tooltip": false, "viz": false } }
+        },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "2xx" }, "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "3xx" }, "properties": [{ "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "4xx" }, "properties": [{ "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "5xx" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 31 },
+      "id": 16,
+      "options": { "reduceOptions": { "calcs": ["sum"] }, "legend": { "displayMode": "table", "placement": "right", "values": ["value", "percent"] }, "tooltip": { "mode": "single" }, "pieType": "donut" },
+      "title": "Response Status Distribution",
+      "type": "piechart",
+      "targets": [
+        { "expr": "sum(increase(http_server_request_duration_seconds_count{job=\"ivf-api\", http_response_status_code=~\"2..\"}[$__range]))", "legendFormat": "2xx", "instant": true },
+        { "expr": "sum(increase(http_server_request_duration_seconds_count{job=\"ivf-api\", http_response_status_code=~\"3..\"}[$__range]))", "legendFormat": "3xx", "instant": true },
+        { "expr": "sum(increase(http_server_request_duration_seconds_count{job=\"ivf-api\", http_response_status_code=~\"4..\"}[$__range]))", "legendFormat": "4xx", "instant": true },
+        { "expr": "sum(increase(http_server_request_duration_seconds_count{job=\"ivf-api\", http_response_status_code=~\"5..\"}[$__range]))", "legendFormat": "5xx", "instant": true }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "unit": "s", "custom": { "fillOpacity": 80, "gradientMode": "hue" } },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 16, "x": 8, "y": 31 },
+      "id": 17,
+      "options": { "calculate": true, "cellGap": 1, "yAxis": { "axisPlacement": "left" }, "color": { "mode": "scheme", "scheme": "RdYlGn", "reverse": true, "steps": 128 }, "exemplars": { "color": "rgba(255,0,255,0.7)" }, "tooltip": { "mode": "single" } },
+      "title": "Latency Heatmap",
+      "type": "heatmap",
+      "targets": [
+        { "expr": "sum(increase(http_server_request_duration_seconds_bucket{job=\"ivf-api\"}[$__interval])) by (le)", "legendFormat": "{{le}}", "format": "heatmap" }
+      ]
+    },
+
+    {
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 39 },
+      "id": 203,
+      "title": "🔴 Errors & Exceptions",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "loki" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 5 }, { "color": "red", "value": 20 }] }
+        }
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 40 },
+      "id": 20,
+      "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "center", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "auto" },
+      "title": "Errors (1h)",
+      "type": "stat",
+      "targets": [{ "expr": "count_over_time({swarm_service=~\"ivf_api.*\"} |~ \"(?i)(exception|error|fail|critical)\" != \"HealthCheck\" != \"errors_total\" != \"error_rate\" [1h])", "legendFormat": "errors" }]
+    },
+    {
+      "datasource": { "type": "loki" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 1 }, { "color": "red", "value": 5 }] }
+        }
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 40 },
+      "id": 21,
+      "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "center", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "auto" },
+      "title": "Exceptions (1h)",
+      "type": "stat",
+      "targets": [{ "expr": "count_over_time({swarm_service=~\"ivf_api.*\"} |~ \"(?i)(exception|unhandled|stacktrace|NullReference|InvalidOperation)\" [1h])", "legendFormat": "exceptions" }]
+    },
+    {
+      "datasource": { "type": "loki" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 1 }, { "color": "red", "value": 3 }] }
+        }
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 40 },
+      "id": 22,
+      "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "center", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "auto" },
+      "title": "DB Errors (1h)",
+      "type": "stat",
+      "targets": [{ "expr": "count_over_time({swarm_service=~\"ivf_api.*\"} |~ \"(?i)(EntityFramework|Npgsql|deadlock|connection refused|timeout expired)\" [1h])", "legendFormat": "db errors" }]
+    },
+    {
+      "datasource": { "type": "loki" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 5 }, { "color": "red", "value": 15 }] }
+        }
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 40 },
+      "id": 23,
+      "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "center", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "auto" },
+      "title": "Auth Failures (1h)",
+      "type": "stat",
+      "targets": [{ "expr": "count_over_time({swarm_service=~\"ivf_api.*\"} |~ \"(?i)(401|403|unauthorized|forbidden|authentication failed|invalid token)\" [1h])", "legendFormat": "auth failures" }]
+    },
+    {
+      "datasource": { "type": "loki" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 1 }, { "color": "red", "value": 3 }] }
+        }
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 40 },
+      "id": 24,
+      "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "center", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "auto" },
+      "title": "Redis Errors (1h)",
+      "type": "stat",
+      "targets": [{ "expr": "count_over_time({swarm_service=~\"ivf_api.*\"} |~ \"(?i)(redis|StackExchange\\\\.Redis|RedisConnectionException|RedisTimeoutException)\" [1h])", "legendFormat": "redis errors" }]
+    },
+    {
+      "datasource": { "type": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "unit": "short",
+          "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 1 }, { "color": "red", "value": 3 }] }
+        }
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 40 },
+      "id": 25,
+      "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "auto" },
+      "title": "Active Alerts",
+      "type": "stat",
+      "targets": [{ "expr": "count(ALERTS{alertstate=\"firing\", job=\"ivf-api\"}) or vector(0)", "legendFormat": "firing", "instant": true }]
+    },
+    {
+      "datasource": { "type": "loki" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "custom": { "lineWidth": 1, "fillOpacity": 30, "showPoints": "never", "stacking": { "mode": "normal" } } }
+      },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 44 },
+      "id": 26,
+      "options": { "legend": { "displayMode": "table", "calcs": ["sum", "lastNotNull"], "placement": "bottom" }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "title": "Error Timeline",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "sum(count_over_time({swarm_service=~\"ivf_api.*\"} |~ \"(?i)(exception|unhandled|stacktrace)\" [$__interval]))", "legendFormat": "Exceptions" },
+        { "expr": "sum(count_over_time({swarm_service=~\"ivf_api.*\"} |~ \"(?i)(error|fail|critical)\" != \"HealthCheck\" != \"errors_total\" != \"error_rate\" [$__interval]))", "legendFormat": "Errors" },
+        { "expr": "sum(count_over_time({swarm_service=~\"ivf_api.*\"} |~ \"(?i)(warn)\" [$__interval]))", "legendFormat": "Warnings" }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "unit": "short", "custom": { "lineWidth": 2, "fillOpacity": 20, "showPoints": "never" } }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 52 },
+      "id": 27,
+      "options": { "legend": { "displayMode": "table", "calcs": ["mean", "max", "lastNotNull"], "placement": "bottom" }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "title": "5xx Errors by Endpoint",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "topk(10, sum(rate(http_server_request_duration_seconds_count{job=\"ivf-api\", http_response_status_code=~\"5..\"}[5m])) by (http_route))", "legendFormat": "{{http_route}}" }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "unit": "short", "custom": { "lineWidth": 2, "fillOpacity": 20, "showPoints": "never" } }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 52 },
+      "id": 28,
+      "options": { "legend": { "displayMode": "table", "calcs": ["mean", "max", "lastNotNull"], "placement": "bottom" }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "title": "4xx Errors by Endpoint",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "topk(10, sum(rate(http_server_request_duration_seconds_count{job=\"ivf-api\", http_response_status_code=~\"4..\"}[5m])) by (http_route))", "legendFormat": "{{http_route}}" }
+      ]
+    },
+
+    {
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 60 },
+      "id": 204,
+      "title": "🔐 Security & Authentication",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "loki" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "custom": { "lineWidth": 1, "fillOpacity": 30, "showPoints": "never" } }
+      },
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 61 },
+      "id": 30,
+      "options": { "legend": { "displayMode": "table", "calcs": ["sum", "lastNotNull"], "placement": "bottom" }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "title": "Authentication Events",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "sum(count_over_time({swarm_service=~\"ivf_api.*\"} |~ \"(?i)(login|sign.?in|authenticated)\" != \"failed\" != \"invalid\" [$__interval]))", "legendFormat": "Login Success" },
+        { "expr": "sum(count_over_time({swarm_service=~\"ivf_api.*\"} |~ \"(?i)(login failed|authentication failed|invalid.*(token|credential|password))\" [$__interval]))", "legendFormat": "Login Failed" },
+        { "expr": "sum(count_over_time({swarm_service=~\"ivf_api.*\"} |~ \"(?i)(401|unauthorized)\" [$__interval]))", "legendFormat": "401 Unauthorized" },
+        { "expr": "sum(count_over_time({swarm_service=~\"ivf_api.*\"} |~ \"(?i)(403|forbidden)\" [$__interval]))", "legendFormat": "403 Forbidden" }
+      ]
+    },
+    {
+      "datasource": { "type": "loki" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "custom": { "lineWidth": 1, "fillOpacity": 30, "showPoints": "never" } }
+      },
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 61 },
+      "id": 31,
+      "options": { "legend": { "displayMode": "table", "calcs": ["sum", "lastNotNull"], "placement": "bottom" }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "title": "Security Events",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "sum(count_over_time({swarm_service=~\"ivf_api.*\"} |~ \"(?i)(rate.?limit|throttl)\" [$__interval]))", "legendFormat": "Rate Limited" },
+        { "expr": "sum(count_over_time({swarm_service=~\"ivf_api.*\"} |~ \"(?i)(blocked|banned|blacklist|suspicious)\" [$__interval]))", "legendFormat": "Blocked/Suspicious" },
+        { "expr": "sum(count_over_time({swarm_service=~\"ivf_api.*\"} |~ \"(?i)(impersonat|permission.?delegat)\" [$__interval]))", "legendFormat": "Impersonation/Delegation" }
+      ]
+    },
+
+    {
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 68 },
+      "id": 205,
+      "title": "💾 .NET Runtime & Resources",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "unit": "decbytes", "custom": { "lineWidth": 2, "fillOpacity": 15, "showPoints": "never", "spanNulls": true } }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 69 },
+      "id": 40,
+      "options": { "legend": { "displayMode": "table", "calcs": ["mean", "max", "lastNotNull"], "placement": "bottom" }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "title": "Process Memory",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "process_resident_memory_bytes{job=\"ivf-api\"}", "legendFormat": "RSS (Physical)" },
+        { "expr": "process_virtual_memory_bytes{job=\"ivf-api\"}", "legendFormat": "Virtual" },
+        { "expr": "dotnet_gc_heap_size_bytes{job=\"ivf-api\"}", "legendFormat": "GC Heap" }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "unit": "short", "custom": { "lineWidth": 2, "fillOpacity": 15, "showPoints": "never", "spanNulls": true } }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 69 },
+      "id": 41,
+      "options": { "legend": { "displayMode": "table", "calcs": ["mean", "max", "lastNotNull"], "placement": "bottom" }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "title": ".NET Runtime",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "rate(dotnet_gc_collections_total{job=\"ivf-api\", gc_generation=\"gen0\"}[5m])", "legendFormat": "GC Gen0/s" },
+        { "expr": "rate(dotnet_gc_collections_total{job=\"ivf-api\", gc_generation=\"gen1\"}[5m])", "legendFormat": "GC Gen1/s" },
+        { "expr": "rate(dotnet_gc_collections_total{job=\"ivf-api\", gc_generation=\"gen2\"}[5m])", "legendFormat": "GC Gen2/s" },
+        { "expr": "process_num_threads{job=\"ivf-api\"}", "legendFormat": "Threads" },
+        { "expr": "dotnet_threadpool_queue_length{job=\"ivf-api\"}", "legendFormat": "ThreadPool Queue" }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "unit": "percent", "custom": { "lineWidth": 2, "fillOpacity": 15, "showPoints": "never", "spanNulls": true }, "min": 0, "max": 100 }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 77 },
+      "id": 42,
+      "options": { "legend": { "displayMode": "table", "calcs": ["mean", "max", "lastNotNull"], "placement": "bottom" }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "title": "CPU Usage",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "rate(process_cpu_seconds_total{job=\"ivf-api\"}[5m]) * 100", "legendFormat": "CPU %" }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "unit": "s", "custom": { "lineWidth": 2, "fillOpacity": 15, "showPoints": "never", "spanNulls": true } }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 77 },
+      "id": 43,
+      "options": { "legend": { "displayMode": "table", "calcs": ["mean", "max", "lastNotNull"], "placement": "bottom" }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "title": "GC Pause Duration",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "rate(dotnet_gc_pause_duration_seconds_total{job=\"ivf-api\"}[5m])", "legendFormat": "GC Pause/s" }
+      ]
+    },
+
+    {
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 85 },
+      "id": 206,
+      "title": "🚨 Active Alerts",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 86 },
+      "id": 50,
+      "options": {
+        "alertName": "",
+        "dashboardAlerts": false,
+        "groupBy": [],
+        "groupMode": "default",
+        "maxItems": 50,
+        "sortOrder": 1,
+        "stateFilter": { "error": true, "firing": true, "noData": false, "normal": false, "pending": true },
+        "viewMode": "list"
+      },
+      "title": "API & Infrastructure Alerts",
+      "type": "alertlist",
+      "targets": [{ "expr": "ALERTS{alertstate=~\"firing|pending\"}", "legendFormat": "{{alertname}}" }]
+    },
+    {
+      "datasource": { "type": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "unit": "short", "custom": { "lineWidth": 2, "fillOpacity": 25, "showPoints": "never" } }
+      },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 94 },
+      "id": 51,
+      "options": { "legend": { "displayMode": "table", "calcs": ["sum", "lastNotNull"], "placement": "bottom" }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "title": "Alert History (Firing)",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "ALERTS{alertstate=\"firing\"}", "legendFormat": "{{alertname}} — {{severity}}" }
+      ]
+    },
+
+    {
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 102 },
+      "id": 207,
+      "title": "📋 API Logs (Live)",
+      "type": "row",
+      "collapsed": false
+    },
+    {
+      "datasource": { "type": "loki" },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 103 },
+      "id": 60,
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "showCommonLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "sortOrder": "Descending",
+        "dedupStrategy": "none"
+      },
+      "title": "🔴 API Error & Exception Logs",
+      "type": "logs",
+      "targets": [{
+        "expr": "{swarm_service=~\"ivf_api.*\"} |~ \"(?i)(exception|error|fail|critical|warn)\" != \"HealthCheck\" != \"errors_total\" != \"error_rate\" != \"_total\"",
+        "legendFormat": ""
+      }]
+    },
+    {
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 113 },
+      "id": 208,
+      "title": "📋 All API Logs",
+      "type": "row",
+      "collapsed": true,
+      "panels": [
+        {
+          "datasource": { "type": "loki" },
+          "gridPos": { "h": 12, "w": 24, "x": 0, "y": 114 },
+          "id": 61,
+          "options": {
+            "showTime": true,
+            "showLabels": false,
+            "showCommonLabels": false,
+            "wrapLogMessage": true,
+            "prettifyLogMessage": false,
+            "enableLogDetails": true,
+            "sortOrder": "Descending",
+            "dedupStrategy": "none"
+          },
+          "title": "API Logs (All)",
+          "type": "logs",
+          "targets": [{
+            "expr": "{swarm_service=~\"ivf_api.*\"}",
+            "legendFormat": ""
+          }]
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["ivf", "api", "monitoring"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {
+    "refresh_intervals": ["5s", "10s", "30s", "1m", "5m", "15m"]
+  },
+  "timezone": "Asia/Ho_Chi_Minh",
+  "title": "IVF API Monitoring",
+  "uid": "ivf-api-monitoring",
+  "version": 1
+}
