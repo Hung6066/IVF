@@ -23,6 +23,8 @@ useDefault = true
     '''(^|[\\/])obj[\\/]''',
     '''gitleaks-report.*\.csv$''',
     '''CertificateAuthorityService\.cs$''',
+    '''docker-compose\.monitoring\.yml$''',
+    '''(^|[\\/])docker[\\/]monitoring[\\/]''',
   ]
 
 # Additional custom rules

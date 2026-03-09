@@ -158,10 +158,14 @@ jobs:
           tags: ${{ steps.meta-frontend.outputs.tags }}
           labels: ${{ steps.meta-frontend.outputs.labels }}
 
+      - name: Set short SHA
+        id: short-sha
+        run: echo "sha=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
+
       - name: Trivy — Scan API image for vulnerabilities
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ steps.short-sha.outputs.sha }}
           format: "sarif"
           output: "trivy-api.sarif"
           severity: "CRITICAL,HIGH"
@@ -177,7 +181,7 @@ jobs:
       - name: Trivy — Scan Frontend image for vulnerabilities
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-client:sha-${{ github.sha }}
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-client:sha-${{ steps.short-sha.outputs.sha }}
           format: "sarif"
           output: "trivy-frontend.sarif"
           severity: "CRITICAL,HIGH"
@@ -204,7 +208,7 @@ jobs:
       - name: Run Gitleaks
         run: |
           curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.21.2/gitleaks_8.21.2_linux_x64.tar.gz | tar xz -C /usr/local/bin gitleaks
-          gitleaks detect --source . --verbose --exit-code 1
+          gitleaks detect --source . --config .gitleaks.toml --verbose --exit-code 1
 
   # ==================== Code Quality ====================
   code-quality:
