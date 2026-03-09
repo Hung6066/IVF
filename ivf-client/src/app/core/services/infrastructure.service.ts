@@ -38,6 +38,7 @@ export class InfrastructureService {
   private healthSubject = new BehaviorSubject<InfraHealth | null>(null);
   private alertsSubject = new BehaviorSubject<InfraAlert[]>([]);
   private healingEventsSubject = new BehaviorSubject<HealingEvent[]>([]);
+  private connectedSubject = new BehaviorSubject<boolean>(false);
 
   vpsMetrics$ = this.vpsMetricsSubject.asObservable();
   swarmServices$ = this.swarmServicesSubject.asObservable();
@@ -45,6 +46,7 @@ export class InfrastructureService {
   health$ = this.healthSubject.asObservable();
   alerts$ = this.alertsSubject.asObservable();
   healingEvents$ = this.healingEventsSubject.asObservable();
+  connected$ = this.connectedSubject.asObservable();
 
   // ═══ SignalR Connection ═══
 
@@ -54,7 +56,7 @@ export class InfrastructureService {
 
     this.hubConnection = new signalR.HubConnectionBuilder()
       .withUrl(`${this.getHubBaseUrl()}/hubs/infrastructure`, {
-        accessTokenFactory: () => token,
+        accessTokenFactory: () => localStorage.getItem('access_token') || '',
       })
       .withAutomaticReconnect([0, 2000, 5000, 10000, 30000])
       .build();
@@ -85,14 +87,22 @@ export class InfrastructureService {
       this.healingEventsSubject.next([data, ...current].slice(0, 100));
     });
 
-    this.hubConnection.start().catch((err) => {
-      console.error('Infrastructure hub connection failed:', err);
-    });
+    this.hubConnection.onreconnected(() => this.connectedSubject.next(true));
+    this.hubConnection.onreconnecting(() => this.connectedSubject.next(false));
+    this.hubConnection.onclose(() => this.connectedSubject.next(false));
+
+    this.hubConnection.start()
+      .then(() => this.connectedSubject.next(true))
+      .catch((err) => {
+        console.error('Infrastructure hub connection failed:', err);
+        this.connectedSubject.next(false);
+      });
   }
 
   disconnectHub(): void {
     this.hubConnection?.stop();
     this.hubConnection = undefined;
+    this.connectedSubject.next(false);
   }
 
   private getHubBaseUrl(): string {

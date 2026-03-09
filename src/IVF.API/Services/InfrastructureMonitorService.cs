@@ -169,20 +169,22 @@ public sealed class InfrastructureMonitorService(
     //  Docker Service Info (reads from Docker socket)
     // ═══════════════════════════════════════════════════════════
 
-    // Cache whether this node is a Swarm manager (checked once, valid for service lifetime)
+    // Cache whether this node is a Swarm manager (only cache positive result; retry on failure)
     private bool? _isSwarmManager;
 
     private async Task<bool> IsSwarmManagerAsync(CancellationToken ct)
     {
-        if (_isSwarmManager.HasValue) return _isSwarmManager.Value;
+        if (_isSwarmManager == true) return true;
 
         var result = await RunCommandAsync("docker", "info --format \"{{.Swarm.ControlAvailable}}\"", ct);
-        _isSwarmManager = result.ExitCode == 0 && result.Output.Trim().Equals("true", StringComparison.OrdinalIgnoreCase);
+        var isManager = result.ExitCode == 0 && result.Output.Trim().Equals("true", StringComparison.OrdinalIgnoreCase);
 
-        if (!_isSwarmManager.Value)
-            logger.LogInformation("This node is not a Swarm manager — Swarm management queries will be skipped");
+        if (isManager)
+            _isSwarmManager = true;
+        else
+            logger.LogInformation("This node is not a Swarm manager (or docker not ready) — Swarm queries skipped this cycle");
 
-        return _isSwarmManager.Value;
+        return isManager;
     }
 
     public async Task<List<SwarmServiceDto>> GetSwarmServicesAsync(CancellationToken ct = default)

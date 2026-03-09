@@ -1,7 +1,7 @@
 import { Component, OnInit, OnDestroy, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Subscription } from 'rxjs';
+import { Subscription, retry } from 'rxjs';
 import { InfrastructureService } from '../../../core/services/infrastructure.service';
 import {
   VpsMetrics,
@@ -99,7 +99,11 @@ export class InfrastructureMonitorComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     // Connect SignalR for real-time data
     this.infraService.connectHub();
-    this.connected.set(true);
+
+    // Track actual connection state
+    this.subscriptions.push(
+      this.infraService.connected$.subscribe((connected) => this.connected.set(connected)),
+    );
 
     // Subscribe to real-time streams
     this.subscriptions.push(
@@ -155,26 +159,26 @@ export class InfrastructureMonitorComponent implements OnInit, OnDestroy {
 
   private loadInitialData(): void {
     this.loading.set(true);
-    this.infraService.getMetrics().subscribe({
+    this.infraService.getMetrics().pipe(retry(1)).subscribe({
       next: (data) => this.metrics.set(data),
       error: () => {},
     });
-    this.infraService.getSwarmServices().subscribe({
+    this.infraService.getSwarmServices().pipe(retry(1)).subscribe({
       next: (data) => this.swarmServices.set(data),
       error: () => {},
     });
-    this.infraService.getSwarmNodes().subscribe({
+    this.infraService.getSwarmNodes().pipe(retry(1)).subscribe({
       next: (data) => this.swarmNodes.set(data),
       error: () => {},
     });
-    this.infraService.getHealth().subscribe({
+    this.infraService.getHealth().pipe(retry(1)).subscribe({
       next: (data) => {
         this.health.set(data);
         this.loading.set(false);
       },
       error: () => this.loading.set(false),
     });
-    this.infraService.getAlerts().subscribe({
+    this.infraService.getAlerts().pipe(retry(1)).subscribe({
       next: (data) => this.alerts.set(data),
       error: () => {},
     });
@@ -370,6 +374,15 @@ export class InfrastructureMonitorComponent implements OnInit, OnDestroy {
   // ═══ Swarm Events & Healing ═══
 
   private loadSwarmExtras(): void {
+    // Reload swarm services & nodes when switching to swarm tab
+    this.infraService.getSwarmServices().pipe(retry(1)).subscribe({
+      next: (data) => this.swarmServices.set(data),
+      error: () => {},
+    });
+    this.infraService.getSwarmNodes().pipe(retry(1)).subscribe({
+      next: (data) => this.swarmNodes.set(data),
+      error: () => {},
+    });
     this.infraService.getSwarmEvents().subscribe({
       next: (data) => this.swarmEvents.set(data),
       error: () => {},
