@@ -1610,7 +1610,7 @@ curl -fsS --retry 3 "$HEALTHCHECK_URL/fail" > /dev/null
 │  ✅ Backup size hợp lý (không đột biến)                         │
 │  ✅ Monthly restore test (critical!)                             │
 │                                                                  │
-│  Alert channels: Email + Telegram/Slack webhook                  │
+│  Alert channels: Discord webhook (qua Grafana unified alerting)  │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
@@ -2113,74 +2113,22 @@ header @html Cache-Control "no-cache, must-revalidate"
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-### 8.2 Thiết lập Serilog (Recommended)
+### 8.2 Serilog (Đã triển khai)
 
+API đã sử dụng Serilog với `RenderedCompactJsonFormatter` để xuất structured JSON logs. Xem chi tiết tại `docs/infrastructure_operations_guide.md` Section 2.
+
+**Các middleware logging:**
+- `CorrelationIdMiddleware` — Tự động gắn `X-Correlation-Id` cho mỗi request
+- `LogContextEnrichmentMiddleware` — Enrich `TenantId`, `UserId`, `UserName`, `ClientIp`
+- `LoggingBehavior` (MediatR) — Log tữ động mọi CQRS command/query với duration
+
+**Packages đã cài:**
 ```bash
-# Thêm package Serilog
-cd src/IVF.API
-dotnet add package Serilog.AspNetCore
-dotnet add package Serilog.Sinks.Console
-dotnet add package Serilog.Sinks.File
-dotnet add package Serilog.Sinks.Seq         # Optional: structured log server
-dotnet add package Serilog.Enrichers.Environment
-dotnet add package Serilog.Enrichers.Thread
-dotnet add package Serilog.Enrichers.ClientInfo
-```
-
-```json
-// appsettings.Production.json — Serilog config
-{
-  "Serilog": {
-    "MinimumLevel": {
-      "Default": "Information",
-      "Override": {
-        "Microsoft.AspNetCore": "Warning",
-        "Microsoft.EntityFrameworkCore": "Warning",
-        "Microsoft.EntityFrameworkCore.Database.Command": "Warning",
-        "System.Net.Http.HttpClient": "Warning"
-      }
-    },
-    "WriteTo": [
-      {
-        "Name": "Console",
-        "Args": {
-          "formatter": "Serilog.Formatting.Compact.CompactJsonFormatter, Serilog.Formatting.Compact"
-        }
-      },
-      {
-        "Name": "File",
-        "Args": {
-          "path": "/var/log/ivf/api-.log",
-          "rollingInterval": "Day",
-          "retainedFileCountLimit": 30,
-          "fileSizeLimitBytes": 104857600,
-          "formatter": "Serilog.Formatting.Compact.CompactJsonFormatter, Serilog.Formatting.Compact"
-        }
-      }
-    ],
-    "Enrich": [
-      "FromLogContext",
-      "WithMachineName",
-      "WithThreadId",
-      "WithClientIp"
-    ]
-  }
-}
-```
-
-```csharp
-// Program.cs — Add Serilog
-builder.Host.UseSerilog((ctx, cfg) => cfg.ReadFrom.Configuration(ctx.Configuration));
-
-// Middleware: Request logging (after UseRouting, before UseEndpoints)
-app.UseSerilogRequestLogging(o =>
-{
-    o.EnrichDiagnosticContext = (diagnosticContext, httpContext) =>
-    {
-        diagnosticContext.Set("TenantId", httpContext.Items["TenantId"]?.ToString());
-        diagnosticContext.Set("UserId", httpContext.User?.FindFirst("sub")?.Value);
-    };
-});
+Serilog.AspNetCore
+Serilog.Formatting.Compact
+Serilog.Enrichers.Environment
+Serilog.Enrichers.Thread
+Serilog.Enrichers.Process
 ```
 
 ### 8.3 OpenTelemetry (Distributed Tracing)
@@ -2220,9 +2168,13 @@ builder.Services.AddOpenTelemetry()
 app.MapPrometheusScrapingEndpoint();
 ```
 
-### 8.4 Prometheus + Grafana Stack
+### 8.4 Prometheus + Grafana Stack (Đã triển khai)
 
-> **Lưu ý**: Cấu hình thực tế production đã được hardening bảo mật. Xem file `docker-compose.monitoring.yml` và `docs/infrastructure_operations_guide.md` để biết chi tiết.
+> **Chi tiết đầy đủ**: Xem `docs/infrastructure_operations_guide.md` — Section 1 (Monitoring Stack), Section 3 (Grafana Unified Alerting & Discord).
+>
+> **Tóm tắt**: 6 scrape targets, 31 Prometheus alerts, 9 Loki log-based alerts, 25 Grafana unified alert rules, 4 dashboards, Discord notifications.
+>
+> **Alert channels**: Discord webhook (qua Grafana unified alerting). Setup: `./scripts/setup-discord-alerts.sh <WEBHOOK_URL>`
 
 ```yaml
 # docker-compose.monitoring.yml (simplified — see actual file for full config)
@@ -2318,17 +2270,18 @@ scrape_configs:
       - targets: ["localhost:9090"]
 ```
 
-### 8.5 Grafana Dashboards (Recommended)
+### 8.5 Grafana Dashboards (Đã triển khai)
 
-| Dashboard        | Metrics                                                              | Alert Threshold              |
-| ---------------- | -------------------------------------------------------------------- | ---------------------------- |
-| **API Overview** | Request rate, error rate, latency p50/p95/p99                        | Error rate > 1%, p99 > 2s    |
-| **Database**     | Active connections, query duration, cache hit ratio, replication lag | Lag > 30s, connections > 80% |
-| **Redis**        | Hit rate, memory usage, evictions, connections                       | Hit rate < 80%, memory > 90% |
-| **MinIO**        | Disk usage, request rate, errors                                     | Disk > 80%                   |
-| **Tenant Usage** | API calls per tenant, active users, storage                          | Per-plan limit thresholds    |
-| **Security**     | Failed logins, blocked IPs, rate limit hits                          | > 100 failed logins/hour     |
-| **PKI**          | Signing operations, cert expiry countdown                            | Cert expiry < 30 days        |
+4 dashboards tự động provisioning vào thư mục **IVF System**:
+
+| Dashboard                        | Path                           | Nội dung chính                                                |
+| -------------------------------- | ------------------------------ | ------------------------------------------------------------ |
+| **IVF System Overview**          | `/d/ivf-system-overview`       | Service health (6 stat panels), RED metrics, HTTP traffic, top endpoints, API resources |
+| **IVF API Monitoring**           | `/d/ivf-api-monitoring`        | API health, traffic, errors & exceptions, security, .NET runtime, active alerts, live logs |
+| **IVF Logs & Errors**            | `/d/ivf-logs-errors`           | Error stats, timeline, log viewer (API, DB, security, proxy, storage) |
+| **IVF Infrastructure & Alerts**  | `/d/ivf-infrastructure`        | Active alerts, Prometheus targets, scrape perf, Loki log volume |
+
+**Truy cập**: `https://natra.site/grafana/` (basic auth: `monitor/<password>`)
 
 ### 8.6 Health Check Endpoints (Recommended)
 
@@ -2364,47 +2317,26 @@ app.MapHealthChecks("/health", new()
 
 | Cơ chế                | Dữ liệu                                                         | Truy vấn                                                                        |
 | --------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| **Serilog JSON Logs** | CorrelationId, TenantId, UserId, RequestPath, StatusCode        | Grafana → Explore → Loki: `{compose_service="ivf-api"} \|= "correlation-id"` |
 | **API Call Logging**  | Method, Path, Status, Duration, IP, UserAgent, UserId, TenantId | `SELECT * FROM api_call_logs WHERE status_code >= 500 ORDER BY created_at DESC` |
 | **Audit Log**         | Partitioned by month, UserId, Action, Entity, TenantId          | `SELECT * FROM audit_logs WHERE action = 'Error' AND tenant_id = ?`             |
 | **Exception Handler** | Validation, TenantLimit, FeatureNotEnabled → structured JSON    | Client receives structured error codes                                          |
 | **SecurityEvent**     | IP, geo, risk level, incident type                              | `SELECT * FROM security_events WHERE severity = 'Critical'`                     |
 
-**Recommended thêm:**
-
-```csharp
-// Correlation ID middleware — thêm trace ID vào mọi request
-app.Use(async (context, next) =>
-{
-    var correlationId = context.Request.Headers["X-Correlation-Id"].FirstOrDefault()
-                       ?? Guid.NewGuid().ToString("N");
-    context.Items["CorrelationId"] = correlationId;
-    context.Response.Headers["X-Correlation-Id"] = correlationId;
-
-    using (LogContext.PushProperty("CorrelationId", correlationId))
-    {
-        await next();
-    }
-});
-```
-
-**Quy trình truy vết lỗi:**
+**Quy trình truy vết lỗi (Correlation ID):**
 
 ```
-1. User báo lỗi → Lấy Correlation ID từ response header
+1. User báo lỗi → Lấy Correlation ID từ response header (X-Correlation-Id)
    ↓
-2. Tìm trong API Call Logs:
+2. Tìm trong Grafana/Loki:
+   {compose_service="ivf-api"} |= "<correlation-id>"
+   → Biết: full structured log, stack trace, context
+   ↓
+3. Tìm trong API Call Logs:
    SELECT * FROM api_call_logs WHERE correlation_id = '{id}';
    → Biết: endpoint, status_code, duration, tenant_id, user_id
    ↓
-3. Tìm trong Serilog (JSON):
-   grep "CorrelationId.*{id}" /var/log/ivf/api-*.log | jq .
-   → Biết: full stack trace, context
-   ↓
-4. Tìm trong Jaeger (distributed tracing):
-   http://jaeger:16686 → Search by trace ID
-   → Biết: timing breakdown, DB queries, external calls
-   ↓
-5. Tìm trong Audit Log:
+4. Tìm trong Audit Log:
    SELECT * FROM audit_logs WHERE correlation_id = '{id}';
    → Biết: business action, before/after data
 ```
@@ -2806,66 +2738,33 @@ echo "=== Deployment Complete — Zero Downtime ==="
 
 ### 10.6 Alerting Rules
 
+> **Chi tiết đầy đủ**: Xem `docs/infrastructure_operations_guide.md` — Section 1.7 (Prometheus), Section 1.8 (Loki), Section 3 (Grafana Unified Alerting & Discord).
+
+**Tóm tắt hệ thống alert (đã triển khai):**
+
+| Engine    | Số rules | Config file                                      |
+| --------- | -------- | ------------------------------------------------ |
+| Prometheus| 31       | `docker/monitoring/alerts.yml`                   |
+| Loki      | 9        | `docker/monitoring/loki-rules/fake/rules.yml`    |
+| Grafana   | 25       | `docker/monitoring/grafana/provisioning/alerting/rules.yml` |
+
+**Notification**: Tất cả Grafana unified alerts → Discord webhook qua contact point `discord-ivf`.
+
+```bash
+# Setup Discord alerting
+./scripts/setup-discord-alerts.sh <DISCORD_WEBHOOK_URL>
+```
+
+**Ví dụ alert rules chính:**
+
 ```yaml
-# docker/prometheus/alerts.yml
-groups:
-  - name: ivf-critical
-    rules:
-      - alert: APIDown
-        expr: up{job="ivf-api"} == 0
-        for: 30s
-        labels:
-          severity: critical
-        annotations:
-          summary: "IVF API instance {{ $labels.instance }} is down"
-
-      - alert: HighErrorRate
-        expr: rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[5m]) / rate(http_server_request_duration_seconds_count[5m]) > 0.01
-        for: 2m
-        labels:
-          severity: critical
-        annotations:
-          summary: "Error rate > 1% for 2 minutes"
-
-      - alert: HighLatency
-        expr: histogram_quantile(0.99, rate(http_server_request_duration_seconds_bucket[5m])) > 2
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "p99 latency > 2 seconds"
-
-      - alert: DatabaseReplicationLag
-        expr: pg_replication_lag > 30
-        for: 1m
-        labels:
-          severity: critical
-        annotations:
-          summary: "PostgreSQL replication lag > 30 seconds"
-
-      - alert: DiskSpaceLow
-        expr: node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"} < 0.15
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "Disk space < 15%"
-
-      - alert: CertificateExpiringSoon
-        expr: ivf_certificate_expiry_days < 30
-        for: 1h
-        labels:
-          severity: warning
-        annotations:
-          summary: "SSL certificate expires in {{ $value }} days"
-
-      - alert: TenantLimitApproaching
-        expr: ivf_tenant_usage_ratio > 0.9
-        for: 1h
-        labels:
-          severity: info
-        annotations:
-          summary: "Tenant {{ $labels.tenant }} at 90%+ of plan limits"
+# Prometheus alerts (docker/monitoring/alerts.yml)
+- alert: ApiDown                    # API instance unreachable (critical, 1m)
+- alert: ErrorRateCritical          # 5xx > 5% (critical, 3m)
+- alert: HighLatencyCritical        # P95 > 3s (critical, 3m)
+- alert: PostgresDown               # PostgreSQL unreachable (critical, 1m)
+- alert: RedisRejectedConnections   # Redis rejecting (critical, 0m)
+- alert: MinioDiskCritical          # Disk > 90% (critical, 5m)
 ```
 
 ---

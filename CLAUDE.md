@@ -88,7 +88,8 @@ HTTP: `ApiService` is the base HTTP client. JWT token is injected via intercepto
 - **Caching:** Redis via StackExchange.Redis. Degrades gracefully if unavailable.
 - **PDF Generation:** QuestPDF for report/form PDF export.
 - **Audit Logging:** Partitioned PostgreSQL table. Auto-creates future partitions.
-- **Monitoring:** Prometheus + Grafana + Loki + Promtail. All ports `127.0.0.1` only. Grafana at `https://natra.site/grafana/`, Prometheus at `https://natra.site/prometheus/` (basic auth). MinIO Console via SSH tunnel. 6 scrape targets, 31 alert rules, 9 Loki log-based alerts, 3 Grafana dashboards. Config: `docker/monitoring/`. See `docs/infrastructure_operations_guide.md`.
+- **Monitoring:** Prometheus + Grafana + Loki + Promtail. All ports `127.0.0.1` only. Grafana at `https://natra.site/grafana/`, Prometheus at `https://natra.site/prometheus/` (basic auth). MinIO Console via SSH tunnel. 6 scrape targets, 31 Prometheus alert rules, 9 Loki log-based alerts, 25 Grafana unified alert rules, 4 Grafana dashboards. Discord notifications via `discord-ivf` contact point. Config: `docker/monitoring/`. See `docs/infrastructure_operations_guide.md`.
+- **Structured Logging:** Serilog with `RenderedCompactJsonFormatter` (JSON). Enriched with `CorrelationId`, `TenantId`, `UserId`, `MachineName`, `Environment`, `ProcessId`, `ThreadId`. Middleware: `CorrelationIdMiddleware`, `LogContextEnrichmentMiddleware`. MediatR: `LoggingBehavior`. Promtail extracts Serilog `@l` (level) and `@mt` (message template) via regex.
 
 ### API Conventions
 

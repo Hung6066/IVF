@@ -254,8 +254,9 @@ Pure **service + RxJS + signals** — no NgRx/NGXS.
 | **MinIO**              | Object storage (S3-compatible) | `localhost:9000`, buckets: `ivf-documents`, `ivf-signed-pdfs`, `ivf-medical-images` |
 | **SignServer + EJBCA** | Digital PDF signing (PKI)      | mTLS, rate-limited 30 ops/min                                                       |
 | **Prometheus**         | Metrics collection & alerting  | `127.0.0.1:9090`, external: `https://natra.site/prometheus/` (basic auth)           |
-| **Grafana**            | Dashboards & visualization     | `127.0.0.1:3000`, external: `https://natra.site/grafana/` (basic auth)              |
+| **Grafana**            | Dashboards, unified alerting, Discord notifications | `127.0.0.1:3000`, external: `https://natra.site/grafana/` (basic auth) |
 | **Loki + Promtail**    | Log aggregation & shipping     | `127.0.0.1:3100`, config: `docker/monitoring/`                                      |
+| **Serilog**            | Structured JSON logging        | `RenderedCompactJsonFormatter`, enriched: CorrelationId, TenantId, UserId           |
 
 ### Authentication Stack
 

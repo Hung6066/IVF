@@ -7,12 +7,14 @@ Tài liệu này mô tả các tính năng hạ tầng enterprise đã triển k
 ## Mục lục
 
 1. [Monitoring Stack (Prometheus + Grafana + Loki)](#1-monitoring-stack)
-2. [Data Retention & S3 Archival](#2-data-retention--s3-archival)
-3. [Read-Replica Routing](#3-read-replica-routing)
-4. [Auto-Healing](#4-auto-healing)
-5. [Disaster Recovery (DR)](#5-disaster-recovery)
-6. [Infrastructure Admin UI](#6-infrastructure-admin-ui)
-7. [API Endpoints](#7-api-endpoints)
+2. [Structured Logging (Serilog)](#2-structured-logging)
+3. [Grafana Unified Alerting & Discord](#3-grafana-unified-alerting--discord)
+4. [Data Retention & S3 Archival](#4-data-retention--s3-archival)
+5. [Read-Replica Routing](#5-read-replica-routing)
+6. [Auto-Healing](#6-auto-healing)
+7. [Disaster Recovery (DR)](#7-disaster-recovery)
+8. [Infrastructure Admin UI](#8-infrastructure-admin-ui)
+9. [API Endpoints](#9-api-endpoints)
 
 ---
 
@@ -118,14 +120,16 @@ docker/monitoring/
 ├── prometheus-web.yml                      # Basic auth configuration (bcrypt)
 ├── alerts.yml                              # 31 alert rules + 8 recording rules
 ├── loki-config.yml                         # Loki storage, retention, ruler, cache
-├── promtail-config.yml                     # Docker log shipping + pipeline stages
+├── promtail-config.yml                     # Docker log shipping + Serilog JSON pipeline
 ├── loki-rules/
 │   └── fake/
 │       └── rules.yml                       # 9 Loki log-based alert rules
 └── grafana/
     └── provisioning/
         ├── datasources/
-        │   └── datasources.yml             # Auto-provision Prometheus + Loki
+        │   └── datasources.yml             # Prometheus (uid: prometheus) + Loki (uid: loki)
+        ├── alerting/
+        │   └── rules.yml                   # 25 Grafana unified alert rules (10 groups)
         └── dashboards/
             ├── dashboards.yml              # Dashboard provisioning config
             └── json/
@@ -304,20 +308,27 @@ Docker Container Logs
 │     Labels: container, compose_service,     │
 │     swarm_service, stack, logstream          │
 ├─────────────────────────────────────────────┤
-│  2. Regex: Extract .NET log level           │
-│     (trce/dbug/info/warn/fail/crit)         │
-│     → Label: level                          │
+│  2. Regex: Extract Serilog JSON fields      │
+│     Pattern: "@l":"(?P<level>\w+)"         │
+│     Serilog levels: Verbose/Debug/          │
+│     Information/Warning/Error/Fatal         │
+│     → Label: level (mapped to standard)     │
 ├─────────────────────────────────────────────┤
-│  3. Drop: Health check noise                │
+│  3. Regex: Extract Serilog @mt (template)   │
+│     → Label: message_template               │
+├─────────────────────────────────────────────┤
+│  4. Drop: Health check noise                │
 │     Pattern: (health|liveness|readiness).*200│
 ├─────────────────────────────────────────────┤
-│  4. Regex: Extract HTTP request info        │
+│  5. Regex: Extract HTTP request info        │
 │     → Labels: http_method, http_status      │
 └─────────────────────────────────────────────┘
     │
     ▼
   Loki (3100)
 ```
+
+**Lưu ý**: API logs là Serilog `RenderedCompactJsonFormatter` (JSON). Promtail sử dụng regex extraction thay vì JMESPath vì các trường Serilog bắt đầu bằng `@` (`@t`, `@l`, `@mt`, `@r`) không tương thích với JMESPath parser.
 
 ### 1.11 Loki Config
 
@@ -335,16 +346,241 @@ Docker Container Logs
 
 ---
 
-## 2. Data Retention & S3 Archival
+## 2. Structured Logging (Serilog)
 
 ### 2.1 Tổng quan
+
+API sử dụng **Serilog** với `RenderedCompactJsonFormatter` để xuất structured JSON logs. Logs được thu thập bởi Promtail → Loki → Grafana.
+
+**Pipeline:**
+
+```
+API Request → Serilog Structured JSON → Docker stdout → Promtail → Loki → Grafana
+```
+
+### 2.2 Enrichment Pipeline
+
+Mỗi log entry được tự động enrich với context:
+
+| Enricher                        | Properties                                        | Source                         |
+| ------------------------------- | ------------------------------------------------- | ------------------------------ |
+| **CorrelationIdMiddleware**     | `CorrelationId`                                   | `X-Correlation-Id` header hoặc auto-generated |
+| **LogContextEnrichmentMiddleware** | `TenantId`, `UserId`, `UserName`, `RequestPath`, `RequestMethod`, `ClientIp` | HttpContext |
+| **Serilog Built-in Enrichers**  | `MachineName`, `Environment`, `ProcessId`, `ThreadId` | System               |
+| **Application Constants**       | `Application` = "IVF.API", `Version`              | Assembly info                  |
+
+### 2.3 Log Format (JSON)
+
+```json
+{
+  "@t": "2026-03-09T01:35:40.123Z",
+  "@mt": "HTTP {RequestMethod} {RequestPath} responded {StatusCode} in {Elapsed:0.0000}ms",
+  "@r": ["HTTP GET /api/patients responded 200 in 45.2300ms"],
+  "@l": "Information",
+  "RequestMethod": "GET",
+  "RequestPath": "/api/patients",
+  "StatusCode": 200,
+  "Elapsed": 45.23,
+  "CorrelationId": "abc123",
+  "TenantId": "tenant-uuid",
+  "UserId": "user-uuid",
+  "MachineName": "ivf-api-1",
+  "Application": "IVF.API"
+}
+```
+
+### 2.4 MediatR Logging (LoggingBehavior)
+
+Mọi CQRS command/query được log tự động:
+
+```
+[Information] Handling CreatePatientCommand (CorrelationId: abc123, UserId: user-uuid)
+[Information] Handled CreatePatientCommand in 125ms — Success
+[Warning]     Handled GetPatientQuery in 3500ms — Slow operation (>3000ms)
+[Error]       Failed CreatePatientCommand after 50ms — ValidationException
+```
+
+### 2.5 Serilog Request Logging
+
+HTTP request logging với dynamic log level:
+
+| Status Code | Log Level   | Ghi chú                        |
+| ----------- | ----------- | ------------------------------- |
+| 2xx, 3xx    | Information | Normal operations               |
+| 4xx         | Warning     | Client errors (validation, 404) |
+| 5xx         | Error       | Server errors                   |
+| Health check| Suppressed  | `/health/*` endpoints excluded  |
+
+### 2.6 Log Level Configuration
+
+```json
+// appsettings.json
+{
+  "Serilog": {
+    "MinimumLevel": {
+      "Default": "Information",
+      "Override": {
+        "Microsoft.AspNetCore": "Warning",
+        "Microsoft.EntityFrameworkCore": "Warning",
+        "Microsoft.EntityFrameworkCore.Database.Command": "Warning",
+        "System.Net.Http.HttpClient": "Warning"
+      }
+    }
+  }
+}
+```
+
+### 2.7 Truy vết Lỗi qua Correlation ID
+
+```bash
+# 1. Lấy CorrelationId từ response header
+curl -v https://natra.site/api/patients
+# → X-Correlation-Id: abc123def
+
+# 2. Tìm trong Grafana/Loki
+# Explore → Loki → LogQL:
+{compose_service="ivf-api"} |= "abc123def"
+
+# 3. Xem toàn bộ request flow
+{compose_service=~".+"} |= "abc123def"
+```
+
+---
+
+## 3. Grafana Unified Alerting & Discord
+
+### 3.1 Tổng quan
+
+Hệ thống alerting gồm 3 tầng, tất cả route tới **Discord**:
+
+| Tầng                    | Engine        | Số rules | Chức năng                          |
+| ----------------------- | ------------- | -------- | ---------------------------------- |
+| Prometheus Alert Rules  | Prometheus    | 31       | Metrics-based alerts (real-time)   |
+| Loki Alert Rules        | Loki Ruler    | 9        | Log-based alerts (pattern matching)|
+| Grafana Unified Alerts  | Grafana 12    | 25       | Combined metrics + logs (Discord)  |
+
+### 3.2 Discord Integration
+
+**Contact Point**: `discord-ivf` — Grafana gửi tất cả alert notifications tới Discord webhook.
+
+**Notification Policy**:
+
+| Severity   | Group Wait | Group Interval | Repeat Interval |
+| ---------- | ---------- | -------------- | --------------- |
+| **Critical**| 10s       | 1m             | 1h              |
+| **Warning** | 30s       | 5m             | 4h              |
+| **Default** | 15s       | 1m             | 4h              |
+
+**Cấu hình**: Contact point và notification policy được tạo qua Grafana API (không provisioning file) vì Grafana không hỗ trợ env var trong webhook URL.
+
+### 3.3 Setup Script
+
+```bash
+# Cấu hình Discord webhook
+./scripts/setup-discord-alerts.sh <DISCORD_WEBHOOK_URL>
+
+# Script tự động:
+# 1. Chờ Grafana ready
+# 2. Tạo/cập nhật contact point 'discord-ivf'
+# 3. Cấu hình notification policy (route tất cả alerts → Discord)
+# 4. Gửi test message xác nhận kết nối
+```
+
+**Tạo Discord Webhook**:
+1. Discord → Server Settings → Integrations → Webhooks
+2. New Webhook → chọn channel → Copy URL
+3. Chạy: `./scripts/setup-discord-alerts.sh <url>`
+
+### 3.4 Grafana Unified Alert Rules (25 rules, 10 groups)
+
+Provisioned tự động qua `docker/monitoring/grafana/provisioning/alerting/rules.yml`:
+
+#### API Alerts
+
+| Alert                       | Điều kiện                | Severity | For  |
+| --------------------------- | ------------------------ | -------- | ---- |
+| API Instance Down           | Instance unreachable     | critical | 1m   |
+| ALL API Instances Down      | Tất cả instances down    | critical | 30s  |
+| P95 Latency > 1s            | P95 response time > 1s  | warning  | 5m   |
+| P95 Latency > 3s            | P95 response time > 3s  | critical | 3m   |
+| Error Rate > 1%             | 5xx > 1% of requests    | warning  | 5m   |
+| Error Rate > 5%             | 5xx > 5% of requests    | critical | 3m   |
+| No API Traffic              | Zero requests            | warning  | 10m  |
+| API Memory > 800MB          | Process memory > 800MB  | warning  | 10m  |
+| API Memory > 950MB (OOM)    | Process memory > 950MB  | critical | 5m   |
+| High GC Pressure            | Gen2 GC > 0.5/s         | warning  | 10m  |
+
+#### Infrastructure Alerts
+
+| Alert                       | Điều kiện                | Severity | For  |
+| --------------------------- | ------------------------ | -------- | ---- |
+| PostgreSQL Down             | PG unreachable           | critical | 1m   |
+| PostgreSQL Replication Lag  | Lag > 100MB              | warning  | 5m   |
+| PostgreSQL Deadlock         | Deadlocks detected       | warning  | 0m   |
+| Redis Down                  | Redis unreachable        | warning  | 1m   |
+| Redis Memory > 80%          | Memory > 80%             | warning  | 5m   |
+| Redis Rejecting Connections | Rejected connections     | critical | 0m   |
+| MinIO Down                  | MinIO unreachable        | critical | 2m   |
+| MinIO Disk > 90%            | Disk usage > 90%        | critical | 5m   |
+| Caddy Reverse Proxy Down    | Caddy unreachable        | critical | 1m   |
+| Scrape Target Down          | Any Prometheus target down| warning | 5m   |
+
+#### Log-based Alerts (Loki)
+
+| Alert                       | Nguồn    | Điều kiện                         | Severity |
+| --------------------------- | -------- | --------------------------------- | -------- |
+| Exception Spike             | API logs | > 10 exceptions/5min              | critical |
+| Authentication Failures     | API logs | > 20 auth failures/5min           | warning  |
+| Database Error Spike        | API logs | > 5 DB errors/3min                | critical |
+| Security Event Detected     | API logs | > 5 security events/1min          | critical |
+| Service Crash/Restart Loop  | All logs | > 4 container restarts/10min      | critical |
+
+### 3.5 Alert Flow
+
+```
+Metrics/Logs
+    │
+    ├─→ Prometheus (31 rules) ──→ AlertManager ──→ [future: webhook]
+    ├─→ Loki Ruler (9 rules) ──→ [evaluates log patterns]
+    └─→ Grafana Unified (25 rules) ──→ discord-ivf ──→ Discord Channel
+         ├── Critical: repeat mỗi 1h
+         └── Warning: repeat mỗi 4h
+```
+
+### 3.6 Quản lý Alerts
+
+```bash
+# Xem danh sách alert rules
+https://natra.site/grafana/alerting/list
+
+# Xem alert đang firing
+https://natra.site/grafana/alerting/groups
+
+# Silence một alert (tạm tắt)
+https://natra.site/grafana/alerting/silences
+
+# API: Liệt kê tất cả rules
+curl -u admin:<password> http://localhost:3000/grafana/api/v1/provisioning/alert-rules
+
+# API: Xem notification policies
+curl -u admin:<password> http://localhost:3000/grafana/api/v1/provisioning/policies
+
+# API: Xem contact points
+curl -u admin:<password> http://localhost:3000/grafana/api/v1/provisioning/contact-points
+```
+
+---
+
+## 4. Data Retention & S3 Archival
+
+### 4.1 Tổng quan
 
 `DataRetentionService` chạy dưới dạng `IHostedService`, quét định kỳ (mặc định mỗi 24h) và áp dụng các chính sách retention:
 
 - **Delete**: Xoá trực tiếp các bản ghi vượt quá retention period
 - **Archive**: Export dữ liệu sang JSONL, upload lên MinIO bucket `ivf-audit-archive`, rồi xoá khỏi DB
 
-### 2.2 Chính sách mặc định
+### 4.2 Chính sách mặc định
 
 Các chính sách retention được seed tự động trong `DatabaseSeeder`. Entity types phổ biến:
 
@@ -355,7 +591,7 @@ Các chính sách retention được seed tự động trong `DatabaseSeeder`. E
 | ApiCallLog       | 90 ngày   | Delete  |
 | UserLoginHistory | 365 ngày  | Archive |
 
-### 2.3 S3 Archival
+### 4.3 S3 Archival
 
 Dữ liệu archive được lưu trong MinIO:
 
@@ -364,11 +600,11 @@ Dữ liệu archive được lưu trong MinIO:
 - **Format**: JSONL (JSON Lines) — mỗi dòng là một JSON record
 - **Encryption**: SSE-S3 (MinIO server-side encryption)
 
-### 2.4 Distributed Lock
+### 4.4 Distributed Lock
 
 Mỗi lần chạy retention, service acquire distributed lock qua `IDistributedLockService` để đảm bảo chỉ một instance chạy tại một thời điểm (quan trọng khi có multiple API replicas).
 
-### 2.5 Thực thi thủ công
+### 4.5 Thực thi thủ công
 
 ```bash
 # Qua API endpoint
@@ -381,20 +617,20 @@ Hoặc qua Admin UI: **Hạ tầng → Lưu trữ → Thực thi ngay**
 
 ---
 
-## 3. Read-Replica Routing
+## 5. Read-Replica Routing
 
-### 3.1 Tổng quan
+### 5.1 Tổng quan
 
 `ReadReplicaInterceptor` (EF Core `DbCommandInterceptor`) tự động route SELECT queries tới PostgreSQL read replica.
 
-### 3.2 Cách hoạt động
+### 5.2 Cách hoạt động
 
 1. Kiểm tra command text bắt đầu bằng `SELECT`
 2. Nếu đang trong transaction → giữ nguyên primary connection
 3. Nếu có `ReadReplicaConnection` trong config → route tới replica
 4. Nếu replica không khả dụng → fallback về primary (retry sau 1 phút)
 
-### 3.3 Cấu hình
+### 5.3 Cấu hình
 
 Trong `appsettings.Production.json`:
 
@@ -407,7 +643,7 @@ Trong `appsettings.Production.json`:
 }
 ```
 
-### 3.4 Giám sát
+### 5.4 Giám sát
 
 API endpoint kiểm tra trạng thái replication:
 
@@ -426,13 +662,13 @@ curl https://your-domain/api/admin/infrastructure/replica/status \
 
 ---
 
-## 4. Auto-Healing
+## 6. Auto-Healing
 
-### 4.1 Tổng quan
+### 6.1 Tổng quan
 
 Script `scripts/auto-heal.sh` giám sát Docker Swarm services và tự động restart các service bị lỗi.
 
-### 4.2 Chức năng
+### 6.2 Chức năng
 
 - Phát hiện services với replicas = 0 hoặc health check fail
 - Tự động force-update service để trigger restart
@@ -440,7 +676,7 @@ Script `scripts/auto-heal.sh` giám sát Docker Swarm services và tự động 
 - Webhook alerts khi restart xảy ra
 - Mode `--dry-run` để test mà không restart
 
-### 4.3 Sử dụng
+### 6.3 Sử dụng
 
 ```bash
 # Chạy 1 lần
@@ -453,7 +689,7 @@ bash scripts/auto-heal.sh --dry-run
 */5 * * * * /opt/ivf/scripts/auto-heal.sh >> /var/log/ivf/auto-heal.log 2>&1
 ```
 
-### 4.4 Webhook Alert
+### 6.4 Webhook Alert
 
 Set biến `ALERT_WEBHOOK` để nhận thông báo:
 
@@ -464,9 +700,9 @@ bash scripts/auto-heal.sh
 
 ---
 
-## 5. Disaster Recovery
+## 7. Disaster Recovery
 
-### 5.1 Failover Script
+### 7.1 Failover Script
 
 `scripts/dr-failover.sh` thực hiện promote PostgreSQL standby thành primary:
 
@@ -488,7 +724,7 @@ bash scripts/dr-failover.sh --force
 3. Cập nhật connection string trên API service
 4. Verify new primary accessible
 
-### 5.2 DR Drill Script
+### 7.2 DR Drill Script
 
 `scripts/dr-drill.sh` chạy kiểm tra tự động cho DR readiness:
 
@@ -511,7 +747,7 @@ bash scripts/dr-drill.sh --full
 7. MinIO accessible
 8. Backup restore test (chỉ `--full`)
 
-### 5.3 Lịch chạy DR Drill khuyến nghị
+### 7.3 Lịch chạy DR Drill khuyến nghị
 
 | Tần suất       | Loại  | Ghi chú                   |
 | -------------- | ----- | ------------------------- |
@@ -521,15 +757,15 @@ bash scripts/dr-drill.sh --full
 
 ---
 
-## 6. Infrastructure Admin UI
+## 8. Infrastructure Admin UI
 
-### 6.1 Truy cập
+### 8.1 Truy cập
 
 - **URL**: `/admin/infrastructure`
 - **Sidebar**: Nền tảng (Super Admin) → Hạ tầng
 - **Quyền**: Platform Admin Only
 
-### 6.2 Các Tab
+### 8.2 Các Tab
 
 | Tab       | Chức năng                                 |
 | --------- | ----------------------------------------- |
@@ -540,14 +776,14 @@ bash scripts/dr-drill.sh --full
 | Lưu trữ   | Data retention policies, execute, replica |
 | Giám sát  | Monitoring stack health, quick links      |
 
-### 6.3 Tab Lưu trữ
+### 8.3 Tab Lưu trữ
 
 - Bảng chính sách retention (entity type, thời gian giữ, hành động, trạng thái)
 - Nút "Thực thi ngay" để chạy retention thủ công
 - Kết quả thực thi (số policies, bản ghi đã xoá, lỗi)
 - Trạng thái Read Replica (streaming replicas, replication slots, vai trò)
 
-### 6.4 Tab Giám sát
+### 8.4 Tab Giám sát
 
 - Health check cho từng service (Prometheus, Grafana, Loki)
 - Links truy cập nhanh tới giao diện monitoring
@@ -555,30 +791,30 @@ bash scripts/dr-drill.sh --full
 
 ---
 
-## 7. API Endpoints
+## 9. API Endpoints
 
 Tất cả endpoints yêu cầu JWT authentication với quyền Admin.
 
-### 7.1 Data Retention
+### 9.1 Data Retention
 
 | Method | Path                                           | Mô tả                       |
 | ------ | ---------------------------------------------- | --------------------------- |
 | GET    | `/api/admin/infrastructure/retention/policies` | Lấy danh sách chính sách    |
 | POST   | `/api/admin/infrastructure/retention/execute`  | Thực thi retention thủ công |
 
-### 7.2 Read Replica
+### 9.2 Read Replica
 
 | Method | Path                                       | Mô tả                  |
 | ------ | ------------------------------------------ | ---------------------- |
 | GET    | `/api/admin/infrastructure/replica/status` | Trạng thái replication |
 
-### 7.3 Monitoring
+### 9.3 Monitoring
 
 | Method | Path                                          | Mô tả                         |
 | ------ | --------------------------------------------- | ----------------------------- |
 | GET    | `/api/admin/infrastructure/monitoring/status` | Health check monitoring stack |
 
-### 7.4 Existing Infrastructure Endpoints
+### 9.4 Existing Infrastructure Endpoints
 
 | Method | Path                                       | Mô tả                        |
 | ------ | ------------------------------------------ | ---------------------------- |
@@ -602,13 +838,15 @@ docker/monitoring/
 ├── prometheus.yml                     # Scrape targets (6 jobs)
 ├── alerts.yml                         # 31 alert rules + 8 recording rules
 ├── loki-config.yml                    # Log retention 30d, cache, ruler
-├── promtail-config.yml                # Docker log shipping + pipeline stages
+├── promtail-config.yml                # Docker log shipping + Serilog JSON pipeline
 ├── loki-rules/
 │   └── fake/
 │       └── rules.yml                  # 9 Loki log-based alert rules
 └── grafana/provisioning/
     ├── datasources/
-    │   └── datasources.yml            # Auto-provision Prometheus + Loki
+    │   └── datasources.yml            # Prometheus (uid: prometheus) + Loki (uid: loki)
+    ├── alerting/
+    │   └── rules.yml                  # 25 Grafana unified alert rules (Discord)
     └── dashboards/
         ├── dashboards.yml             # Dashboard auto-provisioning
         └── json/
@@ -619,8 +857,19 @@ docker/monitoring/
 
 scripts/
 ├── auto-heal.sh                       # Swarm auto-healing
+├── setup-discord-alerts.sh            # Discord webhook setup for Grafana
 ├── dr-failover.sh                     # PostgreSQL failover
 └── dr-drill.sh                        # DR readiness drill
+
+src/IVF.API/
+├── Middleware/
+│   ├── CorrelationIdMiddleware.cs      # Correlation ID tracking
+│   └── LogContextEnrichmentMiddleware.cs # Tenant/User/Request enrichment
+└── Extensions/
+    └── OpenTelemetryExtensions.cs      # Prometheus metrics exporter
+
+src/IVF.Application/Common/Behaviors/
+└── LoggingBehavior.cs                  # MediatR structured logging
 
 src/IVF.Infrastructure/
 ├── Persistence/Interceptors/
