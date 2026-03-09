@@ -282,8 +282,8 @@ jobs:
 
           MAX_RETRIES=12
           RETRY_INTERVAL=10
-          HEALTH_URL="http://localhost/health/live"
-          READY_URL="http://localhost/health/ready"
+          HEALTH_URL="https://natra.site/health/live"
+          READY_URL="https://natra.site/health/ready"
 
           echo "=== Health Check ==="
 
@@ -291,7 +291,7 @@ jobs:
           echo "--- Liveness Check ---"
           LIVE_OK=false
           for i in $(seq 1 $MAX_RETRIES); do
-            HTTP_CODE=$(curl -so /dev/null -w "%{http_code}" \
+            HTTP_CODE=$(curl -sko /dev/null -w "%{http_code}" \
               --max-time 10 "${HEALTH_URL}" 2>/dev/null || echo "000")
 
             if [ "$HTTP_CODE" = "200" ]; then
@@ -310,7 +310,7 @@ jobs:
 
           # 2. Readiness check (DB + Redis)
           echo "--- Readiness Check ---"
-          READY_CODE=$(curl -so /dev/null -w "%{http_code}" \
+          READY_CODE=$(curl -sko /dev/null -w "%{http_code}" \
             --max-time 15 "${READY_URL}" 2>/dev/null || echo "000")
 
           if [ "$READY_CODE" = "200" ]; then
