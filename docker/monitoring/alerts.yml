@@ -140,7 +140,7 @@ groups:
     rules:
       # High memory usage > 800MB (warning)
       - alert: HighMemoryWarning
-        expr: process_resident_memory_bytes{job="ivf-api"} > 800 * 1024 * 1024
+        expr: dotnet_process_memory_working_set_bytes{job="ivf-api"} > 800 * 1024 * 1024
         for: 10m
         labels:
           severity: warning
@@ -151,7 +151,7 @@ groups:
 
       # Critical memory > 950MB (near 1GB limit)
       - alert: HighMemoryCritical
-        expr: process_resident_memory_bytes{job="ivf-api"} > 950 * 1024 * 1024
+        expr: dotnet_process_memory_working_set_bytes{job="ivf-api"} > 950 * 1024 * 1024
         for: 5m
         labels:
           severity: critical
@@ -162,7 +162,7 @@ groups:
 
       # High GC pressure (if available from .NET metrics)
       - alert: HighGCPressure
-        expr: rate(dotnet_gc_collections_total{job="ivf-api", generation="2"}[5m]) > 0.5
+        expr: rate(dotnet_gc_collections_total{job="ivf-api", gc_heap_generation="gen2"}[5m]) > 0.5
         for: 10m
         labels:
           severity: warning
@@ -173,7 +173,7 @@ groups:
 
       # Thread pool exhaustion
       - alert: ThreadPoolStarvation
-        expr: dotnet_threadpool_queue_length{job="ivf-api"} > 100
+        expr: dotnet_thread_pool_queue_length_total{job="ivf-api"} > 100
         for: 5m
         labels:
           severity: warning
