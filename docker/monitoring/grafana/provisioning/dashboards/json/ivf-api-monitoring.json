@@ -444,7 +444,7 @@
     {
       "datasource": { "type": "loki" },
       "fieldConfig": {
-        "defaults": { "color": { "mode": "palette-classic" }, "custom": { "lineWidth": 1, "fillOpacity": 30, "showPoints": "never" } }
+        "defaults": { "color": { "mode": "palette-classic" }, "noValue": "0", "custom": { "lineWidth": 1, "fillOpacity": 30, "showPoints": "never", "spanNulls": true } }
       },
       "gridPos": { "h": 7, "w": 12, "x": 12, "y": 61 },
       "id": 31,
@@ -452,9 +452,9 @@
       "title": "Security Events",
       "type": "timeseries",
       "targets": [
-        { "expr": "sum(count_over_time({swarm_service=~\"ivf_api.*\"} |~ \"(?i)(rate.?limit|throttl)\" [$__interval]))", "legendFormat": "Rate Limited" },
-        { "expr": "sum(count_over_time({swarm_service=~\"ivf_api.*\"} |~ \"(?i)(blocked|banned|blacklist|suspicious)\" [$__interval]))", "legendFormat": "Blocked/Suspicious" },
-        { "expr": "sum(count_over_time({swarm_service=~\"ivf_api.*\"} |~ \"(?i)(impersonat|permission.?delegat)\" [$__interval]))", "legendFormat": "Impersonation/Delegation" }
+        { "expr": "sum(count_over_time({swarm_service=~\"ivf_api.*\"} |~ \"(?i)(rate.?limit|throttl)\" [$__auto]))", "legendFormat": "Rate Limited", "interval": "1m" },
+        { "expr": "sum(count_over_time({swarm_service=~\"ivf_api.*\"} |~ \"(?i)(blocked|banned|blacklist|suspicious)\" [$__auto]))", "legendFormat": "Blocked/Suspicious", "interval": "1m" },
+        { "expr": "sum(count_over_time({swarm_service=~\"ivf_api.*\"} |~ \"(?i)(impersonat|permission.?delegat)\" [$__auto]))", "legendFormat": "Impersonation/Delegation", "interval": "1m" }
       ]
     },
 
