@@ -93,9 +93,8 @@ export class ReceptionDashboardComponent implements OnInit {
       }
     });
 
-    const token = this.authService.getToken();
-    if (!this.fingerprintService.isConnectedState() && token) {
-      this.fingerprintService.connect(token);
+    if (!this.fingerprintService.isConnectedState() && this.authService.getToken()) {
+      this.fingerprintService.connect();
     }
   }
 
@@ -107,7 +106,7 @@ export class ReceptionDashboardComponent implements OnInit {
         return;
       }
 
-      const success = await this.fingerprintService.connect(token);
+      const success = await this.fingerprintService.connect();
       if (!success) {
         this.notificationService.error('Lỗi', 'Không thể kết nối đến máy chủ vân tay. Vui lòng thử lại.');
         return;

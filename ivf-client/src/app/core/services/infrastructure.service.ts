@@ -91,7 +91,8 @@ export class InfrastructureService {
     this.hubConnection.onreconnecting(() => this.connectedSubject.next(false));
     this.hubConnection.onclose(() => this.connectedSubject.next(false));
 
-    this.hubConnection.start()
+    this.hubConnection
+      .start()
       .then(() => this.connectedSubject.next(true))
       .catch((err) => {
         console.error('Infrastructure hub connection failed:', err);
