@@ -475,9 +475,9 @@
       "title": "Process Memory",
       "type": "timeseries",
       "targets": [
-        { "expr": "process_resident_memory_bytes{job=\"ivf-api\"}", "legendFormat": "RSS (Physical)" },
-        { "expr": "process_virtual_memory_bytes{job=\"ivf-api\"}", "legendFormat": "Virtual" },
-        { "expr": "dotnet_gc_heap_size_bytes{job=\"ivf-api\"}", "legendFormat": "GC Heap" }
+        { "expr": "dotnet_process_memory_working_set_bytes{job=\"ivf-api\"}", "legendFormat": "Working Set" },
+        { "expr": "dotnet_gc_last_collection_memory_committed_size_bytes{job=\"ivf-api\"}", "legendFormat": "Committed" },
+        { "expr": "dotnet_gc_last_collection_heap_size_bytes{job=\"ivf-api\"}", "legendFormat": "GC Heap" }
       ]
     },
     {
@@ -491,11 +491,11 @@
       "title": ".NET Runtime",
       "type": "timeseries",
       "targets": [
-        { "expr": "rate(dotnet_gc_collections_total{job=\"ivf-api\", gc_generation=\"gen0\"}[5m])", "legendFormat": "GC Gen0/s" },
-        { "expr": "rate(dotnet_gc_collections_total{job=\"ivf-api\", gc_generation=\"gen1\"}[5m])", "legendFormat": "GC Gen1/s" },
-        { "expr": "rate(dotnet_gc_collections_total{job=\"ivf-api\", gc_generation=\"gen2\"}[5m])", "legendFormat": "GC Gen2/s" },
-        { "expr": "process_num_threads{job=\"ivf-api\"}", "legendFormat": "Threads" },
-        { "expr": "dotnet_threadpool_queue_length{job=\"ivf-api\"}", "legendFormat": "ThreadPool Queue" }
+        { "expr": "rate(dotnet_gc_collections_total{job=\"ivf-api\", gc_heap_generation=\"gen0\"}[5m])", "legendFormat": "GC Gen0/s" },
+        { "expr": "rate(dotnet_gc_collections_total{job=\"ivf-api\", gc_heap_generation=\"gen1\"}[5m])", "legendFormat": "GC Gen1/s" },
+        { "expr": "rate(dotnet_gc_collections_total{job=\"ivf-api\", gc_heap_generation=\"gen2\"}[5m])", "legendFormat": "GC Gen2/s" },
+        { "expr": "dotnet_thread_pool_thread_count_total{job=\"ivf-api\"}", "legendFormat": "ThreadPool Threads" },
+        { "expr": "dotnet_thread_pool_queue_length_total{job=\"ivf-api\"}", "legendFormat": "ThreadPool Queue" }
       ]
     },
     {
@@ -509,7 +509,7 @@
       "title": "CPU Usage",
       "type": "timeseries",
       "targets": [
-        { "expr": "rate(process_cpu_seconds_total{job=\"ivf-api\"}[5m]) * 100", "legendFormat": "CPU %" }
+        { "expr": "sum(rate(dotnet_process_cpu_time_seconds_total{job=\"ivf-api\"}[5m])) * 100", "legendFormat": "CPU %" }
       ]
     },
     {
@@ -523,7 +523,7 @@
       "title": "GC Pause Duration",
       "type": "timeseries",
       "targets": [
-        { "expr": "rate(dotnet_gc_pause_duration_seconds_total{job=\"ivf-api\"}[5m])", "legendFormat": "GC Pause/s" }
+        { "expr": "rate(dotnet_gc_pause_time_seconds_total{job=\"ivf-api\"}[5m])", "legendFormat": "GC Pause/s" }
       ]
     },
 
