@@ -107,11 +107,11 @@ services:
     healthcheck:
       # Swarm dùng healthcheck này để biết container thực sự sẵn sàng phục vụ
       # Không có healthcheck → Swarm coi container running = healthy (sai!)
-      # Simple TCP connection test to API port (doesn't require curl/wget)
+      # Use curl to hit the health endpoint (/bin/sh is dash, not bash — /dev/tcp doesn't work)
       test:
         [
           "CMD-SHELL",
-          "exec 3<>/dev/tcp/127.0.0.1/8080 >/dev/null 2>&1 && exec 3>&- && exit 0 || exit 1",
+          "curl -sf http://127.0.0.1:8080/health/live || exit 1",
         ]
       interval: 15s
       timeout: 5s
@@ -386,7 +386,7 @@ services:
         published: 443
         mode: host
     configs:
-      - source: caddyfile_v7
+      - source: caddyfile_v8
         target: /etc/caddy/Caddyfile
     volumes:
       - caddy_data:/data
@@ -453,7 +453,7 @@ services:
 
 # ─── Docker Configs ───
 configs:
-  caddyfile_v7:
+  caddyfile_v8:
     file: ./Caddyfile
   standby_entrypoint:
     file: ./docker/postgres/standby-entrypoint.sh

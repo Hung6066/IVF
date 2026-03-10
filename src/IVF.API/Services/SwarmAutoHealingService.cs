@@ -21,6 +21,10 @@ public sealed class SwarmAutoHealingService(
     private static readonly TimeSpan ForceRestartCooldown = TimeSpan.FromMinutes(5);
     private static readonly TimeSpan StuckUpdateTimeout = TimeSpan.FromMinutes(10);
 
+    // Never self-heal: this service runs inside ivf_api, restarting itself causes a cascade loop
+    private static readonly HashSet<string> SelfServices = new(StringComparer.OrdinalIgnoreCase)
+        { "ivf_api" };
+
     // Track remediation history to avoid loops
     private readonly Dictionary<string, DateTime> _lastForceRestart = new();
     private readonly Dictionary<string, int> _failureCount = new();
@@ -73,6 +77,10 @@ public sealed class SwarmAutoHealingService(
         var services = await monitorService.GetSwarmServicesAsync(ct);
         foreach (var svc in services)
         {
+            // Never force-restart the service we are running inside — it causes a restart cascade
+            if (SelfServices.Contains(svc.Name))
+                continue;
+
             if (svc.Status == "down" && svc.DesiredReplicas > 0)
             {
                 await HandleServiceDownAsync(svc, ct);
