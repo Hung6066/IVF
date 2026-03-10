@@ -107,16 +107,23 @@ services:
     deploy:
       replicas: 2
       placement:
-        constraints:
-          - node.role == manager
+        # No node constraint — allow scheduling on both VPS1 (manager) and VPS2 (worker)
+        # Spread ensures 1 replica per node for true HA
         preferences:
-          - spread: node.id
+          - spread: node.hostname
       update_config:
         parallelism: 1
         delay: 30s
         order: start-first
+        failure_action: rollback
       rollback_config:
         parallelism: 1
+        delay: 10s
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 5
+        window: 120s
       resources:
         limits:
           memory: 1G
