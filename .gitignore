@@ -74,5 +74,3 @@ ansible/hosts.yml
 .env.production
 
 /backups
-
-GITHUB_ACTIONS_SETUP.md
