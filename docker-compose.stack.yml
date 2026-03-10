@@ -107,7 +107,8 @@ services:
     healthcheck:
       # Swarm dùng healthcheck này để biết container thực sự sẵn sàng phục vụ
       # Không có healthcheck → Swarm coi container running = healthy (sai!)
-      test: ["CMD", "curl", "-f", "--max-time", "5", "http://localhost:8080/health/live"]
+      # Simple TCP connection test to API port (doesn't require curl/wget)
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8080 && if [ $? -eq 0 ]; then exec 3>&- && exit 0; else exit 1; fi"]
       interval: 15s
       timeout: 5s
       retries: 3
