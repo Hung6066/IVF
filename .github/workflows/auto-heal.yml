@@ -35,7 +35,7 @@ on:
 env:
   VPS1_IP: "45.134.226.56"
   VPS2_IP: "194.163.181.19"
-  HEALTH_URL: "https://natra.site/api/health/live"
+  HEALTH_URL: "https://natra.site/health/live"
   STACK_NAME: "ivf"
   STACK_FILE: "/opt/ivf/docker-compose.stack.yml"
 
