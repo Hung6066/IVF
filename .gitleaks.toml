@@ -25,6 +25,7 @@ useDefault = true
     '''CertificateAuthorityService\.cs$''',
     '''docker-compose\.monitoring\.yml$''',
     '''(^|[\\/])docker[\\/]monitoring[\\/]''',
+    '''GITHUB_ACTIONS_SETUP\.md$''',
   ]
 
 # Additional custom rules
