@@ -146,7 +146,7 @@ File: `scripts/watchdog-vps1.sh` — chạy mỗi 2 phút.
 
 ```
 VPS2 cron: */2 * * * *
-  → Ping https://natra.site/api/health/live
+  → Ping https://natra.site/health/live
   → HTTP 200? → Reset fail counter, sleep
   → HTTP ≠ 200? → fail_count++
   → fail_count >= 3 (sau ~6 phút)?
@@ -415,7 +415,57 @@ Vào GitHub Actions → Auto-Heal workflow → Run workflow:
 
 Xem output log để xác nhận health check đúng.
 
-### 6.5 Checklist sau DR drill
+### 6.5 Drill 5: GitHub Actions workflow test
+
+GitHub Actions chạy mỗi 5 phút từ GitHub infrastructure (hoàn toàn ngoài hạ tầng của bạn).
+
+**Workflow configuration:**
+- **Endpoint**: Kiểm tra `https://natra.site/health/live` để liveness check
+- **Secrets required**: VPS1_SSH_KEY, VPS2_SSH_KEY, DISCORD_WEBHOOK, GHCR_PAT
+- **Trigger**: 
+  - Automatic: Mỗi 5 phút (scheduled)
+  - Manual: GitHub UI → Actions → Auto-Heal workflow → Run workflow
+
+**Manual test:**
+
+```bash
+# Trigger workflow thủ công từ CLI
+gh workflow run auto-heal.yml \
+  --repo Hung6066/IVF \
+  -f action=check-only \
+  -f dry_run=true
+
+# Kiểm tra workflow runs
+gh run list --workflow=auto-heal.yml --limit=3
+
+# Xem chi tiết job results
+gh run view <RUN_ID> --json jobs --jq '.jobs[] | {name, conclusion}'
+```
+
+**Expected output:**
+
+```
+Health Check: ✅ SUCCESS
+- HTTP status: 200
+- VPS1 healthy: true
+- VPS2 reachable: true
+- Discord webhook: ✓ Sent (nếu health fail)
+```
+
+**Thử nghiệm fail scenario:**
+
+```bash
+# Trigger failover action (dry-run không thực thi)
+gh workflow run auto-heal.yml \
+  --repo Hung6066/IVF \
+  -f action=restart-vps1 \
+  -f dry_run=true
+
+# Xem log
+gh run view <RUN_ID> --log --job <JOB_ID> | grep -A20 "restart"
+```
+
+### 6.6 Checklist sau DR drill
 
 ```
 □ Health endpoint trả về 200 trong thời gian RTO mục tiêu
@@ -493,7 +543,45 @@ EOF
 
 ## 8. Monitoring & Alerting
 
-### 8.1 Discord alerts hiện có
+### 8.1 Health endpoint monitoring
+
+**API Health Endpoints** (routed through Caddy):
+
+| Endpoint | Port | Purpose | Response |
+|---|---|---|---|
+| `https://natra.site/health/live` | 443 → API:8080 | Liveness probe (process running) | `{"status":"Healthy","timestamp":"..."}` HTTP 200 |
+| `https://natra.site/health/ready` | 443 → API:8080 | Readiness probe (DB/Redis OK) | `{"status":"Healthy","checks":[...],"timestamp":"..."}` HTTP 200/503 |
+| `https://natra.site/health/startup` | 443 → API:8080 | Startup probe (app started) | `{"status":"Started","timestamp":"..."}` HTTP 200 |
+
+**Healthcheck implementation:**
+
+- **Docker Swarm**: TCP port test mỗi 15 giây (timeout 5s, retries 3)
+  - Command: `exec 3<>/dev/tcp/127.0.0.1/8080 && exit 0 || exit 1`
+  - Start period: 45 giây (tránh false restart khi .NET khởi động)
+  
+- **Caddy (reverse proxy)**: Active health check HTTP GET mỗi 15 giây
+  - Kiểm tra: `/health/live` endpoint
+  - Fail duration: 30 giây (tránh flapping)
+  - Load balancing: Round-robin với retry logic
+
+- **GitHub Actions**: Ping `https://natra.site/health/live` mỗi 5 phút
+  - Timeout: 10 giây
+  - Trigger failover nếu fail 3 lần liên tiếp (~15 phút)
+
+**Kiểm tra health endpoint:**
+
+```bash
+# Liveness (nhanh nhất, chỉ kiểm tra port)
+curl -sk https://natra.site/health/live -w 'HTTP %{http_code}\n'
+
+# Readiness (kiểm tra dependencies: DB, Redis, etc.)
+curl -sk https://natra.site/health/ready -w 'HTTP %{http_code}\n'
+
+# Parse response
+curl -s https://natra.site/health/live | jq '.status, .timestamp'
+```
+
+### 8.2 Discord alerts hiện có
 
 | Trigger | Nội dung alert |
 |---|---|
@@ -504,7 +592,7 @@ EOF
 | VPS1 recovered | `✅ VPS1 đã phục hồi` |
 | Force redeploy OK | `✅ IVF Recovery: Force redeploy thành công` |
 
-### 8.2 Grafana alerts liên quan
+### 8.3 Grafana alerts liên quan
 
 Log vào https://natra.site/grafana/ → Alerting → Alert rules. Kiểm tra:
 
@@ -512,7 +600,7 @@ Log vào https://natra.site/grafana/ → Alerting → Alert rules. Kiểm tra:
 - **IVF High Error Rate** — error rate > 10%
 - **IVF DB Connection Failed** — connection errors
 
-### 8.3 Kiểm tra log watchdog
+### 8.4 Kiểm tra log watchdog
 
 ```bash
 # Trên VPS2
@@ -551,11 +639,16 @@ docker service logs ivf_api -f --tail 100
 ### Health checks
 
 ```bash
-# Health API (từ bên ngoài)
-curl -sk https://natra.site/api/health/live
-curl -sk https://natra.site/api/health/ready
+# Health API — liveness check (Caddy routes /health/* trực tiếp tới api:8080)
+curl -sk https://natra.site/health/live
 
-# Health API (trực tiếp từ VPS1)
+# Health API — readiness check (kiểm tra DB, Redis, etc.)
+curl -sk https://natra.site/health/ready
+
+# Health API — startup check
+curl -sk https://natra.site/health/startup
+
+# Health API (trực tiếp từ VPS1, internal)
 ssh root@45.134.226.56 \
   "docker exec \$(docker ps -q -f name=ivf_api | head -1) curl -s http://localhost:8080/health/live"
 
@@ -597,21 +690,30 @@ ssh root@194.163.181.19 "docker service ls"
    $ docker service ls | grep api
    → Replicas 0/2? → docker service update --force ivf_api
 
-2. Kiểm tra container logs
+2. Kiểm tra health endpoint
+   $ curl -sk https://natra.site/health/live
+   → HTTP 200? → API là OK, vấn đề ở Caddy routing
+   → HTTP ≠ 200 hoặc timeout? → API unhealthy
+
+3. Kiểm tra container logs
    $ docker service logs ivf_api --tail 50
 
-3. Kiểm tra DB connection
+4. Kiểm tra Caddy logs (có thể active health check tắt upstream)
+   $ docker service logs ivf_caddy --tail 50 | grep -i "health\|fail\|upstream"
+
+5. Kiểm tra DB connection
    $ docker service logs ivf_api | grep -i "connection\|database"
 
-4. Kiểm tra Redis connection
+6. Kiểm tra Redis connection
    $ docker service logs ivf_api | grep -i "redis"
 
-5. Restart API service
+7. Restart API service
    $ docker service update --force ivf_api
+   → Swarm sẽ restart container, Docker healthcheck test mỗi 15 giây
 
-6. Nếu vẫn fail → restart DB
+8. Nếu vẫn fail → restart DB
    $ docker service update --force ivf_db
-   → Đợi 30 giây → test lại
+   → Đợi 30 giây → test API health lại
 ```
 
 ### Sự cố: DB không thể ghi (read-only)
@@ -651,22 +753,91 @@ ssh root@194.163.181.19 "docker service ls"
 5. Sau khi VPS1 quay lại → join làm manager (xem mục 7.2)
 ```
 
-### Sự cố: Caddy không cấp được SSL cert
+### Sự cố: Caddy không cấp được SSL cert / Cert rate limit
 
 ```
 1. Kiểm tra Caddy logs
-   $ docker service logs ivf_caddy --tail 50 | grep -i "error\|acme\|cert"
+   $ docker service logs ivf_caddy --tail 50 | grep -i "error|acme|cert"
 
 2. Kiểm tra Let's Encrypt rate limit
-   (max 5 failures per hostname per hour)
+   (max 5 failures per hostname per hour — Let's Encrypt sẽ reply HTTP 429)
 
-3. Xóa cache cert cũ
+3. Kiểm tra status Let's Encrypt
+   $ curl -I https://natra.site/
+   → HTTP 200? → cert OK từ trước
+   → HTTP 403/407? → cert expire hoặc rate limit
+
+4. Xóa cache cert cũ (để buộc Caddy renew)
    $ docker exec $(docker ps -q -f name=ivf_caddy | head -1) \
      rm -rf /data/caddy/certificates/acme-v02.api.letsencrypt.org
 
-4. Restart Caddy
+5. Restart Caddy
    $ docker service update --force ivf_caddy
+   → Caddy sẽ thử request cert mới, nhưng nếu rate limit → chờ đến giờ reset (max 1h)
+
+6. Nếu rate limit, dùng staging CA tạm thời để test (test cert không trusted)
+   - Edit Caddyfile → thay `acme-v02.api.letsencrypt.org` = `acme-staging-v02.api.letsencrypt.org`
+   - Restart Caddy
+   - Test health / cert renewal
+   - Sau giờ (hoặc kỳ khác) → restore lại prod CA
 ```
+
+### Sự cố: Docker healthcheck liên tục fail (container restart loop)
+
+4. Xóa cache cert cũ (để buộc Caddy renew)
+   $ docker exec $(docker ps -q -f name=ivf_caddy | head -1) \
+     rm -rf /data/caddy/certificates/acme-v02.api.letsencrypt.org
+
+5. Restart Caddy
+   $ docker service update --force ivf_caddy
+   → Caddy sẽ thử request cert mới, nhưng nếu rate limit → chờ đến giờ reset (max 1h)
+
+6. Nếu rate limit, dùng staging CA tạm thời để test (test cert không trusted)
+   - Edit Caddyfile → thay `acme-v02.api.letsencrypt.org` = `acme-staging-v02.api.letsencrypt.org`
+   - Restart Caddy
+   - Test health / cert renewal
+   - Sau giờ (hoặc kỳ khác) → restore lại prod CA
+```
+
+### Sự cố: Docker healthcheck liên tục fail (container restart loop)
+
+**Lý do:** Healthcheck command không khớp với container runtime hoặc port không accessible.
+
+**Vi dụ:** API healthcheck thất bại liên tục → Container restart mỗi 15 giây.
+
+**DebugSteps:**
+
+```bash
+# 1. Xem current healthcheck config
+docker service inspect ivf_api --format '{{json .Spec.TaskTemplate.ContainerSpec.Healthcheck}}'
+# Output: {"Test":["CMD-SHELL","exec 3<>/dev/tcp/127.0.0.1/8080 >/dev/null 2>&1..."],...}
+
+# 2. Test healthcheck command thủ công trong container
+CONTAINER=$(docker ps -q -f name=ivf_api | head -1)
+docker exec "$CONTAINER" bash -c "exec 3<>/dev/tcp/127.0.0.1/8080 >/dev/null 2>&1 && echo OK || echo FAIL"
+# Output: OK (nếu port accessible) hoặc FAIL
+
+# 3. Nếu FAIL — API port 8080 không listen
+docker exec "$CONTAINER" curl -s http://localhost:8080/health/live | head -5
+# Nếu timeout/refused → API không start correctly
+
+# 4. Kiểm tra API startup logs
+docker service logs ivf_api --tail 100 | grep -i "listening|error|startup"
+
+# 5. Nếu API code changes → rebuild image, redeploy
+docker service update --pull-image --image ghcr.io/hung6066/ivf:sha-NEWSHA ivf_api
+
+# 6. Tạm thời disable healthcheck (KHÔNG dùng lâu dài!)
+# Edit docker-compose.stack.yml → comment healthcheck block
+# Redeploy: docker stack deploy -c docker-compose.stack.yml ivf
+```
+
+**Ghi chú:** Docker healthcheck dùng TCP port test (command: `exec 3<>/dev/tcp/...`) vì:
+- Portable: hoạt động trên tất cả Linux containers (không cần curl/wget)
+- Đơn giản: chỉ kiểm tra port accessible, không test HTTP response
+- Caddy active health checks** cung cấp layer thứ 2: kiểm tra `/health/live` HTTP endpoint mỗi 15 giây
+
+---
 
 ### Sự cố: MinIO không truy cập được
 
