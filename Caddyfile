@@ -11,7 +11,13 @@
 natra.site {
 	# Health checks (no auth required)
 	handle /health/* {
-		reverse_proxy api:8080
+		reverse_proxy api:8080 {
+			active_health_check_uri         /health/live
+			active_health_check_interval     10s
+			active_health_check_timeout      5s
+			active_health_check_threshold    2
+			fail_duration                   15s
+		}
 	}
 
 	# Grafana — monitoring dashboard (basic auth protected)
@@ -38,22 +44,61 @@ natra.site {
 
 	# API requests
 	handle /api/* {
-		reverse_proxy api:8080
+		reverse_proxy api:8080 {
+			# Active health check: Caddy tự probe /health/live mỗi 15s
+			# Nếu replica fail → tự loại ra, không route traffic vào
+			active_health_check_uri         /health/live
+			active_health_check_interval     15s
+			active_health_check_timeout      5s
+			# Số lần fail liên tiếp trước khi mark unhealthy
+			active_health_check_threshold    2
+			# Sau bao lâu thử lại upstream đã fail
+			fail_duration                   30s
+			lb_policy                       round_robin
+			lb_retries                      2
+			# Retry khi kết nối bị từ chối (container restart)
+			retry_match {
+				error connection_refused
+				error connection_reset
+			}
+		}
 	}
 
 	# SignalR hubs
 	handle /hubs/* {
-		reverse_proxy api:8080
+		reverse_proxy api:8080 {
+			active_health_check_uri         /health/live
+			active_health_check_interval     15s
+			active_health_check_timeout      5s
+			active_health_check_threshold    2
+			fail_duration                   30s
+			# WebSocket: giữ sticky session theo IP để SignalR không bị ngắt
+			lb_policy                       ip_hash
+			header_up Connection            {http.request.header.Connection}
+			header_up Upgrade               {http.request.header.Upgrade}
+		}
 	}
 
 	# Swagger
 	handle /swagger/* {
-		reverse_proxy api:8080
+		reverse_proxy api:8080 {
+			active_health_check_uri         /health/live
+			active_health_check_interval     15s
+			active_health_check_timeout      5s
+			active_health_check_threshold    2
+			fail_duration                   30s
+		}
 	}
 
 	# Everything else -> Angular frontend
 	handle {
-		reverse_proxy frontend:80
+		reverse_proxy frontend:80 {
+			active_health_check_uri         /
+			active_health_check_interval     30s
+			active_health_check_timeout      5s
+			active_health_check_threshold    2
+			fail_duration                   30s
+		}
 	}
 
 	# Security headers

@@ -104,6 +104,14 @@ services:
       - ivf-public
       - ivf-data
       - ivf-monitoring
+    healthcheck:
+      # Swarm dùng healthcheck này để biết container thực sự sẵn sàng phục vụ
+      # Không có healthcheck → Swarm coi container running = healthy (sai!)
+      test: ["CMD", "curl", "-f", "--max-time", "5", "http://localhost:8080/health/live"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 45s   # .NET khởi động chậm, tránh false restart
     deploy:
       replicas: 2
       placement:
@@ -138,10 +146,21 @@ services:
     networks:
       - ivf-data
       - ivf-monitoring
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
     deploy:
       placement:
         constraints:
           - node.labels.role == primary
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 5
+        window: 60s
       resources:
         limits:
           memory: 512M
@@ -326,12 +345,24 @@ services:
     image: ghcr.io/hung6066/ivf-client:sha-9d2df1f
     networks:
       - ivf-public
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "--timeout=5", "http://localhost:80/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     deploy:
       replicas: 1
       update_config:
         parallelism: 1
         delay: 10s
         order: start-first
+        failure_action: rollback
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 60s
       placement:
         constraints:
           - node.labels.role == primary
@@ -350,7 +381,7 @@ services:
         published: 443
         mode: host
     configs:
-      - source: caddyfile_v6
+      - source: caddyfile_v7
         target: /etc/caddy/Caddyfile
     volumes:
       - caddy_data:/data
@@ -417,7 +448,7 @@ services:
 
 # ─── Docker Configs ───
 configs:
-  caddyfile_v6:
+  caddyfile_v7:
     file: ./Caddyfile
   standby_entrypoint:
     file: ./docker/postgres/standby-entrypoint.sh
