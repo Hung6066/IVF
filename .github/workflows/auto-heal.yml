@@ -12,282 +12,279 @@ name: Auto-Heal & Health Watchdog
 # =============================================
 
 on:
-  schedule:
-    - cron: "*/5 * * * *"   # Mỗi 5 phút
+    schedule:
+        - cron: "*/5 * * * *" # Mỗi 5 phút
 
-  workflow_dispatch:
-    inputs:
-      action:
-        description: "Hành động thủ công"
-        required: true
-        type: choice
-        options:
-          - check-only
-          - restart-vps1
-          - failover-to-vps2
-          - force-redeploy
-      dry_run:
-        description: "Dry run (không thực thi)"
-        required: false
-        default: false
-        type: boolean
+    workflow_dispatch:
+        inputs:
+            action:
+                description: "Hành động thủ công"
+                required: true
+                type: choice
+                options:
+                    - check-only
+                    - restart-vps1
+                    - failover-to-vps2
+                    - force-redeploy
+            dry_run:
+                description: "Dry run (không thực thi)"
+                required: false
+                default: false
+                type: boolean
 
 env:
-  VPS1_IP: "45.134.226.56"
-  VPS2_IP: "194.163.181.19"
-  HEALTH_URL: "https://natra.site/health/live"
-  STACK_NAME: "ivf"
-  STACK_FILE: "/opt/ivf/docker-compose.stack.yml"
+    VPS1_IP: "45.134.226.56"
+    VPS2_IP: "194.163.181.19"
+    HEALTH_URL: "https://natra.site/health/live"
+    STACK_NAME: "ivf"
+    STACK_FILE: "/opt/ivf/docker-compose.stack.yml"
 
 jobs:
-  # ─────────────────────────────────────────
-  # JOB 1: Kiểm tra sức khỏe cả 2 VPS
-  # ─────────────────────────────────────────
-  health-check:
-    name: Health Check
-    runs-on: ubuntu-latest
-    outputs:
-      vps1_healthy: ${{ steps.check.outputs.vps1_healthy }}
-      vps2_reachable: ${{ steps.check.outputs.vps2_reachable }}
-      needs_action: ${{ steps.check.outputs.needs_action }}
+    # ─────────────────────────────────────────
+    # JOB 1: Kiểm tra sức khỏe cả 2 VPS
+    # ─────────────────────────────────────────
+    health-check:
+        name: Health Check
+        runs-on: ubuntu-latest
+        outputs:
+            vps1_healthy: ${{ steps.check.outputs.vps1_healthy }}
+            vps2_reachable: ${{ steps.check.outputs.vps2_reachable }}
+            needs_action: ${{ steps.check.outputs.needs_action }}
 
-    steps:
-      - name: Kiểm tra health endpoint
-        id: check
-        run: |
-          echo "Checking health endpoint..."
-          HTTP_CODE=$(curl -sk --connect-timeout 10 --max-time 15 \
-            -o /dev/null -w "%{http_code}" "${{ env.HEALTH_URL }}" 2>/dev/null || echo "000")
-          echo "HTTP status: $HTTP_CODE"
+        steps:
+            - name: Kiểm tra health endpoint
+              id: check
+              run: |
+                  echo "Checking health endpoint..."
+                  HTTP_CODE=$(curl -sk --connect-timeout 10 --max-time 15 \
+                    -o /dev/null -w "%{http_code}" "${{ env.HEALTH_URL }}" 2>/dev/null || echo "000")
+                  echo "HTTP status: $HTTP_CODE"
 
-          if [[ "$HTTP_CODE" == "200" ]]; then
-            echo "✅ Health endpoint OK"
-            echo "vps1_healthy=true" >> "$GITHUB_OUTPUT"
-            echo "needs_action=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "❌ Health endpoint FAIL (HTTP $HTTP_CODE)"
-            echo "vps1_healthy=false" >> "$GITHUB_OUTPUT"
-            echo "needs_action=true" >> "$GITHUB_OUTPUT"
-          fi
+                  if [[ "$HTTP_CODE" == "200" ]]; then
+                    echo "✅ Health endpoint OK"
+                    echo "vps1_healthy=true" >> "$GITHUB_OUTPUT"
+                    echo "needs_action=false" >> "$GITHUB_OUTPUT"
+                  else
+                    echo "❌ Health endpoint FAIL (HTTP $HTTP_CODE)"
+                    echo "vps1_healthy=false" >> "$GITHUB_OUTPUT"
+                    echo "needs_action=true" >> "$GITHUB_OUTPUT"
+                  fi
 
-          # Ping VPS2 trực tiếp (Caddy global service)
-          VPS2_CODE=$(curl -sk --connect-timeout 8 -o /dev/null -w "%{http_code}" \
-            "http://${{ env.VPS2_IP }}/health-check" 2>/dev/null || echo "000")
-          if [[ "$VPS2_CODE" != "000" ]]; then
-            echo "vps2_reachable=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "vps2_reachable=false" >> "$GITHUB_OUTPUT"
-          fi
+                  # Ping VPS2 trực tiếp (Caddy global service)
+                  VPS2_CODE=$(curl -sk --connect-timeout 8 -o /dev/null -w "%{http_code}" \
+                    "http://${{ env.VPS2_IP }}/health-check" 2>/dev/null || echo "000")
+                  if [[ "$VPS2_CODE" != "000" ]]; then
+                    echo "vps2_reachable=true" >> "$GITHUB_OUTPUT"
+                  else
+                    echo "vps2_reachable=false" >> "$GITHUB_OUTPUT"
+                  fi
 
-      - name: Discord thông báo (nếu không healthy)
-        if: steps.check.outputs.vps1_healthy == 'false'
-        run: |
-          curl -s -X POST "${{ secrets.DISCORD_WEBHOOK }}" \
-            -H "Content-Type: application/json" \
-            -d '{
-              "content": "⚠️ **IVF GitHub Watchdog**: Health endpoint không phản hồi. Đang kiểm tra và có thể kích hoạt auto-heal..."
-            }' || true
+            - name: Discord thông báo (nếu không healthy)
+              if: steps.check.outputs.vps1_healthy == 'false'
+              run: |
+                  curl -s -X POST "${{ secrets.DISCORD_WEBHOOK }}" \
+                    -H "Content-Type: application/json" \
+                    -d '{
+                      "content": "⚠️ **IVF GitHub Watchdog**: Health endpoint không phản hồi. Đang kiểm tra và có thể kích hoạt auto-heal..."
+                    }' || true
 
-  # ─────────────────────────────────────────
-  # JOB 2: Restart VPS1 services (nếu VPS1 còn SSH được)
-  # ─────────────────────────────────────────
-  restart-vps1:
-    name: Restart VPS1 Services
-    runs-on: ubuntu-latest
-    needs: health-check
-    if: |
-      needs.health-check.outputs.vps1_healthy == 'false' &&
-      (github.event_name == 'schedule' ||
-       (github.event_name == 'workflow_dispatch' && inputs.action == 'restart-vps1'))
-    environment: production
+    # ─────────────────────────────────────────
+    # JOB 2: Restart VPS1 services (nếu VPS1 còn SSH được)
+    # ─────────────────────────────────────────
+    restart-vps1:
+        name: Restart VPS1 Services
+        runs-on: ubuntu-latest
+        needs: health-check
+        if: |
+            needs.health-check.outputs.vps1_healthy == 'false' &&
+            (github.event_name == 'schedule' ||
+             (github.event_name == 'workflow_dispatch' && inputs.action == 'restart-vps1'))
+        environment: production
+        steps:
+            - name: Setup SSH
+              run: |
+                  mkdir -p ~/.ssh
+                  echo "${{ secrets.VPS1_SSH_KEY }}" > ~/.ssh/vps1_key
+                  chmod 600 ~/.ssh/vps1_key
+                  ssh-keyscan -H "${{ env.VPS1_IP }}" >> ~/.ssh/known_hosts 2>/dev/null || true
 
-    steps:
-      - name: Setup SSH
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.VPS1_SSH_KEY }}" > ~/.ssh/vps1_key
-          chmod 600 ~/.ssh/vps1_key
-          ssh-keyscan -H "${{ env.VPS1_IP }}" >> ~/.ssh/known_hosts 2>/dev/null || true
+            - name: Kiểm tra VPS1 còn SSH được không
+              id: ssh_check
+              run: |
+                  if ssh -i ~/.ssh/vps1_key -o ConnectTimeout=15 -o StrictHostKeyChecking=no \
+                      root@${{ env.VPS1_IP }} "echo SSH_OK" 2>/dev/null | grep -q "SSH_OK"; then
+                    echo "ssh_ok=true" >> "$GITHUB_OUTPUT"
+                  else
+                    echo "ssh_ok=false" >> "$GITHUB_OUTPUT"
+                    echo "VPS1 SSH không kết nối được."
+                  fi
 
-      - name: Kiểm tra VPS1 còn SSH được không
-        id: ssh_check
-        run: |
-          if ssh -i ~/.ssh/vps1_key -o ConnectTimeout=15 -o StrictHostKeyChecking=no \
-              root@${{ env.VPS1_IP }} "echo SSH_OK" 2>/dev/null | grep -q "SSH_OK"; then
-            echo "ssh_ok=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "ssh_ok=false" >> "$GITHUB_OUTPUT"
-            echo "VPS1 SSH không kết nối được."
-          fi
+            - name: Restart Docker Swarm services trên VPS1
+              if: steps.ssh_check.outputs.ssh_ok == 'true' && (inputs.dry_run != 'true')
+              run: |
+                  ssh -i ~/.ssh/vps1_key -o ConnectTimeout=15 -o StrictHostKeyChecking=no \
+                      root@${{ env.VPS1_IP }} << 'EOF'
+                    echo "=== Checking Docker ==="
+                    systemctl is-active docker || systemctl start docker
+                    sleep 5
 
-      - name: Restart Docker Swarm services trên VPS1
-        if: steps.ssh_check.outputs.ssh_ok == 'true' && (inputs.dry_run != 'true')
-        run: |
-          ssh -i ~/.ssh/vps1_key -o ConnectTimeout=15 -o StrictHostKeyChecking=no \
-              root@${{ env.VPS1_IP }} << 'EOF'
-            echo "=== Checking Docker ==="
-            systemctl is-active docker || systemctl start docker
-            sleep 5
+                    echo "=== Checking Swarm ==="
+                    docker info --format '{{.Swarm.LocalNodeState}}'
 
-            echo "=== Checking Swarm ==="
-            docker info --format '{{.Swarm.LocalNodeState}}'
+                    echo "=== Restarting unhealthy services ==="
+                    for svc in $(docker service ls --format '{{.Name}}' 2>/dev/null); do
+                      REPLICAS=$(docker service ls --filter "name=$svc" --format '{{.Replicas}}' 2>/dev/null)
+                      if echo "$REPLICAS" | grep -E "^0/[1-9]" > /dev/null 2>&1; then
+                        echo "Force updating $svc (replicas: $REPLICAS)"
+                        docker service update --force "$svc" || true
+                      fi
+                    done
 
-            echo "=== Restarting unhealthy services ==="
-            for svc in $(docker service ls --format '{{.Name}}' 2>/dev/null); do
-              REPLICAS=$(docker service ls --filter "name=$svc" --format '{{.Replicas}}' 2>/dev/null)
-              if echo "$REPLICAS" | grep -E "^0/[1-9]" > /dev/null 2>&1; then
-                echo "Force updating $svc (replicas: $REPLICAS)"
-                docker service update --force "$svc" || true
-              fi
-            done
+                    echo "=== Services status ==="
+                    docker service ls 2>/dev/null | head -20
+                  EOF
 
-            echo "=== Services status ==="
-            docker service ls 2>/dev/null | head -20
-          EOF
+            - name: Đợi recovery sau restart
+              if: steps.ssh_check.outputs.ssh_ok == 'true' && (inputs.dry_run != 'true')
+              run: |
+                  echo "Đợi 45 giây cho services khởi động..."
+                  sleep 45
+                  HTTP_CODE=$(curl -sk --connect-timeout 15 \
+                    -o /dev/null -w "%{http_code}" "${{ env.HEALTH_URL }}" 2>/dev/null || echo "000")
+                  if [[ "$HTTP_CODE" == "200" ]]; then
+                    echo "✅ VPS1 đã phục hồi sau restart"
+                    curl -s -X POST "${{ secrets.DISCORD_WEBHOOK }}" \
+                      -H "Content-Type: application/json" \
+                      -d '{"content":"✅ **IVF Auto-Heal**: VPS1 đã phục hồi sau khi restart services tự động."}' || true
+                  else
+                    echo "❌ VPS1 vẫn chưa healthy sau restart (HTTP $HTTP_CODE)"
+                    echo "ssh_recovered=false" >> "$GITHUB_OUTPUT"
+                  fi
 
-      - name: Đợi recovery sau restart
-        if: steps.ssh_check.outputs.ssh_ok == 'true' && (inputs.dry_run != 'true')
-        run: |
-          echo "Đợi 45 giây cho services khởi động..."
-          sleep 45
-          HTTP_CODE=$(curl -sk --connect-timeout 15 \
-            -o /dev/null -w "%{http_code}" "${{ env.HEALTH_URL }}" 2>/dev/null || echo "000")
-          if [[ "$HTTP_CODE" == "200" ]]; then
-            echo "✅ VPS1 đã phục hồi sau restart"
-            curl -s -X POST "${{ secrets.DISCORD_WEBHOOK }}" \
-              -H "Content-Type: application/json" \
-              -d '{"content":"✅ **IVF Auto-Heal**: VPS1 đã phục hồi sau khi restart services tự động."}' || true
-          else
-            echo "❌ VPS1 vẫn chưa healthy sau restart (HTTP $HTTP_CODE)"
-            echo "ssh_recovered=false" >> "$GITHUB_OUTPUT"
-          fi
+            - name: SSH không được → output để trigger failover
+              if: steps.ssh_check.outputs.ssh_ok == 'false'
+              run: |
+                  echo "VPS1 không SSH được → VPS1 hoàn toàn down."
+                  curl -s -X POST "${{ secrets.DISCORD_WEBHOOK }}" \
+                    -H "Content-Type: application/json" \
+                    -d '{"content":"🔴 **IVF**: VPS1 không SSH được. Cần failover sang VPS2!"}' || true
 
-      - name: SSH không được → output để trigger failover
-        if: steps.ssh_check.outputs.ssh_ok == 'false'
-        run: |
-          echo "VPS1 không SSH được → VPS1 hoàn toàn down."
-          curl -s -X POST "${{ secrets.DISCORD_WEBHOOK }}" \
-            -H "Content-Type: application/json" \
-            -d '{"content":"🔴 **IVF**: VPS1 không SSH được. Cần failover sang VPS2!"}' || true
+    # ─────────────────────────────────────────
+    # JOB 3: Kích hoạt failover sang VPS2
+    # ─────────────────────────────────────────
+    failover-to-vps2:
+        name: Failover to VPS2
+        runs-on: ubuntu-latest
+        needs: [health-check, restart-vps1]
+        if: |
+            always() &&
+            needs.health-check.outputs.vps1_healthy == 'false' &&
+            needs.health-check.outputs.vps2_reachable == 'true' &&
+            (github.event_name == 'workflow_dispatch' && inputs.action == 'failover-to-vps2')
+        environment: production
+        steps:
+            - name: Setup SSH tới VPS2
+              run: |
+                  mkdir -p ~/.ssh
+                  echo "${{ secrets.VPS2_SSH_KEY }}" > ~/.ssh/vps2_key
+                  chmod 600 ~/.ssh/vps2_key
+                  ssh-keyscan -H "${{ env.VPS2_IP }}" >> ~/.ssh/known_hosts 2>/dev/null || true
 
-  # ─────────────────────────────────────────
-  # JOB 3: Kích hoạt failover sang VPS2
-  # ─────────────────────────────────────────
-  failover-to-vps2:
-    name: Failover to VPS2
-    runs-on: ubuntu-latest
-    needs: [health-check, restart-vps1]
-    if: |
-      always() &&
-      needs.health-check.outputs.vps1_healthy == 'false' &&
-      needs.health-check.outputs.vps2_reachable == 'true' &&
-      (github.event_name == 'workflow_dispatch' && inputs.action == 'failover-to-vps2')
-    environment: production
+            - name: Chạy failover script trên VPS2
+              if: inputs.dry_run != 'true'
+              run: |
+                  ssh -i ~/.ssh/vps2_key -o ConnectTimeout=20 -o StrictHostKeyChecking=no \
+                      root@${{ env.VPS2_IP }} << 'EOF'
+                    if [[ -f /opt/ivf/scripts/failover-manager.sh ]]; then
+                      bash /opt/ivf/scripts/failover-manager.sh
+                    else
+                      echo "ERROR: failover script không tồn tại!"
+                      echo "Chạy: cd /opt/ivf && docker swarm init --force-new-cluster && docker stack deploy -c docker-compose.stack.yml ivf"
+                    fi
+                  EOF
 
-    steps:
-      - name: Setup SSH tới VPS2
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.VPS2_SSH_KEY }}" > ~/.ssh/vps2_key
-          chmod 600 ~/.ssh/vps2_key
-          ssh-keyscan -H "${{ env.VPS2_IP }}" >> ~/.ssh/known_hosts 2>/dev/null || true
+                  curl -s -X POST "${{ secrets.DISCORD_WEBHOOK }}" \
+                    -H "Content-Type: application/json" \
+                    -d '{"content":"🔄 **IVF Failover**: VPS2 đã được kích hoạt làm primary. Kiểm tra https://natra.site"}' || true
 
-      - name: Chạy failover script trên VPS2
-        if: inputs.dry_run != 'true'
-        run: |
-          ssh -i ~/.ssh/vps2_key -o ConnectTimeout=20 -o StrictHostKeyChecking=no \
-              root@${{ env.VPS2_IP }} << 'EOF'
-            if [[ -f /opt/ivf/scripts/failover-manager.sh ]]; then
-              bash /opt/ivf/scripts/failover-manager.sh
-            else
-              echo "ERROR: failover script không tồn tại!"
-              echo "Chạy: cd /opt/ivf && docker swarm init --force-new-cluster && docker stack deploy -c docker-compose.stack.yml ivf"
-            fi
-          EOF
+    # ─────────────────────────────────────────
+    # JOB 4: Force redeploy toàn bộ (cả 2 VPS down → VPS1 đã boot lại)
+    # ─────────────────────────────────────────
+    force-redeploy:
+        name: Force Redeploy (Both Down → Recovery)
+        runs-on: ubuntu-latest
+        needs: health-check
+        if: |
+            github.event_name == 'workflow_dispatch' && inputs.action == 'force-redeploy'
+        environment: production
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
 
-          curl -s -X POST "${{ secrets.DISCORD_WEBHOOK }}" \
-            -H "Content-Type: application/json" \
-            -d '{"content":"🔄 **IVF Failover**: VPS2 đã được kích hoạt làm primary. Kiểm tra https://natra.site"}' || true
+            - name: Setup SSH VPS1
+              run: |
+                  mkdir -p ~/.ssh
+                  echo "${{ secrets.VPS1_SSH_KEY }}" > ~/.ssh/vps1_key
+                  chmod 600 ~/.ssh/vps1_key
+                  ssh-keyscan -H "${{ env.VPS1_IP }}" >> ~/.ssh/known_hosts 2>/dev/null || true
 
-  # ─────────────────────────────────────────
-  # JOB 4: Force redeploy toàn bộ (cả 2 VPS down → VPS1 đã boot lại)
-  # ─────────────────────────────────────────
-  force-redeploy:
-    name: Force Redeploy (Both Down → Recovery)
-    runs-on: ubuntu-latest
-    needs: health-check
-    if: |
-      github.event_name == 'workflow_dispatch' && inputs.action == 'force-redeploy'
-    environment: production
+            - name: Đồng bộ stack file lên VPS1
+              run: |
+                  scp -i ~/.ssh/vps1_key -o StrictHostKeyChecking=no \
+                    docker-compose.stack.yml \
+                    root@${{ env.VPS1_IP }}:${{ env.STACK_FILE }}
 
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+            - name: Redeploy stack trên VPS1
+              if: inputs.dry_run != 'true'
+              run: |
+                  ssh -i ~/.ssh/vps1_key -o StrictHostKeyChecking=no \
+                      root@${{ env.VPS1_IP }} << 'ENDSSH'
+                    cd /opt/ivf
+                    # Đảm bảo Docker đang chạy
+                    systemctl start docker || true
+                    sleep 3
 
-      - name: Setup SSH VPS1
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.VPS1_SSH_KEY }}" > ~/.ssh/vps1_key
-          chmod 600 ~/.ssh/vps1_key
-          ssh-keyscan -H "${{ env.VPS1_IP }}" >> ~/.ssh/known_hosts 2>/dev/null || true
+                    # Đảm bảo Swarm đang hoạt động
+                    SWARM_STATE=$(docker info --format '{{.Swarm.LocalNodeState}}' 2>/dev/null || echo "inactive")
+                    if [[ "$SWARM_STATE" != "active" ]]; then
+                      echo "Reinit Swarm..."
+                      docker swarm init --advertise-addr ${{ env.VPS1_IP }} || \
+                      docker swarm init --force-new-cluster || true
+                    fi
 
-      - name: Đồng bộ stack file lên VPS1
-        run: |
-          scp -i ~/.ssh/vps1_key -o StrictHostKeyChecking=no \
-            docker-compose.stack.yml \
-            root@${{ env.VPS1_IP }}:${{ env.STACK_FILE }}
+                    # Login registry
+                    echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin 2>/dev/null || true
 
-      - name: Redeploy stack trên VPS1
-        if: inputs.dry_run != 'true'
-        run: |
-          ssh -i ~/.ssh/vps1_key -o StrictHostKeyChecking=no \
-              root@${{ env.VPS1_IP }} << 'ENDSSH'
-            cd /opt/ivf
-            # Đảm bảo Docker đang chạy
-            systemctl start docker || true
-            sleep 3
+                    # Deploy stack
+                    docker stack deploy \
+                      -c ${{ env.STACK_FILE }} \
+                      ${{ env.STACK_NAME }} \
+                      --with-registry-auth
 
-            # Đảm bảo Swarm đang hoạt động
-            SWARM_STATE=$(docker info --format '{{.Swarm.LocalNodeState}}' 2>/dev/null || echo "inactive")
-            if [[ "$SWARM_STATE" != "active" ]]; then
-              echo "Reinit Swarm..."
-              docker swarm init --advertise-addr ${{ env.VPS1_IP }} || \
-              docker swarm init --force-new-cluster || true
-            fi
+                    echo "Stack deployed. Services:"
+                    docker service ls
+                  ENDSSH
 
-            # Login registry
-            echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin 2>/dev/null || true
-
-            # Deploy stack
-            docker stack deploy \
-              -c ${{ env.STACK_FILE }} \
-              ${{ env.STACK_NAME }} \
-              --with-registry-auth
-
-            echo "Stack deployed. Services:"
-            docker service ls
-          ENDSSH
-
-      - name: Đợi và kiểm tra health
-        if: inputs.dry_run != 'true'
-        run: |
-          echo "Đợi 60 giây cho services khởi động..."
-          sleep 60
-          for i in 1 2 3; do
-            HTTP_CODE=$(curl -sk --connect-timeout 15 \
-              -o /dev/null -w "%{http_code}" "${{ env.HEALTH_URL }}" || echo "000")
-            if [[ "$HTTP_CODE" == "200" ]]; then
-              echo "✅ Service recovered!"
-              curl -s -X POST "${{ secrets.DISCORD_WEBHOOK }}" \
-                -H "Content-Type: application/json" \
-                -d '{"content":"✅ **IVF Recovery**: Force redeploy thành công. https://natra.site đang hoạt động."}' || true
-              exit 0
-            fi
-            echo "Chờ... lần $i (HTTP $HTTP_CODE)"
-            sleep 30
-          done
-          echo "❌ Vẫn chưa healthy sau force-redeploy"
-          curl -s -X POST "${{ secrets.DISCORD_WEBHOOK }}" \
-            -H "Content-Type: application/json" \
-            -d '{"content":"❌ **IVF Recovery**: Force redeploy hoàn tất nhưng API chưa healthy. Cần can thiệp thủ công!"}' || true
-          exit 1
+            - name: Đợi và kiểm tra health
+              if: inputs.dry_run != 'true'
+              run: |
+                  echo "Đợi 60 giây cho services khởi động..."
+                  sleep 60
+                  for i in 1 2 3; do
+                    HTTP_CODE=$(curl -sk --connect-timeout 15 \
+                      -o /dev/null -w "%{http_code}" "${{ env.HEALTH_URL }}" || echo "000")
+                    if [[ "$HTTP_CODE" == "200" ]]; then
+                      echo "✅ Service recovered!"
+                      curl -s -X POST "${{ secrets.DISCORD_WEBHOOK }}" \
+                        -H "Content-Type: application/json" \
+                        -d '{"content":"✅ **IVF Recovery**: Force redeploy thành công. https://natra.site đang hoạt động."}' || true
+                      exit 0
+                    fi
+                    echo "Chờ... lần $i (HTTP $HTTP_CODE)"
+                    sleep 30
+                  done
+                  echo "❌ Vẫn chưa healthy sau force-redeploy"
+                  curl -s -X POST "${{ secrets.DISCORD_WEBHOOK }}" \
+                    -H "Content-Type: application/json" \
+                    -d '{"content":"❌ **IVF Recovery**: Force redeploy hoàn tất nhưng API chưa healthy. Cần can thiệp thủ công!"}' || true
+                  exit 1

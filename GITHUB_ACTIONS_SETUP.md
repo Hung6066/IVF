@@ -65,6 +65,7 @@ https://discord.com/api/webhooks/1480732613051420805/aUjG-AmoRHukTqKwkbrwl2WoSaQ
 **Value:** (Your GitHub Personal Access Token)
 
 Steps to create:
+
 1. Go to https://github.com/settings/tokens
 2. Click **Generate new token (classic)**
 3. Token name: `ivf-ghcr-read`
@@ -88,6 +89,7 @@ After adding all 4 secrets, test the GitHub Actions workflow:
 4. Click **Run workflow**
 
 Expected output in logs:
+
 - ✅ Health check passed
 - ✅ All VPS reachable
 - ✅ Discord webhook configured
@@ -100,4 +102,3 @@ Expected output in logs:
 - Keys are **ed25519** (secure, compact)
 - GitHub Actions will use these keys to SSH into VPS for recovery operations
 - All secrets are now ready for GitHub Actions workflows
-

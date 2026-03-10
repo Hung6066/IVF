@@ -12,7 +12,7 @@ LOG_FILE="/var/log/ivf/wal-s3.log"
 
 mkdir -p "$TEMP_DIR" "$(dirname "$LOG_FILE")"
 
-DB_CONTAINER=$(docker ps -q -f name=ivf_db.1 -f status=running)
+DB_CONTAINER=$(docker ps -q --filter 'name=ivf_db' --filter status=running | head -1)
 if [ -z "$DB_CONTAINER" ]; then
   exit 0
 fi

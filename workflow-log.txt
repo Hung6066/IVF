@@ -1,0 +1,83 @@
+Health Check	Set up job	∩╗┐2026-03-10T01:34:55.9830266Z Current runner version: '2.332.0'
+Health Check	Set up job	2026-03-10T01:34:55.9860286Z ##[group]Runner Image Provisioner
+Health Check	Set up job	2026-03-10T01:34:55.9861475Z Hosted Compute Agent
+Health Check	Set up job	2026-03-10T01:34:55.9862106Z Version: 20260213.493
+Health Check	Set up job	2026-03-10T01:34:55.9862945Z Commit: 5c115507f6dd24b8de37d8bbe0bb4509d0cc0fa3
+Health Check	Set up job	2026-03-10T01:34:55.9863748Z Build Date: 2026-02-13T00:28:41Z
+Health Check	Set up job	2026-03-10T01:34:55.9864431Z Worker ID: {742a2d80-ee2b-4c5d-8c17-7fa22035cc40}
+Health Check	Set up job	2026-03-10T01:34:55.9865304Z Azure Region: eastus
+Health Check	Set up job	2026-03-10T01:34:55.9865879Z ##[endgroup]
+Health Check	Set up job	2026-03-10T01:34:55.9867788Z ##[group]Operating System
+Health Check	Set up job	2026-03-10T01:34:55.9868405Z Ubuntu
+Health Check	Set up job	2026-03-10T01:34:55.9868916Z 24.04.3
+Health Check	Set up job	2026-03-10T01:34:55.9869491Z LTS
+Health Check	Set up job	2026-03-10T01:34:55.9869964Z ##[endgroup]
+Health Check	Set up job	2026-03-10T01:34:55.9870582Z ##[group]Runner Image
+Health Check	Set up job	2026-03-10T01:34:55.9871362Z Image: ubuntu-24.04
+Health Check	Set up job	2026-03-10T01:34:55.9872064Z Version: 20260302.42.1
+Health Check	Set up job	2026-03-10T01:34:55.9873307Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260302.42/images/ubuntu/Ubuntu2404-Readme.md
+Health Check	Set up job	2026-03-10T01:34:55.9875292Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260302.42
+Health Check	Set up job	2026-03-10T01:34:55.9876264Z ##[endgroup]
+Health Check	Set up job	2026-03-10T01:34:55.9877727Z ##[group]GITHUB_TOKEN Permissions
+Health Check	Set up job	2026-03-10T01:34:55.9879912Z Contents: read
+Health Check	Set up job	2026-03-10T01:34:55.9880590Z Metadata: read
+Health Check	Set up job	2026-03-10T01:34:55.9881441Z Packages: read
+Health Check	Set up job	2026-03-10T01:34:55.9881995Z ##[endgroup]
+Health Check	Set up job	2026-03-10T01:34:55.9884281Z Secret source: Actions
+Health Check	Set up job	2026-03-10T01:34:55.9885459Z Prepare workflow directory
+Health Check	Set up job	2026-03-10T01:34:56.0271981Z Prepare all required actions
+Health Check	Set up job	2026-03-10T01:34:56.0330074Z Complete job name: Health Check
+Health Check	Kiß╗âm tra health endpoint	∩╗┐2026-03-10T01:34:56.1082613Z ##[group]Run echo "Checking health endpoint..."
+Health Check	Kiß╗âm tra health endpoint	2026-03-10T01:34:56.1083774Z [36;1mecho "Checking health endpoint..."[0m
+Health Check	Kiß╗âm tra health endpoint	2026-03-10T01:34:56.1084584Z [36;1mHTTP_CODE=$(curl -sk --connect-timeout 10 --max-time 15 \[0m
+Health Check	Kiß╗âm tra health endpoint	2026-03-10T01:34:56.1085704Z [36;1m  -o /dev/null -w "%{http_code}" "https://natra.site/api/health/live" 2>/dev/null || echo "000")[0m
+Health Check	Kiß╗âm tra health endpoint	2026-03-10T01:34:56.1087056Z [36;1mecho "HTTP status: $HTTP_CODE"[0m
+Health Check	Kiß╗âm tra health endpoint	2026-03-10T01:34:56.1087660Z [36;1m[0m
+Health Check	Kiß╗âm tra health endpoint	2026-03-10T01:34:56.1088173Z [36;1mif [[ "$HTTP_CODE" == "200" ]]; then[0m
+Health Check	Kiß╗âm tra health endpoint	2026-03-10T01:34:56.1088957Z [36;1m  echo "Γ£à Health endpoint OK"[0m
+Health Check	Kiß╗âm tra health endpoint	2026-03-10T01:34:56.1089669Z [36;1m  echo "vps1_healthy=true" >> "$GITHUB_OUTPUT"[0m
+Health Check	Kiß╗âm tra health endpoint	2026-03-10T01:34:56.1090392Z [36;1m  echo "needs_action=false" >> "$GITHUB_OUTPUT"[0m
+Health Check	Kiß╗âm tra health endpoint	2026-03-10T01:34:56.1091449Z [36;1melse[0m
+Health Check	Kiß╗âm tra health endpoint	2026-03-10T01:34:56.1092098Z [36;1m  echo "Γ¥î Health endpoint FAIL (HTTP $HTTP_CODE)"[0m
+Health Check	Kiß╗âm tra health endpoint	2026-03-10T01:34:56.1092870Z [36;1m  echo "vps1_healthy=false" >> "$GITHUB_OUTPUT"[0m
+Health Check	Kiß╗âm tra health endpoint	2026-03-10T01:34:56.1093875Z [36;1m  echo "needs_action=true" >> "$GITHUB_OUTPUT"[0m
+Health Check	Kiß╗âm tra health endpoint	2026-03-10T01:34:56.1094565Z [36;1mfi[0m
+Health Check	Kiß╗âm tra health endpoint	2026-03-10T01:34:56.1095111Z [36;1m[0m
+Health Check	Kiß╗âm tra health endpoint	2026-03-10T01:34:56.1095683Z [36;1m# Ping VPS2 trß╗▒c tiß║┐p (Caddy global service)[0m
+Health Check	Kiß╗âm tra health endpoint	2026-03-10T01:34:56.1096622Z [36;1mVPS2_CODE=$(curl -sk --connect-timeout 8 -o /dev/null -w "%{http_code}" \[0m
+Health Check	Kiß╗âm tra health endpoint	2026-03-10T01:34:56.1097708Z [36;1m  "http://194.163.181.19/health-check" 2>/dev/null || echo "000")[0m
+Health Check	Kiß╗âm tra health endpoint	2026-03-10T01:34:56.1098661Z [36;1mif [[ "$VPS2_CODE" != "000" ]]; then[0m
+Health Check	Kiß╗âm tra health endpoint	2026-03-10T01:34:56.1099396Z [36;1m  echo "vps2_reachable=true" >> "$GITHUB_OUTPUT"[0m
+Health Check	Kiß╗âm tra health endpoint	2026-03-10T01:34:56.1100024Z [36;1melse[0m
+Health Check	Kiß╗âm tra health endpoint	2026-03-10T01:34:56.1100726Z [36;1m  echo "vps2_reachable=false" >> "$GITHUB_OUTPUT"[0m
+Health Check	Kiß╗âm tra health endpoint	2026-03-10T01:34:56.1101544Z [36;1mfi[0m
+Health Check	Kiß╗âm tra health endpoint	2026-03-10T01:34:56.2121622Z shell: /usr/bin/bash -e {0}
+Health Check	Kiß╗âm tra health endpoint	2026-03-10T01:34:56.2122703Z env:
+Health Check	Kiß╗âm tra health endpoint	2026-03-10T01:34:56.2123173Z   VPS1_IP: 45.134.226.56
+Health Check	Kiß╗âm tra health endpoint	2026-03-10T01:34:56.2123864Z   VPS2_IP: 194.163.181.19
+Health Check	Kiß╗âm tra health endpoint	2026-03-10T01:34:56.2124594Z   HEALTH_URL: https://natra.site/api/health/live
+Health Check	Kiß╗âm tra health endpoint	2026-03-10T01:34:56.2125237Z   STACK_NAME: ivf
+Health Check	Kiß╗âm tra health endpoint	2026-03-10T01:34:56.2125898Z   STACK_FILE: /opt/ivf/docker-compose.stack.yml
+Health Check	Kiß╗âm tra health endpoint	2026-03-10T01:34:56.2126545Z ##[endgroup]
+Health Check	Kiß╗âm tra health endpoint	2026-03-10T01:34:56.2337827Z Checking health endpoint...
+Health Check	Kiß╗âm tra health endpoint	2026-03-10T01:34:57.0250803Z HTTP status: 403
+Health Check	Kiß╗âm tra health endpoint	2026-03-10T01:34:57.0360403Z Γ¥î Health endpoint FAIL (HTTP 403)
+Health Check	Discord th├┤ng b├ío (nß║┐u kh├┤ng healthy)	∩╗┐2026-03-10T01:34:57.2539302Z ##[group]Run curl -s -X POST "" \
+Health Check	Discord th├┤ng b├ío (nß║┐u kh├┤ng healthy)	2026-03-10T01:34:57.2540718Z [36;1mcurl -s -X POST "" \[0m
+Health Check	Discord th├┤ng b├ío (nß║┐u kh├┤ng healthy)	2026-03-10T01:34:57.2542270Z [36;1m  -H "Content-Type: application/json" \[0m
+Health Check	Discord th├┤ng b├ío (nß║┐u kh├┤ng healthy)	2026-03-10T01:34:57.2543689Z [36;1m  -d '{[0m
+Health Check	Discord th├┤ng b├ío (nß║┐u kh├┤ng healthy)	2026-03-10T01:34:57.2545883Z [36;1m    "content": "ΓÜá∩╕Å **IVF GitHub Watchdog**: Health endpoint kh├┤ng phß║ún hß╗ôi. ─Éang kiß╗âm tra v├á c├│ thß╗â k├¡ch hoß║ít auto-heal..."[0m
+Health Check	Discord th├┤ng b├ío (nß║┐u kh├┤ng healthy)	2026-03-10T01:34:57.2548327Z [36;1m  }' || true[0m
+Health Check	Discord th├┤ng b├ío (nß║┐u kh├┤ng healthy)	2026-03-10T01:34:57.2605600Z shell: /usr/bin/bash -e {0}
+Health Check	Discord th├┤ng b├ío (nß║┐u kh├┤ng healthy)	2026-03-10T01:34:57.2606709Z env:
+Health Check	Discord th├┤ng b├ío (nß║┐u kh├┤ng healthy)	2026-03-10T01:34:57.2607544Z   VPS1_IP: 45.134.226.56
+Health Check	Discord th├┤ng b├ío (nß║┐u kh├┤ng healthy)	2026-03-10T01:34:57.2608547Z   VPS2_IP: 194.163.181.19
+Health Check	Discord th├┤ng b├ío (nß║┐u kh├┤ng healthy)	2026-03-10T01:34:57.2609725Z   HEALTH_URL: https://natra.site/api/health/live
+Health Check	Discord th├┤ng b├ío (nß║┐u kh├┤ng healthy)	2026-03-10T01:34:57.2611275Z   STACK_NAME: ivf
+Health Check	Discord th├┤ng b├ío (nß║┐u kh├┤ng healthy)	2026-03-10T01:34:57.2612314Z   STACK_FILE: /opt/ivf/docker-compose.stack.yml
+Health Check	Discord th├┤ng b├ío (nß║┐u kh├┤ng healthy)	2026-03-10T01:34:57.2613643Z ##[endgroup]
+Health Check	Complete job	∩╗┐2026-03-10T01:34:57.2843316Z Evaluate and set job outputs
+Health Check	Complete job	2026-03-10T01:34:57.2853776Z Set output 'vps1_healthy'
+Health Check	Complete job	2026-03-10T01:34:57.2857092Z Set output 'vps2_reachable'
+Health Check	Complete job	2026-03-10T01:34:57.2858856Z Set output 'needs_action'
+Health Check	Complete job	2026-03-10T01:34:57.2860659Z Cleaning up orphan processes

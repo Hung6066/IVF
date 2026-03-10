@@ -51,28 +51,28 @@ Internet
 
 ### 1.2 Phân bổ service
 
-| Service | VPS1 | VPS2 | Ghi chú |
-|---|---|---|---|
-| `ivf_api` | ✅ replica 1 | ✅ replica 2 | Spread 2 node — HA hoàn toàn |
-| `ivf_caddy` | ✅ global | ✅ global | Chạy mọi node tự động |
-| `ivf_db` | ✅ primary | — | Stateful, chỉ 1 node |
-| `ivf_db-standby` | — | ✅ streaming | Readonly replica |
-| `ivf_redis` | ✅ primary | — | Stateful, chỉ 1 node |
-| `ivf_redis-replica` | — | ✅ | Replicate từ primary |
-| `ivf_minio` | ✅ | — | Object storage, cần backup riêng |
-| `ivf_signserver` | ✅ | — | PKI service, stateful |
-| `ivf_frontend` | ✅ | — | Static SPA, thấp risk |
-| Monitoring | ✅ | — | Prometheus/Grafana/Loki |
+| Service             | VPS1         | VPS2         | Ghi chú                          |
+| ------------------- | ------------ | ------------ | -------------------------------- |
+| `ivf_api`           | ✅ replica 1 | ✅ replica 2 | Spread 2 node — HA hoàn toàn     |
+| `ivf_caddy`         | ✅ global    | ✅ global    | Chạy mọi node tự động            |
+| `ivf_db`            | ✅ primary   | —            | Stateful, chỉ 1 node             |
+| `ivf_db-standby`    | —            | ✅ streaming | Readonly replica                 |
+| `ivf_redis`         | ✅ primary   | —            | Stateful, chỉ 1 node             |
+| `ivf_redis-replica` | —            | ✅           | Replicate từ primary             |
+| `ivf_minio`         | ✅           | —            | Object storage, cần backup riêng |
+| `ivf_signserver`    | ✅           | —            | PKI service, stateful            |
+| `ivf_frontend`      | ✅           | —            | Static SPA, thấp risk            |
+| Monitoring          | ✅           | —            | Prometheus/Grafana/Loki          |
 
 ### 1.3 Thời gian phục hồi mục tiêu (RTO/RPO)
 
-| Kịch bản | RTO mục tiêu | RPO mục tiêu | Cơ chế |
-|---|---|---|---|
-| Container crash | < 30 giây | 0 | Swarm restart_policy |
-| VPS1 down (có VPS2 watchdog) | 6–10 phút | < 2 phút | watchdog-vps1.sh |
-| VPS1 down (GitHub Actions) | 10–15 phút | < 2 phút | auto-heal.yml |
-| Cả 2 VPS down và reboot | 3–10 phút sau khi VPS1 boot | Từ backup | force-redeploy |
-| Cả 2 VPS down hoàn toàn | Thủ công | Từ backup s3/pg_dump | restore-pitr.sh |
+| Kịch bản                     | RTO mục tiêu                | RPO mục tiêu         | Cơ chế               |
+| ---------------------------- | --------------------------- | -------------------- | -------------------- |
+| Container crash              | < 30 giây                   | 0                    | Swarm restart_policy |
+| VPS1 down (có VPS2 watchdog) | 6–10 phút                   | < 2 phút             | watchdog-vps1.sh     |
+| VPS1 down (GitHub Actions)   | 10–15 phút                  | < 2 phút             | auto-heal.yml        |
+| Cả 2 VPS down và reboot      | 3–10 phút sau khi VPS1 boot | Từ backup            | force-redeploy       |
+| Cả 2 VPS down hoàn toàn      | Thủ công                    | Từ backup s3/pg_dump | restore-pitr.sh      |
 
 ---
 
@@ -128,13 +128,13 @@ docker service logs ivf_api --tail 50 -f
 
 ### 3.1 Ảnh hưởng tức thời
 
-| Thứ sau khi VPS1 down | Trạng thái |
-|---|---|
-| T+0 | Caddy trên VPS2 vẫn nhận traffic, nhưng API replica trên VPS1 mất |
-| T+0 | ivf_api replica 2 trên VPS2 **vẫn chạy** (sau khi fix placement) |
-| T+0 | DB writes **không thể thực hiện** (primary trên VPS1) |
-| T+0 | Swarm không thể schedule task mới (mất quorum) |
-| T+6 phút | Watchdog VPS2 trigger failover (3 checks × 2 phút) |
+| Thứ sau khi VPS1 down | Trạng thái                                                        |
+| --------------------- | ----------------------------------------------------------------- |
+| T+0                   | Caddy trên VPS2 vẫn nhận traffic, nhưng API replica trên VPS1 mất |
+| T+0                   | ivf_api replica 2 trên VPS2 **vẫn chạy** (sau khi fix placement)  |
+| T+0                   | DB writes **không thể thực hiện** (primary trên VPS1)             |
+| T+0                   | Swarm không thể schedule task mới (mất quorum)                    |
+| T+6 phút              | Watchdog VPS2 trigger failover (3 checks × 2 phút)                |
 
 > **Quan trọng:** Sau khi fix `placement` (commit `359af9e`), `ivf_api` replica trên VPS2 **sẽ tiếp tục phục vụ traffic đọc**. Chỉ các operations cần ghi DB mới bị lỗi cho đến khi Postgres standby được promote.
 
@@ -214,6 +214,7 @@ curl -sk https://natra.site/api/health/live
 ### 3.4 GitHub Actions: Trigger thủ công qua UI
 
 Vào [GitHub → Actions → Auto-Heal & Health Watchdog → Run workflow]:
+
 - `action: failover-to-vps2`
 - `dry_run: false`
 
@@ -260,6 +261,7 @@ GitHub Actions chạy mỗi 5 phút từ server GitHub (hoàn toàn ngoài hạ 
 **Trigger thủ công:**
 
 Vào [GitHub → Actions → Auto-Heal & Health Watchdog → Run workflow]:
+
 - `action: force-redeploy`
 
 ### 4.3 Tình huống C: Cả 2 VPS không boot lại được
@@ -321,12 +323,12 @@ ssh root@45.134.226.56 \
 
 Vào [GitHub → Settings → Secrets and variables → Actions → New repository secret]:
 
-| Secret name | Giá trị | Cách lấy |
-|---|---|---|
-| `VPS1_SSH_KEY` | Nội dung `~/.ssh/id_rsa` của VPS1 | `cat ~/.ssh/id_rsa` |
-| `VPS2_SSH_KEY` | Nội dung `~/.ssh/id_rsa` của VPS2 | `cat ~/.ssh/id_rsa` |
-| `DISCORD_WEBHOOK` | Discord webhook URL | Discord → Server Settings → Integrations → Webhooks |
-| `GHCR_PAT` | GitHub Personal Access Token | GitHub → Settings → Developer settings → PAT (scope: `read:packages`) |
+| Secret name       | Giá trị                           | Cách lấy                                                              |
+| ----------------- | --------------------------------- | --------------------------------------------------------------------- |
+| `VPS1_SSH_KEY`    | Nội dung `~/.ssh/id_rsa` của VPS1 | `cat ~/.ssh/id_rsa`                                                   |
+| `VPS2_SSH_KEY`    | Nội dung `~/.ssh/id_rsa` của VPS2 | `cat ~/.ssh/id_rsa`                                                   |
+| `DISCORD_WEBHOOK` | Discord webhook URL               | Discord → Server Settings → Integrations → Webhooks                   |
+| `GHCR_PAT`        | GitHub Personal Access Token      | GitHub → Settings → Developer settings → PAT (scope: `read:packages`) |
 
 **Tạo SSH key cho GitHub Actions (khuyến nghị dùng key riêng):**
 
@@ -351,6 +353,7 @@ ssh root@45.134.226.56 "docker node ls -q | xargs -I{} docker node inspect {} --
 ```
 
 Expected output:
+
 ```
 vmi3129111: map[role:primary]     ← VPS1
 vmi3129107: map[role:standby]     ← VPS2
@@ -410,6 +413,7 @@ iptables -D INPUT -p tcp --dport 80 -j DROP
 ### 6.4 Drill 4: Kiểm tra GitHub Actions auto-heal
 
 Vào GitHub Actions → Auto-Heal workflow → Run workflow:
+
 - `action: check-only`
 - `dry_run: true`
 
@@ -420,9 +424,10 @@ Xem output log để xác nhận health check đúng.
 GitHub Actions chạy mỗi 5 phút từ GitHub infrastructure (hoàn toàn ngoài hạ tầng của bạn).
 
 **Workflow configuration:**
+
 - **Endpoint**: Kiểm tra `https://natra.site/health/live` để liveness check
 - **Secrets required**: VPS1_SSH_KEY, VPS2_SSH_KEY, DISCORD_WEBHOOK, GHCR_PAT
-- **Trigger**: 
+- **Trigger**:
   - Automatic: Mỗi 5 phút (scheduled)
   - Manual: GitHub UI → Actions → Auto-Heal workflow → Run workflow
 
@@ -547,18 +552,17 @@ EOF
 
 **API Health Endpoints** (routed through Caddy):
 
-| Endpoint | Port | Purpose | Response |
-|---|---|---|---|
-| `https://natra.site/health/live` | 443 → API:8080 | Liveness probe (process running) | `{"status":"Healthy","timestamp":"..."}` HTTP 200 |
-| `https://natra.site/health/ready` | 443 → API:8080 | Readiness probe (DB/Redis OK) | `{"status":"Healthy","checks":[...],"timestamp":"..."}` HTTP 200/503 |
-| `https://natra.site/health/startup` | 443 → API:8080 | Startup probe (app started) | `{"status":"Started","timestamp":"..."}` HTTP 200 |
+| Endpoint                            | Port           | Purpose                          | Response                                                             |
+| ----------------------------------- | -------------- | -------------------------------- | -------------------------------------------------------------------- |
+| `https://natra.site/health/live`    | 443 → API:8080 | Liveness probe (process running) | `{"status":"Healthy","timestamp":"..."}` HTTP 200                    |
+| `https://natra.site/health/ready`   | 443 → API:8080 | Readiness probe (DB/Redis OK)    | `{"status":"Healthy","checks":[...],"timestamp":"..."}` HTTP 200/503 |
+| `https://natra.site/health/startup` | 443 → API:8080 | Startup probe (app started)      | `{"status":"Started","timestamp":"..."}` HTTP 200                    |
 
 **Healthcheck implementation:**
 
 - **Docker Swarm**: TCP port test mỗi 15 giây (timeout 5s, retries 3)
   - Command: `exec 3<>/dev/tcp/127.0.0.1/8080 && exit 0 || exit 1`
   - Start period: 45 giây (tránh false restart khi .NET khởi động)
-  
 - **Caddy (reverse proxy)**: Active health check HTTP GET mỗi 15 giây
   - Kiểm tra: `/health/live` endpoint
   - Fail duration: 30 giây (tránh flapping)
@@ -583,14 +587,14 @@ curl -s https://natra.site/health/live | jq '.status, .timestamp'
 
 ### 8.2 Discord alerts hiện có
 
-| Trigger | Nội dung alert |
-|---|---|
-| VPS1 fail lần 1/3 | `⚠️ VPS1 không phản hồi (lần 1/3)` |
-| Failover bắt đầu | `🚨 IVF FAILOVER: VPS1 down, chuyển sang VPS2` |
-| Failover thành công | `✅ Failover hoàn thành. API chạy trên VPS2` |
-| Failover thất bại | `❌ Failover script thất bại! Cần can thiệp thủ công` |
-| VPS1 recovered | `✅ VPS1 đã phục hồi` |
-| Force redeploy OK | `✅ IVF Recovery: Force redeploy thành công` |
+| Trigger             | Nội dung alert                                        |
+| ------------------- | ----------------------------------------------------- |
+| VPS1 fail lần 1/3   | `⚠️ VPS1 không phản hồi (lần 1/3)`                    |
+| Failover bắt đầu    | `🚨 IVF FAILOVER: VPS1 down, chuyển sang VPS2`        |
+| Failover thành công | `✅ Failover hoàn thành. API chạy trên VPS2`          |
+| Failover thất bại   | `❌ Failover script thất bại! Cần can thiệp thủ công` |
+| VPS1 recovered      | `✅ VPS1 đã phục hồi`                                 |
+| Force redeploy OK   | `✅ IVF Recovery: Force redeploy thành công`          |
 
 ### 8.3 Grafana alerts liên quan
 
@@ -786,7 +790,7 @@ ssh root@194.163.181.19 "docker service ls"
 
 4. Xóa cache cert cũ (để buộc Caddy renew)
    $ docker exec $(docker ps -q -f name=ivf_caddy | head -1) \
-     rm -rf /data/caddy/certificates/acme-v02.api.letsencrypt.org
+    rm -rf /data/caddy/certificates/acme-v02.api.letsencrypt.org
 
 5. Restart Caddy
    $ docker service update --force ivf_caddy
@@ -797,7 +801,8 @@ ssh root@194.163.181.19 "docker service ls"
    - Restart Caddy
    - Test health / cert renewal
    - Sau giờ (hoặc kỳ khác) → restore lại prod CA
-```
+
+````
 
 ### Sự cố: Docker healthcheck liên tục fail (container restart loop)
 
@@ -830,12 +835,13 @@ docker service update --pull-image --image ghcr.io/hung6066/ivf:sha-NEWSHA ivf_a
 # 6. Tạm thời disable healthcheck (KHÔNG dùng lâu dài!)
 # Edit docker-compose.stack.yml → comment healthcheck block
 # Redeploy: docker stack deploy -c docker-compose.stack.yml ivf
-```
+````
 
 **Ghi chú:** Docker healthcheck dùng TCP port test (command: `exec 3<>/dev/tcp/...`) vì:
+
 - Portable: hoạt động trên tất cả Linux containers (không cần curl/wget)
 - Đơn giản: chỉ kiểm tra port accessible, không test HTTP response
-- Caddy active health checks** cung cấp layer thứ 2: kiểm tra `/health/live` HTTP endpoint mỗi 15 giây
+- Caddy active health checks\*\* cung cấp layer thứ 2: kiểm tra `/health/live` HTTP endpoint mỗi 15 giây
 
 ---
 

@@ -36,7 +36,7 @@ log "═══ Starting IVF backup to S3: ${DATE} ═══"
 # ── 1. PostgreSQL Full Backup ──
 log "[1/5] PostgreSQL full backup..."
 
-DB_CONTAINER=$(docker ps -q -f name=ivf_db.1 -f status=running)
+DB_CONTAINER=$(docker ps -q --filter 'name=ivf_db' --filter status=running | head -1)
 if [ -z "$DB_CONTAINER" ]; then
   log "ERROR: PostgreSQL container not found!"
   exit 1
@@ -75,31 +75,21 @@ fi
 # ── 3. MinIO Objects ──
 log "[3/5] MinIO objects sync..."
 
-MINIO_CONTAINER=$(docker ps -q -f name=ivf_minio.1 -f status=running)
+MINIO_CONTAINER=$(docker ps -q --filter name=minio --filter status=running | head -1)
 if [ -n "$MINIO_CONTAINER" ]; then
-  MINIO_KEY=$(docker exec "$MINIO_CONTAINER" cat /run/secrets/minio_access_key 2>/dev/null || echo "minioadmin")
-  MINIO_SECRET=$(docker exec "$MINIO_CONTAINER" cat /run/secrets/minio_secret_key 2>/dev/null || echo "minioadmin123")
-
-  for BUCKET_NAME in ivf-documents ivf-signed-pdfs ivf-medical-images; do
-    log "  Syncing bucket: ${BUCKET_NAME}..."
-    TEMP_MINIO="/tmp/ivf-minio-${BUCKET_NAME}"
-    mkdir -p "$TEMP_MINIO"
-
-    docker run --rm --network ivf_ivf-data \
-      -v "${TEMP_MINIO}:/data" \
-      minio/mc:latest \
-      bash -c "
-        mc alias set local http://minio:9000 '${MINIO_KEY}' '${MINIO_SECRET}' 2>/dev/null
-        mc mirror --overwrite local/${BUCKET_NAME} /data/ 2>/dev/null
-      " 2>/dev/null || log "  Warning: failed to sync ${BUCKET_NAME}"
-
-    if [ -d "$TEMP_MINIO" ] && [ "$(ls -A "$TEMP_MINIO" 2>/dev/null)" ]; then
-      aws s3 sync "$TEMP_MINIO/" "${BUCKET}/minio/${BUCKET_NAME}/" \
-        --storage-class STANDARD --sse AES256 --quiet
-    fi
-    rm -rf "$TEMP_MINIO"
-  done
-  log "  MinIO sync completed"
+  # Backup MinIO data directory directly
+  docker cp "${MINIO_CONTAINER}:/data/" "${BACKUP_DIR}/minio-data/" 2>/dev/null || true
+  
+  if [ -d "${BACKUP_DIR}/minio-data" ] && [ "$(ls -A "${BACKUP_DIR}/minio-data" 2>/dev/null)" ]; then
+    tar czf "${BACKUP_DIR}/minio_objects_${DATE}.tar.gz" -C "${BACKUP_DIR}" minio-data/
+    aws s3 cp "${BACKUP_DIR}/minio_objects_${DATE}.tar.gz" \
+      "${BUCKET}/minio/minio_objects_${DATE}.tar.gz" \
+      --storage-class STANDARD --sse AES256 --quiet
+    MINIO_SIZE=$(du -sh "${BACKUP_DIR}/minio_objects_${DATE}.tar.gz" | cut -f1)
+    log "  MinIO data backed up (${MINIO_SIZE})"
+  fi
+  
+  rm -rf "${BACKUP_DIR}/minio-data"
 else
   log "  Warning: MinIO container not running, skipping"
 fi
@@ -136,26 +126,36 @@ fi
 # ── 5. PKI Backup (EJBCA + SignServer volumes) ──
 log "[5/5] PKI volumes backup..."
 
-EJBCA_CONTAINER=$(docker ps -q -f name=ivf_ejbca.1 -f status=running)
+EJBCA_CONTAINER=$(docker ps -q --filter name=ejbca --filter status=running | grep -v db | head -1)
 if [ -n "$EJBCA_CONTAINER" ]; then
-  docker cp "${EJBCA_CONTAINER}:/opt/keyfactor/ejbca-ce" "${BACKUP_DIR}/ejbca-persistent/" 2>/dev/null || true
-  if [ -d "${BACKUP_DIR}/ejbca-persistent" ]; then
+  docker cp "${EJBCA_CONTAINER}:/opt/keyfactor/" "${BACKUP_DIR}/ejbca-persistent/" 2>/dev/null || true
+  if [ -d "${BACKUP_DIR}/ejbca-persistent" ] && [ "$(ls -A "${BACKUP_DIR}/ejbca-persistent" 2>/dev/null)" ]; then
     tar czf "${BACKUP_DIR}/pki_ejbca_${DATE}.tar.gz" -C "${BACKUP_DIR}" ejbca-persistent/
     aws s3 cp "${BACKUP_DIR}/pki_ejbca_${DATE}.tar.gz" \
       "${BUCKET}/pki/pki_ejbca_${DATE}.tar.gz" --sse AES256 --quiet
-    log "  EJBCA volume backed up"
+    EJBCA_SIZE=$(du -sh "${BACKUP_DIR}/pki_ejbca_${DATE}.tar.gz" | cut -f1)
+    log "  EJBCA volume backed up (${EJBCA_SIZE})"
+  else
+    log "  EJBCA data not found"
   fi
+else
+  log "  Warning: EJBCA container not found"
 fi
 
-SIGNSRV_CONTAINER=$(docker ps -q -f name=ivf_signserver.1 -f status=running)
+SIGNSRV_CONTAINER=$(docker ps -q --filter name=signserver --filter status=running | grep -v db | head -1)
 if [ -n "$SIGNSRV_CONTAINER" ]; then
-  docker cp "${SIGNSRV_CONTAINER}:/opt/keyfactor/signserver-ce" "${BACKUP_DIR}/signserver-persistent/" 2>/dev/null || true
-  if [ -d "${BACKUP_DIR}/signserver-persistent" ]; then
+  docker cp "${SIGNSRV_CONTAINER}:/opt/keyfactor/" "${BACKUP_DIR}/signserver-persistent/" 2>/dev/null || true
+  if [ -d "${BACKUP_DIR}/signserver-persistent" ] && [ "$(ls -A "${BACKUP_DIR}/signserver-persistent" 2>/dev/null)" ]; then
     tar czf "${BACKUP_DIR}/pki_signserver_${DATE}.tar.gz" -C "${BACKUP_DIR}" signserver-persistent/
     aws s3 cp "${BACKUP_DIR}/pki_signserver_${DATE}.tar.gz" \
       "${BUCKET}/pki/pki_signserver_${DATE}.tar.gz" --sse AES256 --quiet
-    log "  SignServer volume backed up"
+    SS_SIZE=$(du -sh "${BACKUP_DIR}/pki_signserver_${DATE}.tar.gz" | cut -f1)
+    log "  SignServer volume backed up (${SS_SIZE})"
+  else
+    log "  SignServer data not found"
   fi
+else
+  log "  Warning: SignServer container not found"
 fi
 
 # ── Retention: xóa backup local cũ hơn 7 ngày ──
