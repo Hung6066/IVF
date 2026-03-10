@@ -367,6 +367,7 @@ export interface ReplicationActivationResult {
 export interface StartPitrRestoreRequest {
   baseBackupFile: string;
   targetTime?: string;
+  recoveryMethod?: string;
   dryRun?: boolean;
 }
 
@@ -506,6 +507,50 @@ export interface ExternalReplicationGuide {
   steps: ReplicationSetupStep[];
   minioSteps: ReplicationSetupStep[];
   securityNotes: string[];
+}
+
+// ─── System Restore ────────────────────────────────────
+
+export interface SystemRestoreRequest {
+  databaseBackupFile?: string;
+  minioBackupFile?: string;
+  pkiBackupFile?: string;
+  baseBackupFile?: string;
+  pitrTargetTime?: string;
+  dryRun?: boolean;
+}
+
+export interface RestoreStageInfo {
+  stage: string;
+  fileName: string;
+  fileExists: boolean;
+  sizeBytes: number;
+  order: number;
+  detail?: string;
+}
+
+export interface SystemRestorePreflightResult {
+  stages: RestoreStageInfo[];
+  allFilesExist: boolean;
+  totalSizeBytes: number;
+  estimatedMinutes: number;
+}
+
+export interface SystemRestoreInventory {
+  database: DataBackupFile[];
+  minio: DataBackupFile[];
+  pki: DataBackupFile[];
+  baseBackups: DataBackupFile[];
+}
+
+// ─── WAL Backup to S3 ─────────────────────────────────
+
+export interface WalBackupToS3Result {
+  walSwitched: boolean;
+  walSwitchMessage: string;
+  segmentsCopied: number;
+  segmentsUploaded: number;
+  message: string;
 }
 
 // ─── Certificate Authority & mTLS models ────────────────

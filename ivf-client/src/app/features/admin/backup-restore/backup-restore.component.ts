@@ -28,7 +28,10 @@ import {
   ReplicationActivationResult,
   ReplicationSetupGuide,
   ReplicationStatus,
+  SystemRestoreInventory,
+  SystemRestorePreflightResult,
   WalArchiveListResponse,
+  WalBackupToS3Result,
   WalStatusResponse,
 } from '../../../core/models/backup.models';
 
@@ -146,6 +149,7 @@ export class BackupRestoreComponent implements OnInit, OnDestroy {
   pitrDryRun = true;
   pitrTargetTime = '';
   pitrSelectedBackup = '';
+  pitrRecoveryMethod: 'time' | 'latest' = 'time';
   pitrOperationId = '';
   pitrLogs = signal<BackupLogLine[]>([]);
   showPitrPanel = false;
@@ -172,6 +176,26 @@ export class BackupRestoreComponent implements OnInit, OnDestroy {
   cloudReplMinioSetting = false;
   cloudReplMinioSyncing = false;
   showCloudReplGuide = false;
+
+  // System Restore state
+  restoreInventory = signal<SystemRestoreInventory | null>(null);
+  restorePreflight = signal<SystemRestorePreflightResult | null>(null);
+  systemRestoreRunning = false;
+  systemRestoreDryRun = true;
+  systemRestoreOperationId = '';
+  systemRestoreLogs = signal<BackupLogLine[]>([]);
+  systemRestoreDbFile = '';
+  systemRestoreMinioFile = '';
+  systemRestorePkiFile = '';
+  systemRestoreBaseBackup = '';
+  systemRestorePitrTargetTime = '';
+  systemRestoreMethod: 'snapshot' | 'pitr' = 'snapshot';
+  showPreflightResult = false;
+
+  // WAL Backup to S3 state
+  walBackupToS3Running = false;
+  walBackupToS3Result = signal<WalBackupToS3Result | null>(null);
+
   cloudReplDbForm = {
     enabled: false,
     remoteHost: '',
@@ -241,6 +265,7 @@ export class BackupRestoreComponent implements OnInit, OnDestroy {
     if (tab === 'wal') this.loadWalStatus();
     if (tab === 'replication') this.loadReplicationStatus();
     if (tab === 'cloud-replication') this.loadCloudReplication();
+    if (tab === 'system-restore') this.loadRestoreInventory();
   }
 
   // ─── Data loading ─────────────────────────────────────
@@ -1007,6 +1032,7 @@ export class BackupRestoreComponent implements OnInit, OnDestroy {
       .startPitrRestore({
         baseBackupFile: this.pitrSelectedBackup,
         targetTime: this.pitrTargetTime || undefined,
+        recoveryMethod: this.pitrRecoveryMethod,
         dryRun: this.pitrDryRun,
       })
       .subscribe({
@@ -1046,6 +1072,21 @@ export class BackupRestoreComponent implements OnInit, OnDestroy {
           this.notify.error('PITR', 'Lỗi khởi chạy PITR: ' + (err.error?.error || err.message));
         },
       });
+  }
+
+  openWalGuide() {
+    // Open documentation link — could be a modal, external window, or navigate within app
+    // For now, provide clear documentation reference
+    this.notify.info(
+      'WAL Guide',
+      'Xem tài liệu chi tiết: Section 16.2 WAL Backup & Point-in-Time Recovery (PITR) ' +
+        'trong docs/swarm_s3_deployment_guide.md',
+    );
+    // Optionally open documentation in new tab
+    window.open(
+      'https://github.com/yourusername/ivf/blob/main/docs/swarm_s3_deployment_guide.md#162-wal-backup--point-in-time-recovery-pitr--chi-tiết',
+      '_blank',
+    );
   }
 
   // ─── Replication ─────────────────────────────────────
@@ -1351,6 +1392,161 @@ export class BackupRestoreComponent implements OnInit, OnDestroy {
     if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
     if (bytes < 1073741824) return (bytes / 1048576).toFixed(1) + ' MB';
     return (bytes / 1073741824).toFixed(1) + ' GB';
+  }
+
+  // ─── System Restore ───────────────────────────────────
+
+  loadRestoreInventory() {
+    this.backupService.getRestoreInventory().subscribe({
+      next: (data) => this.restoreInventory.set(data),
+      error: (err) => console.error('Failed to load restore inventory', err),
+    });
+  }
+
+  runPreflightCheck() {
+    const request: any = {};
+    if (this.systemRestoreMethod === 'snapshot') {
+      if (this.systemRestoreDbFile) request.databaseBackupFile = this.systemRestoreDbFile;
+    } else {
+      if (this.systemRestoreBaseBackup) request.baseBackupFile = this.systemRestoreBaseBackup;
+      if (this.systemRestorePitrTargetTime)
+        request.pitrTargetTime = this.systemRestorePitrTargetTime;
+    }
+    if (this.systemRestoreMinioFile) request.minioBackupFile = this.systemRestoreMinioFile;
+    if (this.systemRestorePkiFile) request.pkiBackupFile = this.systemRestorePkiFile;
+
+    this.backupService.preflightSystemRestore(request).subscribe({
+      next: (result) => {
+        this.restorePreflight.set(result);
+        this.showPreflightResult = true;
+      },
+      error: (err) =>
+        this.notify.error('Preflight', 'Lỗi kiểm tra: ' + (err.error?.error || err.message)),
+    });
+  }
+
+  startSystemRestore() {
+    const hasAnyFile =
+      this.systemRestoreDbFile ||
+      this.systemRestoreMinioFile ||
+      this.systemRestorePkiFile ||
+      this.systemRestoreBaseBackup;
+
+    if (!hasAnyFile) {
+      this.notify.warning('System Restore', 'Vui lòng chọn ít nhất một tệp backup');
+      return;
+    }
+
+    const action = this.systemRestoreDryRun ? 'DRY-RUN' : 'THỰC THI';
+    const stages: string[] = [];
+    if (this.systemRestoreDbFile) stages.push('Database');
+    if (this.systemRestoreBaseBackup) stages.push('PITR');
+    if (this.systemRestoreMinioFile) stages.push('MinIO');
+    if (this.systemRestorePkiFile) stages.push('PKI');
+
+    this.confirmMessage = `${action} System Restore: ${stages.join(' → ')}?`;
+    this.confirmAction = () => this.executeSystemRestore();
+    this.showConfirmDialog = true;
+  }
+
+  private executeSystemRestore() {
+    this.systemRestoreRunning = true;
+    this.systemRestoreLogs.set([]);
+
+    const request: any = { dryRun: this.systemRestoreDryRun };
+    if (this.systemRestoreMethod === 'snapshot') {
+      if (this.systemRestoreDbFile) request.databaseBackupFile = this.systemRestoreDbFile;
+    } else {
+      if (this.systemRestoreBaseBackup) request.baseBackupFile = this.systemRestoreBaseBackup;
+      if (this.systemRestorePitrTargetTime)
+        request.pitrTargetTime = this.systemRestorePitrTargetTime;
+    }
+    if (this.systemRestoreMinioFile) request.minioBackupFile = this.systemRestoreMinioFile;
+    if (this.systemRestorePkiFile) request.pkiBackupFile = this.systemRestorePkiFile;
+
+    this.backupService.startSystemRestore(request).subscribe({
+      next: (res) => {
+        this.systemRestoreOperationId = res.operationId;
+        this.backupService.connectHub(res.operationId);
+
+        const logSub = this.backupService.logLine$.subscribe((line) => {
+          if (line.operationId === res.operationId) {
+            this.systemRestoreLogs.update((logs) => [
+              ...logs,
+              { timestamp: line.timestamp, level: line.level, message: line.message },
+            ]);
+            this.scrollToBottom();
+          }
+        });
+
+        const statusSub = this.backupService.statusChanged$.subscribe((op) => {
+          if (
+            (op as any).operationId === res.operationId ||
+            (op.id === res.operationId && op.status !== 'Running')
+          ) {
+            const status = (op as any).status || op.status;
+            if (status !== 'Running') {
+              this.systemRestoreRunning = false;
+              logSub.unsubscribe();
+              statusSub.unsubscribe();
+              this.backupService.disconnectHub();
+              if (status === 'Completed') {
+                this.notify.success('System Restore', 'Khôi phục hệ thống hoàn tất!');
+              } else if (status === 'Cancelled') {
+                this.notify.warning('System Restore', 'Đã hủy khôi phục');
+              } else {
+                this.notify.error(
+                  'System Restore',
+                  'Khôi phục thất bại: ' +
+                    ((op as any).errorMessage || op.errorMessage || 'Lỗi không xác định'),
+                );
+              }
+            }
+          }
+        });
+
+        this.subscriptions.push(logSub, statusSub);
+      },
+      error: (err) => {
+        this.systemRestoreRunning = false;
+        this.notify.error('System Restore', 'Lỗi khởi chạy: ' + (err.error?.error || err.message));
+      },
+    });
+  }
+
+  cancelSystemRestore() {
+    if (!this.systemRestoreOperationId) return;
+    this.backupService.cancelSystemRestore(this.systemRestoreOperationId).subscribe({
+      next: () => this.notify.info('System Restore', 'Đã gửi yêu cầu hủy'),
+      error: (err) => this.notify.error('Hủy', 'Lỗi hủy: ' + (err.error?.error || err.message)),
+    });
+  }
+
+  // ─── WAL Backup to S3 ────────────────────────────────
+
+  triggerWalBackupToS3() {
+    this.walBackupToS3Running = true;
+    this.walBackupToS3Result.set(null);
+    this.backupService.triggerWalBackupToS3().subscribe({
+      next: (result) => {
+        this.walBackupToS3Running = false;
+        this.walBackupToS3Result.set(result);
+        if (result.segmentsCopied > 0) {
+          this.notify.success(
+            'WAL Backup',
+            `Đã archive ${result.segmentsCopied} segment, upload ${result.segmentsUploaded} lên S3`,
+          );
+        } else {
+          this.notify.info('WAL Backup', result.message);
+        }
+        // Refresh WAL status
+        this.loadWalStatus();
+      },
+      error: (err) => {
+        this.walBackupToS3Running = false;
+        this.notify.error('WAL Backup', 'Lỗi: ' + (err.error?.error || err.message));
+      },
+    });
   }
 
   formatDate(dateStr: string): string {

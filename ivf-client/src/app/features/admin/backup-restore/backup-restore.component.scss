@@ -1299,3 +1299,557 @@
 .ml-1 {
   margin-left: 6px;
 }
+
+// ─── S3 Backup Status & Test Results ────────────────
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #1976d2;
+
+  h4 {
+    margin: 0;
+    font-size: 1rem;
+    color: #1976d2;
+  }
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+
+  .stat-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px;
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    border-radius: 8px;
+    border-left: 4px solid #1976d2;
+
+    .stat-icon {
+      font-size: 2rem;
+      flex-shrink: 0;
+    }
+
+    .stat-info {
+      flex: 1;
+
+      .stat-label {
+        font-size: 0.8rem;
+        color: #666;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .stat-value {
+        font-size: 1.4rem;
+        font-weight: 700;
+        color: #1976d2;
+        margin: 4px 0;
+      }
+
+      .stat-desc {
+        font-size: 0.75rem;
+        color: #999;
+      }
+    }
+  }
+}
+
+.restore-procedures {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px;
+  margin: 16px 0;
+
+  .procedure-card {
+    background: #fafbfc;
+    border: 1px solid #e1e8ed;
+    border-radius: 8px;
+    padding: 16px;
+    transition: all 0.3s ease;
+
+    &:hover {
+      border-color: #1976d2;
+      box-shadow: 0 4px 12px rgba(25, 118, 210, 0.1);
+      transform: translateY(-2px);
+    }
+
+    .procedure-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 12px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #e1e8ed;
+
+      h5 {
+        margin: 0;
+        font-size: 0.95rem;
+        color: #1976d2;
+        flex: 1;
+      }
+
+      .badge {
+        flex-shrink: 0;
+      }
+    }
+
+    .procedure-body {
+      .procedure-cmd {
+        background: #272822;
+        color: #f8f8f2;
+        padding: 10px 12px;
+        border-radius: 6px;
+        font-family: 'Courier New', monospace;
+        font-size: 0.8rem;
+        margin: 8px 0;
+        overflow-x: auto;
+        white-space: pre-wrap;
+        word-break: break-all;
+      }
+
+      .procedure-stats {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        margin-top: 8px;
+
+        .stat {
+          font-size: 0.8rem;
+          color: #666;
+          padding: 4px 0;
+          border-bottom: 1px solid #f0f0f0;
+
+          &:last-child {
+            border-bottom: none;
+          }
+        }
+      }
+    }
+  }
+}
+
+.disaster-recovery-timeline {
+  position: relative;
+  padding: 16px 0;
+
+  &::before {
+    content: '';
+    position: absolute;
+    left: 24px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: linear-gradient(180deg, #1976d2 0%, #64b5f6 100%);
+  }
+
+  .timeline-item {
+    display: flex;
+    gap: 24px;
+    margin-bottom: 16px;
+    position: relative;
+
+    .timeline-marker {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 48px;
+      height: 48px;
+      background: #1976d2;
+      color: white;
+      border-radius: 50%;
+      font-weight: 700;
+      font-size: 1.1rem;
+      flex-shrink: 0;
+      box-shadow: 0 2px 8px rgba(25, 118, 210, 0.3);
+      z-index: 1;
+    }
+
+    .timeline-content {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 4px;
+      padding: 12px;
+      background: #f5f7fa;
+      border-radius: 6px;
+      border-left: 3px solid #1976d2;
+      flex: 1;
+
+      strong {
+        color: #1976d2;
+        font-size: 0.95rem;
+      }
+
+      .duration {
+        color: #666;
+        font-size: 0.8rem;
+        font-weight: 500;
+      }
+    }
+  }
+
+  .recovery-summary {
+    margin-top: 24px;
+    padding: 16px;
+    background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
+    border-radius: 8px;
+    border: 2px solid #ffb74d;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+
+    @media (max-width: 600px) {
+      grid-template-columns: 1fr;
+    }
+
+    .summary-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+
+      .summary-label {
+        font-size: 0.85rem;
+        color: #666;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .summary-value {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: #e65100;
+      }
+    }
+  }
+}
+
+// ─── Responsive ─────────────────────────────────────
+@media (max-width: 768px) {
+  .stats-grid {
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  }
+
+  .restore-procedures {
+    grid-template-columns: 1fr;
+  }
+}
+
+// ─── Info Banner (Documentation Reference) ─────────
+.info-banner {
+  display: flex;
+  gap: 16px;
+  padding: 16px;
+  background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%);
+  border-left: 4px solid #1976d2;
+  border-radius: 6px;
+  margin-bottom: 20px;
+
+  .banner-icon {
+    font-size: 1.8rem;
+    flex-shrink: 0;
+    line-height: 1;
+  }
+
+  .banner-content {
+    flex: 1;
+
+    h4 {
+      margin: 0 0 8px 0;
+      font-size: 1rem;
+      color: #1565c0;
+    }
+
+    p {
+      margin: 0 0 8px 0;
+    }
+
+    ul {
+      margin: 0;
+      padding-left: 20px;
+
+      li {
+        margin: 4px 0;
+        font-size: 0.85rem;
+      }
+    }
+
+    code {
+      background: rgba(0, 0, 0, 0.05);
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-size: 0.85rem;
+    }
+  }
+
+  button {
+    flex-shrink: 0;
+    align-self: center;
+  }
+}
+
+// ─── PITR Quick Reference ──────────────────────────
+.pitr-quick-ref {
+  background: #fafafa;
+  padding: 16px;
+  border-radius: 6px;
+  border: 1px solid #e0e0e0;
+
+  h4 {
+    margin: 0 0 12px 0;
+    font-size: 0.95rem;
+    color: #333;
+  }
+}
+
+.ref-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+
+  .ref-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 12px;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+
+    .ref-label {
+      font-size: 0.75rem;
+      color: #999;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .ref-value {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #1976d2;
+    }
+  }
+}
+
+// ─── Radio Group (Recovery Method Selection) ────────
+.radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 12px 0;
+}
+
+.radio-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  cursor: pointer;
+
+  input[type='radio'] {
+    margin-top: 3px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  span {
+    font-size: 0.9rem;
+    color: #333;
+
+    small {
+      display: block;
+      color: #999;
+      margin-top: 2px;
+    }
+  }
+}
+
+// ─── Alert ─────────────────────────────────────────
+.alert {
+  padding: 16px;
+  border-radius: 6px;
+  border: 1px solid;
+  margin: 12px 0;
+
+  &.alert-warning {
+    background: #fff3e0;
+    border-color: #ffe0b2;
+    color: #e65100;
+
+    strong {
+      color: #d84315;
+    }
+
+    ul {
+      margin: 8px 0 0 0;
+      padding-left: 20px;
+
+      li {
+        margin: 4px 0;
+      }
+    }
+  }
+
+  &.alert-danger {
+    background: #ffebee;
+    border-color: #ffcdd2;
+    color: #c62828;
+  }
+
+  &.alert-info {
+    background: #e3f2fd;
+    border-color: #bbdefb;
+    color: #1565c0;
+  }
+
+  &.alert-success {
+    background: #f1f8e9;
+    border-color: #c5e1a5;
+    color: #558b2f;
+  }
+}
+
+// ─── Form Controls (Improved styling) ───────────────
+.form-group {
+  margin-bottom: 16px;
+
+  label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #333;
+
+    small {
+      font-weight: normal;
+      color: #999;
+      margin-left: 4px;
+    }
+  }
+
+  .form-control {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    transition: border-color 0.2s;
+
+    &:focus {
+      border-color: #1976d2;
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.1);
+    }
+  }
+
+  small {
+    display: block;
+    margin-top: 4px;
+    color: #999;
+    font-size: 0.85rem;
+  }
+}
+
+.checkbox-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+
+  input[type='checkbox'] {
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  span {
+    font-size: 0.9rem;
+    color: #333;
+
+    small {
+      margin-left: 4px;
+      color: #999;
+    }
+  }
+}
+
+// ─── System Restore ─────────────────────────────────
+
+.system-restore-section {
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #eee;
+
+  h4 {
+    margin: 0 0 12px;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #444;
+  }
+
+  &:last-of-type {
+    border-bottom: none;
+  }
+}
+
+.preflight-result {
+  .preflight-summary {
+    display: flex;
+    gap: 24px;
+    padding: 12px;
+    background: #f8f9fa;
+    border-radius: 6px;
+    margin-top: 12px;
+  }
+}
+
+.system-restore-logs {
+  background: #1e1e2e;
+  border-radius: 8px;
+  padding: 16px;
+  max-height: 400px;
+  overflow-y: auto;
+
+  h4 {
+    color: #cdd6f4;
+    margin: 0 0 12px;
+    font-size: 0.95rem;
+  }
+}
+
+// ─── WAL Backup to S3 ──────────────────────────────
+
+.wal-s3-result {
+  background: #f0f7ff;
+  border: 1px solid #b3d7ff;
+  border-radius: 8px;
+  padding: 12px 16px;
+}
+
+.wal-s3-result-grid {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+}
+
+.wal-s3-stat {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  .wal-s3-stat-label {
+    font-size: 0.85rem;
+    color: #666;
+  }
+}

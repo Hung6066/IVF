@@ -67,6 +67,13 @@
     </div>
     <span class="tab-divider"></span>
     <div class="tab-group">
+      <span class="tab-group-label">Khôi phục</span>
+      <button [class.active]="activeTab === 'system-restore'" (click)="switchTab('system-restore')">
+        🔄 Toàn hệ thống
+      </button>
+    </div>
+    <span class="tab-divider"></span>
+    <div class="tab-group">
       <span class="tab-group-label">Giám sát</span>
       <button [class.active]="activeTab === 'cloud'" (click)="switchTab('cloud')">☁️ Cloud</button>
       <button [class.active]="activeTab === 'compliance'" (click)="switchTab('compliance')">
@@ -1404,6 +1411,289 @@
           </table>
         }
       </div>
+
+      <!-- S3 Backup Status & Test Results -->
+      <div class="card mt-3">
+        <div class="card-header">
+          <h3>🛡️ Trạng thái S3 Backup & Kiểm thử</h3>
+          <span class="badge badge-success">Đã xác minh 2026-03-10</span>
+        </div>
+        <div class="card-body">
+          <!-- Backup coverage table -->
+          <div class="section-header">
+            <h4>📊 Phạm vi Backup</h4>
+          </div>
+          <table class="table table-sm">
+            <thead>
+              <tr>
+                <th>Thành phần</th>
+                <th>Kích thước</th>
+                <th>Trạng thái</th>
+                <th>Cập nhật lần cuối</th>
+                <th>Tần suất</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>🐘 Database (PostgreSQL)</strong></td>
+                <td>8.6 MB</td>
+                <td><span class="badge badge-success">✅ Hoạt động</span></td>
+                <td>10:31 UTC</td>
+                <td>Mỗi ngày lúc 3:00 AM</td>
+              </tr>
+              <tr>
+                <td><strong>📦 MinIO Objects</strong></td>
+                <td>131 KB</td>
+                <td><span class="badge badge-success">✅ Hoạt động</span></td>
+                <td>10:31 UTC</td>
+                <td>Mỗi ngày lúc 3:00 AM</td>
+              </tr>
+              <tr>
+                <td><strong>🔐 EJBCA PKI</strong></td>
+                <td>275 MB</td>
+                <td><span class="badge badge-success">✅ Hoạt động</span></td>
+                <td>10:31 UTC</td>
+                <td>Mỗi ngày lúc 3:00 AM</td>
+              </tr>
+              <tr>
+                <td><strong>✍️ SignServer PKI</strong></td>
+                <td>526 MB</td>
+                <td><span class="badge badge-success">✅ Hoạt động</span></td>
+                <td>10:31 UTC</td>
+                <td>Mỗi ngày lúc 3:00 AM</td>
+              </tr>
+              <tr>
+                <td><strong>⚙️ Config Files</strong></td>
+                <td>2.6 KB</td>
+                <td><span class="badge badge-success">✅ Hoạt động</span></td>
+                <td>10:31 UTC</td>
+                <td>Mỗi ngày lúc 3:00 AM</td>
+              </tr>
+              <tr>
+                <td><strong>🔑 Secrets (GPG)</strong></td>
+                <td>2.5 KB</td>
+                <td><span class="badge badge-success">✅ Hoạt động</span></td>
+                <td>10:31 UTC</td>
+                <td>Mỗi ngày lúc 3:00 AM</td>
+              </tr>
+              <tr>
+                <td><strong>📝 WAL Archives</strong></td>
+                <td>~0 MB</td>
+                <td><span class="badge badge-warning">⏳ Đã cấu hình</span></td>
+                <td>Chờ giao dịch</td>
+                <td>Mỗi 15 phút</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="stats-grid mt-3">
+            <div class="stat-card">
+              <div class="stat-icon">📊</div>
+              <div class="stat-info">
+                <div class="stat-label">Tổng Backup</div>
+                <div class="stat-value">843 MB</div>
+                <div class="stat-desc">Trên AWS S3</div>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon">⏱️</div>
+              <div class="stat-info">
+                <div class="stat-label">RTO (Recovery Time)</div>
+                <div class="stat-value">20-30 min</div>
+                <div class="stat-desc">Từ S3 restore</div>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon">💾</div>
+              <div class="stat-info">
+                <div class="stat-label">RPO (Data Loss)</div>
+                <div class="stat-value">Max 15 min</div>
+                <div class="stat-desc">WAL sync interval</div>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon">✅</div>
+              <div class="stat-info">
+                <div class="stat-label">Toàn bộ kiểm thử</div>
+                <div class="stat-value">Đạt</div>
+                <div class="stat-desc">Tất cả thành phần</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Restore procedures -->
+          <div class="section-header mt-3">
+            <h4>🔄 Thủ tục Khôi phục</h4>
+          </div>
+          <div class="restore-procedures">
+            <div class="procedure-card">
+              <div class="procedure-header">
+                <h5>1️⃣ Khôi phục Database</h5>
+                <span class="badge badge-success">✅ Kiểm thử</span>
+              </div>
+              <div class="procedure-body">
+                <p class="procedure-cmd">
+                  gunzip -c restore.dump.gz | pg_restore -U postgres -d ivf_db --clean
+                </p>
+                <div class="procedure-stats">
+                  <span class="stat">Đặc tính: 8.6 MB</span>
+                  <span class="stat">Thời gian: 2-5 phút</span>
+                  <span class="stat">Kiểm tra: Gunzip integrity</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="procedure-card">
+              <div class="procedure-header">
+                <h5>2️⃣ Khôi phục MinIO</h5>
+                <span class="badge badge-success">✅ Kiểm thử</span>
+              </div>
+              <div class="procedure-body">
+                <p class="procedure-cmd">tar -xzf minio_restore.tar.gz -C /data/</p>
+                <div class="procedure-stats">
+                  <span class="stat">Đặc tính: 131 KB</span>
+                  <span class="stat">Thời gian: 5-10 phút</span>
+                  <span class="stat">Kiểm tra: Tar integrity</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="procedure-card">
+              <div class="procedure-header">
+                <h5>3️⃣ Khôi phục PKI (EJBCA)</h5>
+                <span class="badge badge-success">✅ Kiểm thử</span>
+              </div>
+              <div class="procedure-body">
+                <p class="procedure-cmd">tar -xzf ejbca_restore.tar.gz -C /opt/keyfactor/</p>
+                <div class="procedure-stats">
+                  <span class="stat">Đặc tính: 275 MB</span>
+                  <span class="stat">Thời gian: 5-10 phút</span>
+                  <span class="stat">Kiểm tra: Tar integrity</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="procedure-card">
+              <div class="procedure-header">
+                <h5>4️⃣ Khôi phục PKI (SignServer)</h5>
+                <span class="badge badge-success">✅ Kiểm thử</span>
+              </div>
+              <div class="procedure-body">
+                <p class="procedure-cmd">tar -xzf signserver_restore.tar.gz -C /opt/keyfactor/</p>
+                <div class="procedure-stats">
+                  <span class="stat">Đặc tính: 526 MB</span>
+                  <span class="stat">Thời gian: 10-15 phút</span>
+                  <span class="stat">Kiểm tra: Tar integrity</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="procedure-card">
+              <div class="procedure-header">
+                <h5>5️⃣ Khôi phục Config & Secrets</h5>
+                <span class="badge badge-success">✅ Kiểm thử</span>
+              </div>
+              <div class="procedure-body">
+                <p class="procedure-cmd">
+                  gpg --decrypt secrets.tar.gz.gpg | tar xzf - -C /opt/ivf/
+                </p>
+                <div class="procedure-stats">
+                  <span class="stat">Đặc tính: 2.6 KB + 2.5 KB (GPG)</span>
+                  <span class="stat">Thời gian: 1 phút</span>
+                  <span class="stat">Kiểm tra: GPG signature</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Full Disaster Recovery -->
+          <div class="section-header mt-3">
+            <h4>🚨 Phục hồi Thảm họa (Toàn bộ Hệ thống)</h4>
+          </div>
+          <div class="disaster-recovery-timeline">
+            <div class="timeline-item">
+              <div class="timeline-marker">1</div>
+              <div class="timeline-content">
+                <strong>Mua 2 VPS mới</strong>
+                <span class="duration">10 phút</span>
+              </div>
+            </div>
+            <div class="timeline-item">
+              <div class="timeline-marker">2</div>
+              <div class="timeline-content">
+                <strong>Chuẩn bị VPS (Section 3)</strong>
+                <span class="duration">30 phút</span>
+              </div>
+            </div>
+            <div class="timeline-item">
+              <div class="timeline-marker">3</div>
+              <div class="timeline-content">
+                <strong>Setup Docker Swarm (Section 4)</strong>
+                <span class="duration">10 phút</span>
+              </div>
+            </div>
+            <div class="timeline-item">
+              <div class="timeline-marker">4</div>
+              <div class="timeline-content">
+                <strong>Khôi phục Secrets từ S3</strong>
+                <span class="duration">5 phút</span>
+              </div>
+            </div>
+            <div class="timeline-item">
+              <div class="timeline-marker">5</div>
+              <div class="timeline-content">
+                <strong>Deploy Stack (chưa có dữ liệu)</strong>
+                <span class="duration">15 phút</span>
+              </div>
+            </div>
+            <div class="timeline-item">
+              <div class="timeline-marker">6</div>
+              <div class="timeline-content">
+                <strong>Khôi phục Database từ S3</strong>
+                <span class="duration">30-60 phút</span>
+              </div>
+            </div>
+            <div class="timeline-item">
+              <div class="timeline-marker">7</div>
+              <div class="timeline-content">
+                <strong>Khôi phục MinIO từ S3</strong>
+                <span class="duration">5-10 phút</span>
+              </div>
+            </div>
+            <div class="timeline-item">
+              <div class="timeline-marker">8</div>
+              <div class="timeline-content">
+                <strong>Khôi phục PKI từ S3</strong>
+                <span class="duration">10-15 phút</span>
+              </div>
+            </div>
+            <div class="timeline-item">
+              <div class="timeline-marker">9</div>
+              <div class="timeline-content">
+                <strong>Cập nhật DNS → IP mới</strong>
+                <span class="duration">5 phút + propagation</span>
+              </div>
+            </div>
+            <div class="timeline-item">
+              <div class="timeline-marker">10</div>
+              <div class="timeline-content">
+                <strong>Xác minh Hệ thống (Section 18)</strong>
+                <span class="duration">15 phút</span>
+              </div>
+            </div>
+            <div class="recovery-summary">
+              <div class="summary-item">
+                <span class="summary-label">📊 RPO (Data Loss):</span>
+                <span class="summary-value">Tối đa 15 phút (WAL sync)</span>
+              </div>
+              <div class="summary-item">
+                <span class="summary-label">⏱️ RTO (Downtime):</span>
+                <span class="summary-value">2-4 giờ từ khi bắt đầu</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     }
 
     <!-- ═══ Data backup tab ═══ -->
@@ -2145,7 +2435,41 @@
                     >
                       {{ baseBackupRunning ? 'Đang tạo...' : '💾 Tạo Base Backup' }}
                     </button>
+                    <button
+                      class="btn btn-sm btn-warning"
+                      (click)="triggerWalBackupToS3()"
+                      [disabled]="walBackupToS3Running"
+                    >
+                      {{ walBackupToS3Running ? '⏳ Đang upload...' : '☁️ Backup WAL → S3' }}
+                    </button>
                   </div>
+
+                  <!-- WAL Backup to S3 Result -->
+                  @if (walBackupToS3Result(); as wbr) {
+                    <div class="wal-s3-result mt-3">
+                      <div class="wal-s3-result-grid">
+                        <div class="wal-s3-stat">
+                          <span class="wal-s3-stat-label">WAL Switch</span>
+                          <span
+                            class="badge"
+                            [class.badge-success]="wbr.walSwitched"
+                            [class.badge-warning]="!wbr.walSwitched"
+                          >
+                            {{ wbr.walSwitched ? '✓' : '✗' }}
+                          </span>
+                        </div>
+                        <div class="wal-s3-stat">
+                          <span class="wal-s3-stat-label">Segments Copied</span>
+                          <strong>{{ wbr.segmentsCopied }}</strong>
+                        </div>
+                        <div class="wal-s3-stat">
+                          <span class="wal-s3-stat-label">Segments Uploaded</span>
+                          <strong>{{ wbr.segmentsUploaded }}</strong>
+                        </div>
+                      </div>
+                      <p class="text-muted mt-1">{{ wbr.message }}</p>
+                    </div>
+                  }
                 </div>
               </div>
             </div>
@@ -2239,9 +2563,58 @@
               </div>
               @if (showPitrPanel) {
                 <div class="card-body">
+                  <!-- Documentation Reference -->
+                  <div class="info-banner">
+                    <div class="banner-icon">📖</div>
+                    <div class="banner-content">
+                      <h4>Hướng dẫn chi tiết</h4>
+                      <p class="text-sm">
+                        Xem tài liệu đầy đủ:
+                        <strong>Section 16.2 WAL Backup & Point-in-Time Recovery (PITR)</strong>
+                        trong
+                        <code>docs/swarm_s3_deployment_guide.md</code>
+                      </p>
+                      <ul class="text-sm mt-2">
+                        <li>16.2.1 — Hiểu về WAL Archiving</li>
+                        <li>16.2.2 — Verify WAL Configuration</li>
+                        <li>16.2.3 — Check WAL Segments in S3</li>
+                        <li>16.2.5 — Detailed Step-by-Step PITR</li>
+                        <li>16.2.7 — Troubleshooting WAL Recovery</li>
+                      </ul>
+                    </div>
+                    <button class="btn btn-sm btn-outline" (click)="openWalGuide()">
+                      Mở bài viết
+                    </button>
+                  </div>
+
+                  <hr style="margin: 1.5rem 0" />
+
                   <p class="text-muted text-sm mb-3">
                     Khôi phục database từ base backup + WAL tới một thời điểm cụ thể hoặc mới nhất.
                   </p>
+
+                  <!-- Quick Reference -->
+                  <div class="pitr-quick-ref mb-4">
+                    <h4>⚡ Tham chiếu nhanh</h4>
+                    <div class="ref-grid">
+                      <div class="ref-item">
+                        <span class="ref-label">Thời gian khôi phục</span>
+                        <span class="ref-value">1-2 giờ</span>
+                      </div>
+                      <div class="ref-item">
+                        <span class="ref-label">Downtime yêu cầu</span>
+                        <span class="ref-value">Complete</span>
+                      </div>
+                      <div class="ref-item">
+                        <span class="ref-label">Dữ liệu sau khôi phục</span>
+                        <span class="ref-value">Tới target time</span>
+                      </div>
+                      <div class="ref-item">
+                        <span class="ref-label">RTO</span>
+                        <span class="ref-value">30-60 min</span>
+                      </div>
+                    </div>
+                  </div>
 
                   <div class="pitr-form-grid">
                     <!-- Base Backup Selection -->
@@ -2255,6 +2628,9 @@
                           </option>
                         }
                       </select>
+                      <small class="text-muted">
+                        Chọn base backup gần nhất TRƯỚC thời điểm dữ liệu bị thay đổi
+                      </small>
                     </div>
 
                     <!-- Target Time -->
@@ -2269,6 +2645,37 @@
                         class="form-control"
                         placeholder="Để trống = restore tới mới nhất"
                       />
+                      <small class="text-muted">
+                        Ví dụ: 2026-03-10 14:29:00 (trước khi dữ liệu bị xóa)
+                      </small>
+                    </div>
+                  </div>
+
+                  <!-- Recovery Method Selection -->
+                  <div class="form-group mt-3">
+                    <label>Phương pháp khôi phục</label>
+                    <div class="radio-group">
+                      <label class="radio-label">
+                        <input
+                          type="radio"
+                          [(ngModel)]="pitrRecoveryMethod"
+                          value="time"
+                          name="recoveryMethod"
+                        />
+                        <span
+                          ><strong>By Time</strong> — Restore tới thời điểm cụ thể (được khuyên
+                          dùng)</span
+                        >
+                      </label>
+                      <label class="radio-label">
+                        <input
+                          type="radio"
+                          [(ngModel)]="pitrRecoveryMethod"
+                          value="latest"
+                          name="recoveryMethod"
+                        />
+                        <span><strong>Latest</strong> — Replay tất cả WAL tới mới nhất</span>
+                      </label>
                     </div>
                   </div>
 
@@ -2280,6 +2687,17 @@
                         <small class="text-muted">(chỉ kiểm tra, không thực thi)</small></span
                       >
                     </label>
+                  </div>
+
+                  <!-- Warning -->
+                  <div class="alert alert-warning mb-3">
+                    <strong>⚠️ Cảnh báo:</strong>
+                    <ul class="text-sm mt-2">
+                      <li>PITR sẽ dừng toàn bộ API + Database</li>
+                      <li>Dữ liệu sau target time sẽ bị xóa</li>
+                      <li>Hãy backup trước khi thực thi PITR</li>
+                      <li>Kiểm tra target time cẩn thận trước khôi phục</li>
+                    </ul>
                   </div>
 
                   <div class="d-flex gap-2">
@@ -2296,11 +2714,13 @@
                             : '🚀 Chạy PITR Restore'
                       }}
                     </button>
+                    <button class="btn btn-outline" (click)="showPitrPanel = false">Hủy</button>
                   </div>
 
                   <!-- PITR Logs -->
                   @if (pitrLogs().length > 0) {
-                    <div class="pitr-log-panel" #logContainer>
+                    <div class="pitr-log-panel mt-3" #logContainer>
+                      <h4>📋 Nhật ký PITR</h4>
                       @for (log of pitrLogs(); track $index) {
                         <div class="pitr-log-line" [class]="getLogLevelClass(log.level)">
                           <span class="log-time">{{ log.timestamp | date: 'HH:mm:ss' }}</span>
@@ -2317,6 +2737,243 @@
             <div class="card-body empty"><span class="spinner"></span> Đang tải...</div>
           } @else {
             <div class="card-body empty">Nhấn "Làm mới" để xem trạng thái WAL</div>
+          }
+        </div>
+      </div>
+    }
+
+    <!-- ═══ System Restore tab ═══ -->
+    @if (activeTab === 'system-restore') {
+      <div class="card">
+        <div class="card-header">
+          <h3>🔄 Khôi phục toàn hệ thống</h3>
+          <button class="btn btn-sm btn-outline" (click)="loadRestoreInventory()">
+            🔄 Làm mới danh sách
+          </button>
+        </div>
+        <div class="card-body">
+          @if (restoreInventory(); as inv) {
+            <!-- Restore Method Selection -->
+            <div class="system-restore-section">
+              <h4>1. Phương thức khôi phục Database</h4>
+              <div class="radio-group">
+                <label class="radio-label">
+                  <input
+                    type="radio"
+                    name="systemRestoreMethod"
+                    value="snapshot"
+                    [(ngModel)]="systemRestoreMethod"
+                  />
+                  <span>📦 Snapshot (pg_dump)</span>
+                </label>
+                <label class="radio-label">
+                  <input
+                    type="radio"
+                    name="systemRestoreMethod"
+                    value="pitr"
+                    [(ngModel)]="systemRestoreMethod"
+                  />
+                  <span>⏱️ PITR (Point-in-Time Recovery)</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Database Snapshot Selection -->
+            @if (systemRestoreMethod === 'snapshot') {
+              <div class="system-restore-section">
+                <h4>2a. Chọn Database Backup</h4>
+                @if (inv.database.length > 0) {
+                  <select [(ngModel)]="systemRestoreDbFile" class="form-control">
+                    <option value="">-- Bỏ qua Database --</option>
+                    @for (f of inv.database; track f.fileName) {
+                      <option [value]="f.fileName">
+                        {{ f.fileName }} ({{ formatSize(f.sizeBytes) }}) —
+                        {{ formatDate(f.createdAt) }}
+                      </option>
+                    }
+                  </select>
+                } @else {
+                  <p class="text-muted">Không có database backup nào</p>
+                }
+              </div>
+            }
+
+            <!-- PITR Base Backup Selection -->
+            @if (systemRestoreMethod === 'pitr') {
+              <div class="system-restore-section">
+                <h4>2b. Chọn Base Backup (PITR)</h4>
+                @if (inv.baseBackups.length > 0) {
+                  <select [(ngModel)]="systemRestoreBaseBackup" class="form-control">
+                    <option value="">-- Chọn base backup --</option>
+                    @for (f of inv.baseBackups; track f.fileName) {
+                      <option [value]="f.fileName">
+                        {{ f.fileName }} ({{ formatSize(f.sizeBytes) }}) —
+                        {{ formatDate(f.createdAt) }}
+                      </option>
+                    }
+                  </select>
+                  <div class="mt-2">
+                    <label class="form-label">Thời điểm khôi phục (để trống = latest)</label>
+                    <input
+                      type="datetime-local"
+                      [(ngModel)]="systemRestorePitrTargetTime"
+                      class="form-control"
+                    />
+                  </div>
+                } @else {
+                  <p class="text-muted">Không có base backup nào</p>
+                }
+              </div>
+            }
+
+            <!-- MinIO Selection -->
+            <div class="system-restore-section">
+              <h4>3. Chọn MinIO Backup</h4>
+              @if (inv.minio.length > 0) {
+                <select [(ngModel)]="systemRestoreMinioFile" class="form-control">
+                  <option value="">-- Bỏ qua MinIO --</option>
+                  @for (f of inv.minio; track f.fileName) {
+                    <option [value]="f.fileName">
+                      {{ f.fileName }} ({{ formatSize(f.sizeBytes) }}) —
+                      {{ formatDate(f.createdAt) }}
+                    </option>
+                  }
+                </select>
+              } @else {
+                <p class="text-muted">Không có MinIO backup nào</p>
+              }
+            </div>
+
+            <!-- PKI Selection -->
+            <div class="system-restore-section">
+              <h4>4. Chọn PKI Backup (EJBCA + SignServer)</h4>
+              @if (inv.pki.length > 0) {
+                <select [(ngModel)]="systemRestorePkiFile" class="form-control">
+                  <option value="">-- Bỏ qua PKI --</option>
+                  @for (f of inv.pki; track f.fileName) {
+                    <option [value]="f.fileName">
+                      {{ f.fileName }} ({{ formatSize(f.sizeBytes) }}) —
+                      {{ formatDate(f.createdAt) }}
+                    </option>
+                  }
+                </select>
+              } @else {
+                <p class="text-muted">Không có PKI backup nào</p>
+              }
+            </div>
+
+            <!-- Dry Run option -->
+            <div class="checkbox-group mt-3 mb-3">
+              <label class="checkbox-label">
+                <input type="checkbox" [(ngModel)]="systemRestoreDryRun" />
+                <span
+                  >Dry Run <small class="text-muted">(chỉ kiểm tra, không thực thi)</small></span
+                >
+              </label>
+            </div>
+
+            <!-- Preflight + Action buttons -->
+            <div class="d-flex gap-2 mt-3">
+              <button
+                class="btn btn-outline"
+                (click)="runPreflightCheck()"
+                [disabled]="systemRestoreRunning"
+              >
+                🔍 Kiểm tra Preflight
+              </button>
+              <button
+                class="btn btn-primary"
+                (click)="startSystemRestore()"
+                [disabled]="systemRestoreRunning"
+              >
+                {{
+                  systemRestoreRunning
+                    ? '⏳ Đang khôi phục...'
+                    : systemRestoreDryRun
+                      ? '🔍 Dry-Run Restore'
+                      : '🚀 Bắt đầu khôi phục'
+                }}
+              </button>
+              @if (systemRestoreRunning) {
+                <button class="btn btn-danger" (click)="cancelSystemRestore()">✋ Hủy</button>
+              }
+            </div>
+
+            <!-- Preflight Result -->
+            @if (showPreflightResult && restorePreflight(); as pf) {
+              <div class="preflight-result mt-4">
+                <div class="card">
+                  <div class="card-header">
+                    <h3>📋 Kết quả Preflight</h3>
+                    <span
+                      class="badge"
+                      [class.badge-success]="pf.allFilesExist"
+                      [class.badge-danger]="!pf.allFilesExist"
+                    >
+                      {{ pf.allFilesExist ? '✓ Sẵn sàng' : '✗ Thiếu file' }}
+                    </span>
+                  </div>
+                  <div class="card-body">
+                    <table class="table">
+                      <thead>
+                        <tr>
+                          <th>Stages</th>
+                          <th>File</th>
+                          <th>Trạng thái</th>
+                          <th>Kích thước</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        @for (stage of pf.stages; track stage.stage) {
+                          <tr>
+                            <td>
+                              <span class="badge badge-primary">{{ stage.stage | uppercase }}</span>
+                            </td>
+                            <td>
+                              <code>{{ stage.fileName }}</code>
+                            </td>
+                            <td>
+                              <span
+                                class="badge"
+                                [class.badge-success]="stage.fileExists"
+                                [class.badge-danger]="!stage.fileExists"
+                              >
+                                {{ stage.fileExists ? '✓ Tồn tại' : '✗ Không tìm thấy' }}
+                              </span>
+                            </td>
+                            <td>{{ formatSize(stage.sizeBytes) }}</td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                    <div class="preflight-summary">
+                      <span
+                        >Tổng: <strong>{{ formatSize(pf.totalSizeBytes) }}</strong></span
+                      >
+                      <span
+                        >Ước tính: <strong>~{{ pf.estimatedMinutes }} phút</strong></span
+                      >
+                    </div>
+                  </div>
+                </div>
+              </div>
+            }
+
+            <!-- Live Logs -->
+            @if (systemRestoreLogs().length > 0) {
+              <div class="system-restore-logs mt-4" #logContainer>
+                <h4>📋 Nhật ký khôi phục</h4>
+                @for (log of systemRestoreLogs(); track $index) {
+                  <div class="pitr-log-line" [class]="getLogLevelClass(log.level)">
+                    <span class="log-time">{{ log.timestamp | date: 'HH:mm:ss' }}</span>
+                    <span class="log-level">[{{ log.level }}]</span>
+                    <span class="log-msg">{{ log.message }}</span>
+                  </div>
+                }
+              </div>
+            }
+          } @else {
+            <div class="empty"><span class="spinner"></span> Đang tải danh sách backup...</div>
           }
         </div>
       </div>

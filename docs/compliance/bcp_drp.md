@@ -107,7 +107,24 @@ docker exec ivf-postgres-standby psql -U postgres -c "SELECT pg_last_wal_replay_
 | 7             | Validation & smoke testing                       |    T+30min     |
 | **Total RTO** |                                                  | **~3.5 hours** |
 
-**PITR Command:**
+**Khôi phục qua API (khuyến nghị):**
+
+```bash
+# System Restore API — khôi phục toàn bộ DB + MinIO + PKI trong 1 operation
+curl -X POST -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  https://natra.site/api/admin/system-restore/start \
+  -d '{
+    "databaseBackupFile": "ivf_db_20260310_020000.sql.gz",
+    "minioBackupFile": "ivf_minio_20260310_023000.tar.gz",
+    "pkiBackupFile": "ivf-ca-backup_20260310_020000.tar.gz"
+  }'
+
+# Hoặc sử dụng Frontend UI: Admin → Backup/Restore → Toàn hệ thống
+# Xem thêm: swarm_s3_deployment_guide.md Section 16.7
+```
+
+**PITR Command (alternative):**
 
 ```bash
 # Point-in-Time Recovery to specific timestamp
@@ -178,14 +195,14 @@ Detection → IT/Security Team → IT Director → CEO/Director
 
 ## 7. Testing Schedule
 
-| Test Type                                | Frequency     | Last Tested | Next Test  |
-| ---------------------------------------- | ------------- | :---------: | :--------: |
-| Backup restore verification              | Monthly       | ****\_****  | ****\_**** |
-| Database failover (standby promotion)    | Quarterly     | ****\_****  | ****\_**** |
-| Full disaster recovery simulation        | Annually      | ****\_****  | ****\_**** |
-| Tabletop exercise (scenario walkthrough) | Semi-annually | ****\_****  | ****\_**** |
-| Cloud backup restore                     | Quarterly     | ****\_****  | ****\_**** |
-| Communication plan drill                 | Annually      | ****\_****  | ****\_**** |
+| Test Type                                | Frequency     |  Last Tested   |   Next Test    |
+| ---------------------------------------- | ------------- | :------------: | :------------: |
+| Backup restore verification              | Monthly       | \***\*\_\*\*** | \***\*\_\*\*** |
+| Database failover (standby promotion)    | Quarterly     | \***\*\_\*\*** | \***\*\_\*\*** |
+| Full disaster recovery simulation        | Annually      | \***\*\_\*\*** | \***\*\_\*\*** |
+| Tabletop exercise (scenario walkthrough) | Semi-annually | \***\*\_\*\*** | \***\*\_\*\*** |
+| Cloud backup restore                     | Quarterly     | \***\*\_\*\*** | \***\*\_\*\*** |
+| Communication plan drill                 | Annually      | \***\*\_\*\*** | \***\*\_\*\*** |
 
 ## 8. Monitoring & Alerts
 
@@ -228,11 +245,11 @@ Detection → IT/Security Team → IT Director → CEO/Director
 
 **Approval:**
 
-| Role             | Name                 | Date         | Signature  |
-| ---------------- | -------------------- | ------------ | ---------- |
-| IT Director      | ******\_\_\_\_****** | **\_\_\_\_** | ****\_**** |
-| Security Officer | ******\_\_\_\_****** | **\_\_\_\_** | ****\_**** |
-| CEO/Director     | ******\_\_\_\_****** | **\_\_\_\_** | ****\_**** |
+| Role             | Name                     | Date         | Signature      |
+| ---------------- | ------------------------ | ------------ | -------------- |
+| IT Director      | **\*\***\_\_\_\_**\*\*** | **\_\_\_\_** | \***\*\_\*\*** |
+| Security Officer | **\*\***\_\_\_\_**\*\*** | **\_\_\_\_** | \***\*\_\*\*** |
+| CEO/Director     | **\*\***\_\_\_\_**\*\*** | **\_\_\_\_** | \***\*\_\*\*** |
 
 ---
 

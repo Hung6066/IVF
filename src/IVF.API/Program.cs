@@ -330,6 +330,9 @@ try
     builder.Services.AddSingleton<IVF.API.Services.BackupComplianceService>();
     builder.Services.AddSingleton<IVF.API.Services.WalBackupSchedulerService>();
 
+    // ─── System Restore (orchestrator) ───
+    builder.Services.AddSingleton<IVF.API.Services.SystemRestoreService>();
+
     // ─── Evidence Collection ───
     builder.Services.AddSingleton<IVF.API.Services.EvidenceCollectorService>();
     builder.Services.AddSingleton<IVF.API.Services.ComplianceAuditorService>();
@@ -724,6 +727,7 @@ try
     app.MapDataBackupEndpoints();
     app.MapDataBackupStrategyEndpoints();
     app.MapBackupComplianceEndpoints();
+    app.MapSystemRestoreEndpoints();
     app.MapCloudReplicationEndpoints();
     app.MapCertificateAuthorityEndpoints();
     app.MapUserSignatureEndpoints();

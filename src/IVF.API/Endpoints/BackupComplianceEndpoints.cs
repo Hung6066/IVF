@@ -147,6 +147,37 @@ public static class BackupComplianceEndpoints
         })
         .WithName("ActivateReplication");
 
+        // ─── WAL Backup to S3 (on-demand) ───────────────────
+        group.MapPost("/wal/backup-to-s3", async (
+            WalBackupSchedulerService scheduler,
+            WalBackupService walService,
+            IWebHostEnvironment env,
+            CancellationToken ct) =>
+        {
+            // 1. Switch WAL to flush current segment
+            var (switched, switchMsg) = await walService.SwitchWalAsync(ct);
+
+            // 2. Small delay for archive_command
+            await Task.Delay(TimeSpan.FromSeconds(3), ct);
+
+            // 3. Trigger archive + cloud upload (reuse scheduler logic)
+            var walBackupsDir = Path.Combine(
+                Path.GetFullPath(Path.Combine(env.ContentRootPath, "..", "..")), "backups", "wal");
+            Directory.CreateDirectory(walBackupsDir);
+
+            var result = await scheduler.RunOnDemandArchiveAsync(walBackupsDir, ct);
+
+            return Results.Ok(new
+            {
+                walSwitched = switched,
+                walSwitchMessage = switchMsg,
+                result.SegmentsCopied,
+                result.SegmentsUploaded,
+                result.Message
+            });
+        })
+        .WithName("WalBackupToS3");
+
         // ─── WAL Archive Listing ─────────────────────────────
         group.MapGet("/wal/archives", (IWebHostEnvironment env) =>
         {

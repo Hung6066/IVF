@@ -216,6 +216,75 @@ public sealed class WalBackupSchedulerService : BackgroundService
         }
     }
 
+    /// <summary>
+    /// On-demand WAL archive + cloud upload. Called from endpoint for manual trigger.
+    /// </summary>
+    public async Task<WalBackupToS3Result> RunOnDemandArchiveAsync(string walBackupsDir, CancellationToken ct)
+    {
+        var copied = await CopyNewWalFilesAsync(walBackupsDir, ct);
+        int uploaded = 0;
+
+        if (copied > 0)
+        {
+            uploaded = await CountAndUploadToCloudAsync(walBackupsDir, ct);
+            _logger.LogInformation("On-demand WAL backup: copied {Copied}, uploaded {Uploaded}", copied, uploaded);
+        }
+
+        return new WalBackupToS3Result(
+            copied,
+            uploaded,
+            copied == 0 ? "No new WAL segments to archive" : $"Archived {copied} segment(s), uploaded {uploaded} to S3");
+    }
+
+    private async Task<int> CountAndUploadToCloudAsync(string walDir, CancellationToken ct)
+    {
+        try
+        {
+            var cloudProvider = await _cloudProviderFactory.GetProviderAsync(ct);
+            var walFiles = Directory.GetFiles(walDir)
+                .Where(f => !f.EndsWith(".sha256") && !f.EndsWith(".br"))
+                .Select(f => new FileInfo(f))
+                .Where(f => f.LastWriteTimeUtc > DateTime.UtcNow.AddHours(-2))
+                .ToList();
+
+            var cloudConfig = await _cloudProviderFactory.GetConfigAsync(ct);
+            int uploaded = 0;
+
+            foreach (var file in walFiles)
+            {
+                var objectKey = $"wal-archives/{file.Name}";
+                if (cloudConfig.CompressionEnabled)
+                {
+                    var compressed = await _compressionService.CompressAsync(file.FullName, ct: ct);
+                    try
+                    {
+                        await cloudProvider.UploadAsync(
+                            compressed.CompressedFilePath,
+                            objectKey + BackupCompressionService.CompressedExtension, ct);
+                        uploaded++;
+                    }
+                    finally
+                    {
+                        if (File.Exists(compressed.CompressedFilePath))
+                            File.Delete(compressed.CompressedFilePath);
+                    }
+                }
+                else
+                {
+                    await cloudProvider.UploadAsync(file.FullName, objectKey, ct);
+                    uploaded++;
+                }
+            }
+
+            return uploaded;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "On-demand WAL S3 upload failed (non-fatal)");
+            return 0;
+        }
+    }
+
     private void CleanupOldWalFiles(string walDir, int retentionDays)
     {
         try
@@ -288,3 +357,8 @@ public sealed class WalBackupSchedulerService : BackgroundService
         return (process.ExitCode, string.IsNullOrWhiteSpace(stdout) ? stderr : stdout);
     }
 }
+
+public record WalBackupToS3Result(
+    int SegmentsCopied,
+    int SegmentsUploaded,
+    string Message);

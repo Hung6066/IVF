@@ -49,7 +49,11 @@ import {
   UpdateMinioReplicationRequest,
   UpdateScheduleRequest,
   WalArchiveListResponse,
+  WalBackupToS3Result,
   WalStatusResponse,
+  SystemRestoreRequest,
+  SystemRestorePreflightResult,
+  SystemRestoreInventory,
 } from '../models/backup.models';
 
 @Injectable({ providedIn: 'root' })
@@ -558,6 +562,44 @@ export class BackupService {
 
     await this.hubConnection.start();
     await this.hubConnection.invoke('JoinOperation', operationId);
+  }
+
+  // ─── System Restore ────────────────────────────────────
+
+  private readonly systemRestoreUrl = `${environment.apiUrl}/admin/system-restore`;
+
+  getRestoreInventory(): Observable<SystemRestoreInventory> {
+    return this.http.get<SystemRestoreInventory>(`${this.systemRestoreUrl}/inventory`);
+  }
+
+  preflightSystemRestore(
+    request: Partial<SystemRestoreRequest>,
+  ): Observable<SystemRestorePreflightResult> {
+    return this.http.post<SystemRestorePreflightResult>(
+      `${this.systemRestoreUrl}/preflight`,
+      request,
+    );
+  }
+
+  startSystemRestore(request: SystemRestoreRequest): Observable<{ operationId: string }> {
+    return this.http.post<{ operationId: string }>(`${this.systemRestoreUrl}/start`, request);
+  }
+
+  getSystemRestoreLogs(operationCode: string): Observable<any[]> {
+    return this.http.get<any[]>(`${this.systemRestoreUrl}/logs/${operationCode}`);
+  }
+
+  cancelSystemRestore(operationCode: string): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(
+      `${this.systemRestoreUrl}/cancel/${operationCode}`,
+      {},
+    );
+  }
+
+  // ─── WAL Backup to S3 ────────────────────────────────
+
+  triggerWalBackupToS3(): Observable<WalBackupToS3Result> {
+    return this.http.post<WalBackupToS3Result>(`${this.dataUrl}/wal/backup-to-s3`, {});
   }
 
   // ─── SignalR ──────────────────────────────────────────

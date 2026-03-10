@@ -270,6 +270,7 @@ Triple auth pipeline: `VaultToken (X-Vault-Token)` → `ApiKey (X-API-Key)` → 
 - `/hubs/queue` — Real-time queue management
 - `/hubs/notifications` — Push notifications
 - `/hubs/fingerprint` — Biometric device events
+- `/hubs/backup` — Backup/Restore real-time log streaming (used by System Restore)
 
 ### Alert Webhooks (Optional — chưa áp dụng)
 

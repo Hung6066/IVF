@@ -22,6 +22,8 @@
     - 13.1 Backup khuyến nghị hàng ngày
     - 13.2 Chính sách lưu giữ (Retention Policy)
     - 13.3 Kiểm tra sức khỏe
+14. [System Restore (Toàn hệ thống)](#14-system-restore-toàn-hệ-thống)
+15. [WAL Backup to S3 (On-demand)](#15-wal-backup-to-s3-on-demand)
 
 ---
 
@@ -34,35 +36,48 @@
 │                        API Endpoints                             │
 │  /api/admin/backup/*          /api/admin/data-backup/*           │
 │  (CA Keys)                    (DB + MinIO + WAL + PITR)          │
-└──────────┬──────────────────────────────┬─────────────────────────┘
-           │                              │
-  ┌────────▼────────┐           ┌─────────▼──────────┐
-  │ BackupRestore   │           │ DataBackupService  │
-  │ Service         │           │ (Orchestrator)     │
-  │ (CA keys)       │           │ SignalR real-time   │
-  └──┬─────┬────────┘           └──┬──────┬─────┬────┘
-     │     │                       │      │     │
-  Scripts Cloud               ┌────┘      │     └─────────┐
-  (bash)  Ops                 │           │               │
-                      ┌───────▼──────┐ ┌──▼────────┐ ┌───▼──────────┐
-                      │ Database     │ │ MinIO     │ │ WAL Backup   │
-                      │ BackupSvc   │ │ BackupSvc │ │ Service      │
-                      │ (pg_dump)   │ │ (tar/cp)  │ │ (PITR/base)  │
-                      └──────────────┘ └───────────┘ └──────┬───────┘
-                                                            │
-                                                     restore-pitr.sh
+│                                                                  │
+│  /api/admin/system-restore/*                                     │
+│  (Full System Restore)                                          │
+│                                                                  │
+│  /api/admin/data-backup/compliance/wal/backup-to-s3              │
+│  (WAL archive to S3 — on-demand)                                │
+└──────────┬───────────────┬──────────────────┬─────────────────────┘
+           │               │                  │
+  ┌────────▼────────┐  ┌───▼──────────────┐  ┌▼─────────────────┐
+  │ BackupRestore   │  │ DataBackupService│  │SystemRestoreService│
+  │ Service         │  │ (Orchestrator)   │  │(Full Restore)      │
+  │ (CA keys)       │  │ SignalR real-time│  │DB→MinIO→PKI        │
+  └──┬─────┬────────┘  └──┬──────┬─────┬──┘  └─┬──┬──┬──┬───────┘
+     │     │               │      │     │       │  │  │  │
+  Scripts Cloud       ┌────┘      │     └────┐  │  │  │  │
+  (bash)  Ops         │           │          │  │  │  │  │
+              ┌───────▼──────┐ ┌──▼────────┐ ┌┘  │  │  │
+              │ Database     │ │ MinIO     │ │   │  │  │
+              │ BackupSvc   │ │ BackupSvc │ │   │  │  │
+              │ (pg_dump)   │ │ (tar/cp)  │ │   │  │  │
+              └──────────────┘ └───────────┘ │   │  │  │
+                                     ┌───────▼───▼──┘  │
+                                     │ WAL Backup      │
+                                     │ Service         │
+                                     │ (PITR/base)     │
+                                     └──────┬──────────┘
+                                            │
+                                     restore-pitr.sh
 ```
 
 ### 1.2 Dịch vụ hỗ trợ
 
-| Service                      | Chức năng                            |
-| ---------------------------- | ------------------------------------ |
-| `BackupSchedulerService`     | Cron job tự động chạy backup         |
-| `BackupComplianceService`    | Kiểm tra tuân thủ quy tắc 3-2-1      |
-| `ReplicationMonitorService`  | Giám sát streaming replication       |
-| `BackupIntegrityService`     | SHA-256 checksum cho mọi file backup |
-| `BackupCompressionService`   | Nén Brotli cho cloud upload          |
-| `CloudBackupProviderFactory` | Tạo cloud provider (S3/Azure/GCS)    |
+| Service                      | Chức năng                                          |
+| ---------------------------- | -------------------------------------------------- |
+| `BackupSchedulerService`     | Cron job tự động chạy backup                       |
+| `BackupComplianceService`    | Kiểm tra tuân thủ quy tắc 3-2-1                    |
+| `ReplicationMonitorService`  | Giám sát streaming replication                     |
+| `BackupIntegrityService`     | SHA-256 checksum cho mọi file backup               |
+| `BackupCompressionService`   | Nén Brotli cho cloud upload                        |
+| `CloudBackupProviderFactory` | Tạo cloud provider (S3/Azure/GCS)                  |
+| `SystemRestoreService`       | Điều phối restore toàn hệ thống (DB + MinIO + PKI) |
+| `WalBackupSchedulerService`  | Scheduler WAL archive + cloud upload               |
 
 ### 1.3 Lưu trữ hoạt động
 
@@ -348,14 +363,55 @@ Hỗ trợ archive đã mã hóa (`.enc`) — tự động decrypt bằng OpenSS
 
 Download backup từ cloud storage. Tự động giải nén Brotli nếu file có extension `.br`.
 
-### 3.6 Tóm tắt so sánh
+### 3.6 System Restore (Toàn hệ thống)
 
-| Loại                      | Ưu điểm             | Nhược điểm                          | RPO                 | RTO                |
-| ------------------------- | ------------------- | ----------------------------------- | ------------------- | ------------------ |
-| **pg_dump**               | Đơn giản, portable  | Chậm với DB lớn, không granular     | Tới backup gần nhất | Vài phút           |
-| **PITR**                  | Granular tới giây   | Phức tạp hơn, cần base backup + WAL | Tới WAL mới nhất    | 5-15 phút          |
-| **Streaming Replication** | Near-zero RPO       | Không quay lại quá khứ              | Gần 0               | Failover: < 1 phút |
-| **CA Keys**               | Bảo vệ chứng chỉ số | Chỉ cert/keys                       | —                   | Vài phút           |
+**Endpoint:** `POST /api/admin/system-restore/start`
+**Service:** `SystemRestoreService`
+
+Diều phối khôi phục toàn bộ hệ thống trong một operation duy nhất: Database → MinIO → PKI.
+
+**Quy trình tuần tự:**
+
+| Bước | Stage                    | Mô tả                                                          |
+| ---- | ------------------------ | -------------------------------------------------------------- |
+| 1a   | Database Restore         | pg_dump restore (nếu chọn `databaseBackupFile`)                |
+| 1b   | PITR Restore (thay thế)  | Base backup + WAL replay (nếu chọn `baseBackupFile`)           |
+| 2    | MinIO Object Store       | Restore 3 buckets từ archive (nếu chọn `minioBackupFile`)      |
+| 3    | PKI (EJBCA + SignServer) | Restore certificates + signing keys (nếu chọn `pkiBackupFile`) |
+
+**Đặc điểm:**
+
+- Từng stage có thể bật/tắt độc lập (chỉ cần ít nhất 1 file)
+- Hỗ trợ dry-run mode (kiểm tra trước khi thực thi)
+- Preflight check xác nhận file tồn tại + kích thước
+- SignalR real-time streaming logs (group = operationCode)
+- Stage tracking: biết stage nào hoàn thành nếu bị cancel/fail giữa chừng
+- Operation lưu vào bảng `BackupOperations` với logs chi tiết
+
+**Request:**
+
+```json
+{
+  "databaseBackupFile": "ivf_db_20260310_020000.sql.gz",
+  "minioBackupFile": "ivf_minio_20260310_023000.tar.gz",
+  "pkiBackupFile": "ivf-ca-backup_20260310_020000.tar.gz",
+  "baseBackupFile": null,
+  "pitrTargetTime": null,
+  "dryRun": false
+}
+```
+
+> ⚠️ Không nên chọn cả `databaseBackupFile` lẫn `baseBackupFile` — chọn 1 trong 2 phương pháp restore database.
+
+### 3.7 Tóm tắt so sánh
+
+| Loại                      | Ưu điểm                    | Nhược điểm                          | RPO                 | RTO                |
+| ------------------------- | -------------------------- | ----------------------------------- | ------------------- | ------------------ |
+| **pg_dump**               | Đơn giản, portable         | Chậm với DB lớn, không granular     | Tới backup gần nhất | Vài phút           |
+| **PITR**                  | Granular tới giây          | Phức tạp hơn, cần base backup + WAL | Tới WAL mới nhất    | 5-15 phút          |
+| **Streaming Replication** | Near-zero RPO              | Không quay lại quá khứ              | Gần 0               | Failover: < 1 phút |
+| **CA Keys**               | Bảo vệ chứng chỉ số        | Chỉ cert/keys                       | —                   | Vài phút           |
+| **System Restore**        | All-in-one, live streaming | Chạy tuần tự (chậm hơn song song)   | Tùy loại backup     | 20-30 phút         |
 
 ---
 
@@ -438,6 +494,84 @@ Tất cả endpoints yêu cầu JWT authentication với policy `AdminOnly`.
 | `POST`   | `/slots`        | Tạo replication slot     | `{ slotName }` | `{ message }`                 |
 | `DELETE` | `/slots/{name}` | Xóa replication slot     | —              | `{ message }`                 |
 | `POST`   | `/activate`     | Kích hoạt WAL + slot     | —              | `ReplicationActivationResult` |
+
+### 4.8 System Restore — `/api/admin/system-restore`
+
+| Method | Path                      | Mô tả                           | Request                         | Response                       |
+| ------ | ------------------------- | ------------------------------- | ------------------------------- | ------------------------------ |
+| `POST` | `/preflight`              | Pre-flight validation check     | `SystemRestorePreflightRequest` | `SystemRestorePreflightResult` |
+| `GET`  | `/inventory`              | Danh sách backup khả dụng       | —                               | `SystemRestoreInventory`       |
+| `POST` | `/start`                  | Bắt đầu restore toàn hệ thống   | `SystemRestoreRequest`          | `{ operationId }`              |
+| `GET`  | `/logs/{operationCode}`   | Live logs của restore đang chạy | —                               | `BackupLogLine[]`              |
+| `POST` | `/cancel/{operationCode}` | Hủy restore đang chạy           | —                               | `{ message }`                  |
+
+**Request DTOs:**
+
+```typescript
+// Preflight Request
+{
+  databaseBackupFile?: string;
+  minioBackupFile?: string;
+  pkiBackupFile?: string;
+  baseBackupFile?: string;
+  pitrTargetTime?: string;
+}
+
+// Start Restore Request
+{
+  databaseBackupFile?: string;  // pg_dump file
+  minioBackupFile?: string;     // MinIO tar.gz archive
+  pkiBackupFile?: string;       // CA keys archive
+  baseBackupFile?: string;      // Base backup for PITR
+  pitrTargetTime?: string;      // Target time (ISO 8601)
+  dryRun?: boolean;             // Test without executing
+}
+```
+
+**Response DTOs:**
+
+```typescript
+// Preflight Result
+{
+  stages: [{ stage, fileName, fileExists, sizeBytes, order, detail? }],
+  allFilesExist: boolean,
+  totalSizeBytes: number,
+  estimatedMinutes: number
+}
+
+// Inventory
+{
+  database: BackupInfo[],
+  minio: BackupInfo[],
+  pki: BackupInfo[],
+  baseBackups: BackupInfo[]
+}
+```
+
+### 4.9 WAL Backup to S3 — `/api/admin/data-backup/compliance/wal/backup-to-s3`
+
+| Method | Path                | Mô tả                            | Request | Response              |
+| ------ | ------------------- | -------------------------------- | ------- | --------------------- |
+| `POST` | `/wal/backup-to-s3` | Switch WAL + archive + upload S3 | —       | `WalBackupToS3Result` |
+
+**Quy trình:**
+
+1. Force switch WAL segment hiện tại (`pg_switch_wal()`)
+2. Chờ 3 giây cho `archive_command` hoàn tất
+3. Copy WAL segments mới từ container → `backups/wal/`
+4. Upload tất cả WAL segments lên AWS S3 (`wal/` prefix)
+
+**Response:**
+
+```json
+{
+  "walSwitched": true,
+  "walSwitchMessage": "WAL segment switched at 0/2000028",
+  "segmentsCopied": 3,
+  "segmentsUploaded": 3,
+  "message": "On-demand WAL archive completed: 3 copied, 3 uploaded to cloud"
+}
+```
 
 ---
 
@@ -949,6 +1083,8 @@ Tabs được tổ chức theo nhóm:
 |                    | Chiến lược    | 📋   | Data backup strategies (CRUD + run)            |
 |                    | Lịch tự động  | ⏰   | Cấu hình cron scheduler cho CA keys            |
 | **PKI**            | PKI / CA Keys | 🔐   | Archives + Restore CA keys (EJBCA/SignServer)  |
+| **Khôi phục**      | Toàn hệ thống | 🔄   | System Restore (DB + MinIO + PKI) all-in-one   |
+|                    | WAL → S3      | ☁️   | On-demand WAL backup to S3                     |
 | **Giám sát**       | Cloud         | ☁️   | Quản lý cloud backup (cấu hình + upload)       |
 |                    | 3-2-1         | 🛡️   | Báo cáo tuân thủ 3-2-1                         |
 |                    | Lịch sử       | 📜   | Lịch sử operations                             |
@@ -1049,6 +1185,8 @@ POST /api/admin/data-backup/restore
 4. Restore MinIO từ backup
 5. Kích hoạt lại replication
 
+> **Hoặc** sử dụng **System Restore** (API/UI) để khôi phục toàn bộ Database + MinIO + PKI trong một operation duy nhất — xem [Mục 14](#14-system-restore-toàn-hệ-thống).
+
 #### Scenario 4: Primary DB down, standby available
 
 **Giải pháp:** Promote standby thành primary.
@@ -1095,3 +1233,141 @@ backups/
 - File name validation chống path traversal (chỉ accept prefix `ivf_db_`, `ivf_minio_`, `ivf_basebackup_`)
 - Replication slot names validated với regex
 - SignalR hub yêu cầu `AdminOnly` policy
+
+---
+
+## 14. System Restore (Toàn hệ thống)
+
+### 14.1 Tổng quan
+
+**Service:** `SystemRestoreService` (`src/IVF.API/Services/SystemRestoreService.cs`)
+**Endpoints:** `/api/admin/system-restore/*` (`src/IVF.API/Endpoints/SystemRestoreEndpoints.cs`)
+**Frontend:** Tab "🔄 Toàn hệ thống" trong Admin → Backup/Restore
+
+Diều phối restore toàn bộ hệ thống (Database + MinIO + PKI) trong một operation duy nhất với SignalR real-time log streaming.
+
+### 14.2 Kiến trúc
+
+```
+┌───────────────────┐     ┌────────────────────┐     ┌───────────────────┐
+│   Frontend UI   │ →  │ SystemRestore    │  → │   BackupHub      │
+│   (Angular)     │     │ Endpoints       │     │   (SignalR)      │
+└───────────────────┘     └────────┬───────────┘     └────────┬──────────┘
+                             │                           │
+                    ┌────────▼───────────────────────▼─────┐
+                    │       SystemRestoreService                │
+                    │ (Orchestrator — Background Task)          │
+                    └───┬─────────┬─────────┬─────────┬───────┘
+                        │             │             │             │
+                 ┌─────▼─────┐ ┌───▼──────┐ ┌──▼───────┐ ┌─▼────────┐
+                 │ Database  │ │ WalBackup  │ │ MinIO     │ │ Backup   │
+                 │ BackupSvc │ │ Service   │ │ BackupSvc │ │ Restore  │
+                 │ (pg_dump) │ │ (PITR)    │ │ (tar/cp)  │ │ Service  │
+                 └───────────┘ └──────────┘ └──────────┘ └──────────┘
+                   Stage 1a      Stage 1b      Stage 2     Stage 3
+                   (Database)    (PITR)        (MinIO)     (PKI)
+```
+
+### 14.3 Quy trình sử dụng
+
+```
+Bước 1: Chọn Phương pháp restore       ───  Snapshot (pg_dump) hoặc PITR (base backup)
+Bước 2: Chọn file backup               ───  Từ inventory dropdown (DB, MinIO, PKI)
+Bước 3: Preflight Check                ───  Validate file tồn tại + size + stages
+Bước 4: Start System Restore            ───  Xác nhận → Chạy tuần tự các stage
+Bước 5: Monitor real-time logs          ───  SignalR streaming (level: INFO/WARN/ERROR/OK)
+```
+
+### 14.4 API Usage
+
+```bash
+# 1. Xem danh sách backup khả dụng
+curl -H "Authorization: Bearer $TOKEN" \
+  http://localhost:5000/api/admin/system-restore/inventory
+
+# 2. Kiểm tra trước (preflight)
+curl -X POST -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  http://localhost:5000/api/admin/system-restore/preflight \
+  -d '{
+    "databaseBackupFile": "ivf_db_20260310_020000.sql.gz",
+    "minioBackupFile": "ivf_minio_20260310_023000.tar.gz",
+    "pkiBackupFile": "ivf-ca-backup_20260310_020000.tar.gz"
+  }'
+
+# 3. Chạy restore toàn hệ thống
+curl -X POST -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  http://localhost:5000/api/admin/system-restore/start \
+  -d '{
+    "databaseBackupFile": "ivf_db_20260310_020000.sql.gz",
+    "minioBackupFile": "ivf_minio_20260310_023000.tar.gz",
+    "pkiBackupFile": "ivf-ca-backup_20260310_020000.tar.gz",
+    "dryRun": false
+  }'
+
+# 4. Xem live logs
+curl -H "Authorization: Bearer $TOKEN" \
+  http://localhost:5000/api/admin/system-restore/logs/{operationCode}
+
+# 5. Hủy restore đang chạy
+curl -X POST -H "Authorization: Bearer $TOKEN" \
+  http://localhost:5000/api/admin/system-restore/cancel/{operationCode}
+```
+
+### 14.5 Xử lý lỗi
+
+| Tình huống                       | Hành vi                                              |
+| -------------------------------- | ---------------------------------------------------- |
+| Stage 1 (DB) thất bại            | Kết thúc operation, ghi error log                    |
+| Stage 1 OK, Stage 2 (MinIO) fail | Báo completed stages, ghi lỗi của MinIO              |
+| User hủy giữa chừng              | Ghi log stages đã hoàn thành, đánh dấu Cancelled     |
+| File backup không tồn tại        | FileNotFoundException, ghi vào error log             |
+| Dry-run mode                     | Đi qua logic nhưng không thực thi (tuỳ stage hỗ trợ) |
+
+---
+
+## 15. WAL Backup to S3 (On-demand)
+
+### 15.1 Tổng quan
+
+**Endpoint:** `POST /api/admin/data-backup/compliance/wal/backup-to-s3`
+**Service:** `WalBackupSchedulerService.RunOnDemandArchiveAsync()`
+**Frontend:** Nút "☁️ Backup WAL → S3" trong tab Khôi phục
+
+Cho phép trích xuất và upload WAL segments lên AWS S3 theo yêu cầu (không phải chờ cron 15 phút).
+
+### 15.2 Quy trình
+
+```
+1. pg_switch_wal()     ───  Force switch WAL segment hiện tại
+2. Đợi 3 giây           ───  Cho archive_command hoàn tất
+3. Copy WAL segments   ───  Container → backups/wal/ (chỉ file mới)
+4. Upload to S3        ───  Hỗ trợ compression (.gz / .br)
+```
+
+### 15.3 Sử dụng
+
+```bash
+curl -X POST -H "Authorization: Bearer $TOKEN" \
+  http://localhost:5000/api/admin/data-backup/compliance/wal/backup-to-s3
+```
+
+**Response:**
+
+```json
+{
+  "walSwitched": true,
+  "walSwitchMessage": "WAL segment switched successfully",
+  "segmentsCopied": 3,
+  "segmentsUploaded": 3,
+  "message": "On-demand WAL archive completed: 3 copied, 3 uploaded to cloud"
+}
+```
+
+### 15.4 Khi nào sử dụng
+
+- Trước khi thực hiện System Restore — đảm bảo WAL mới nhất đã lên S3
+- Sau một loạt thay đổi quan trọng — force archive ngay lập tức
+- Kiểm tra WAL archiving hoạt động đúng (segment count > 0)
+- Bổ sung cho cron `sync-wal-s3.sh` (mỗi 15 phút) khi cần RPO thấp hơn

@@ -2510,18 +2510,25 @@ docker compose exec db psql -U postgres ivf_db -c "SELECT max(created_at) FROM p
 docker compose up -d
 ```
 
+> **Thay thế:** Sử dụng **System Restore API** (`POST /api/admin/system-restore/start`) hoặc
+> **Frontend UI** (Admin → Backup/Restore → Toàn hệ thống) để khôi phục toàn bộ
+> Database + MinIO + PKI trong 1 operation với live log streaming.
+> Xem: [backup_and_restore.md — Section 14](backup_and_restore.md#14-system-restore-toàn-hệ-thống),
+> [swarm_s3_deployment_guide.md — Section 16.7](swarm_s3_deployment_guide.md#167-system-restore-via-api-toàn-hệ-thống).
+
 ### 9.5 Disaster Recovery Plan
 
-| Scenario                   | RTO    | RPO    | Phương án                                         |
-| -------------------------- | ------ | ------ | ------------------------------------------------- |
-| **API crash**              | 0s     | 0      | Docker auto-restart                               |
-| **Single container OOM**   | 10s    | 0      | Docker restart + resource limits                  |
-| **Primary DB failure**     | 15-40s | 0      | Patroni auto-failover hoặc manual promote standby |
-| **Disk corruption**        | 30 min | ~5 min | PITR từ WAL archive                               |
-| **Ransomware / data loss** | 1h     | 24h    | Restore từ daily backup                           |
-| **Full node failure**      | 5 min  | 0      | LB routes to Node B + promote standby             |
-| **Datacenter outage**      | 30 min | ~1 min | Cloud Replica promotion + DNS failover            |
-| **Region-wide disaster**   | 2h     | 24h    | Cloud backup restore trên cloud mới               |
+| Scenario                   | RTO       | RPO        | Phương án                                         |
+| -------------------------- | --------- | ---------- | ------------------------------------------------- |
+| **API crash**              | 0s        | 0          | Docker auto-restart                               |
+| **Single container OOM**   | 10s       | 0          | Docker restart + resource limits                  |
+| **Primary DB failure**     | 15-40s    | 0          | Patroni auto-failover hoặc manual promote standby |
+| **Disk corruption**        | 30 min    | ~5 min     | PITR từ WAL archive                               |
+| **Ransomware / data loss** | 1h        | 24h        | Restore từ daily backup (hoặc System Restore API) |
+| **Full node failure**      | 5 min     | 0          | LB routes to Node B + promote standby             |
+| **Datacenter outage**      | 30 min    | ~1 min     | Cloud Replica promotion + DNS failover            |
+| **Region-wide disaster**   | 2h        | 24h        | Cloud backup restore trên cloud mới               |
+| **Full system restore**    | 20-30 min | tùy backup | System Restore API (DB + MinIO + PKI all-in-one)  |
 
 ### 9.6 Redis Failover
 
