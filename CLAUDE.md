@@ -80,8 +80,9 @@ HTTP: `ApiService` is the base HTTP client. JWT token is injected via intercepto
 
 ### Key Infrastructure
 
-- **Authentication:** Triple auth middleware pipeline: VaultTokenMiddleware (X-Vault-Token) → ApiKeyMiddleware (X-API-Key) → JWT Bearer. `IApiKeyValidator` validates against DB (BCrypt) with config fallback.
-- **Real-time:** Three SignalR hubs — `/hubs/queue`, `/hubs/notifications`, `/hubs/fingerprint`
+- **Authentication:** Triple auth middleware pipeline: VaultTokenMiddleware (X-Vault-Token) → ApiKeyMiddleware (X-API-Key) → JWT Bearer. `IApiKeyValidator` validates against DB (BCrypt) with config fallback. **JWT key sharing:** In Docker Swarm, all API replicas must share the same RSA signing key via Docker secret `jwt_private_key` (mounted at `/app/keys/jwt/jwt-private.pem`). `JwtKeyService` loads an existing key from this path if present, otherwise generates a new one.
+- **Real-time:** Six SignalR hubs — `/hubs/queue`, `/hubs/notifications`, `/hubs/fingerprint`, `/hubs/backup`, `/hubs/evidence`, `/hubs/infrastructure`
+- **Auto-healing:** `SwarmAutoHealingService` monitors Docker Swarm services and restarts unhealthy ones. Must skip self-service (ivf_api) to prevent restart cascades — uses `SelfServices` guard.
 - **Digital Signing:** SignServer + EJBCA PKI via mTLS. `IDigitalSigningService` in Application, implementation in Infrastructure. Rate-limited to 30 ops/min.
 - **Biometrics:** DigitalPersona SDK (server-side matching, Windows only). Falls back to stub on Mac/Linux. `IBiometricMatcher` interface.
 - **File Storage:** MinIO (S3-compatible). Three shared buckets: `ivf-documents`, `ivf-signed-pdfs`, `ivf-medical-images`. **Tenant-isolated** via object key prefix `tenants/{tenantId}/`. Constants in `StorageBuckets`, prefix helper `TenantStoragePrefix.Prefix()` (both in `IVF.Application.Common`).

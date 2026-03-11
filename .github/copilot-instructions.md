@@ -264,6 +264,7 @@ Triple auth pipeline: `VaultToken (X-Vault-Token)` → `ApiKey (X-API-Key)` → 
 
 - JWT: 60-min expiry, 7-day refresh token
 - Frontend injects JWT via `authInterceptor`
+- **Swarm**: All replicas share RSA signing key via Docker secret `jwt_private_key` → `/app/keys/jwt/jwt-private.pem`
 
 ### SignalR Hubs
 
@@ -271,6 +272,8 @@ Triple auth pipeline: `VaultToken (X-Vault-Token)` → `ApiKey (X-API-Key)` → 
 - `/hubs/notifications` — Push notifications
 - `/hubs/fingerprint` — Biometric device events
 - `/hubs/backup` — Backup/Restore real-time log streaming (used by System Restore)
+- `/hubs/evidence` — Evidence/audit trail real-time events
+- `/hubs/infrastructure` — Real-time VPS metrics streaming
 
 ### Alert Webhooks (Optional — chưa áp dụng)
 
@@ -307,6 +310,10 @@ Triple auth pipeline: `VaultToken (X-Vault-Token)` → `ApiKey (X-API-Key)` → 
 8. **Docker required**: PostgreSQL, Redis, MinIO must be running via `docker-compose up -d`
 9. **Auto-migration in dev**: `DatabaseSeeder.SeedAsync()` runs seeders on startup in development mode
 10. **Storage tenant isolation**: All MinIO object keys must be prefixed with `TenantStoragePrefix.Prefix(tenantId, key)`. Use `StorageBuckets` constants (not hardcoded strings) for bucket names. Both in `IVF.Application.Common`.
+11. **JWT key sharing in Swarm**: Each API replica generates its own RSA key → tokens signed by one replica fail on another. Fix: share key via Docker secret `jwt_private_key` mounted at `/app/keys/jwt/jwt-private.pem`. `JwtKeyService` loads existing key if present.
+12. **Health check shell compatibility**: Container base image uses `dash` (not `bash`) — `/dev/tcp` is a bash-only feature. Use `curl -sf http://127.0.0.1:8080/health/live` instead.
+13. **Auto-healing self-reference**: `SwarmAutoHealingService` must skip the API service itself (`SelfServices` guard) to prevent restart cascade loops.
+14. **Docker config immutability**: Docker Swarm configs are immutable — to update Caddyfile, create a new versioned config (e.g., `caddyfile_v9` → `caddyfile_v10`) and update the service.
 
 ## applyTo Patterns
 
