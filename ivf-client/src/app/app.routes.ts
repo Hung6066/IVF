@@ -313,6 +313,13 @@ export const routes: Routes = [
             (m) => m.EnterpriseUsersComponent,
           ),
       },
+      {
+        path: 'admin/tenant-ca',
+        loadComponent: () =>
+          import('./features/admin/tenant-ca/tenant-ca.component').then(
+            (m) => m.TenantCaComponent,
+          ),
+      },
 
       {
         path: 'forms',

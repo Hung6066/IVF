@@ -1,37 +1,392 @@
-<div class="tenant-ca-container">
-  <div class="page-header">
-    <h2>Quản lý Chứng chỉ Trung tâm</h2>
-    <p class="subtitle">Cấu hình chứng chỉ số và khóa thi hành cho các trung tâm con</p>
-  </div>
+﻿<div class="dashboard-layout">
+  <header class="page-header">
+    <div class="header-title">
+      @if (activeTab === 'detail' && selectedTenant()) {
+        <button class="btn-back" (click)="backToList()">← Quay lại</button>
+        <h1>🏛️ {{ selectedTenant()!.tenantName }}</h1>
+        <p class="subtitle">Quản lý Sub-CA EJBCA cho trung tâm</p>
+      } @else {
+        <h1>🏛️ Quản lý Tenant Sub-CA</h1>
+        <p class="subtitle">Cấu hình EJBCA Certificate Authority theo trung tâm</p>
+      }
+    </div>
+    <div class="header-actions">
+      @if (activeTab === 'list') {
+        <button class="btn-primary" (click)="loadTenantCAs()" [disabled]="loading()">
+          {{ loading() ? '⏳ Đang tải...' : '🔄 Làm mới' }}
+        </button>
+      }
+    </div>
+  </header>
 
-  <div class="content-grid">
-    <!-- CA Status Card -->
-    <div class="card ca-status">
-      <div class="card-header">
-        <h3>Trạng thái CA</h3>
+  @if (activeTab === 'list') {
+    <div class="tab-content">
+      @if (loading()) {
+        <div class="loading-state">
+          <div class="spinner"></div>
+          <p>Đang tải danh sách...</p>
+        </div>
+      } @else if (tenantCAs().length === 0) {
+        <div class="empty-state-box">
+          <div class="empty-icon">🏛️</div>
+          <h3>Chưa có Tenant Sub-CA nào</h3>
+          <p>Các trung tâm cần được cấu hình EJBCA Sub-CA để sử dụng ký số.</p>
+        </div>
+      } @else {
+        <div class="stats-grid">
+          <div class="stat-card status-healthy">
+            <div class="stat-icon">🏛️</div>
+            <div class="stat-info">
+              <h3>Tổng Tenant CA</h3>
+              <span class="stat-value">{{ tenantCAs().length }}</span>
+            </div>
+          </div>
+          <div class="stat-card status-healthy">
+            <div class="stat-icon">✅</div>
+            <div class="stat-info">
+              <h3>Đang hoạt động</h3>
+              <span class="stat-value">{{ activeCount() }}</span>
+            </div>
+          </div>
+          <div class="stat-card status-warning">
+            <div class="stat-icon">⏸️</div>
+            <div class="stat-info">
+              <h3>Tạm dừng</h3>
+              <span class="stat-value">{{ suspendedCount() }}</span>
+            </div>
+          </div>
+          <div class="stat-card status-unhealthy">
+            <div class="stat-icon">🚫</div>
+            <div class="stat-info">
+              <h3>Đã thu hồi</h3>
+              <span class="stat-value">{{ revokedCount() }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="section-header">
+            <h2>📋 Danh sách Tenant Sub-CA</h2>
+          </div>
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Trung tâm</th>
+                  <th>EJBCA CA</th>
+                  <th>Worker Prefix</th>
+                  <th>Workers</th>
+                  <th>Trạng thái</th>
+                  <th>Auto Provision</th>
+                  <th>Thao tác</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (tenant of tenantCAs(); track tenant.tenantId) {
+                  <tr>
+                    <td>
+                      <div class="tenant-cell">
+                        <strong>{{ tenant.tenantName }}</strong>
+                        <small>{{ tenant.organizationName }}</small>
+                      </div>
+                    </td>
+                    <td><span class="mono">{{ tenant.ejbcaCaName }}</span></td>
+                    <td><span class="mono">{{ tenant.workerNamePrefix }}</span></td>
+                    <td>
+                      <span class="worker-count">{{ tenant.activeWorkerCount }} / {{ tenant.maxWorkers }}</span>
+                    </td>
+                    <td>
+                      <span class="status-badge {{ getStatusInfo(tenant.subCaStatus).cssClass }}">
+                        {{ getStatusInfo(tenant.subCaStatus).icon }} {{ getStatusInfo(tenant.subCaStatus).label }}
+                      </span>
+                    </td>
+                    <td>
+                      <span class="auto-badge" [class.enabled]="tenant.autoProvisionEnabled">
+                        {{ tenant.autoProvisionEnabled ? '✅ Bật' : '❌ Tắt' }}
+                      </span>
+                    </td>
+                    <td>
+                      <div class="action-buttons">
+                        <button class="btn-sm btn-secondary" (click)="viewDetail(tenant)" title="Chi tiết">👁️</button>
+                        @if (tenant.subCaStatus !== 'Revoked') {
+                          <button class="btn-sm btn-secondary" (click)="openUserCertModal(tenant.tenantId)" title="Cấp cert">🔐</button>
+                        }
+                      </div>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      }
+    </div>
+  }
+
+  @if (activeTab === 'detail' && selectedTenant()) {
+    <div class="tab-content">
+      <div class="detail-status-bar {{ getStatusInfo(selectedTenant()!.subCaStatus).cssClass }}">
+        <span class="status-icon">{{ getStatusInfo(selectedTenant()!.subCaStatus).icon }}</span>
+        <span class="status-text">{{ getStatusInfo(selectedTenant()!.subCaStatus).label }}</span>
       </div>
-      <div class="card-body">
-        <p class="info-text">Hiện tại chưa có dữ liệu CA</p>
+
+      <div class="card">
+        <div class="section-header">
+          <h2>🏛️ Cấu hình EJBCA</h2>
+          <div class="header-actions">
+            @if (selectedTenant()!.subCaStatus === 'Active') {
+              <button class="btn-secondary" (click)="openConfigModal(selectedTenant()!)">⚙️ Sửa cấu hình</button>
+            }
+          </div>
+        </div>
+        <div class="info-grid">
+          <div class="info-item"><label>EJBCA CA Name</label><span>{{ selectedTenant()!.ejbcaCaName }}</span></div>
+          <div class="info-item"><label>Certificate Profile</label><span>{{ selectedTenant()!.ejbcaCertProfileName }}</span></div>
+          <div class="info-item"><label>End Entity Profile</label><span>{{ selectedTenant()!.ejbcaEeProfileName }}</span></div>
+          <div class="info-item"><label>Tổ chức (O=)</label><span>{{ selectedTenant()!.organizationName }}</span></div>
+          <div class="info-item"><label>Worker Name Prefix</label><span class="mono">{{ selectedTenant()!.workerNamePrefix }}</span></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="section-header">
+          <h2>📊 Thống kê vận hành</h2>
+          <button class="btn-secondary" (click)="refreshDetail(selectedTenant()!.tenantId)">🔄 Làm mới</button>
+        </div>
+        <div class="stats-grid">
+          <div class="stat-card status-healthy">
+            <div class="stat-icon">✍️</div>
+            <div class="stat-info">
+              <h3>Workers đang hoạt động</h3>
+              <span class="stat-value">{{ selectedTenant()!.activeWorkerCount }} / {{ selectedTenant()!.maxWorkers }}</span>
+            </div>
+          </div>
+          <div class="stat-card status-healthy">
+            <div class="stat-icon">🔐</div>
+            <div class="stat-info">
+              <h3>Chữ ký đang hoạt động</h3>
+              <span class="stat-value">{{ selectedTenant()!.activeSignatureCount }}</span>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon">📅</div>
+            <div class="stat-info">
+              <h3>Cert validity mặc định</h3>
+              <span class="stat-value">{{ selectedTenant()!.defaultCertValidityDays }} ngày</span>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon">🔄</div>
+            <div class="stat-info">
+              <h3>Gia hạn trước</h3>
+              <span class="stat-value">{{ selectedTenant()!.renewBeforeDays }} ngày</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="section-header"><h2>⚡ Thao tác</h2></div>
+        <div class="actions-grid">
+          @if (selectedTenant()!.subCaStatus === 'Active') {
+            <button class="action-card" (click)="openUserCertModal(selectedTenant()!.tenantId)">
+              <span class="action-icon">🔐</span>
+              <div class="action-info"><strong>Cấp chứng thư số</strong><small>Cấp cert EJBCA cho người dùng</small></div>
+            </button>
+            <button class="action-card" (click)="openConfigModal(selectedTenant()!)">
+              <span class="action-icon">⚙️</span>
+              <div class="action-info"><strong>Cấu hình</strong><small>Sửa thông số CA</small></div>
+            </button>
+            <button class="action-card warning" (click)="openConfirmAction('suspend', selectedTenant()!.tenantId, selectedTenant()!.tenantName)">
+              <span class="action-icon">⏸️</span>
+              <div class="action-info"><strong>Tạm dừng</strong><small>Tạm ngừng cấp cert mới</small></div>
+            </button>
+            <button class="action-card danger" (click)="openConfirmAction('revoke', selectedTenant()!.tenantId, selectedTenant()!.tenantName)">
+              <span class="action-icon">🚫</span>
+              <div class="action-info"><strong>Thu hồi</strong><small>Thu hồi vĩnh viễn Sub-CA</small></div>
+            </button>
+          }
+          @if (selectedTenant()!.subCaStatus === 'Suspended') {
+            <button class="action-card" (click)="openProvisionModal(selectedTenant()!.tenantId)">
+              <span class="action-icon">▶️</span>
+              <div class="action-info"><strong>Kích hoạt lại</strong><small>Provision lại Sub-CA</small></div>
+            </button>
+            <button class="action-card danger" (click)="openConfirmAction('revoke', selectedTenant()!.tenantId, selectedTenant()!.tenantName)">
+              <span class="action-icon">🚫</span>
+              <div class="action-info"><strong>Thu hồi</strong><small>Thu hồi vĩnh viễn Sub-CA</small></div>
+            </button>
+          }
+          @if (selectedTenant()!.subCaStatus === 'Revoked') {
+            <div class="revoked-notice">
+              <span>🚫</span>
+              <p>Sub-CA này đã bị thu hồi vĩnh viễn. Không thể thực hiện thao tác nào thêm.</p>
+            </div>
+          }
+        </div>
       </div>
     </div>
+  }
 
-    <!-- CA Management Card -->
-    <div class="card ca-management">
-      <div class="card-header">
-        <h3>Quản lý Chứng chỉ</h3>
-      </div>
-      <div class="card-body">
-        <p class="info-text">Chức năng quản lý chứng chỉ đang được phát triển</p>
+  @if (showProvisionModal()) {
+    <div class="modal-overlay" (click)="closeProvisionModal()">
+      <div class="modal-content" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h2>🏛️ Provision Tenant Sub-CA</h2>
+          <button class="modal-close" (click)="closeProvisionModal()">✕</button>
+        </div>
+        <div class="modal-body">
+          <p class="modal-desc">Cấu hình EJBCA Sub-CA cho trung tâm. Để trống để sử dụng giá trị mặc định.</p>
+          <div class="form-group">
+            <label for="caName">EJBCA CA Name</label>
+            <select id="caName" [(ngModel)]="provisionRequest.caName" class="form-control">
+              <option value="">-- Mặc định (ManagementCA) --</option>
+              @for (ca of ejbcaCAs(); track ca.name) {
+                <option [value]="ca.name">{{ ca.name }}</option>
+              }
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="certProfile">Certificate Profile</label>
+            <select id="certProfile" [(ngModel)]="provisionRequest.certProfileName" class="form-control">
+              <option value="">-- Mặc định --</option>
+              @for (profile of ejbcaCertProfiles(); track profile.name) {
+                <option [value]="profile.name">{{ profile.name }}</option>
+              }
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="eeProfile">End Entity Profile</label>
+            <select id="eeProfile" [(ngModel)]="provisionRequest.eeProfileName" class="form-control">
+              <option value="">-- Mặc định --</option>
+              @for (profile of ejbcaEeProfiles(); track profile.name) {
+                <option [value]="profile.name">{{ profile.name }}</option>
+              }
+            </select>
+          </div>
+          @if (provisionResult()) {
+            <div class="result-box" [class.success]="provisionResult()!.success" [class.error]="!provisionResult()!.success">
+              {{ provisionResult()!.success ? '✅' : '❌' }} {{ provisionResult()!.message }}
+            </div>
+          }
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary" (click)="closeProvisionModal()">Hủy</button>
+          <button class="btn-primary" (click)="provision()" [disabled]="provisioning()">
+            {{ provisioning() ? '⏳ Đang xử lý...' : '🏛️ Provision' }}
+          </button>
+        </div>
       </div>
     </div>
-  </div>
+  }
 
-  <!-- Empty state placeholder -->
-  @if (tenantCAs().length === 0) {
-    <div class="empty-state">
-      <div class="empty-icon">🔐</div>
-      <h3>Chưa cấu hình CA</h3>
-      <p>Vui lòng liên hệ quản trị viên để tạo chứng chỉ số cho trung tâm</p>
+  @if (showConfigModal()) {
+    <div class="modal-overlay" (click)="closeConfigModal()">
+      <div class="modal-content" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h2>⚙️ Cấu hình Tenant CA</h2>
+          <button class="modal-close" (click)="closeConfigModal()">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="certValidity">Thời hạn cert mặc định (ngày)</label>
+            <input type="number" id="certValidity" [(ngModel)]="configRequest.defaultCertValidityDays" class="form-control" min="30" max="3650">
+          </div>
+          <div class="form-group">
+            <label for="renewBefore">Gia hạn trước (ngày)</label>
+            <input type="number" id="renewBefore" [(ngModel)]="configRequest.renewBeforeDays" class="form-control" min="7" max="365">
+          </div>
+          <div class="form-group">
+            <label for="maxWorkers">Số workers tối đa</label>
+            <input type="number" id="maxWorkers" [(ngModel)]="configRequest.maxWorkers" class="form-control" min="1" max="500">
+          </div>
+          @if (configResult()) {
+            <div class="result-box" [class.success]="configResult()!.success" [class.error]="!configResult()!.success">
+              {{ configResult()!.success ? '✅ Đã cập nhật cấu hình' : '❌ ' + (configResult()!.message || 'Lỗi') }}
+            </div>
+          }
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary" (click)="closeConfigModal()">Hủy</button>
+          <button class="btn-primary" (click)="updateConfig()" [disabled]="updatingConfig()">
+            {{ updatingConfig() ? '⏳ Đang lưu...' : '💾 Lưu cấu hình' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  @if (confirmAction()) {
+    <div class="modal-overlay" (click)="cancelAction()">
+      <div class="modal-content modal-sm" (click)="$event.stopPropagation()">
+        <div class="modal-header" [class.danger-header]="confirmAction()!.type === 'revoke'">
+          <h2>{{ confirmAction()!.type === 'suspend' ? '⏸️ Xác nhận tạm dừng' : '🚫 Xác nhận thu hồi' }}</h2>
+          <button class="modal-close" (click)="cancelAction()">✕</button>
+        </div>
+        <div class="modal-body">
+          @if (confirmAction()!.type === 'suspend') {
+            <p>Bạn có chắc muốn <strong>tạm dừng</strong> Sub-CA của trung tâm <strong>{{ confirmAction()!.tenantName }}</strong>?</p>
+            <p class="warning-text">⚠️ Sẽ không thể cấp cert mới cho đến khi kích hoạt lại.</p>
+          } @else {
+            <p>Bạn có chắc muốn <strong>thu hồi vĩnh viễn</strong> Sub-CA của trung tâm <strong>{{ confirmAction()!.tenantName }}</strong>?</p>
+            <p class="danger-text">🚫 Hành động này không thể hoàn tác. Tất cả cert đã cấp sẽ bị vô hiệu hóa.</p>
+          }
+          @if (actionResult()) {
+            <div class="result-box" [class.success]="actionResult()!.success" [class.error]="!actionResult()!.success">
+              {{ actionResult()!.success ? '✅' : '❌' }} {{ actionResult()!.message }}
+            </div>
+          }
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary" (click)="cancelAction()">Hủy</button>
+          <button [class]="confirmAction()!.type === 'revoke' ? 'btn-danger' : 'btn-warning'" (click)="executeAction()" [disabled]="actionLoading()">
+            {{ actionLoading() ? '⏳ Đang xử lý...' : (confirmAction()!.type === 'suspend' ? '⏸️ Tạm dừng' : '🚫 Thu hồi') }}
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  @if (showUserCertModal()) {
+    <div class="modal-overlay" (click)="closeUserCertModal()">
+      <div class="modal-content" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h2>🔐 Cấp chứng thư số cho người dùng</h2>
+          <button class="modal-close" (click)="closeUserCertModal()">✕</button>
+        </div>
+        <div class="modal-body">
+          <p class="modal-desc">Cấp cert EJBCA và tạo SignServer worker cho người dùng qua Tenant Sub-CA.</p>
+          <div class="form-group">
+            <label for="userId">User ID</label>
+            <input type="text" id="userId" [(ngModel)]="userCertUserId" class="form-control" placeholder="Nhập GUID của người dùng">
+          </div>
+          @if (userCertResult()) {
+            <div class="result-box" [class.success]="userCertResult()!.success" [class.error]="!userCertResult()!.success">
+              @if (userCertResult()!.success) {
+                <div class="cert-result-detail">
+                  <p>✅ {{ userCertResult()!.message }}</p>
+                  @if (userCertResult()!.certificateSubject) {
+                    <div class="result-item"><label>Subject</label><span>{{ userCertResult()!.certificateSubject }}</span></div>
+                  }
+                  @if (userCertResult()!.workerName) {
+                    <div class="result-item"><label>Worker</label><span class="mono">{{ userCertResult()!.workerName }}</span></div>
+                  }
+                  @if (userCertResult()!.estimatedExpiry) {
+                    <div class="result-item"><label>Hạn cert</label><span>{{ formatDate(userCertResult()!.estimatedExpiry) }}</span></div>
+                  }
+                </div>
+              } @else {
+                <p>❌ {{ userCertResult()!.message }}</p>
+              }
+            </div>
+          }
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary" (click)="closeUserCertModal()">Đóng</button>
+          <button class="btn-primary" (click)="provisionUserCert()" [disabled]="provisioningUserCert() || !userCertUserId.trim()">
+            {{ provisioningUserCert() ? '⏳ Đang cấp cert...' : '🔐 Cấp cert' }}
+          </button>
+        </div>
+      </div>
     </div>
   }
 </div>

@@ -1,4 +1,4 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { TenantCaService } from '../../../core/services/tenant-ca.service';
@@ -26,6 +26,11 @@ export class TenantCaComponent implements OnInit {
   // List state
   tenantCAs = signal<TenantSubCaStatusDto[]>([]);
   loading = signal(false);
+
+  // Computed stats
+  activeCount = computed(() => this.tenantCAs().filter(t => t.subCaStatus === 'Active').length);
+  suspendedCount = computed(() => this.tenantCAs().filter(t => t.subCaStatus === 'Suspended').length);
+  revokedCount = computed(() => this.tenantCAs().filter(t => t.subCaStatus === 'Revoked').length);
 
   // Detail/edit state
   selectedTenant = signal<TenantSubCaStatusDto | null>(null);
