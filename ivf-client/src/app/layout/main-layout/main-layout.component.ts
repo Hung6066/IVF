@@ -208,8 +208,8 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
 
   private async initializeSignalR(token: string) {
     try {
-      await this.signalRService.startNotificationConnection(token);
-      await this.signalRService.startQueueConnection(token);
+      await this.signalRService.startNotificationConnection();
+      await this.signalRService.startQueueConnection();
 
       this.signalRService.notification$.subscribe((notification) => {
         if (notification) {

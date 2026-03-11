@@ -209,3 +209,73 @@ export const EJBCA_REVOKE_REASONS = [
   { value: 'CERTIFICATE_HOLD', label: 'Tạm giữ' },
   { value: 'PRIVILEGES_WITHDRAWN', label: 'Thu hồi quyền' },
 ] as const;
+
+// ─── Tenant Sub-CA Models ───────────────────────────────────
+
+export type TenantSubCaStatus = 'Active' | 'Suspended' | 'Revoked';
+
+export interface TenantSubCaStatusDto {
+  tenantId: string;
+  tenantName: string;
+  ejbcaCaName: string;
+  ejbcaCertProfileName: string;
+  ejbcaEeProfileName: string;
+  subCaStatus: TenantSubCaStatus;
+  workerNamePrefix: string;
+  organizationName: string;
+  activeWorkerCount: number;
+  maxWorkers: number;
+  activeSignatureCount: number;
+  defaultCertValidityDays: number;
+  renewBeforeDays: number;
+  autoProvisionEnabled: boolean;
+}
+
+export interface TenantSubCaListResponse {
+  items: TenantSubCaStatusDto[];
+  total: number;
+}
+
+export interface ProvisionTenantCaRequest {
+  caName?: string;
+  certProfileName?: string;
+  eeProfileName?: string;
+}
+
+export interface TenantCaConfigRequest {
+  defaultCertValidityDays?: number;
+  renewBeforeDays?: number;
+  maxWorkers?: number;
+}
+
+export interface TenantCaProvisionResponse {
+  success: boolean;
+  message: string;
+  status?: TenantSubCaStatusDto;
+}
+
+export interface TenantCaConfigResponse {
+  success: boolean;
+  status?: TenantSubCaStatusDto;
+}
+
+export interface TenantCaActionResponse {
+  success: boolean;
+  message: string;
+}
+
+export interface TenantUserCertProvisionResponse {
+  success: boolean;
+  certificateSubject?: string;
+  workerName?: string;
+  ejbcaUsername?: string;
+  estimatedExpiry?: string;
+  workerId?: number;
+  message: string;
+}
+
+export const TENANT_CA_STATUSES = [
+  { value: 'Active', label: 'Hoạt động', icon: '✅', cssClass: 'status-active' },
+  { value: 'Suspended', label: 'Tạm dừng', icon: '⏸️', cssClass: 'status-suspended' },
+  { value: 'Revoked', label: 'Đã thu hồi', icon: '🚫', cssClass: 'status-revoked' },
+] as const;

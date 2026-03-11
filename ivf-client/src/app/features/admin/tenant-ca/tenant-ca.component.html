@@ -1,0 +1,37 @@
+<div class="tenant-ca-container">
+  <div class="page-header">
+    <h2>Quản lý Chứng chỉ Trung tâm</h2>
+    <p class="subtitle">Cấu hình chứng chỉ số và khóa thi hành cho các trung tâm con</p>
+  </div>
+
+  <div class="content-grid">
+    <!-- CA Status Card -->
+    <div class="card ca-status">
+      <div class="card-header">
+        <h3>Trạng thái CA</h3>
+      </div>
+      <div class="card-body">
+        <p class="info-text">Hiện tại chưa có dữ liệu CA</p>
+      </div>
+    </div>
+
+    <!-- CA Management Card -->
+    <div class="card ca-management">
+      <div class="card-header">
+        <h3>Quản lý Chứng chỉ</h3>
+      </div>
+      <div class="card-body">
+        <p class="info-text">Chức năng quản lý chứng chỉ đang được phát triển</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Empty state placeholder -->
+  @if (tenantCAs().length === 0) {
+    <div class="empty-state">
+      <div class="empty-icon">🔐</div>
+      <h3>Chưa cấu hình CA</h3>
+      <p>Vui lòng liên hệ quản trị viên để tạo chứng chỉ số cho trung tâm</p>
+    </div>
+  }
+</div>
