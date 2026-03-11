@@ -22,7 +22,7 @@ public static class UltrasoundEndpoints
 
         group.MapPut("/{id:guid}/follicles", async (Guid id, RecordFolliclesRequest req, IMediator m) =>
         {
-            var r = await m.Send(new RecordFolliclesCommand(id, req.LeftOvaryCount, req.RightOvaryCount, 
+            var r = await m.Send(new RecordFolliclesCommand(id, req.LeftOvaryCount, req.RightOvaryCount,
                 req.LeftFollicles, req.RightFollicles, req.EndometriumThickness, req.Findings));
             return r.IsSuccess ? Results.Ok(r.Value) : Results.NotFound(r.Error);
         });

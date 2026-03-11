@@ -40,7 +40,7 @@ public class GetAnalysesByCycleHandler : IRequestHandler<GetAnalysesByCycleQuery
 }
 
 // ==================== SEARCH ANALYSES ====================
-public record SearchSemenAnalysesQuery(string? Query, DateTime? FromDate, DateTime? ToDate, string? Status, int Page = 1, int PageSize = 20) 
+public record SearchSemenAnalysesQuery(string? Query, DateTime? FromDate, DateTime? ToDate, string? Status, int Page = 1, int PageSize = 20)
     : IRequest<(IReadOnlyList<SemenAnalysisDto> Items, int Total)>;
 
 public class SearchSemenAnalysesHandler : IRequestHandler<SearchSemenAnalysesQuery, (IReadOnlyList<SemenAnalysisDto> Items, int Total)>
@@ -57,7 +57,7 @@ public class SearchSemenAnalysesHandler : IRequestHandler<SearchSemenAnalysesQue
 }
 
 // ==================== SEARCH WASHINGS ====================
-public record SearchSpermWashingsQuery(string? Method, DateTime? FromDate, DateTime? ToDate, int Page = 1, int PageSize = 20) 
+public record SearchSpermWashingsQuery(string? Method, DateTime? FromDate, DateTime? ToDate, int Page = 1, int PageSize = 20)
     : IRequest<(IReadOnlyList<SpermWashingDto> Items, int Total)>;
 
 public class SearchSpermWashingsHandler : IRequestHandler<SearchSpermWashingsQuery, (IReadOnlyList<SpermWashingDto> Items, int Total)>
@@ -94,9 +94,9 @@ public class GetAndrologyStatisticsHandler : IRequestHandler<GetAndrologyStatist
         var today = DateTime.UtcNow.Date;
         var todayAnalyses = await _analysisRepo.GetCountByDateAsync(today, ct);
         var todayWashings = await _washingRepo.GetCountByDateAsync(today, ct);
-        
+
         var (_, pendingCount) = await _analysisRepo.SearchAsync(null, null, null, "Pending", 1, 1, ct);
-        
+
         var avgConc = await _analysisRepo.GetAverageConcentrationAsync(ct);
         var dist = await _analysisRepo.GetConcentrationDistributionAsync(ct);
 

@@ -14,7 +14,7 @@ public class Concept : BaseEntity
     public string? Description { get; private set; }
     public string System { get; private set; } = "LOCAL"; // Your own system identifier
     public ConceptType ConceptType { get; private set; }
-    
+
     // Full-text search (PostgreSQL TsVector)
     public NpgsqlTsVector? SearchVector { get; private set; }
 

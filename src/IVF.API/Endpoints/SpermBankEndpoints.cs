@@ -28,7 +28,7 @@ public static class SpermBankEndpoints
 
         group.MapPut("/donors/{id:guid}/profile", async (Guid id, UpdateDonorProfileRequest req, IMediator m) =>
         {
-            var r = await m.Send(new UpdateDonorProfileCommand(id, req.BloodType, req.Height, req.Weight, 
+            var r = await m.Send(new UpdateDonorProfileCommand(id, req.BloodType, req.Height, req.Weight,
                 req.EyeColor, req.HairColor, req.Ethnicity, req.Education, req.Occupation));
             return r.IsSuccess ? Results.Ok(r.Value) : Results.NotFound(r.Error);
         });

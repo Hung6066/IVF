@@ -12,13 +12,13 @@ public class SemenAnalysis : BaseEntity
     public Guid? CycleId { get; private set; }
     public DateTime AnalysisDate { get; private set; }
     public AnalysisType AnalysisType { get; private set; }
-    
+
     // Macroscopic
     public decimal? Volume { get; private set; } // ml
     public string? Appearance { get; private set; }
     public string? Liquefaction { get; private set; }
     public decimal? Ph { get; private set; }
-    
+
     // Microscopic
     public decimal? Concentration { get; private set; } // million/ml
     public decimal? TotalCount { get; private set; } // million
@@ -27,14 +27,14 @@ public class SemenAnalysis : BaseEntity
     public decimal? Immotile { get; private set; } // %
     public decimal? NormalMorphology { get; private set; } // %
     public decimal? Vitality { get; private set; } // %
-    
+
     // Post-wash (if applicable)
     public decimal? PostWashConcentration { get; private set; }
     public decimal? PostWashMotility { get; private set; }
-    
+
     public string? Notes { get; private set; }
     public Guid? PerformedByUserId { get; private set; }
-    
+
     // Navigation
     public Patient Patient { get; private set; } = null!;
     public TreatmentCycle? Cycle { get; private set; }

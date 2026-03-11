@@ -26,7 +26,7 @@ public partial class CaptureForm : Form, DPFP.Capture.EventHandler
         _patientId = patientId;
         _fingerType = fingerType;
         _samplesCollected = 0;
-        
+
         // DEBUG: Show patient ID in title
         Text = $"Chụp vân tay - Patient: {patientId}";
     }
@@ -89,7 +89,7 @@ public partial class CaptureForm : Form, DPFP.Capture.EventHandler
                 UpdateStatus("Không thể bắt đầu quét!");
                 AddLog($"ERROR: {errorMsg}");
                 MessageBox.Show(errorMsg, "Lỗi khởi động quét", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                
+
                 // Send failure result with detailed error
                 _ = Task.Run(async () =>
                 {
@@ -102,7 +102,7 @@ public partial class CaptureForm : Form, DPFP.Capture.EventHandler
                     };
                     await _hubService.SendCaptureResultAsync(result);
                 });
-                
+
                 Close();
             }
         }
@@ -249,7 +249,7 @@ public partial class CaptureForm : Form, DPFP.Capture.EventHandler
             AddLog("Đang gửi kết quả qua SignalR...");
             await _hubService.SendCaptureResultAsync(result);
             AddLog("✅ Đã gửi CaptureResult thành công!");
-            
+
             await SendStatusAsync("Completed");
             AddLog("✅ Đã gửi status Completed!");
 

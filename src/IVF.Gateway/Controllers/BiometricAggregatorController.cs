@@ -12,7 +12,7 @@ public class BiometricAggregatorController : ControllerBase
     private readonly ILogger<BiometricAggregatorController> _logger;
 
     public BiometricAggregatorController(
-        IHttpClientFactory httpClientFactory, 
+        IHttpClientFactory httpClientFactory,
         IConfiguration configuration,
         ILogger<BiometricAggregatorController> logger)
     {
@@ -26,20 +26,20 @@ public class BiometricAggregatorController : ControllerBase
     {
         // Get Cluster Destinations from Config (Manually or via YARP abstraction if accessible, manual is easier for now)
         // Hardcoded or Configured Shard URLs
-        var shardUrls = new[] 
-        { 
+        var shardUrls = new[]
+        {
             "https://localhost:7001", // Node 1
             "https://localhost:7002"  // Node 2 (Example)
         };
 
-        var tasks = shardUrls.Select(async url => 
+        var tasks = shardUrls.Select(async url =>
         {
-            try 
+            try
             {
                 var client = _httpClientFactory.CreateClient();
                 // Check if internal API requires Key? 
                 // client.DefaultRequestHeaders.Add("X-API-KEY", "If-Needed");
-                
+
                 var response = await client.PostAsJsonAsync($"{url}/api/patients/fingerprints/identify", requestBody);
                 if (response.IsSuccessStatusCode)
                 {
@@ -58,7 +58,7 @@ public class BiometricAggregatorController : ControllerBase
         // Aggregation Logic: Find Best Match (Highest Score / Lowest FAR depending on metric)
         // Assuming Score is "Confidence" (Higher is better) or FAR (Lower is better).
         // BiometricMatcherService returns "Score" (FAR). Implementation said: "Lower is BETTER match".
-        
+
         var validMatches = results.Where(r => r != null && r.Match).ToList();
 
         if (validMatches.Any())
@@ -72,7 +72,7 @@ public class BiometricAggregatorController : ControllerBase
     }
 }
 
-public class IdentificationResult 
+public class IdentificationResult
 {
     public bool Match { get; set; }
     public Guid? PatientId { get; set; }

@@ -17,9 +17,9 @@ public class AuditLog : BaseEntity
     public string? ChangedColumns { get; private set; }  // Comma-separated
     public string? IpAddress { get; private set; }
     public string? UserAgent { get; private set; }
-    
+
     private AuditLog() { }
-    
+
     public static AuditLog Create(
         string entityType,
         Guid entityId,

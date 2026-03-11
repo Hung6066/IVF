@@ -75,7 +75,7 @@ public class FingerprintHubService : IAsyncDisposable
         }
         catch (Exception ex)
         {
-           StatusChanged?.Invoke(this, $"Lỗi gửi mẫu vân tay: {ex.Message}");
+            StatusChanged?.Invoke(this, $"Lỗi gửi mẫu vân tay: {ex.Message}");
         }
     }
 
@@ -240,7 +240,7 @@ public class FingerprintHubService : IAsyncDisposable
         {
             StatusChanged?.Invoke(this, "Đã kết nối lại");
             ConnectionChanged?.Invoke(this, true);
-            
+
             // Auto-rejoin patient group if we were in one
             if (!string.IsNullOrEmpty(_currentPatientId))
             {
@@ -269,7 +269,7 @@ public class FingerprintHubService : IAsyncDisposable
         {
             _currentPatientId = request.PatientId;
             StatusChanged?.Invoke(this, $"Nhận request cho patient: {request.PatientId}");
-            
+
             // Join the patient group so we can send results back
             try
             {
@@ -281,52 +281,52 @@ public class FingerprintHubService : IAsyncDisposable
             {
                 StatusChanged?.Invoke(this, $"Lỗi join group: {ex.Message}");
             }
-            
+
             CaptureRequested?.Invoke(this, new CaptureRequestEventArgs(request));
         });
 
-            // Listen for verification requests
-            _hubConnection.On<VerificationRequestDto>("VerificationRequested", async dto =>
-            {
-                var request = dto.Request;
-                _currentPatientId = request.PatientId;
-                StatusChanged?.Invoke(this, $"Nhận verification request cho patient: {request.PatientId}");
-                
-                try
-                {
-                    StatusChanged?.Invoke(this, $"Đang join group cho verification: fingerprint_{request.PatientId}");
-                    await JoinPatientCaptureAsync(request.PatientId);
-                }
-                catch (Exception ex)
-                {
-                    StatusChanged?.Invoke(this, $"Lỗi join group: {ex.Message}");
-                }
-                
-                VerificationRequested?.Invoke(this, new VerificationRequestEventArgs(dto));
-            });
-
-            // Listen for identification requests
-            _hubConnection.On<IdentificationRequestDto>("IdentificationRequested", dto =>
-            {
-                StatusChanged?.Invoke(this, "Nhận yêu cầu định danh (1:N)");
-                IdentificationRequested?.Invoke(this, new IdentificationRequestEventArgs(dto));
-            });
-
-            // Listen for identification results (Server-Side Matching Response)
-            _hubConnection.On<IdentificationResultDto>("IdentificationResult", dto =>
-            {
-                StatusChanged?.Invoke(this, $"Nhận kết quả định danh: {dto.Success}");
-                IdentificationResultReceived?.Invoke(this, dto);
-            });
-            
-            // Listen for capture cancellation
-            _hubConnection.On<string>("CaptureCancelled", patientId =>
+        // Listen for verification requests
+        _hubConnection.On<VerificationRequestDto>("VerificationRequested", async dto =>
         {
-            if (patientId == _currentPatientId)
+            var request = dto.Request;
+            _currentPatientId = request.PatientId;
+            StatusChanged?.Invoke(this, $"Nhận verification request cho patient: {request.PatientId}");
+
+            try
             {
-                CaptureCancelled?.Invoke(this, EventArgs.Empty);
+                StatusChanged?.Invoke(this, $"Đang join group cho verification: fingerprint_{request.PatientId}");
+                await JoinPatientCaptureAsync(request.PatientId);
             }
+            catch (Exception ex)
+            {
+                StatusChanged?.Invoke(this, $"Lỗi join group: {ex.Message}");
+            }
+
+            VerificationRequested?.Invoke(this, new VerificationRequestEventArgs(dto));
         });
+
+        // Listen for identification requests
+        _hubConnection.On<IdentificationRequestDto>("IdentificationRequested", dto =>
+        {
+            StatusChanged?.Invoke(this, "Nhận yêu cầu định danh (1:N)");
+            IdentificationRequested?.Invoke(this, new IdentificationRequestEventArgs(dto));
+        });
+
+        // Listen for identification results (Server-Side Matching Response)
+        _hubConnection.On<IdentificationResultDto>("IdentificationResult", dto =>
+        {
+            StatusChanged?.Invoke(this, $"Nhận kết quả định danh: {dto.Success}");
+            IdentificationResultReceived?.Invoke(this, dto);
+        });
+
+        // Listen for capture cancellation
+        _hubConnection.On<string>("CaptureCancelled", patientId =>
+    {
+        if (patientId == _currentPatientId)
+        {
+            CaptureCancelled?.Invoke(this, EventArgs.Empty);
+        }
+    });
 
         // Confirmation of joining
         _hubConnection.On<string>("JoinedCapture", patientId =>
@@ -404,30 +404,30 @@ public record VerificationResultDto
     public DateTime VerifiedAt { get; init; }
 }
 
-    public class VerificationRequestEventArgs : EventArgs
-    {
-        public VerificationRequestData Request { get; }
-        public VerificationRequestEventArgs(VerificationRequestDto dto) => Request = dto.Request;
-    }
+public class VerificationRequestEventArgs : EventArgs
+{
+    public VerificationRequestData Request { get; }
+    public VerificationRequestEventArgs(VerificationRequestDto dto) => Request = dto.Request;
+}
 
-    public class IdentificationRequestEventArgs : EventArgs
-    {
-        public IdentificationRequestDto Request { get; }
-        public IdentificationRequestEventArgs(IdentificationRequestDto dto) => Request = dto;
-    }
+public class IdentificationRequestEventArgs : EventArgs
+{
+    public IdentificationRequestDto Request { get; }
+    public IdentificationRequestEventArgs(IdentificationRequestDto dto) => Request = dto;
+}
 
-    // ==================== IDENTIFICATION (1:N) ====================
-    
-    public record IdentificationRequestDto
-    {
-        public string RequestedBy { get; init; } = string.Empty;
-        public DateTime RequestedAt { get; init; }
-    }
+// ==================== IDENTIFICATION (1:N) ====================
 
-    public record IdentificationResultDto
-    {
-        public bool Success { get; init; }
-        public string? PatientId { get; init; }
-        public string? RequestedBy { get; init; }
-        public string? ErrorMessage { get; init; }
-    }
+public record IdentificationRequestDto
+{
+    public string RequestedBy { get; init; } = string.Empty;
+    public DateTime RequestedAt { get; init; }
+}
+
+public record IdentificationResultDto
+{
+    public bool Success { get; init; }
+    public string? PatientId { get; init; }
+    public string? RequestedBy { get; init; }
+    public string? ErrorMessage { get; init; }
+}

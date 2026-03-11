@@ -37,7 +37,7 @@ public static class AndrologyEndpoints
                 req.NonProgressiveMotility, req.Immotile, req.NormalMorphology, req.Vitality));
             return r.IsSuccess ? Results.Ok(r.Value) : Results.NotFound(r.Error);
         });
-        
+
         // New Endpoints
         group.MapGet("/analyses", async (IMediator m, string? q, DateTime? from, DateTime? to, string? status, int page = 1, int pageSize = 20) =>
         {

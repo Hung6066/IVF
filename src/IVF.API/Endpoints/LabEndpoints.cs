@@ -52,7 +52,7 @@ public static class LabEndpoints
             var result = await sender.Send(command);
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
         });
-        
+
         group.MapDelete("/cryo-locations/{tank}", async (string tank, ISender sender) =>
         {
             var result = await sender.Send(new DeleteCryoLocationCommand(tank));

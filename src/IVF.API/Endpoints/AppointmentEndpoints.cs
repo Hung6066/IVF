@@ -63,7 +63,7 @@ public static class AppointmentEndpoints
 
             await repo.AddAsync(apt);
             await uow.SaveChangesAsync();
-            
+
             // Send Notification to Doctor
             if (req.DoctorId.HasValue)
             {

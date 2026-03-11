@@ -9,7 +9,7 @@ public class TemplateCacheService
     private readonly string _baseUrl;
     private readonly string _apiKey;
     private List<PatientFingerprintDto> _cache = new();
-    
+
     public bool IsLoaded { get; private set; }
     public int TemplateCount => _cache.Count;
 
@@ -18,7 +18,7 @@ public class TemplateCacheService
         _baseUrl = baseUrl.TrimEnd('/');
         _apiKey = apiKey;
         _httpClient = new HttpClient();
-        
+
         // Setup API Key authentication if used by backend
         // (Note: Backend currently checks Query string or Header for SignalR, need to confirm for REST API)
         _httpClient.DefaultRequestHeaders.Add("X-API-Key", _apiKey);
@@ -30,7 +30,7 @@ public class TemplateCacheService
         {
             var url = $"{_baseUrl}/api/patients/fingerprints/all?apiKey={_apiKey}";
             var templates = await _httpClient.GetFromJsonAsync<List<PatientFingerprintDto>>(url);
-            
+
             if (templates != null)
             {
                 _cache = templates;
@@ -57,14 +57,14 @@ public class TemplateCacheService
 
         foreach (var t in _cache)
         {
-            try 
+            try
             {
                 var bytes = Convert.FromBase64String(t.TemplateData);
                 var template = new DPFP.Template();
                 template.DeSerialize(bytes);
 
                 verificator.Verify(features, template, ref result);
-                
+
                 if (result.Verified)
                 {
                     matches.Add((t, result.FARAchieved));

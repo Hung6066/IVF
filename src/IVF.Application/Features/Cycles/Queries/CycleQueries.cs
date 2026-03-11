@@ -82,8 +82,8 @@ public class SearchCyclesHandler : IRequestHandler<SearchCyclesQuery, IReadOnlyL
     {
         if (string.IsNullOrWhiteSpace(request.Query) && request.PatientId == null)
         {
-             // If no query and no patient filter, return empty
-             return new List<CycleDto>();
+            // If no query and no patient filter, return empty
+            return new List<CycleDto>();
         }
 
         var cycles = await _cycleRepo.SearchAsync(request.Query, request.PatientId, ct);

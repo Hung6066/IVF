@@ -32,7 +32,7 @@ public partial class MainForm : Form
         // Extract base URL from Hub URL (approximate)
         var apiBaseUrl = _settings.HubUrl.Replace("/hubs/fingerprint", "");
         _cacheService = new TemplateCacheService(apiBaseUrl, _settings.ApiKey);
-        
+
         // Subscribe to hub events
         _hubService.StatusChanged += HubService_StatusChanged;
         _hubService.ConnectionChanged += HubService_ConnectionChanged;
@@ -47,16 +47,17 @@ public partial class MainForm : Form
         {
             await ConnectToHub();
             // Start cache refresh in background
-            _ = Task.Run(async () => {
-                try 
+            _ = Task.Run(async () =>
+            {
+                try
                 {
                     Invoke(() => UpdateStatus("Đang tải CSDL vân tay...", Color.Orange));
                     await _cacheService.RefreshCacheAsync();
                     Invoke(() => UpdateStatus($"Đã tải {_cacheService.TemplateCount} mẫu vân tay", Color.Green));
                 }
-                catch 
+                catch
                 {
-                   // Invoke(() => UpdateStatus("Lỗi tải CSDL vân tay", Color.Red));
+                    // Invoke(() => UpdateStatus("Lỗi tải CSDL vân tay", Color.Red));
                 }
             });
         }
@@ -65,11 +66,11 @@ public partial class MainForm : Form
         if (_settings.MinimizeToTray && _settings.AutoConnect)
         {
             Hide();
-            notifyIcon.ShowBalloonTip(2000, "IVF Fingerprint Client", 
+            notifyIcon.ShowBalloonTip(2000, "IVF Fingerprint Client",
                 "Ứng dụng đang chạy nền, chờ yêu cầu từ hệ thống", ToolTipIcon.Info);
         }
     }
-// ...
+    // ...
     private void HubService_IdentificationRequested(object? sender, IdentificationRequestEventArgs e)
     {
         Invoke(() =>
@@ -97,7 +98,7 @@ public partial class MainForm : Form
             _identificationForm.BringToFront();
             return;
         }
-        
+
         if (_cacheService == null || !_cacheService.IsLoaded)
         {
             MessageBox.Show("Chưa tải cơ sở dữ liệu vân tay. Vui lòng chờ.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -109,18 +110,18 @@ public partial class MainForm : Form
 
         _identificationForm = new IdentificationForm(_hubService!, _cacheService, request);
         _identificationForm.FormClosed += (s, args) => _identificationForm = null;
-        
+
         // Handle auto-minimize on success
         _identificationForm.IdentificationCompleted += (s, success) =>
         {
             if (success && _settings.MinimizeToTray)
             {
-                Invoke(() => 
+                Invoke(() =>
                 {
-                    Task.Delay(1000).ContinueWith(_ => Invoke(() => 
+                    Task.Delay(1000).ContinueWith(_ => Invoke(() =>
                     {
                         Hide();
-                        notifyIcon.ShowBalloonTip(2000, "IVF Fingerprint Client", 
+                        notifyIcon.ShowBalloonTip(2000, "IVF Fingerprint Client",
                             "Định danh thành công. Ứng dụng đã ẩn xuống khay hệ thống.", ToolTipIcon.Info);
                     }));
                 });
@@ -130,7 +131,7 @@ public partial class MainForm : Form
         _identificationForm.Show();
         _identificationForm.BringToFront();
     }
-// ...
+    // ...
 
     private async void MainForm_FormClosing(object sender, FormClosingEventArgs e)
     {
@@ -138,7 +139,7 @@ public partial class MainForm : Form
         {
             e.Cancel = true;
             Hide();
-            notifyIcon.ShowBalloonTip(2000, "IVF Fingerprint Client", 
+            notifyIcon.ShowBalloonTip(2000, "IVF Fingerprint Client",
                 "Ứng dụng đang chạy trong khay hệ thống", ToolTipIcon.Info);
             return;
         }
@@ -213,7 +214,7 @@ public partial class MainForm : Form
 
         _isCapturing = true;
         lblPatientInfo.Text = $"Đang chụp vân tay cho: {request.PatientId}";
-        
+
         // DEBUG: Show patient ID in title
         Text = $"IVF Fingerprint Client - Patient: {request.PatientId}";
 
@@ -224,9 +225,9 @@ public partial class MainForm : Form
             {
                 _isCapturing = false;
                 _currentRequest = null;
-                
+
                 System.Diagnostics.Debug.WriteLine($"CaptureCompleted event received: Success={args.Success}");
-                
+
                 if (args.Success)
                 {
                     lblPatientInfo.Text = $"✅ Đã hoàn thành cho: {request.PatientId}";
@@ -235,10 +236,10 @@ public partial class MainForm : Form
                     // Minimize to tray if configured
                     if (_settings.MinimizeToTray)
                     {
-                        Task.Delay(1000).ContinueWith(_ => Invoke(() => 
+                        Task.Delay(1000).ContinueWith(_ => Invoke(() =>
                         {
                             Hide();
-                            notifyIcon.ShowBalloonTip(2000, "IVF Fingerprint Client", 
+                            notifyIcon.ShowBalloonTip(2000, "IVF Fingerprint Client",
                                 "Đã ẩn xuống khay hệ thống", ToolTipIcon.Info);
                         }));
                     }
@@ -319,7 +320,7 @@ public partial class MainForm : Form
         {
             _isCapturing = false;
             _currentRequest = null;
-            
+
             if (_captureForm != null && !_captureForm.IsDisposed)
             {
                 _captureForm.Close();
@@ -373,10 +374,10 @@ public partial class MainForm : Form
                     // Minimize to tray if configured
                     if (_settings.MinimizeToTray)
                     {
-                        Task.Delay(1500).ContinueWith(_ => Invoke(() => 
+                        Task.Delay(1500).ContinueWith(_ => Invoke(() =>
                         {
                             Hide();
-                            notifyIcon.ShowBalloonTip(2000, "IVF Fingerprint Client", 
+                            notifyIcon.ShowBalloonTip(2000, "IVF Fingerprint Client",
                                 "Đã ẩn xuống khay hệ thống", ToolTipIcon.Info);
                         }));
                     }
@@ -435,7 +436,7 @@ public partial class MainForm : Form
     {
         var originalColor = BackColor;
         BackColor = Color.FromArgb(255, 235, 200);
-        Task.Delay(200).ContinueWith(_ => 
+        Task.Delay(200).ContinueWith(_ =>
         {
             if (!IsDisposed)
             {

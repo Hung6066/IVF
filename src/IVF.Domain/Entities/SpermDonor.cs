@@ -11,7 +11,7 @@ public class SpermDonor : BaseEntity
     public string DonorCode { get; private set; } = string.Empty;
     public Guid PatientId { get; private set; } // Link to Patient for medical records
     public DonorStatus Status { get; private set; }
-    
+
     // Physical characteristics
     public string? BloodType { get; private set; }
     public decimal? Height { get; private set; } // cm
@@ -21,16 +21,16 @@ public class SpermDonor : BaseEntity
     public string? Ethnicity { get; private set; }
     public string? Education { get; private set; }
     public string? Occupation { get; private set; }
-    
+
     // Screening
     public DateTime? ScreeningDate { get; private set; }
     public DateTime? LastDonationDate { get; private set; }
     public int TotalDonations { get; private set; }
     public int SuccessfulPregnancies { get; private set; }
-    
+
     public string? MedicalHistory { get; private set; }
     public string? Notes { get; private set; }
-    
+
     // Navigation
     public Patient Patient { get; private set; } = null!;
     public ICollection<SpermSample> SpermSamples { get; private set; } = new List<SpermSample>();
@@ -115,19 +115,19 @@ public class SpermSample : BaseEntity
     public string SampleCode { get; private set; } = string.Empty;
     public DateTime CollectionDate { get; private set; }
     public SpecimenType SpecimenType { get; private set; }
-    
+
     // Quality
     public decimal? Volume { get; private set; }
     public decimal? Concentration { get; private set; }
     public decimal? Motility { get; private set; }
     public int? VialCount { get; private set; }
-    
+
     // Storage
     public Guid? CryoLocationId { get; private set; }
     public DateTime? FreezeDate { get; private set; }
     public DateTime? ThawDate { get; private set; }
     public bool IsAvailable { get; private set; }
-    
+
     // Navigation
     public SpermDonor Donor { get; private set; } = null!;
     public CryoLocation? CryoLocation { get; private set; }

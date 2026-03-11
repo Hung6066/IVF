@@ -95,16 +95,16 @@ public class CryoLocationRepository : ICryoLocationRepository
             // we might need to use Entry(loc).CurrentValues or similar, OR add a method to Domain.
             // Let's check if we can hack it via EF Entry for now to avoid Domain change if possible,
             // OR better, add a method to Domain `UpdateSpecimenType`.
-            
+
             // Checking: loc.SpecimenType is likely private set.
             // I'll try to set it via Entry if needed, but let's assume I can't.
             // Actually, I should check CryoLocation.cs.
-            
+
             // For now, I'll just handle occupancy. 
             // If I need to update type, I'll need to update Domain.
             // Let's assume for this task, the user wants to FIX the type too.
             // So `_context.Entry(loc).Property(x => x.SpecimenType).CurrentValue = type;`
-            
+
             _context.Entry(loc).Property(x => x.SpecimenType).CurrentValue = type;
 
             bool shouldBeOccupied = count < occupiedCount;

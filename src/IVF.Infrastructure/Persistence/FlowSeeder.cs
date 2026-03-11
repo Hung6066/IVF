@@ -18,7 +18,7 @@ public class FlowSeeder : IFlowSeeder
     {
         // Seed services first
         await SeedServicesAsync();
-        
+
         // 1. Patient ready for Consultation (New)
         var p1 = await CreatePatientAsync("BN-TEST-001", "Nguyễn Thị Tư Vấn", 1995, Gender.Female);
         var p1h = await CreatePatientAsync("BN-TEST-002", "Trần Văn Chồng Tư Vấn", 1990, Gender.Male);
@@ -30,14 +30,14 @@ public class FlowSeeder : IFlowSeeder
         var p2h = await CreatePatientAsync("BN-TEST-004", "Lê Văn Chồng KT", 1988, Gender.Male);
         var c2 = await CreateCoupleAsync(p2, p2h);
         var cy2 = await CreateCycleAsync(c2, "CK-TEST-02", TreatmentMethod.ICSI, CyclePhase.OvarianStimulation);
-        
+
         // Add minimal Indication
         if (!await _context.TreatmentIndications.AnyAsync(x => x.CycleId == cy2.Id))
         {
             var ind2 = TreatmentIndication.Create(cy2.Id);
             _context.TreatmentIndications.Add(ind2);
         }
-        
+
         // Add Stimulation Data
         if (!await _context.StimulationData.AnyAsync(x => x.CycleId == cy2.Id))
         {
@@ -49,13 +49,13 @@ public class FlowSeeder : IFlowSeeder
             stim2.SetDrugs(new[] { StimulationDrug.Create(stim2.Id, 0, "Gonal F", 5, "150IU") });
             _context.StimulationData.Add(stim2);
         }
-        
+
         // 3. Patient ready for Trigger (Follicles ready)
         var p3 = await CreatePatientAsync("BN-TEST-005", "Hoàng Thị Trigger", 1993, Gender.Female);
         var p3h = await CreatePatientAsync("BN-TEST-006", "Ngô Văn Chồng Trigger", 1985, Gender.Male);
         var c3 = await CreateCoupleAsync(p3, p3h);
         var cy3 = await CreateCycleAsync(c3, "CK-TEST-03", TreatmentMethod.ICSI, CyclePhase.TriggerShot);
-        
+
         if (!await _context.StimulationData.AnyAsync(x => x.CycleId == cy3.Id))
         {
             var stim3 = StimulationData.Create(cy3.Id);
@@ -70,7 +70,7 @@ public class FlowSeeder : IFlowSeeder
             });
             _context.StimulationData.Add(stim3);
         }
-        
+
         // 4. Patient ready for Egg Retrieval (Trigger done)
         var p4 = await CreatePatientAsync("BN-TEST-007", "Lê Thị Chọc Hút", 1991, Gender.Female);
         var p4h = await CreatePatientAsync("BN-TEST-008", "Trần Văn Chồng CH", 1986, Gender.Male);
@@ -117,8 +117,8 @@ public class FlowSeeder : IFlowSeeder
         var p6 = await CreatePatientAsync("BN-TEST-011", "Vũ Thị Chuyển Phôi", 1990, Gender.Female);
         var p6h = await CreatePatientAsync("BN-TEST-012", "Đặng Văn Chồng CP", 1987, Gender.Male);
         var c6 = await CreateCoupleAsync(p6, p6h);
-        var cy6 = await CreateCycleAsync(c6, "CK-TEST-06", TreatmentMethod.ICSI, CyclePhase.EmbryoTransfer); 
-        
+        var cy6 = await CreateCycleAsync(c6, "CK-TEST-06", TreatmentMethod.ICSI, CyclePhase.EmbryoTransfer);
+
         // Add fake embryos for transfer
         if (!await _context.Embryos.AnyAsync(x => x.CycleId == cy6.Id))
         {
@@ -128,7 +128,7 @@ public class FlowSeeder : IFlowSeeder
             e6_2.UpdateGrade("AB", EmbryoDay.D5);
             _context.Embryos.AddRange(e6_1, e6_2);
         }
-        
+
         // Add Transfer Data
         if (!await _context.TransferData.AnyAsync(x => x.CycleId == cy6.Id))
         {
@@ -175,7 +175,7 @@ public class FlowSeeder : IFlowSeeder
 
         var p = Patient.Create(code, name, DateTime.UtcNow.AddYears(-(DateTime.Now.Year - yob)), gender, PatientType.Infertility, "0123456789", "0909000000", "Test Address");
         _context.Patients.Add(p);
-        
+
         try
         {
             await _context.SaveChangesAsync();
@@ -227,8 +227,8 @@ public class FlowSeeder : IFlowSeeder
             // Ensure phase is correct even if existing
             if (existing.CurrentPhase != phase)
             {
-               // Optional: Updating phase if we want to RESET the test data to the requested state
-               // existing.AdvancePhase(phase);
+                // Optional: Updating phase if we want to RESET the test data to the requested state
+                // existing.AdvancePhase(phase);
             }
             return existing;
         }

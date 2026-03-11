@@ -8,8 +8,8 @@ public class UtcDateTimeConverter : JsonConverter<DateTime>
     public override DateTime Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
         var date = reader.GetDateTime();
-        return date.Kind == DateTimeKind.Local 
-            ? date.ToUniversalTime() 
+        return date.Kind == DateTimeKind.Local
+            ? date.ToUniversalTime()
             : DateTime.SpecifyKind(date, DateTimeKind.Utc);
     }
 

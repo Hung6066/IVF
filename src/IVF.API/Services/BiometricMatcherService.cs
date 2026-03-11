@@ -17,19 +17,19 @@ public class BiometricMatcherService : BackgroundService, IBiometricMatcher
     private readonly IServiceProvider _serviceProvider;
     private readonly ConcurrentDictionary<Guid, byte[]> _templateCache = new();
     private readonly ConcurrentDictionary<Guid, string> _fingerTypeCache = new();
-    
+
     // DPFP Verification Control
     private readonly DPFP.Verification.Verification _verificator = new();
 
     private readonly StackExchange.Redis.IConnectionMultiplexer? _redis;
     private readonly IConfiguration _configuration;
-    
+
     // Sharding Config
     private int _shardId = 0;
     private int _totalShards = 1;
 
     public BiometricMatcherService(
-        ILogger<BiometricMatcherService> logger, 
+        ILogger<BiometricMatcherService> logger,
         IServiceProvider serviceProvider,
         IConfiguration configuration,
         StackExchange.Redis.IConnectionMultiplexer? redis = null)
@@ -38,7 +38,7 @@ public class BiometricMatcherService : BackgroundService, IBiometricMatcher
         _serviceProvider = serviceProvider;
         _configuration = configuration;
         _redis = redis;
-        
+
         _shardId = configuration.GetValue<int>("Matcher:ShardId", 0);
         _totalShards = configuration.GetValue<int>("Matcher:TotalShards", 1);
     }
@@ -57,7 +57,7 @@ public class BiometricMatcherService : BackgroundService, IBiometricMatcher
         // 1. Try Load from Redis
         if (_redis != null && _redis.IsConnected)
         {
-            try 
+            try
             {
                 var db = _redis.GetDatabase();
                 var hashEntries = await db.HashGetAllAsync("fingerprints:all");
@@ -65,7 +65,7 @@ public class BiometricMatcherService : BackgroundService, IBiometricMatcher
                 if (hashEntries.Length > 0)
                 {
                     _logger.LogInformation("Found {Count} templates in Redis. Loading...", hashEntries.Length);
-                    
+
                     int loadedCount = 0;
                     foreach (var entry in hashEntries)
                     {
@@ -75,7 +75,7 @@ public class BiometricMatcherService : BackgroundService, IBiometricMatcher
                             // Sharding Filter
                             if (Math.Abs(patientId.GetHashCode()) % _totalShards != _shardId) continue;
 
-                            try 
+                            try
                             {
                                 // Format: "FingerType|Base64Data"
                                 var parts = entry.Value.ToString().Split('|', 2);
@@ -92,10 +92,10 @@ public class BiometricMatcherService : BackgroundService, IBiometricMatcher
                             catch { /* invalid data */ }
                         }
                     }
-                    
+
                     IsLoaded = true;
                     _logger.LogInformation("Loaded {Count} templates from Redis (Shard {ShardId}/{Total}).", loadedCount, _shardId, _totalShards);
-                    return; 
+                    return;
                 }
             }
             catch (Exception ex)
@@ -109,7 +109,7 @@ public class BiometricMatcherService : BackgroundService, IBiometricMatcher
         {
             using var scope = _serviceProvider.CreateScope();
             var repo = scope.ServiceProvider.GetRequiredService<IPatientBiometricsRepository>();
-            
+
             _logger.LogInformation("Loading fingerprint templates from database...");
             var templates = await repo.GetAllFingerprintsAsync(stoppingToken);
 
@@ -135,13 +135,16 @@ public class BiometricMatcherService : BackgroundService, IBiometricMatcher
             // Populate Redis Async
             if (_redis != null && _redis.IsConnected && batchForRedis.Any())
             {
-                _ = Task.Run(async () => 
+                _ = Task.Run(async () =>
                 {
-                    try {
+                    try
+                    {
                         var db = _redis.GetDatabase();
                         await db.HashSetAsync("fingerprints:all", batchForRedis.ToArray());
                         _logger.LogInformation("Populated Redis with {Count} templates.", batchForRedis.Count);
-                    } catch (Exception ex) {
+                    }
+                    catch (Exception ex)
+                    {
                         _logger.LogError(ex, "Failed to populate Redis.");
                     }
                 }, stoppingToken);
@@ -165,7 +168,7 @@ public class BiometricMatcherService : BackgroundService, IBiometricMatcher
             var db = _redis.GetDatabase();
             var redisValue = $"{fingerType}|{Convert.ToBase64String(fingerprintData)}";
             await db.HashSetAsync("fingerprints:all", patientId.ToString(), redisValue);
-            
+
             // Also update local cache if it belongs to this shard
             if (Math.Abs(patientId.GetHashCode()) % _totalShards == _shardId)
             {
@@ -199,8 +202,8 @@ public class BiometricMatcherService : BackgroundService, IBiometricMatcher
         }
         catch (Exception ex)
         {
-             _logger.LogError("Invalid feature set data: {Message}", ex.Message);
-             return (false, null, 0);
+            _logger.LogError("Invalid feature set data: {Message}", ex.Message);
+            return (false, null, 0);
         }
 
         var matchResult = new DPFP.Verification.Verification.Result();
@@ -218,7 +221,7 @@ public class BiometricMatcherService : BackgroundService, IBiometricMatcher
             try
             {
                 template.DeSerialize(item.Value);
-                
+
                 // Thread-local verification result
                 var localResult = new DPFP.Verification.Verification.Result();
                 _verificator.Verify(features, template, ref localResult);
@@ -231,9 +234,9 @@ public class BiometricMatcherService : BackgroundService, IBiometricMatcher
                         if (localResult.FARAchieved < bestScore || matchedPatient == null)
                         {
                             bestScore = localResult.FARAchieved; // Lower FAR is better? Wait, usually Score probability
-                            // DPFP FARAchieved: Represents the probability that the two fingerprints are NOT the same. 
-                            // So LOWER is BETTER match.
-                            
+                                                                 // DPFP FARAchieved: Represents the probability that the two fingerprints are NOT the same. 
+                                                                 // So LOWER is BETTER match.
+
                             matchedPatient = item.Key;
                             state.Stop(); // Stop other threads
                         }

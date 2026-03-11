@@ -1,5 +1,5 @@
 using IVF.Application.Common.Interfaces;
-using IVF.Application.Features.Users.Queries; 
+using IVF.Application.Features.Users.Queries;
 using MediatR;
 
 namespace IVF.Application.Features.Users.Queries;

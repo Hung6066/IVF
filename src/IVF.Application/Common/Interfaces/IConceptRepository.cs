@@ -17,10 +17,10 @@ public interface IConceptRepository
     Task<Concept> AddAsync(Concept concept, CancellationToken ct = default);
     Task UpdateAsync(Concept concept, CancellationToken ct = default);
     Task<bool> ExistsAsync(Guid id, CancellationToken ct = default);
-    
+
     // Concept Mappings
     Task<ConceptMapping> AddMappingAsync(ConceptMapping mapping, CancellationToken ct = default);
-    
+
     // Field/Option linking
     Task<FormField?> GetFieldByIdAsync(Guid fieldId, CancellationToken ct = default);
     Task UpdateFieldAsync(FormField field, CancellationToken ct = default);

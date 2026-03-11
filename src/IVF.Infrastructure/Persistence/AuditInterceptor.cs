@@ -13,7 +13,7 @@ namespace IVF.Infrastructure.Persistence;
 public class AuditInterceptor : SaveChangesInterceptor
 {
     private readonly IHttpContextAccessor? _httpContextAccessor;
-    
+
     public AuditInterceptor(IHttpContextAccessor? httpContextAccessor = null)
     {
         _httpContextAccessor = httpContextAccessor;
@@ -28,7 +28,7 @@ public class AuditInterceptor : SaveChangesInterceptor
             return await base.SavingChangesAsync(eventData, result, cancellationToken);
 
         var auditLogs = CreateAuditLogs(eventData.Context);
-        
+
         if (auditLogs.Any())
         {
             await eventData.Context.Set<AuditLog>().AddRangeAsync(auditLogs, cancellationToken);
@@ -84,7 +84,7 @@ public class AuditInterceptor : SaveChangesInterceptor
                 {
                     var propName = prop.Metadata.Name;
                     if (propName is "UpdatedAt" or "CreatedAt") continue;
-                    
+
                     columns.Add(propName);
                     originals[propName] = prop.OriginalValue;
                     changes[propName] = prop.CurrentValue;

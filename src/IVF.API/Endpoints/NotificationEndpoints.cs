@@ -39,11 +39,11 @@ public static class NotificationEndpoints
         {
             var userId = GetUserId(principal);
             if (userId == null) return Results.Unauthorized();
-            
+
             var notification = await repo.GetByIdAsync(id);
             if (notification is null) return Results.NotFound();
             if (notification.UserId != userId) return Results.Forbid();
-            
+
             notification.MarkAsRead();
             await uow.SaveChangesAsync();
             return Results.Ok(notification);
@@ -54,7 +54,7 @@ public static class NotificationEndpoints
         {
             var userId = GetUserId(principal);
             if (userId == null) return Results.Unauthorized();
-            
+
             await repo.MarkAsReadAsync(userId.Value);
             await uow.SaveChangesAsync();
             return Results.NoContent();
@@ -70,7 +70,7 @@ public static class NotificationEndpoints
                 req.Type,
                 req.EntityType,
                 req.EntityId);
-            
+
             await repo.AddAsync(notification);
             await uow.SaveChangesAsync();
             return Results.Created($"/api/notifications/{notification.Id}", notification);
@@ -84,7 +84,7 @@ public static class NotificationEndpoints
                 req.Title,
                 req.Message,
                 req.Type));
-            
+
             await repo.AddManyAsync(notifications);
             await uow.SaveChangesAsync();
             return Results.Ok(new { sent = req.UserIds.Count });

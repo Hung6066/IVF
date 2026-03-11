@@ -13,7 +13,7 @@ public partial class IdentificationForm : Form, DPFP.Capture.EventHandler
     private readonly FingerprintHubService _hubService;
     private readonly TemplateCacheService _cacheService;
     private readonly IdentificationRequestDto _request;
-    
+
     public event EventHandler<bool>? IdentificationCompleted;
 
     // UI Controls
@@ -30,7 +30,7 @@ public partial class IdentificationForm : Form, DPFP.Capture.EventHandler
         _request = request;
 
         InitializeComponent();
-        
+
         Text = "Định danh bệnh nhân (Identifcation)";
         AddLog($"Đang tìm kiếm trong {_cacheService.TemplateCount} mẫu vân tay...");
     }
@@ -46,9 +46,9 @@ public partial class IdentificationForm : Form, DPFP.Capture.EventHandler
 
         lblPrompt = new Label { Text = "Đặt ngón tay để định danh", Location = new Point(20, 20), AutoSize = true, Font = new Font("Segoe UI", 12, FontStyle.Bold) };
         lblStatus = new Label { Text = "Sẵn sàng", Location = new Point(20, 50), AutoSize = true, ForeColor = Color.DimGray };
-        
+
         pictureBoxFingerprint = new PictureBox { Location = new Point(20, 80), Size = new Size(150, 200), BorderStyle = BorderStyle.FixedSingle, SizeMode = PictureBoxSizeMode.Zoom };
-        
+
         btnCancel = new Button { Text = "Hủy bỏ", Location = new Point(350, 320), Size = new Size(100, 30) };
         btnCancel.Click += (s, e) => { StopCapture(); Close(); };
 
@@ -129,24 +129,24 @@ public partial class IdentificationForm : Form, DPFP.Capture.EventHandler
     {
         AddLog("Đã nhận mẫu vân tay");
         DrawFingerprint(Sample);
-        
+
         // Server-Side Matching Logic
         Invoke(() =>
         {
             UpdateStatus("Đang nhận diện trên server...");
-            
+
             var features = ExtractFeatures(Sample, DPFP.Processing.DataPurpose.Verification);
 
             if (features != null)
             {
-                try 
+                try
                 {
                     using var ms = new MemoryStream();
                     features.Serialize(ms);
                     var featuresBase64 = Convert.ToBase64String(ms.ToArray());
-                    
+
                     var requesterId = _request?.RequestedBy;
-                    
+
                     // Send to Server
                     _ = _hubService.IdentifyFingerprintAsync(featuresBase64, requesterId);
                 }
@@ -172,7 +172,7 @@ public partial class IdentificationForm : Form, DPFP.Capture.EventHandler
         if (features != null && _verificator != null)
         {
             AddLog("Đang tìm kiếm trong CSDL...");
-            
+
             // USE CACHE SERVICE TO FIND MATCH
             var result = _cacheService.FindBestMatch(features, _verificator);
 
@@ -183,9 +183,10 @@ public partial class IdentificationForm : Form, DPFP.Capture.EventHandler
                 UpdateStatus("Đã định danh thành công!");
 
                 await SendResultAsync(true, patientId);
-                
+
                 // Auto-close on success
-                Invoke(() => {
+                Invoke(() =>
+                {
                     Task.Delay(1000).ContinueWith(_ => Invoke(() => Close()));
                 });
             }
@@ -201,32 +202,32 @@ public partial class IdentificationForm : Form, DPFP.Capture.EventHandler
         var extractor = new DPFP.Processing.FeatureExtraction();
         var feedback = DPFP.Capture.CaptureFeedback.None;
         var features = new DPFP.FeatureSet();
-        
+
         extractor.CreateFeatureSet(Sample, Purpose, ref feedback, ref features);
-        
+
         if (feedback == DPFP.Capture.CaptureFeedback.Good)
             return features;
-            
+
         return null;
     }
-    
+
     // Listen for results from server
     private void OnIdentificationResult(object? sender, IdentificationResultDto result)
     {
-        Invoke(() => 
+        Invoke(() =>
         {
             if (result.Success)
             {
                 UpdateStatus($"✅ TÌM THẤY! PatientID: {result.PatientId}");
                 // Assuming lblMessage is lblStatus based on context
                 lblStatus.ForeColor = Color.Green;
-                
+
                 // Minimize to allow user to see the Web App result immediately
                 this.WindowState = FormWindowState.Minimized;
 
                 // Close form after delay
                 Task.Delay(2000).ContinueWith(_ => Invoke(Close));
-                
+
                 IdentificationCompleted?.Invoke(this, true);
             }
             else
@@ -234,7 +235,7 @@ public partial class IdentificationForm : Form, DPFP.Capture.EventHandler
                 UpdateStatus($"❌ {result.ErrorMessage ?? "Không tìm thấy kết quả"}");
                 // Assuming lblMessage is lblStatus based on context
                 lblStatus.ForeColor = Color.Red;
-                
+
                 IdentificationCompleted?.Invoke(this, false);
             }
         });

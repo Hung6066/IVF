@@ -35,7 +35,7 @@ public class PatientTests
     public void Update_ShouldModifyPatientProperties()
     {
         // Arrange
-        var patient = Patient.Create("BN-2026-000001", "Nguyen Van A", DateTime.Now.AddYears(-30), 
+        var patient = Patient.Create("BN-2026-000001", "Nguyen Van A", DateTime.Now.AddYears(-30),
             Gender.Female, PatientType.Infertility);
         var newName = "Nguyen Thi B";
         var newPhone = "0987654321";
@@ -55,7 +55,7 @@ public class PatientTests
     public void MarkAsDeleted_ShouldSetIsDeletedToTrue()
     {
         // Arrange
-        var patient = Patient.Create("BN-2026-000001", "Nguyen Van A", DateTime.Now.AddYears(-30), 
+        var patient = Patient.Create("BN-2026-000001", "Nguyen Van A", DateTime.Now.AddYears(-30),
             Gender.Female, PatientType.Infertility);
 
         // Act

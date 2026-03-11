@@ -42,7 +42,7 @@ public class AuditLogConfiguration : IEntityTypeConfiguration<AuditLog>
         builder.HasIndex(a => a.UserId);
         builder.HasIndex(a => a.CreatedAt);
         builder.HasIndex(a => new { a.EntityType, a.EntityId });
-        
+
         // No query filter - audit logs should not be soft deleted
     }
 }

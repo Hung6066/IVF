@@ -140,14 +140,14 @@ public partial class VerificationForm : Form, DPFP.Capture.EventHandler
 
             foreach (var t in _templates)
             {
-                try 
+                try
                 {
                     AddLog($"So khớp mẫu type: {t.FingerType}...");
                     var bytes = Convert.FromBase64String(t.TemplateData);
                     var template = new DPFP.Template();
                     var templateCreated = false;
-                    
-                    try 
+
+                    try
                     {
                         template.DeSerialize(bytes);
                         templateCreated = true;
@@ -159,14 +159,14 @@ public partial class VerificationForm : Form, DPFP.Capture.EventHandler
 
                     if (template == null)
                     {
-                        try 
+                        try
                         {
                             var fs = new DPFP.FeatureSet();
                             fs.DeSerialize(bytes);
-                            
+
                             var enroller = new DPFP.Processing.Enrollment();
                             for (int i = 0; i < 4; i++) enroller.AddFeatures(fs);
-                            
+
                             if (enroller.TemplateStatus == DPFP.Processing.Enrollment.Status.Ready)
                             {
                                 template = enroller.Template;
@@ -179,7 +179,7 @@ public partial class VerificationForm : Form, DPFP.Capture.EventHandler
                     if (templateCreated && template != null)
                     {
                         _verificator.Verify(features, template, ref result);
-                        
+
                         if (result.Verified)
                         {
                             AddLog($"-> MATCH CANDIDATE: {t.FingerType} (Score: {result.FARAchieved})");
@@ -277,7 +277,7 @@ public partial class VerificationForm : Form, DPFP.Capture.EventHandler
     {
         if (InvokeRequired) { Invoke(() => UpdateStatus(text)); return; }
         lblStatus.Text = text;
-        
+
         // Color feedback
         if (text.Contains("thành công") || text.Contains("KHỚP"))
             lblStatus.ForeColor = Color.Green;

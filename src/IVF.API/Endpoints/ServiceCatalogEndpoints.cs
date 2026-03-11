@@ -26,7 +26,7 @@ public static class ServiceCatalogEndpoints
 
             var items = await repo.SearchAsync(q, cat, page, pageSize);
             var total = await repo.CountAsync(q, cat);
-            
+
             return Results.Ok(new
             {
                 items = items.Select(s => new
