@@ -220,12 +220,15 @@ public static class InfrastructureEndpoints
         {
             var checks = new List<MonitoringServiceStatus>();
 
-            async Task CheckService(string name, string url)
+            async Task CheckService(string name, string url, string? basicAuth = null)
             {
                 try
                 {
                     using var client = httpFactory.CreateClient();
                     client.Timeout = TimeSpan.FromSeconds(3);
+                    if (basicAuth is not null)
+                        client.DefaultRequestHeaders.Authorization =
+                            new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", basicAuth);
                     var response = await client.GetAsync(url, ct);
                     checks.Add(new MonitoringServiceStatus(name, response.IsSuccessStatusCode, (int)response.StatusCode));
                 }
@@ -235,8 +238,11 @@ public static class InfrastructureEndpoints
                 }
             }
 
+            // Prometheus basic auth: monitor:<password> base64-encoded
+            const string prometheusAuth = "bW9uaXRvcjp3RERhSTh6elNUQlB5emZHcDN3UmM2SmtER2dJdjZaRg==";
+
             await Task.WhenAll(
-                CheckService("Prometheus", "http://prometheus:9090/-/healthy"),
+                CheckService("Prometheus", "http://prometheus:9090/-/healthy", prometheusAuth),
                 CheckService("Grafana", "http://grafana:3000/api/health"),
                 CheckService("Loki", "http://loki:3100/ready")
             );
