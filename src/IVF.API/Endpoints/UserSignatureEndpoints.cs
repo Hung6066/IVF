@@ -161,7 +161,8 @@ public static class UserSignatureEndpoints
             Guid userId,
             IvfDbContext db,
             IOptions<DigitalSigningOptions> options,
-            ILogger<Program> logger) =>
+            ILogger<Program> logger,
+            IVF.API.Services.TenantCertificateService? tenantCaService) =>
         {
             var opts = options.Value;
             if (!opts.Enabled)
@@ -183,7 +184,37 @@ public static class UserSignatureEndpoints
                 sig.SetCertificateStatus(CertificateStatus.Pending);
                 await db.SaveChangesAsync();
 
-                // Generate per-user keystore and SignServer worker
+                // Try Sub-CA path first if tenant has a provisioned Sub-CA
+                if (tenantCaService is not null && user.TenantId != Guid.Empty)
+                {
+                    var tenantCaStatus = await tenantCaService.GetTenantCaStatusAsync(user.TenantId, CancellationToken.None);
+                    if (tenantCaStatus is not null && tenantCaStatus.SubCaStatus == TenantSubCaStatus.Active)
+                    {
+                        var subCaResult = await tenantCaService.ProvisionUserCertAsync(
+                            user, user.TenantId, opts, CancellationToken.None);
+
+                        sig.SetCertificateInfo(
+                            subject: subCaResult.CertSubject,
+                            serialNumber: subCaResult.SerialNumber,
+                            expiry: subCaResult.Expiry,
+                            workerName: subCaResult.WorkerName,
+                            keystorePath: null);
+                        await db.SaveChangesAsync();
+
+                        return Results.Ok(new
+                        {
+                            success = true,
+                            certificateSubject = subCaResult.CertSubject,
+                            workerName = subCaResult.WorkerName,
+                            serialNumber = subCaResult.SerialNumber,
+                            expiry = subCaResult.Expiry,
+                            issuedBy = "Sub-CA",
+                            message = $"Đã cấp chứng thư Sub-CA cho {user.FullName}"
+                        });
+                    }
+                }
+
+                // Fallback: self-signed via keytool (legacy)
                 var result = await ProvisionUserCertificateAsync(user, opts, logger);
 
                 sig.SetCertificateInfo(
@@ -227,7 +258,8 @@ public static class UserSignatureEndpoints
             Guid userId,
             IvfDbContext db,
             IOptions<DigitalSigningOptions> options,
-            ILogger<Program> logger) =>
+            ILogger<Program> logger,
+            IVF.API.Services.TenantCertificateService? tenantCaService) =>
         {
             var opts = options.Value;
             if (!opts.Enabled)
@@ -252,7 +284,36 @@ public static class UserSignatureEndpoints
                 sig.SetCertificateStatus(CertificateStatus.Pending);
                 await db.SaveChangesAsync();
 
-                // Re-provision: generates a new key pair, replacing the existing worker
+                // Try Sub-CA renewal path first
+                if (tenantCaService is not null && user.TenantId != Guid.Empty)
+                {
+                    var tenantCaStatus = await tenantCaService.GetTenantCaStatusAsync(user.TenantId, CancellationToken.None);
+                    if (tenantCaStatus is not null && tenantCaStatus.SubCaStatus == TenantSubCaStatus.Active)
+                    {
+                        var subCaResult = await tenantCaService.ProvisionUserCertAsync(
+                            user, user.TenantId, opts, CancellationToken.None);
+
+                        sig.SetCertificateInfo(
+                            subject: subCaResult.CertSubject,
+                            serialNumber: subCaResult.SerialNumber,
+                            expiry: subCaResult.Expiry,
+                            workerName: subCaResult.WorkerName,
+                            keystorePath: null);
+                        await db.SaveChangesAsync();
+
+                        return Results.Ok(new
+                        {
+                            success = true,
+                            certificateSubject = subCaResult.CertSubject,
+                            workerName = subCaResult.WorkerName,
+                            expiry = subCaResult.Expiry,
+                            issuedBy = "Sub-CA",
+                            message = $"Đã gia hạn chứng thư Sub-CA cho {user.FullName}"
+                        });
+                    }
+                }
+
+                // Fallback: self-signed via keytool (legacy)
                 var result = await ProvisionUserCertificateAsync(user, opts, logger);
 
                 sig.SetCertificateInfo(
@@ -680,17 +741,17 @@ public static class UserSignatureEndpoints
 
     // ─── Process Helpers ────────────────────────────────────────
 
-    private static async Task RunDockerExecAsync(string container, string command, ILogger logger)
+    internal static async Task RunDockerExecAsync(string container, string command, ILogger logger)
     {
         await RunProcessAsync("docker", $"exec {container} {command}", logger);
     }
 
-    private static async Task RunDockerExecAsRootAsync(string container, string command, ILogger logger)
+    internal static async Task RunDockerExecAsRootAsync(string container, string command, ILogger logger)
     {
         await RunProcessAsync("docker", $"exec -u root {container} bash -c \"{command}\"", logger);
     }
 
-    private static async Task<string> RunProcessAsync(string fileName, string arguments, ILogger logger)
+    internal static async Task<string> RunProcessAsync(string fileName, string arguments, ILogger logger)
     {
         logger.LogDebug("Running: {FileName} {Arguments}", fileName, arguments);
 
@@ -717,7 +778,7 @@ public static class UserSignatureEndpoints
         return output + error;
     }
 
-    private static string SanitizeForDN(string name)
+    internal static string SanitizeForDN(string name)
     {
         // Remove characters invalid in X.500 DNs
         return name.Replace("\"", "").Replace(",", " ").Replace("+", " ")
@@ -725,7 +786,7 @@ public static class UserSignatureEndpoints
                     .Replace("#", "").Replace(";", "").Trim();
     }
 
-    private static string SanitizeWorkerId(string username)
+    internal static string SanitizeWorkerId(string username)
     {
         return new string(username.Where(c => char.IsLetterOrDigit(c) || c == '_').ToArray());
     }

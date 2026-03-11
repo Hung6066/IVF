@@ -613,6 +613,73 @@ public sealed class CertificateAuthorityService(
     }
 
     // ═══════════════════════════════════════════════════════
+    // Key Access & CA Revocation
+    // ═══════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Get the decrypted private key PEM for a managed certificate.
+    /// Used by TenantCertificateService to export PKCS#12 for SignServer deployment.
+    /// </summary>
+    public async Task<string> GetDecryptedPrivateKeyAsync(Guid certId, CancellationToken ct)
+    {
+        using var scope = scopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<IvfDbContext>();
+
+        var cert = await db.ManagedCertificates.FirstOrDefaultAsync(c => c.Id == certId, ct)
+            ?? throw new InvalidOperationException("Certificate not found");
+
+        return await UnprotectKeyAsync(cert.PrivateKeyPem);
+    }
+
+    /// <summary>
+    /// Revoke an entire Certificate Authority (Intermediate CA).
+    /// Used for tenant offboarding — revokes the CA itself, invalidating all certs it issued.
+    /// </summary>
+    public async Task RevokeCertificateAuthorityAsync(Guid caId, CancellationToken ct)
+    {
+        using var scope = scopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<IvfDbContext>();
+
+        var ca = await db.CertificateAuthorities.FirstOrDefaultAsync(c => c.Id == caId, ct)
+            ?? throw new InvalidOperationException("CA not found");
+
+        if (ca.Status == CaStatus.Revoked)
+            return; // Already revoked
+
+        ca.Revoke();
+
+        // Revoke all active certs issued by this CA
+        var activeCerts = await db.ManagedCertificates
+            .Where(c => c.IssuingCaId == caId && c.Status == ManagedCertStatus.Active)
+            .ToListAsync(ct);
+
+        foreach (var cert in activeCerts)
+            cert.Revoke(RevocationReason.CaCompromise);
+
+        await AuditAsync(db, CertAuditEventType.CaRevoked,
+            $"Revoked CA '{ca.Name}' and {activeCerts.Count} issued certificates",
+            caId: caId,
+            metadata: JsonSerializer.Serialize(new { RevokedCertCount = activeCerts.Count }));
+        await db.SaveChangesAsync(ct);
+
+        logger.LogWarning("Revoked CA {CaId} ({CaName}) and {CertCount} issued certificates",
+            caId, ca.Name, activeCerts.Count);
+
+        // Generate CRL if the CA has a parent (for cross-reference)
+        if (ca.ParentCaId.HasValue)
+        {
+            try
+            {
+                await GenerateCrlAsync(ca.ParentCaId.Value, ct);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Failed to generate parent CRL after revoking CA {CaId}", caId);
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════
     // Certificate Revocation (with CRL generation + audit)
     // ═══════════════════════════════════════════════════════
 

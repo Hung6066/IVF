@@ -81,6 +81,33 @@ public class DigitalSigningOptions
     public string EjbcaUrl { get; set; } = "https://localhost:8443/ejbca";
 
     /// <summary>
+    /// Docker container name for EJBCA CLI access.
+    /// Used for certificate enrollment via docker exec.
+    /// </summary>
+    public string EjbcaContainerName { get; set; } = "ivf-ejbca";
+
+    /// <summary>
+    /// EJBCA CA name used for signing certificate enrollment.
+    /// Can be overridden per-tenant via TenantSubCa.EjbcaCaName.
+    /// </summary>
+    public string EjbcaDefaultCaName { get; set; } = "ManagementCA";
+
+    /// <summary>
+    /// Default EJBCA Certificate Profile for PDF signer certificates.
+    /// </summary>
+    public string EjbcaDefaultCertProfile { get; set; } = "IVF-PDFSigner-Profile";
+
+    /// <summary>
+    /// Default EJBCA End Entity Profile for PDF signer enrollment.
+    /// </summary>
+    public string EjbcaDefaultEeProfile { get; set; } = "IVF-Signer-EEProfile";
+
+    /// <summary>
+    /// PKCS#12 keystore password used for EJBCA-enrolled certificates.
+    /// </summary>
+    public string EjbcaKeystorePassword { get; set; } = "changeit";
+
+    /// <summary>
     /// Whether to skip TLS certificate validation for SignServer (dev only).
     /// MUST be false in production.
     /// </summary>

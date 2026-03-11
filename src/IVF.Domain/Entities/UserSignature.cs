@@ -9,10 +9,15 @@ namespace IVF.Domain.Entities;
 /// Flow: User draws signature on canvas → base64 PNG stored → used as visible
 /// stamp on digitally signed PDFs via SignServer.
 /// </summary>
-public class UserSignature : BaseEntity
+public class UserSignature : BaseEntity, ITenantEntity
 {
     /// <summary>FK to User who owns this signature.</summary>
     public Guid UserId { get; private set; }
+
+    /// <summary>Tenant this signature belongs to (multi-tenancy isolation).</summary>
+    public Guid TenantId { get; private set; }
+
+    public void SetTenantId(Guid tenantId) => TenantId = tenantId;
 
     /// <summary>Base64-encoded PNG image of the handwritten signature.</summary>
     public string SignatureImageBase64 { get; private set; } = string.Empty;

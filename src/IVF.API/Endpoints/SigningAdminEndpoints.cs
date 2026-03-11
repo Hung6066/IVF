@@ -686,7 +686,7 @@ public static class SigningAdminEndpoints
 
     // ─── Helper Methods ─────────────────────────────────────────
 
-    private static HttpClientHandler CreateHandler(DigitalSigningOptions opts, bool attachClientCert = true)
+    internal static HttpClientHandler CreateHandler(DigitalSigningOptions opts, bool attachClientCert = true)
     {
         var handler = new HttpClientHandler();
         if (opts.SkipTlsValidation)
@@ -811,7 +811,7 @@ startxref
     /// then without if the TLS handshake fails (common when EJBCA doesn't trust the client cert).
     /// Returns (jsonContent, null) on success or (null, errorMessage) on failure.
     /// </summary>
-    private static async Task<(string? Content, string? Error)> TryEjbcaRestCallAsync(
+    internal static async Task<(string? Content, string? Error)> TryEjbcaRestCallAsync(
         DigitalSigningOptions opts, string url, HttpMethod? method = null, HttpContent? body = null)
     {
         method ??= HttpMethod.Get;

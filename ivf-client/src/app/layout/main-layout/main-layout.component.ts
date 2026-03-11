@@ -165,7 +165,7 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
 
     const token = localStorage.getItem('ivf_access_token');
     if (token) {
-      await this.initializeSignalR();
+      await this.initializeSignalR(token);
     }
   }
 
@@ -206,10 +206,10 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     await this.signalRService.stopConnections();
   }
 
-  private async initializeSignalR() {
+  private async initializeSignalR(token: string) {
     try {
-      await this.signalRService.startNotificationConnection();
-      await this.signalRService.startQueueConnection();
+      await this.signalRService.startNotificationConnection(token);
+      await this.signalRService.startQueueConnection(token);
 
       this.signalRService.notification$.subscribe((notification) => {
         if (notification) {

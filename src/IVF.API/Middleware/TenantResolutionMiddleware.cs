@@ -46,10 +46,27 @@ public class TenantResolutionMiddleware
         }
         else if (dbContext is not null)
         {
-            // Try custom domain-based resolution for unauthenticated requests (login page, public API)
             var host = context.Request.Host.Host;
-            if (!IsDefaultHost(host))
+            var slug = ExtractSubdomainSlug(host);
+
+            if (slug is not null)
             {
+                // Subdomain-based resolution: {slug}.ivf.clinic → tenant by slug
+                var tenantRepo = context.RequestServices.GetService<ITenantRepository>();
+                if (tenantRepo is not null)
+                {
+                    var tenant = await tenantRepo.GetBySlugAsync(slug);
+                    if (tenant is not null && tenant.Status == TenantStatus.Active)
+                    {
+                        dbContext.SetCurrentTenant(tenant.Id);
+                        context.Items["TenantId"] = tenant.Id;
+                        context.Items["TenantSlug"] = tenant.Slug;
+                    }
+                }
+            }
+            else if (!IsDefaultHost(host))
+            {
+                // Custom domain-based resolution for unauthenticated requests (login page, public API)
                 var tenantRepo = context.RequestServices.GetService<ITenantRepository>();
                 if (tenantRepo is not null)
                 {
@@ -67,10 +84,23 @@ public class TenantResolutionMiddleware
         await _next(context);
     }
 
+    private static string? ExtractSubdomainSlug(string host)
+    {
+        const string suffix = ".ivf.clinic";
+        if (host.EndsWith(suffix, StringComparison.OrdinalIgnoreCase)
+            && host.Length > suffix.Length)
+        {
+            var subdomain = host[..^suffix.Length];
+            // Only single-level subdomains (no dots), valid slug chars
+            if (!subdomain.Contains('.') && subdomain.Length > 0)
+                return subdomain.ToLowerInvariant();
+        }
+        return null;
+    }
+
     private static bool IsDefaultHost(string host)
     {
         return host is "localhost" or "127.0.0.1"
-            || host.EndsWith(".ivf.clinic", StringComparison.OrdinalIgnoreCase)
             || host == "ivf.clinic";
     }
 }

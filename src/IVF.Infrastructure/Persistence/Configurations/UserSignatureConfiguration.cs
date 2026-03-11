@@ -42,8 +42,7 @@ public class UserSignatureConfiguration : IEntityTypeConfiguration<UserSignature
 
         builder.HasIndex(s => s.UserId);
 
-        // Matching query filter — resolves the EF warning about
-        // the required User relationship having a filter while UserSignature does not.
-        builder.HasQueryFilter(s => !s.IsDeleted);
+        // Tenant query filter is applied automatically via IvfDbContext.ApplyTenantFilter
+        // because UserSignature now implements ITenantEntity.
     }
 }
