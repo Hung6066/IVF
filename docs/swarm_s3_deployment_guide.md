@@ -2,9 +2,11 @@
 
 > **Tài liệu hướng dẫn triển khai chi tiết — từ zero đến production**
 >
-> Phiên bản: 5.0 | Cập nhật: 2026-03-08
+> Phiên bản: 6.0 | Cập nhật: 2026-03-11
 >
-> Áp dụng: IVF Platform v5.0+ | .NET 10 | Angular 21 | PostgreSQL 16
+> Áp dụng: IVF Platform v6.0+ | .NET 10 | Angular 21 | PostgreSQL 16
+>
+> Thay đổi v6.0: JWT RSA key sharing qua Docker secret `jwt_private_key` (fix 401 khi multi-replica do mỗi replica generate RSA key riêng), health check chuyển từ `/dev/tcp` sang `curl` (dash compatibility), `SwarmAutoHealingService` skip self-service guard (fix restart cascade), Caddyfile config versioning lên v9
 >
 > Thay đổi v5.0: RefreshTokenFamilyService chuyển từ in-memory ConcurrentDictionary sang Redis-backed (fix 401 sau login khi multi-replica), AdaptiveSessionService multi-replica fallback, Caddy replicated (1 replica, manager-only — fix TLS cert race condition), `/hubs` SecurityEnforcement exemption
 >
@@ -461,6 +463,10 @@ openssl genrsa -out secrets/jwt_private.pem 2048
 openssl rsa -in secrets/jwt_private.pem -pubout -out secrets/jwt_public.pem
 echo "$(cat secrets/jwt_private.pem)" > secrets/jwt_secret.txt
 
+# ─── JWT private key for Swarm sharing (all replicas share same RSA signing key) ───
+# Dùng cùng key đã generate ở trên — mount vào /app/keys/jwt/jwt-private.pem
+cp secrets/jwt_private.pem secrets/jwt_private_key.txt
+
 # ─── MinIO credentials ───
 echo "ivf-admin-$(openssl rand -hex 8)" > secrets/minio_access_key.txt
 openssl rand -base64 32 > secrets/minio_secret_key.txt
@@ -721,11 +727,22 @@ services:
       - jwt_secret
       - minio_access_key
       - minio_secret_key
+      - source: jwt_private_key
+        target: /app/keys/jwt/jwt-private.pem
+        mode: 0400
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro # Infrastructure monitoring (Swarm management)
     networks:
       - ivf-public
       - ivf-data
+    healthcheck:
+      # Use curl — /bin/sh is dash, not bash — /dev/tcp doesn't work
+      test:
+        ["CMD-SHELL", "curl -sf http://127.0.0.1:8080/health/live || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 45s
     deploy:
       replicas: 1
       update_config:
@@ -944,7 +961,7 @@ services:
         published: 443
         mode: host # Required for IP whitelist / SecurityEnforcementMiddleware
     configs:
-      - source: caddyfile_v2
+      - source: caddyfile_v9
         target: /etc/caddy/Caddyfile
     volumes:
       - caddy_data:/data
@@ -961,7 +978,7 @@ services:
 
 # ─── Docker Configs ───
 configs:
-  caddyfile_v2:
+  caddyfile_v9:
     file: ./Caddyfile
 
 # ─── Docker Secrets (external — tạo trước bằng docker secret create) ───
@@ -985,6 +1002,8 @@ secrets:
   softhsm_pin:
     external: true
   softhsm_so_pin:
+    external: true
+  jwt_private_key:
     external: true
 
 # ─── Volumes ───
@@ -1127,6 +1146,9 @@ echo "your_keystore_password" | docker secret create keystore_password -
 echo "your_api_cert_password" | docker secret create api_cert_password -
 echo "your_softhsm_pin" | docker secret create softhsm_pin -
 echo "your_softhsm_so_pin" | docker secret create softhsm_so_pin -
+
+# JWT private key cho multi-replica (tất cả replica dùng chung RSA signing key)
+cat secrets/jwt_private_key.txt | docker secret create jwt_private_key -
 
 # Verify
 docker secret ls
@@ -3190,6 +3212,75 @@ docker service update \
 # Verify:
 curl -v https://natra.site/api/health/live 2>&1 | grep 'HTTP/2 200'
 # Chạy 10 lần, phải 100% thành công (không còn 50% fail)
+```
+
+### 19.15 Health check fail — `/dev/tcp` không hoạt động trong container
+
+> **Lỗi đã gặp thực tế (v6).** API container liên tục unhealthy, Swarm restart loop.
+
+```bash
+# Nguyên nhân: Base image dùng dash (/bin/sh → dash), không phải bash
+# /dev/tcp là tính năng bash-only, dash không hỗ trợ
+
+# Healthcheck cũ (KHÔNG hoạt động):
+# test: ["CMD-SHELL", "echo > /dev/tcp/127.0.0.1/8080"]
+
+# Fix: Dùng curl thay thế
+# healthcheck:
+#   test: ["CMD-SHELL", "curl -sf http://127.0.0.1:8080/health/live || exit 1"]
+#   interval: 15s
+#   timeout: 5s
+#   retries: 3
+#   start_period: 45s
+
+# Verify:
+docker service ps ivf_api  # state = Running (không còn restart liên tục)
+```
+
+### 19.16 SwarmAutoHealingService restart cascade (API tự restart chính mình)
+
+> **Lỗi đã gặp thực tế (v6).** API restart loop — logs hiện "restarting unhealthy service".
+
+```bash
+# Nguyên nhân: SwarmAutoHealingService phát hiện ivf_api unhealthy (do health check fail)
+# → Gọi docker service update --force ivf_api → container restart
+# → Trong start_period, container chưa sẵn sàng → lại unhealthy → restart tiếp → loop
+
+# Fix: SwarmAutoHealingService phải skip self-service
+# Code: SelfServices guard trong SwarmAutoHealingService.cs
+# Danh sách skip: "ivf_api" (service chứa chính nó)
+
+# Verify:
+docker service logs ivf_api --since 10m 2>&1 | grep -i 'auto-heal\|self-service\|skipping'
+```
+
+### 19.17 JWT 401 khi multi-replica — mỗi replica generate RSA key riêng
+
+> **Lỗi đã gặp thực tế (v6).** Login OK, nhưng request tiếp theo bị 401 (50% fail rate).
+
+```bash
+# Nguyên nhân: JwtKeyService.cs generate RSA key pair khi khởi động
+# Mỗi replica có RSA key riêng → token ký bởi replica 1, replica 2 không verify được
+# Caddy load-balance → ~50% request đến replica sai → 401
+
+# Fix: Tất cả replica dùng chung RSA key qua Docker secret
+cat secrets/jwt_private_key.txt | docker secret create jwt_private_key -
+
+# Mount trong docker-compose.stack.yml:
+#   secrets:
+#     - source: jwt_private_key
+#       target: /app/keys/jwt/jwt-private.pem
+#       mode: 0400
+
+# JwtKeyService tự động load key từ /app/keys/jwt/jwt-private.pem nếu tồn tại
+
+# Verify:
+for i in $(seq 1 20); do
+  curl -s -o /dev/null -w "%{http_code}" \
+    -H "Authorization: Bearer $TOKEN" \
+    https://natra.site/api/auth/my-status
+done
+# Phải 100% trả 200 (không còn 401)
 ```
 
 ---

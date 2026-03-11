@@ -127,7 +127,7 @@ IVF/
 │   │
 │   ├── IVF.API/                 ← API layer (endpoints, hubs, middleware)
 │   │   ├── Endpoints/           ← 37 endpoint files (Minimal API)
-│   │   ├── Hubs/                ← 4 SignalR hubs + auth filter
+│   │   ├── Hubs/                ← 6 SignalR hubs + auth filter
 │   │   ├── Services/            ← API-level services (backup, CA, PDF)
 │   │   ├── Program.cs           ← Application bootstrap (~400 lines)
 │   │   └── appsettings.json
@@ -232,7 +232,7 @@ HTTP Response (200 OK / 201 Created / 400 Bad Request / 404 Not Found)
 - **State management**: Service-based with RxJS (no NgRx)
 - **Routing**: Lazy-loaded via `loadComponent`/`loadChildren` in `app.routes.ts`
 - **HTTP**: `ApiService` as base client, JWT injected via `authInterceptor`
-- **Real-time**: SignalR for queue updates, notifications, biometrics, backup progress
+- **Real-time**: SignalR for queue updates, notifications, biometrics, backup progress, evidence trail, infrastructure metrics
 
 ---
 
@@ -826,6 +826,10 @@ Repository: `IEnterpriseUserRepository` (65+ methods). CQRS: 14 commands + 7 que
 
 5. SignalR passes token via query string:
    /hubs/queue?access_token=<JWT>
+
+6. Docker Swarm: all replicas share RSA signing key
+   via Docker secret `jwt_private_key` → /app/keys/jwt/jwt-private.pem
+   (JwtKeyService loads existing key if present)
 ```
 
 ### Authorization Policies
@@ -866,12 +870,14 @@ All endpoints are under `/api/security/advanced/*` with `AdminOnly` authorizatio
 
 ### Hubs
 
-| Hub             | Endpoint              | Purpose                                      |
-| --------------- | --------------------- | -------------------------------------------- |
-| QueueHub        | `/hubs/queue`         | Queue ticket updates (call, complete, stats) |
-| NotificationHub | `/hubs/notifications` | Push notifications to users                  |
-| FingerprintHub  | `/hubs/fingerprint`   | Biometric matching progress                  |
-| BackupHub       | `/hubs/backup`        | Backup/restore/deploy progress               |
+| Hub                | Endpoint                | Purpose                                      |
+| ------------------ | ----------------------- | -------------------------------------------- |
+| QueueHub           | `/hubs/queue`           | Queue ticket updates (call, complete, stats) |
+| NotificationHub    | `/hubs/notifications`   | Push notifications to users                  |
+| FingerprintHub     | `/hubs/fingerprint`     | Biometric matching progress                  |
+| BackupHub          | `/hubs/backup`          | Backup/restore/deploy progress               |
+| EvidenceHub        | `/hubs/evidence`        | Evidence/audit trail real-time events        |
+| InfrastructureHub  | `/hubs/infrastructure`  | Real-time VPS metrics streaming              |
 
 ### Client Connection (Angular)
 
@@ -1520,6 +1526,18 @@ Redis degrades gracefully — the app works without it but without caching.
 
 **MinIO self-signed cert errors:**
 The API uses `ServerCertificateCustomValidationCallback` to trust the private CA.
+
+**JWT 401 errors in Docker Swarm (multi-replica):**
+Each API replica generates its own RSA key pair. Tokens signed by replica 1 are invalid on replica 2. Fix: share key via Docker secret `jwt_private_key` mounted at `/app/keys/jwt/jwt-private.pem`. `JwtKeyService` loads an existing key from this path if present.
+
+**Health check fails in container (`/dev/tcp` not found):**
+Container base image uses `dash` (not `bash`). `/dev/tcp` is bash-only. Use `curl -sf http://127.0.0.1:8080/health/live` instead.
+
+**Auto-healing restart cascade:**
+`SwarmAutoHealingService` must skip the API service itself (`SelfServices` guard) to prevent restart loops where the API restarts itself infinitely.
+
+**Docker config immutable error:**
+Docker Swarm configs are immutable. To update Caddyfile, create a new versioned config (e.g., `caddyfile_v9` → `caddyfile_v10`) and update the service reference.
 
 ### Logs
 
