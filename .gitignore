@@ -48,6 +48,36 @@ python-ml-service/experiments
 
 # Model weights
 *.pt
+
+# .NET / Visual Studio
+bin/
+obj/
+.vs/
+!.vs/ProjectSettings.json
+!.vs/slnx.sqlite
+.user
+.suo
+*.csproj.user
+*.sln.user
+
+# IVF-specific secrets (DO NOT COMMIT)
+# Use User Secrets (dotnet user-secrets) or environment variables in production
+# For local development:
+#   1. Create appsettings.local.json (git-ignored)
+#   2. Or use: dotnet user-secrets set "Monitoring:PrometheusAuth" "..."
+.env
+.env.local
+.env.*.local
+appsettings.local.json
+appsettings.Production.json
+
+# Secrets directory (local)
+secrets/
+keys/
+
+# User secrets
+**/Properties/launchSettings.json
+**/UserSecretsId.txt
 *.pth
 *.onnx
 

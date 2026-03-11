@@ -87,3 +87,15 @@ useDefault = true
   description = "Azure AD client secret"
   regex = '''ClientSecret\s*[:=]\s*["'][A-Za-z0-9~._-]{30,}["']'''
   keywords = ["ClientSecret"]
+
+[[rules]]
+  id = "ivf-prometheus-auth"
+  description = "Prometheus basic auth (development only)"
+  regex = '''PrometheusAuth\s*[:=]\s*["'][A-Za-z0-9+/=]{40,}["']'''
+  keywords = ["PrometheusAuth", "Prometheus"]
+  [rules.allowlist]
+    description = "Allow in Development.json only - rotate in production"
+    paths = [
+      '''appsettings\.Development\.json$''',
+      '''\.gitleaks\.toml$''',
+    ]
