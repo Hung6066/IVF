@@ -1,37 +1,46 @@
-using System.Security.Cryptography.X509Certificates;
+using System.Text.Json;
 using IVF.API.Endpoints;
 using IVF.Domain.Entities;
-using IVF.Domain.Enums;
 using IVF.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace IVF.API.Services;
 
 /// <summary>
-/// Orchestrates per-tenant Sub-CA lifecycle and tenant-aware user certificate provisioning.
+/// Orchestrates per-tenant Sub-CA lifecycle and tenant-aware user certificate provisioning
+/// via EJBCA (Certificate Authority) and SignServer (PDF signing).
 /// 
 /// Flow:
-///   1. Admin provisions Sub-CA for tenant → CreateIntermediateCA → TenantSubCa record
-///   2. User cert provisioning → finds tenant's Sub-CA → issues end-entity cert via CertificateAuthorityService
+///   1. Admin provisions TenantSubCa record → references EJBCA CA name + profiles
+///   2. User cert provisioning → EJBCA CLI: addendentity + batch → PKCS#12
+///      → docker pipe to SignServer → configure worker
 ///   3. Worker naming: PDFSigner_{tenantSlug}_{sanitizedUsername}
-///   4. Worker ID: hash(tenantId, userId) → wider range (1000–9999) to avoid bootstrap workers
-///   5. Tenant offboarding → revoke Sub-CA → all user certs invalidated atomically
+///   4. Worker ID: hash(tenantId, userId) → range (1000–9999) to avoid bootstrap workers
+///   5. Tenant offboarding → revoke all certs via EJBCA REST API
 /// </summary>
 public sealed class TenantCertificateService(
-    CertificateAuthorityService caService,
     IServiceScopeFactory scopeFactory,
+    IOptions<DigitalSigningOptions> signingOptions,
     ILogger<TenantCertificateService> logger)
 {
+    private readonly DigitalSigningOptions _opts = signingOptions.Value;
+
     // ═══════════════════════════════════════════════════════
-    // Sub-CA Provisioning
+    // Sub-CA Provisioning (logical — registers EJBCA CA ref)
     // ═══════════════════════════════════════════════════════
 
     /// <summary>
-    /// Provision a dedicated Sub-CA for a tenant, signed by the specified Root CA.
-    /// Idempotent — returns existing TenantSubCa if already provisioned.
+    /// Register a TenantSubCa record linking a tenant to an EJBCA CA.
+    /// Idempotent — returns existing if already provisioned.
+    /// The EJBCA CA must already exist (created via EJBCA Admin UI or CLI).
     /// </summary>
     public async Task<TenantSubCa> ProvisionTenantSubCaAsync(
-        Guid tenantId, Guid rootCaId, CancellationToken ct)
+        Guid tenantId,
+        string? caName,
+        string? certProfileName,
+        string? eeProfileName,
+        CancellationToken ct)
     {
         using var scope = scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<IvfDbContext>();
@@ -45,12 +54,11 @@ public sealed class TenantCertificateService(
         {
             if (existing.Status == TenantSubCaStatus.Active)
             {
-                logger.LogInformation("Tenant {TenantId} already has active Sub-CA {CaId}",
-                    tenantId, existing.CertificateAuthorityId);
+                logger.LogInformation("Tenant {TenantId} already has active Sub-CA (EJBCA CA={CaName})",
+                    tenantId, existing.EjbcaCaName);
                 return existing;
             }
 
-            // Re-activate if suspended
             if (existing.Status == TenantSubCaStatus.Suspended)
             {
                 existing.Activate();
@@ -58,43 +66,26 @@ public sealed class TenantCertificateService(
                 logger.LogInformation("Re-activated Sub-CA for tenant {TenantId}", tenantId);
                 return existing;
             }
-
-            // Revoked → must create a new one (fall through)
+            // Revoked → create a new one (fall through)
         }
 
         var tenant = await db.Tenants.FirstOrDefaultAsync(t => t.Id == tenantId, ct)
             ?? throw new InvalidOperationException($"Tenant {tenantId} not found");
 
-        // Verify root CA exists and is active
-        var rootCa = await caService.GetCaAsync(rootCaId, ct)
-            ?? throw new InvalidOperationException($"Root CA {rootCaId} not found");
+        var ejbcaCa = caName ?? _opts.EjbcaDefaultCaName;
+        var ejbcaCertProfile = certProfileName ?? _opts.EjbcaDefaultCertProfile;
+        var ejbcaEeProfile = eeProfileName ?? _opts.EjbcaDefaultEeProfile;
 
-        if (rootCa.Status != CaStatus.Active)
-            throw new InvalidOperationException($"Root CA '{rootCa.Name}' is not active");
+        // Verify EJBCA CA exists via REST API
+        await VerifyEjbcaCaExistsAsync(ejbcaCa);
 
-        // Create Intermediate CA via the existing CertificateAuthorityService
         var workerPrefix = $"PDFSigner_{SanitizeSlug(tenant.Slug)}";
-        var caName = $"Tenant-{tenant.Slug}-SubCA";
-        var commonName = $"{tenant.Name} Signing CA";
 
-        var intermediateCa = await caService.CreateIntermediateCaAsync(new CreateIntermediateCaRequest(
-            ParentCaId: rootCaId,
-            Name: caName,
-            CommonName: commonName,
-            Organization: tenant.Name,
-            OrgUnit: "Digital Signing",
-            Country: "VN",
-            State: null,
-            Locality: null,
-            KeyAlgorithm: "RSA",
-            KeySize: 4096,
-            ValidityDays: 1825 // 5 years
-        ), ct);
-
-        // Create TenantSubCa linking record
         var tenantSubCa = TenantSubCa.Create(
             tenantId: tenant.Id,
-            certificateAuthorityId: intermediateCa.Id,
+            ejbcaCaName: ejbcaCa,
+            ejbcaCertProfileName: ejbcaCertProfile,
+            ejbcaEeProfileName: ejbcaEeProfile,
             workerNamePrefix: workerPrefix,
             organizationName: tenant.Name);
 
@@ -102,23 +93,22 @@ public sealed class TenantCertificateService(
         await db.SaveChangesAsync(ct);
 
         logger.LogInformation(
-            "Provisioned Sub-CA for tenant {TenantSlug}: CA={CaName}, prefix={Prefix}",
-            tenant.Slug, caName, workerPrefix);
+            "Provisioned Sub-CA for tenant {TenantSlug}: EJBCA CA={CaName}, profile={Profile}, prefix={Prefix}",
+            tenant.Slug, ejbcaCa, ejbcaCertProfile, workerPrefix);
 
         return tenantSubCa;
     }
 
     // ═══════════════════════════════════════════════════════
-    // User Certificate Provisioning (Sub-CA issued)
+    // User Certificate Provisioning (EJBCA enrollment)
     // ═══════════════════════════════════════════════════════
 
     /// <summary>
-    /// Provision a signing certificate for a user under their tenant's Sub-CA.
-    /// Issues the cert via CertificateAuthorityService (not keytool self-signed) and
-    /// creates a SignServer worker with tenant-scoped naming.
+    /// Provision a signing certificate for a user under their tenant's EJBCA CA.
+    /// Uses EJBCA CLI: addendentity → batch (P12) → docker pipe to SignServer → configure worker.
     /// </summary>
     public async Task<TenantCertProvisionResult> ProvisionUserCertAsync(
-        User user, Guid tenantId, DigitalSigningOptions opts, CancellationToken ct)
+        User user, Guid tenantId, CancellationToken ct)
     {
         using var scope = scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<IvfDbContext>();
@@ -146,47 +136,57 @@ public sealed class TenantCertificateService(
         var workerId = 1000 + Math.Abs(HashCode.Combine(tenantId, user.Id) % 9000);
 
         var sanitizedName = UserSignatureEndpoints.SanitizeForDN(user.FullName);
-        var certDN = $"CN={sanitizedName}, O={tenantSubCa.OrganizationName}, OU={user.Role ?? "Staff"}, C=VN";
+        var cn = sanitizedName;
+        var org = tenantSubCa.OrganizationName;
+        var ou = user.Role ?? "Staff";
 
-        var validityDays = tenantSubCa.DefaultCertValidityDays;
+        var eeUsername = $"ivf-signer-{SanitizeSlug(tenantSubCa.Tenant?.Slug ?? tenantId.ToString()[..8])}-{sanitizedUsername}";
+        var keyFile = $"{workerName.ToLowerInvariant()}.p12";
 
         logger.LogInformation(
-            "Provisioning Sub-CA cert for user {User} (tenant={TenantId}), worker={Worker}, ID={WorkerId}",
-            user.FullName, tenantId, workerName, workerId);
+            "Enrolling EJBCA cert for user {User} (tenant={TenantId}), worker={Worker}, ID={WorkerId}, EE={EE}",
+            user.FullName, tenantId, workerName, workerId, eeUsername);
 
-        // Issue certificate via CertificateAuthorityService using tenant's Sub-CA
-        var managedCert = await caService.IssueCertificateAsync(new IssueCertRequest(
-            CaId: tenantSubCa.CertificateAuthorityId,
-            CommonName: sanitizedName,
-            SubjectAltNames: null,
-            Type: CertType.Client,
-            Purpose: $"pdf-signing:{workerName}",
-            ValidityDays: validityDays,
-            KeySize: 2048,
-            RenewBeforeDays: tenantSubCa.RenewBeforeDays,
-            KeyAlgorithm: "RSA"
-        ), ct);
+        // Step 1: Create End Entity in EJBCA via CLI
+        await EjbcaAddEndEntityAsync(
+            eeUsername, cn, org, ou,
+            tenantSubCa.EjbcaCaName,
+            tenantSubCa.EjbcaCertProfileName,
+            tenantSubCa.EjbcaEeProfileName);
 
-        // Export cert + key as PKCS#12 and deploy to SignServer as worker
-        await DeployWorkerToSignServerAsync(
-            managedCert, workerId, workerName, certDN, validityDays, opts, db);
+        // Step 2: Generate PKCS#12 via EJBCA batch
+        await EjbcaBatchEnrollAsync(eeUsername);
+
+        // Step 3: Deploy P12 from EJBCA → SignServer via docker pipe
+        await DeployP12ToSignServerAsync(eeUsername, keyFile);
+
+        // Step 4: Normalize key alias
+        var keyAlias = await NormalizeKeyAliasAsync(keyFile, workerName.ToLowerInvariant());
+
+        // Step 5: Configure SignServer worker
+        await ConfigureSignServerWorkerAsync(workerId, workerName, keyFile, keyAlias, cn, org);
+
+        // Step 6: Cleanup EJBCA temp file
+        await CleanupEjbcaTempAsync(eeUsername);
 
         // Update worker count
         tenantSubCa.IncrementWorkerCount();
         await db.SaveChangesAsync(ct);
 
-        var expiry = managedCert.NotAfter;
+        // Estimate expiry (EJBCA controls actual validity via cert profile)
+        var estimatedExpiry = DateTime.UtcNow.AddDays(tenantSubCa.DefaultCertValidityDays);
+
+        var certSubject = $"CN={cn}, O={org}, OU={ou}, C=VN";
         logger.LogInformation(
-            "Sub-CA cert provisioned: {Subject}, worker={Worker}, serial={Serial}, expires={Expiry}",
-            certDN, workerName, managedCert.SerialNumber, expiry);
+            "EJBCA cert enrolled: {Subject}, worker={Worker}, EE={EE}",
+            certSubject, workerName, eeUsername);
 
         return new TenantCertProvisionResult(
-            CertSubject: certDN,
-            SerialNumber: managedCert.SerialNumber,
-            Expiry: expiry,
+            CertSubject: certSubject,
+            EjbcaUsername: eeUsername,
+            EstimatedExpiry: estimatedExpiry,
             WorkerName: workerName,
-            ManagedCertId: managedCert.Id,
-            CertificateAuthorityId: tenantSubCa.CertificateAuthorityId);
+            WorkerId: workerId);
     }
 
     // ═══════════════════════════════════════════════════════
@@ -201,34 +201,29 @@ public sealed class TenantCertificateService(
 
         var tenantSubCa = await db.Set<TenantSubCa>()
             .IgnoreQueryFilters()
-            .Include(t => t.CertificateAuthority)
             .Include(t => t.Tenant)
             .FirstOrDefaultAsync(t => t.TenantId == tenantId && !t.IsDeleted, ct);
 
-        if (tenantSubCa?.CertificateAuthority is null) return null;
+        if (tenantSubCa is null) return null;
 
-        var ca = tenantSubCa.CertificateAuthority;
-
-        // Count active user certs issued by this Sub-CA
-        var activeCerts = await db.ManagedCertificates
-            .CountAsync(c => c.IssuingCaId == ca.Id && c.Status == ManagedCertStatus.Active, ct);
+        // Count active user signatures for this tenant
+        var activeSignatures = await db.UserSignatures
+            .Where(s => s.TenantId == tenantId && !s.IsDeleted && s.IsActive
+                && s.WorkerName != null)
+            .CountAsync(ct);
 
         return new TenantSubCaStatusDto(
             TenantId: tenantSubCa.TenantId,
             TenantName: tenantSubCa.Tenant?.Name ?? "",
-            CaId: ca.Id,
-            CaName: ca.Name,
-            CaCommonName: ca.CommonName,
-            CaFingerprint: ca.Fingerprint,
-            CaNotBefore: ca.NotBefore,
-            CaNotAfter: ca.NotAfter,
-            CaStatus: ca.Status,
+            EjbcaCaName: tenantSubCa.EjbcaCaName,
+            EjbcaCertProfileName: tenantSubCa.EjbcaCertProfileName,
+            EjbcaEeProfileName: tenantSubCa.EjbcaEeProfileName,
             SubCaStatus: tenantSubCa.Status,
             WorkerNamePrefix: tenantSubCa.WorkerNamePrefix,
             OrganizationName: tenantSubCa.OrganizationName,
             ActiveWorkerCount: tenantSubCa.ActiveWorkerCount,
             MaxWorkers: tenantSubCa.MaxWorkers,
-            ActiveCertCount: activeCerts,
+            ActiveSignatureCount: activeSignatures,
             DefaultCertValidityDays: tenantSubCa.DefaultCertValidityDays,
             RenewBeforeDays: tenantSubCa.RenewBeforeDays,
             AutoProvisionEnabled: tenantSubCa.AutoProvisionEnabled);
@@ -243,35 +238,29 @@ public sealed class TenantCertificateService(
         var tenantSubCas = await db.Set<TenantSubCa>()
             .IgnoreQueryFilters()
             .Where(t => !t.IsDeleted)
-            .Include(t => t.CertificateAuthority)
             .Include(t => t.Tenant)
             .ToListAsync(ct);
 
         var result = new List<TenantSubCaStatusDto>();
         foreach (var tsc in tenantSubCas)
         {
-            if (tsc.CertificateAuthority is null) continue;
-            var ca = tsc.CertificateAuthority;
-
-            var activeCerts = await db.ManagedCertificates
-                .CountAsync(c => c.IssuingCaId == ca.Id && c.Status == ManagedCertStatus.Active, ct);
+            var activeSignatures = await db.UserSignatures
+                .Where(s => s.TenantId == tsc.TenantId && !s.IsDeleted && s.IsActive
+                    && s.WorkerName != null)
+                .CountAsync(ct);
 
             result.Add(new TenantSubCaStatusDto(
                 TenantId: tsc.TenantId,
                 TenantName: tsc.Tenant?.Name ?? "",
-                CaId: ca.Id,
-                CaName: ca.Name,
-                CaCommonName: ca.CommonName,
-                CaFingerprint: ca.Fingerprint,
-                CaNotBefore: ca.NotBefore,
-                CaNotAfter: ca.NotAfter,
-                CaStatus: ca.Status,
+                EjbcaCaName: tsc.EjbcaCaName,
+                EjbcaCertProfileName: tsc.EjbcaCertProfileName,
+                EjbcaEeProfileName: tsc.EjbcaEeProfileName,
                 SubCaStatus: tsc.Status,
                 WorkerNamePrefix: tsc.WorkerNamePrefix,
                 OrganizationName: tsc.OrganizationName,
                 ActiveWorkerCount: tsc.ActiveWorkerCount,
                 MaxWorkers: tsc.MaxWorkers,
-                ActiveCertCount: activeCerts,
+                ActiveSignatureCount: activeSignatures,
                 DefaultCertValidityDays: tsc.DefaultCertValidityDays,
                 RenewBeforeDays: tsc.RenewBeforeDays,
                 AutoProvisionEnabled: tsc.AutoProvisionEnabled));
@@ -317,8 +306,8 @@ public sealed class TenantCertificateService(
     }
 
     /// <summary>
-    /// Revoke a tenant's Sub-CA — invalidates ALL certificates issued by it.
-    /// This is the nuclear option for tenant offboarding.
+    /// Revoke a tenant's certificates via EJBCA REST API.
+    /// Searches all certs issued for the tenant's worker prefix and revokes them.
     /// </summary>
     public async Task RevokeTenantCaAsync(Guid tenantId, CancellationToken ct)
     {
@@ -330,21 +319,22 @@ public sealed class TenantCertificateService(
             .FirstOrDefaultAsync(t => t.TenantId == tenantId && !t.IsDeleted, ct)
             ?? throw new InvalidOperationException("Tenant chưa có Sub-CA");
 
-        // Revoke the Intermediate CA itself (cascades to all issued certs logically)
-        await caService.RevokeCertificateAuthorityAsync(tenantSubCa.CertificateAuthorityId, ct);
+        // Revoke all certificates via EJBCA REST API (search by CA name + username pattern)
+        await RevokeAllTenantCertsViaEjbcaAsync(tenantSubCa);
 
         tenantSubCa.Revoke();
         await db.SaveChangesAsync(ct);
 
-        logger.LogWarning("Revoked Sub-CA for tenant {TenantId} — all tenant certs invalidated", tenantId);
+        logger.LogWarning("Revoked Sub-CA for tenant {TenantId} — all tenant certs revoked via EJBCA", tenantId);
     }
 
     // ═══════════════════════════════════════════════════════
-    // User Cert Renewal via Sub-CA
+    // User Cert Renewal via EJBCA Re-enrollment
     // ═══════════════════════════════════════════════════════
 
     /// <summary>
     /// Auto-renew expiring user signing certs across all tenants.
+    /// Checks UserSignature.CertificateExpiry and re-enrolls via EJBCA.
     /// Called by the cert lifecycle background service.
     /// </summary>
     public async Task<int> AutoRenewTenantUserCertsAsync(CancellationToken ct)
@@ -359,32 +349,47 @@ public sealed class TenantCertificateService(
         var activeTenantCas = await db.Set<TenantSubCa>()
             .IgnoreQueryFilters()
             .Where(t => !t.IsDeleted && t.Status == TenantSubCaStatus.Active)
+            .Include(t => t.Tenant)
             .ToListAsync(ct);
 
         foreach (var tsc in activeTenantCas)
         {
-            // Find user certs issued by this Sub-CA that are expiring soon
-            var expiringCerts = await db.ManagedCertificates
-                .Where(c => c.IssuingCaId == tsc.CertificateAuthorityId
-                    && c.Status == ManagedCertStatus.Active
-                    && c.AutoRenewEnabled
-                    && c.ReplacedByCertId == null
-                    && c.Purpose.StartsWith("pdf-signing:"))
+            var renewThreshold = now.AddDays(tsc.RenewBeforeDays);
+
+            // Find user signatures with expiring certs
+            var expiringSignatures = await db.UserSignatures
+                .Include(s => s.User)
+                .Where(s => s.TenantId == tsc.TenantId
+                    && !s.IsDeleted && s.IsActive
+                    && s.WorkerName != null
+                    && s.CertificateExpiry != null
+                    && s.CertificateExpiry <= renewThreshold
+                    && s.CertStatus != CertificateStatus.Revoked)
                 .ToListAsync(ct);
 
-            foreach (var cert in expiringCerts.Where(c => c.IsExpiringSoon()))
+            foreach (var sig in expiringSignatures)
             {
+                if (sig.User is null) continue;
                 try
                 {
-                    await caService.RenewCertificateAsync(cert.Id, ct);
+                    var result = await ProvisionUserCertAsync(sig.User, tsc.TenantId, ct);
+
+                    sig.SetCertificateInfo(
+                        subject: result.CertSubject,
+                        serialNumber: result.EjbcaUsername,
+                        expiry: result.EstimatedExpiry,
+                        workerName: result.WorkerName,
+                        keystorePath: null);
+                    await db.SaveChangesAsync(ct);
+
                     renewedCount++;
-                    logger.LogInformation("Auto-renewed tenant user cert {CertId} (CN={CN}, tenant={Tenant})",
-                        cert.Id, cert.CommonName, tsc.TenantId);
+                    logger.LogInformation("Auto-renewed tenant user cert via EJBCA: user={User}, tenant={Tenant}",
+                        sig.User.FullName, tsc.TenantId);
                 }
                 catch (Exception ex)
                 {
-                    logger.LogWarning(ex, "Failed to auto-renew cert {CertId} for tenant {TenantId}",
-                        cert.Id, tsc.TenantId);
+                    logger.LogWarning(ex, "Failed to auto-renew cert for user {UserId} in tenant {TenantId}",
+                        sig.UserId, tsc.TenantId);
                 }
             }
         }
@@ -393,61 +398,162 @@ public sealed class TenantCertificateService(
     }
 
     // ═══════════════════════════════════════════════════════
-    // SignServer Worker Deployment
+    // EJBCA CLI Operations (via docker exec)
     // ═══════════════════════════════════════════════════════
 
-    /// <summary>
-    /// Deploy a CA-issued certificate as a SignServer P12 worker.
-    /// Exports the managed cert's PEM to PKCS#12, copies to SignServer container,
-    /// and configures the worker properties.
-    /// </summary>
-    private async Task DeployWorkerToSignServerAsync(
-        ManagedCertificate managedCert,
-        int workerId,
-        string workerName,
-        string certDN,
-        int validityDays,
-        DigitalSigningOptions opts,
-        IvfDbContext db)
+    /// <summary>Create/update End Entity in EJBCA via CLI.</summary>
+    private async Task EjbcaAddEndEntityAsync(
+        string eeUsername, string cn, string org, string ou,
+        string caName, string certProfile, string eeProfile)
     {
-        var certPem = managedCert.CertificatePem;
-        var keyPem = await caService.GetDecryptedPrivateKeyAsync(managedCert.Id, CancellationToken.None);
+        var ejbcaContainer = _opts.EjbcaContainerName;
+        var keystorePassword = _opts.EjbcaKeystorePassword;
+        var dn = $"CN={cn},O={org},OU={ou},C=VN";
 
-        const string keyDir = "/opt/keyfactor/persistent/keys";
-        var keystorePassword = "changeit";
-        var keystorePath = $"{keyDir}/{workerName.ToLowerInvariant()}.p12";
-        var keyAlias = "signer";
+        // Try to add new End Entity
+        var (addExit, _) = await RunDockerExecWithExitCodeAsync(ejbcaContainer,
+            $"/opt/keyfactor/bin/ejbca.sh ra addendentity " +
+            $"--username \"{eeUsername}\" " +
+            $"--dn \"{dn}\" " +
+            $"--caname \"{caName}\" " +
+            $"--type 1 " +
+            $"--token P12 " +
+            $"--password \"{keystorePassword}\" " +
+            $"--certprofile \"{certProfile}\" " +
+            $"--eeprofile \"{eeProfile}\"");
 
-        // Create PKCS#12 from PEM cert + key using .NET crypto
-        using var cert = X509Certificate2.CreateFromPem(certPem, keyPem);
-        var pfxBytes = cert.Export(X509ContentType.Pfx, keystorePassword);
-
-        // Write PFX to temp file and copy to container
-        var tempPfx = Path.GetTempFileName();
-        try
+        if (addExit != 0)
         {
-            await File.WriteAllBytesAsync(tempPfx, pfxBytes);
-
-            // Ensure directory exists
-            await UserSignatureEndpoints.RunDockerExecAsRootAsync("ivf-signserver",
-                $"mkdir -p {keyDir} && chown 10001:root {keyDir} && chmod 700 {keyDir}",
+            // Entity may already exist — reset status to NEW (10) for re-enrollment
+            await UserSignatureEndpoints.RunDockerExecAsync(ejbcaContainer,
+                $"/opt/keyfactor/bin/ejbca.sh ra setendentitystatus \"{eeUsername}\" 10",
                 logger);
-
-            // Copy PKCS#12 to container
-            await UserSignatureEndpoints.RunProcessAsync("docker",
-                $"cp \"{tempPfx}\" ivf-signserver:{keystorePath}", logger);
-
-            // Set restrictive permissions
-            await UserSignatureEndpoints.RunDockerExecAsRootAsync("ivf-signserver",
-                $"chmod 400 {keystorePath} && chown 10001:root {keystorePath}", logger);
+            logger.LogInformation("EJBCA End Entity {EE} already exists — reset for re-enrollment", eeUsername);
         }
-        finally
+
+        // Set clear-text password (required for PKCS#12 batch generation)
+        await UserSignatureEndpoints.RunDockerExecAsync(ejbcaContainer,
+            $"/opt/keyfactor/bin/ejbca.sh ra setclearpwd \"{eeUsername}\" \"{keystorePassword}\"",
+            logger);
+    }
+
+    /// <summary>Generate PKCS#12 keystore via EJBCA batch command.</summary>
+    private async Task EjbcaBatchEnrollAsync(string eeUsername)
+    {
+        var ejbcaContainer = _opts.EjbcaContainerName;
+
+        // Ensure temp directory exists
+        await UserSignatureEndpoints.RunDockerExecAsync(ejbcaContainer,
+            "mkdir -p /tmp/ejbca-certs", logger);
+
+        // Batch generate PKCS#12
+        await UserSignatureEndpoints.RunDockerExecAsync(ejbcaContainer,
+            $"/opt/keyfactor/bin/ejbca.sh batch --username \"{eeUsername}\" -dir /tmp/ejbca-certs",
+            logger);
+
+        // Verify P12 was generated
+        var p12Path = $"/tmp/ejbca-certs/{eeUsername}.p12";
+        var (exitCode, _) = await RunDockerExecWithExitCodeAsync(ejbcaContainer,
+            $"test -f {p12Path}");
+
+        if (exitCode != 0)
+            throw new InvalidOperationException(
+                $"EJBCA batch enrollment failed: PKCS#12 not generated at {p12Path}");
+    }
+
+    /// <summary>Copy PKCS#12 from EJBCA container to SignServer container via docker pipe.</summary>
+    private async Task DeployP12ToSignServerAsync(string eeUsername, string keyFile)
+    {
+        var ejbcaContainer = _opts.EjbcaContainerName;
+        var signServerContainer = _opts.SignServerContainerName;
+        var p12Path = $"/tmp/ejbca-certs/{eeUsername}.p12";
+        const string keyDir = "/opt/keyfactor/persistent/keys";
+
+        // Docker pipe: EJBCA → SignServer (avoids host filesystem)
+        await UserSignatureEndpoints.RunProcessAsync("docker",
+            $"exec {ejbcaContainer} cat {p12Path}", logger);
+
+        // Use a combined command to pipe between containers
+        var pipeCommand = $"exec {ejbcaContainer} cat {p12Path}";
+        // Since RunProcessAsync doesn't support piping, use shell approach
+        var isWindows = OperatingSystem.IsWindows();
+        if (isWindows)
         {
-            File.Delete(tempPfx);
+            await UserSignatureEndpoints.RunProcessAsync("cmd",
+                $"/c \"docker exec {ejbcaContainer} cat {p12Path} | docker exec -i {signServerContainer} bash -c \\\"cat > /tmp/_deploy_p12\\\"\"",
+                logger);
+        }
+        else
+        {
+            await UserSignatureEndpoints.RunProcessAsync("bash",
+                $"-c \"docker exec {ejbcaContainer} cat {p12Path} | docker exec -i {signServerContainer} bash -c 'cat > /tmp/_deploy_p12'\"",
+                logger);
         }
 
-        // Write worker properties
-        var sanitizedName = UserSignatureEndpoints.SanitizeForDN(certDN);
+        // Move to final location with correct permissions
+        await UserSignatureEndpoints.RunDockerExecAsRootAsync(signServerContainer,
+            $"mkdir -p {keyDir} && " +
+            $"rm -f '{keyDir}/{keyFile}' && " +
+            $"cp /tmp/_deploy_p12 '{keyDir}/{keyFile}' && " +
+            $"rm -f /tmp/_deploy_p12 && " +
+            $"chmod 400 '{keyDir}/{keyFile}' && " +
+            $"chown 10001:root '{keyDir}/{keyFile}'",
+            logger);
+    }
+
+    /// <summary>Normalize PKCS#12 key alias (EJBCA uses CN which may contain spaces).</summary>
+    private async Task<string> NormalizeKeyAliasAsync(string keyFile, string desiredAlias)
+    {
+        var signServerContainer = _opts.SignServerContainerName;
+        var keystorePassword = _opts.EjbcaKeystorePassword;
+        const string keyDir = "/opt/keyfactor/persistent/keys";
+        var keystorePath = $"{keyDir}/{keyFile}";
+
+        // Get current alias
+        var (_, output) = await RunDockerExecWithExitCodeAsync(signServerContainer,
+            $"keytool -list -keystore {keystorePath} -storepass {keystorePassword} -storetype PKCS12");
+
+        var currentAlias = "";
+        if (output is not null)
+        {
+            foreach (var line in output.Split('\n'))
+            {
+                if (line.Contains("PrivateKeyEntry", StringComparison.OrdinalIgnoreCase))
+                {
+                    currentAlias = line.Split(',')[0].Trim();
+                    break;
+                }
+            }
+        }
+
+        if (!string.IsNullOrEmpty(currentAlias) && currentAlias != desiredAlias)
+        {
+            await UserSignatureEndpoints.RunDockerExecAsRootAsync(signServerContainer,
+                $"chmod 600 '{keystorePath}' && " +
+                $"keytool -changealias -keystore '{keystorePath}' " +
+                $"-storepass '{keystorePassword}' -storetype PKCS12 " +
+                $"-alias '{currentAlias}' -destalias '{desiredAlias}' && " +
+                $"chmod 400 '{keystorePath}'",
+                logger);
+            logger.LogInformation("Key alias normalized: {Old} → {New}", currentAlias, desiredAlias);
+            return desiredAlias;
+        }
+
+        return string.IsNullOrEmpty(currentAlias) ? desiredAlias : currentAlias;
+    }
+
+    /// <summary>Configure SignServer worker properties for the deployed PKCS#12.</summary>
+    private async Task ConfigureSignServerWorkerAsync(
+        int workerId, string workerName, string keyFile, string keyAlias,
+        string cn, string org)
+    {
+        var signServerContainer = _opts.SignServerContainerName;
+        var keystorePassword = _opts.EjbcaKeystorePassword;
+        const string keyDir = "/opt/keyfactor/persistent/keys";
+        var keystorePath = $"{keyDir}/{keyFile}";
+        const string signerCli = "bin/signserver";
+
+        // Write worker properties file
         var propsContent =
             $"GLOB.WORKER{workerId}.CLASSPATH = org.signserver.module.pdfsigner.PDFSigner\n" +
             $"GLOB.WORKER{workerId}.SIGNERTOKEN.CLASSPATH = org.signserver.server.cryptotokens.P12CryptoToken\n" +
@@ -463,13 +569,13 @@ public sealed class TenantCertificateService(
             await File.WriteAllTextAsync(tempProps, propsContent);
             var containerPropsPath = $"/tmp/worker_{workerId}.properties";
             await UserSignatureEndpoints.RunProcessAsync("docker",
-                $"cp \"{tempProps}\" ivf-signserver:{containerPropsPath}", logger);
+                $"cp \"{tempProps}\" {signServerContainer}:{containerPropsPath}", logger);
 
-            await UserSignatureEndpoints.RunDockerExecAsync("ivf-signserver",
-                $"bin/signserver setproperties {containerPropsPath}", logger);
+            await UserSignatureEndpoints.RunDockerExecAsync(signServerContainer,
+                $"{signerCli} setproperties {containerPropsPath}", logger);
 
             // Clean up temp properties file (contains keystore password)
-            await UserSignatureEndpoints.RunDockerExecAsync("ivf-signserver",
+            await UserSignatureEndpoints.RunDockerExecAsync(signServerContainer,
                 $"rm -f {containerPropsPath}", logger);
         }
         finally
@@ -478,29 +584,39 @@ public sealed class TenantCertificateService(
         }
 
         // Set additional properties
-        await UserSignatureEndpoints.RunDockerExecAsync("ivf-signserver",
-            $"bin/signserver setproperty {workerId} TYPE PROCESSABLE", logger);
-        await UserSignatureEndpoints.RunDockerExecAsync("ivf-signserver",
-            $"bin/signserver setproperty {workerId} CERTIFICATION_LEVEL NOT_CERTIFIED", logger);
-        await UserSignatureEndpoints.RunDockerExecAsync("ivf-signserver",
-            $"bin/signserver setproperty {workerId} ADD_VISIBLE_SIGNATURE false", logger);
-        await UserSignatureEndpoints.RunDockerExecAsync("ivf-signserver",
-            $"bin/signserver setproperty {workerId} REASON \"Ky boi {UserSignatureEndpoints.SanitizeForDN(certDN)}\"",
-            logger);
-        await UserSignatureEndpoints.RunDockerExecAsync("ivf-signserver",
-            $"bin/signserver setproperty {workerId} LOCATION \"IVF Clinic\"", logger);
+        await UserSignatureEndpoints.RunDockerExecAsync(signServerContainer,
+            $"{signerCli} setproperty {workerId} TYPE PROCESSABLE", logger);
+        await UserSignatureEndpoints.RunDockerExecAsync(signServerContainer,
+            $"{signerCli} setproperty {workerId} KEYSTOREPATH {keystorePath}", logger);
+        await UserSignatureEndpoints.RunDockerExecAsync(signServerContainer,
+            $"{signerCli} setproperty {workerId} KEYSTOREPASSWORD {keystorePassword}", logger);
+
+        if (!string.IsNullOrEmpty(keyAlias))
+        {
+            await UserSignatureEndpoints.RunDockerExecAsync(signServerContainer,
+                $"{signerCli} setproperty {workerId} DEFAULTKEY {keyAlias}", logger);
+        }
+
+        await UserSignatureEndpoints.RunDockerExecAsync(signServerContainer,
+            $"{signerCli} setproperty {workerId} CERTIFICATION_LEVEL NOT_CERTIFIED", logger);
+        await UserSignatureEndpoints.RunDockerExecAsync(signServerContainer,
+            $"{signerCli} setproperty {workerId} ADD_VISIBLE_SIGNATURE false", logger);
+        await UserSignatureEndpoints.RunDockerExecAsync(signServerContainer,
+            $"{signerCli} setproperty {workerId} REASON \"Ky boi {cn}\"", logger);
+        await UserSignatureEndpoints.RunDockerExecAsync(signServerContainer,
+            $"{signerCli} setproperty {workerId} LOCATION \"{org}\"", logger);
 
         // Add authorized API client certificate (mTLS) if configured
-        if (!string.IsNullOrEmpty(opts.ClientCertificatePath) && File.Exists(opts.ClientCertificatePath))
+        if (!string.IsNullOrEmpty(_opts.ClientCertificatePath) && File.Exists(_opts.ClientCertificatePath))
         {
             try
             {
                 using var apiCert = System.Security.Cryptography.X509Certificates.X509CertificateLoader
-                    .LoadPkcs12FromFile(opts.ClientCertificatePath, opts.ResolveClientCertificatePassword());
+                    .LoadPkcs12FromFile(_opts.ClientCertificatePath, _opts.ResolveClientCertificatePassword());
                 var serial = apiCert.SerialNumber;
                 var issuerDN = apiCert.Issuer;
-                await UserSignatureEndpoints.RunDockerExecAsync("ivf-signserver",
-                    $"bin/signserver addauthorizedclient {workerId} {serial} \"{issuerDN}\"", logger);
+                await UserSignatureEndpoints.RunDockerExecAsync(signServerContainer,
+                    $"{signerCli} addauthorizedclient {workerId} {serial} \"{issuerDN}\"", logger);
             }
             catch (Exception ex)
             {
@@ -508,20 +624,144 @@ public sealed class TenantCertificateService(
             }
         }
 
-        // Reload and activate
-        await UserSignatureEndpoints.RunDockerExecAsync("ivf-signserver",
-            $"bin/signserver reload {workerId}", logger);
-        await UserSignatureEndpoints.RunDockerExecAsync("ivf-signserver",
-            $"bin/signserver activatecryptotoken {workerId} {keystorePassword}", logger);
+        // Activate crypto token and reload
+        await UserSignatureEndpoints.RunDockerExecAsync(signServerContainer,
+            $"{signerCli} activatecryptotoken {workerId} {keystorePassword}", logger);
+        await UserSignatureEndpoints.RunDockerExecAsync(signServerContainer,
+            $"{signerCli} reload {workerId}", logger);
+    }
+
+    /// <summary>Cleanup temporary EJBCA enrollment files.</summary>
+    private async Task CleanupEjbcaTempAsync(string eeUsername)
+    {
+        var p12Path = $"/tmp/ejbca-certs/{eeUsername}.p12";
+        await UserSignatureEndpoints.RunDockerExecAsync(_opts.EjbcaContainerName,
+            $"rm -f {p12Path}", logger);
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // EJBCA REST API Operations
+    // ═══════════════════════════════════════════════════════
+
+    /// <summary>Verify that an EJBCA CA exists via REST API.</summary>
+    private async Task VerifyEjbcaCaExistsAsync(string caName)
+    {
+        var url = $"{_opts.EjbcaUrl.TrimEnd('/')}/ejbca-rest-api/v1/ca";
+        var (content, error) = await SigningAdminEndpoints.TryEjbcaRestCallAsync(_opts, url);
+
+        if (error is not null)
+        {
+            logger.LogWarning("Cannot verify EJBCA CA '{CaName}': {Error}. Proceeding anyway.", caName, error);
+            return; // Don't block provisioning if REST API is unavailable
+        }
+
+        if (content is not null)
+        {
+            using var doc = JsonDocument.Parse(content);
+            var cas = doc.RootElement.TryGetProperty("certificate_authorities", out var casArray)
+                ? casArray : doc.RootElement;
+
+            var found = false;
+            if (cas.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var ca in cas.EnumerateArray())
+                {
+                    var name = ca.TryGetProperty("name", out var n) ? n.GetString() : null;
+                    if (string.Equals(name, caName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        found = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!found)
+                logger.LogWarning("EJBCA CA '{CaName}' not found in REST API response. Verify it exists.", caName);
+        }
+    }
+
+    /// <summary>Revoke all certificates issued for a tenant via EJBCA REST API.</summary>
+    private async Task RevokeAllTenantCertsViaEjbcaAsync(TenantSubCa tenantSubCa)
+    {
+        // Search for certs by CA name using EJBCA REST API v2
+        var searchUrl = $"{_opts.EjbcaUrl.TrimEnd('/')}/ejbca-rest-api/v2/certificate/search";
+        var searchBody = JsonSerializer.Serialize(new
+        {
+            max_number_of_results = 100,
+            criteria = new[]
+            {
+                new { property = "CA", value = tenantSubCa.EjbcaCaName, operation = "EQUAL" },
+                new { property = "STATUS", value = "CERT_ACTIVE", operation = "EQUAL" }
+            }
+        });
+
+        var (content, error) = await SigningAdminEndpoints.TryEjbcaRestCallAsync(
+            _opts, searchUrl, HttpMethod.Post,
+            new StringContent(searchBody, System.Text.Encoding.UTF8, "application/json"));
+
+        if (error is not null)
+        {
+            logger.LogWarning("Cannot search EJBCA certs for revocation: {Error}", error);
+            return;
+        }
+
+        if (content is null) return;
+
+        using var doc = JsonDocument.Parse(content);
+        if (!doc.RootElement.TryGetProperty("certificates", out var certs)) return;
+
+        foreach (var cert in certs.EnumerateArray())
+        {
+            var serial = cert.TryGetProperty("serialNumber", out var sn) ? sn.GetString() : null;
+            var issuerDn = cert.TryGetProperty("issuerDN", out var iss) ? iss.GetString() : null;
+
+            if (serial is null || issuerDn is null) continue;
+
+            // Only revoke certs matching tenant's worker prefix pattern
+            var username = cert.TryGetProperty("username", out var un) ? un.GetString() : null;
+            var tenantSlug = tenantSubCa.Tenant?.Slug ?? "";
+            if (username is not null && !username.Contains(SanitizeSlug(tenantSlug))) continue;
+
+            var revokeUrl = $"{_opts.EjbcaUrl.TrimEnd('/')}/ejbca-rest-api/v1/certificate/{Uri.EscapeDataString(issuerDn)}/{serial}/revoke?reason=CESSATION_OF_OPERATION";
+            var (_, revokeError) = await SigningAdminEndpoints.TryEjbcaRestCallAsync(
+                _opts, revokeUrl, HttpMethod.Put);
+
+            if (revokeError is not null)
+                logger.LogWarning("Failed to revoke cert {Serial}: {Error}", serial, revokeError);
+            else
+                logger.LogInformation("Revoked EJBCA cert {Serial} for tenant {Tenant}", serial, tenantSubCa.TenantId);
+        }
     }
 
     // ═══════════════════════════════════════════════════════
     // Helpers
     // ═══════════════════════════════════════════════════════
 
-    /// <summary>Sanitize tenant slug for use in worker names (alphanumeric + hyphens only).</summary>
+    /// <summary>Sanitize tenant slug for use in worker names and EE usernames.</summary>
     private static string SanitizeSlug(string slug)
         => new(slug.Where(c => char.IsLetterOrDigit(c) || c == '-').ToArray());
+
+    /// <summary>Run docker exec and capture exit code + output.</summary>
+    private static async Task<(int ExitCode, string? Output)> RunDockerExecWithExitCodeAsync(
+        string containerName, string command)
+    {
+        var psi = new System.Diagnostics.ProcessStartInfo("docker",
+            $"exec {containerName} {command}")
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+
+        using var process = System.Diagnostics.Process.Start(psi);
+        if (process is null) return (-1, null);
+
+        var stdout = await process.StandardOutput.ReadToEndAsync();
+        await process.WaitForExitAsync();
+
+        return (process.ExitCode, stdout);
+    }
 }
 
 // ═══════════════════════════════════════════════════════
@@ -530,28 +770,23 @@ public sealed class TenantCertificateService(
 
 public record TenantCertProvisionResult(
     string CertSubject,
-    string? SerialNumber,
-    DateTime Expiry,
+    string EjbcaUsername,
+    DateTime EstimatedExpiry,
     string WorkerName,
-    Guid ManagedCertId,
-    Guid CertificateAuthorityId);
+    int WorkerId);
 
 public record TenantSubCaStatusDto(
     Guid TenantId,
     string TenantName,
-    Guid CaId,
-    string CaName,
-    string CaCommonName,
-    string CaFingerprint,
-    DateTime CaNotBefore,
-    DateTime CaNotAfter,
-    CaStatus CaStatus,
+    string EjbcaCaName,
+    string EjbcaCertProfileName,
+    string EjbcaEeProfileName,
     TenantSubCaStatus SubCaStatus,
     string WorkerNamePrefix,
     string OrganizationName,
     int ActiveWorkerCount,
     int MaxWorkers,
-    int ActiveCertCount,
+    int ActiveSignatureCount,
     int DefaultCertValidityDays,
     int RenewBeforeDays,
     bool AutoProvisionEnabled);
@@ -561,4 +796,7 @@ public record TenantCaConfigRequest(
     int? RenewBeforeDays,
     int? MaxWorkers);
 
-public record ProvisionTenantCaRequest(Guid RootCaId);
+public record ProvisionTenantCaRequest(
+    string? CaName,
+    string? CertProfileName,
+    string? EeProfileName);

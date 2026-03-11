@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 namespace IVF.API.Endpoints;
 
 /// <summary>
-/// Admin endpoints for managing per-tenant Sub-CAs and tenant certificate lifecycle.
+/// Admin endpoints for managing per-tenant Sub-CAs (EJBCA-backed) and tenant certificate lifecycle.
 /// Platform admin can provision, configure, suspend, and revoke tenant Sub-CAs.
 /// </summary>
 public static class TenantCaEndpoints
@@ -39,7 +39,7 @@ public static class TenantCaEndpoints
         })
         .WithName("GetTenantCA");
 
-        // ─── Provision Sub-CA for a tenant ──────────────────────
+        // ─── Provision Sub-CA for a tenant (registers EJBCA CA reference) ───
         group.MapPost("/{tenantId:guid}/provision", async (
             Guid tenantId,
             ProvisionTenantCaRequest request,
@@ -49,7 +49,7 @@ public static class TenantCaEndpoints
             try
             {
                 var result = await tenantCaService.ProvisionTenantSubCaAsync(
-                    tenantId, request.RootCaId, ct);
+                    tenantId, request.CaName, request.CertProfileName, request.EeProfileName, ct);
 
                 var status = await tenantCaService.GetTenantCaStatusAsync(tenantId, ct);
                 return Results.Created($"/api/admin/tenant-ca/{tenantId}", new
@@ -110,7 +110,7 @@ public static class TenantCaEndpoints
         })
         .WithName("SuspendTenantCA");
 
-        // ─── Revoke tenant Sub-CA (nuclear option) ──────────────
+        // ─── Revoke tenant Sub-CA (revokes all tenant certs via EJBCA) ──────
         group.MapPost("/{tenantId:guid}/revoke", async (
             Guid tenantId,
             TenantCertificateService tenantCaService,
@@ -132,7 +132,7 @@ public static class TenantCaEndpoints
         })
         .WithName("RevokeTenantCA");
 
-        // ─── Provision user cert via tenant Sub-CA ──────────────
+        // ─── Provision user cert via tenant Sub-CA (EJBCA enrollment) ───────
         group.MapPost("/{tenantId:guid}/users/{userId:guid}/provision", async (
             Guid tenantId,
             Guid userId,
@@ -162,12 +162,12 @@ public static class TenantCaEndpoints
                 sig.SetCertificateStatus(CertificateStatus.Pending);
                 await db.SaveChangesAsync(ct);
 
-                var result = await tenantCaService.ProvisionUserCertAsync(user, tenantId, opts, ct);
+                var result = await tenantCaService.ProvisionUserCertAsync(user, tenantId, ct);
 
                 sig.SetCertificateInfo(
                     subject: result.CertSubject,
-                    serialNumber: result.SerialNumber,
-                    expiry: result.Expiry,
+                    serialNumber: result.EjbcaUsername,
+                    expiry: result.EstimatedExpiry,
                     workerName: result.WorkerName,
                     keystorePath: null);
 
@@ -178,10 +178,10 @@ public static class TenantCaEndpoints
                     success = true,
                     certificateSubject = result.CertSubject,
                     workerName = result.WorkerName,
-                    serialNumber = result.SerialNumber,
-                    expiry = result.Expiry,
-                    managedCertId = result.ManagedCertId,
-                    message = $"Đã cấp chứng thư Sub-CA cho {user.FullName}"
+                    ejbcaUsername = result.EjbcaUsername,
+                    estimatedExpiry = result.EstimatedExpiry,
+                    workerId = result.WorkerId,
+                    message = $"Đã cấp chứng thư EJBCA cho {user.FullName}"
                 });
             }
             catch (Exception ex)

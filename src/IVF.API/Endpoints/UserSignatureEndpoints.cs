@@ -191,12 +191,12 @@ public static class UserSignatureEndpoints
                     if (tenantCaStatus is not null && tenantCaStatus.SubCaStatus == TenantSubCaStatus.Active)
                     {
                         var subCaResult = await tenantCaService.ProvisionUserCertAsync(
-                            user, user.TenantId, opts, CancellationToken.None);
+                            user, user.TenantId, CancellationToken.None);
 
                         sig.SetCertificateInfo(
                             subject: subCaResult.CertSubject,
-                            serialNumber: subCaResult.SerialNumber,
-                            expiry: subCaResult.Expiry,
+                            serialNumber: subCaResult.EjbcaUsername,
+                            expiry: subCaResult.EstimatedExpiry,
                             workerName: subCaResult.WorkerName,
                             keystorePath: null);
                         await db.SaveChangesAsync();
@@ -206,10 +206,10 @@ public static class UserSignatureEndpoints
                             success = true,
                             certificateSubject = subCaResult.CertSubject,
                             workerName = subCaResult.WorkerName,
-                            serialNumber = subCaResult.SerialNumber,
-                            expiry = subCaResult.Expiry,
-                            issuedBy = "Sub-CA",
-                            message = $"Đã cấp chứng thư Sub-CA cho {user.FullName}"
+                            ejbcaUsername = subCaResult.EjbcaUsername,
+                            expiry = subCaResult.EstimatedExpiry,
+                            issuedBy = "EJBCA",
+                            message = $"Đã cấp chứng thư EJBCA cho {user.FullName}"
                         });
                     }
                 }
@@ -291,12 +291,12 @@ public static class UserSignatureEndpoints
                     if (tenantCaStatus is not null && tenantCaStatus.SubCaStatus == TenantSubCaStatus.Active)
                     {
                         var subCaResult = await tenantCaService.ProvisionUserCertAsync(
-                            user, user.TenantId, opts, CancellationToken.None);
+                            user, user.TenantId, CancellationToken.None);
 
                         sig.SetCertificateInfo(
                             subject: subCaResult.CertSubject,
-                            serialNumber: subCaResult.SerialNumber,
-                            expiry: subCaResult.Expiry,
+                            serialNumber: subCaResult.EjbcaUsername,
+                            expiry: subCaResult.EstimatedExpiry,
                             workerName: subCaResult.WorkerName,
                             keystorePath: null);
                         await db.SaveChangesAsync();
@@ -306,9 +306,9 @@ public static class UserSignatureEndpoints
                             success = true,
                             certificateSubject = subCaResult.CertSubject,
                             workerName = subCaResult.WorkerName,
-                            expiry = subCaResult.Expiry,
-                            issuedBy = "Sub-CA",
-                            message = $"Đã gia hạn chứng thư Sub-CA cho {user.FullName}"
+                            expiry = subCaResult.EstimatedExpiry,
+                            issuedBy = "EJBCA",
+                            message = $"Đã gia hạn chứng thư EJBCA cho {user.FullName}"
                         });
                     }
                 }
