@@ -32,6 +32,17 @@ natra.site {
 		}
 	}
 
+	# Loki — log aggregation (basic auth protected, strip /loki prefix)
+	handle_path /loki/* {
+		basic_auth {
+			monitor $2b$12$i27omGvrtGdYIh93svxdZO6.BJRMU6a1Y//ZjK7qMqBSV2E/9srIC
+		}
+		reverse_proxy ivf-loki:3100
+	}
+	handle /loki {
+		redir /loki/ permanent
+	}
+
 	# MinIO Console — access via SSH tunnel only:
 	# ssh -L 9001:localhost:9001 root@45.134.226.56
 	# Then open http://localhost:9001
