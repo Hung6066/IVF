@@ -98,6 +98,9 @@ services:
       - jwt_secret
       - minio_access_key
       - minio_secret_key
+      - source: jwt_private_key
+        target: /app/keys/jwt/jwt-private.pem
+        mode: 0400
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
@@ -109,10 +112,7 @@ services:
       # Không có healthcheck → Swarm coi container running = healthy (sai!)
       # Use curl to hit the health endpoint (/bin/sh is dash, not bash — /dev/tcp doesn't work)
       test:
-        [
-          "CMD-SHELL",
-          "curl -sf http://127.0.0.1:8080/health/live || exit 1",
-        ]
+        ["CMD-SHELL", "curl -sf http://127.0.0.1:8080/health/live || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 3
@@ -386,7 +386,7 @@ services:
         published: 443
         mode: host
     configs:
-      - source: caddyfile_v8
+      - source: caddyfile_v9
         target: /etc/caddy/Caddyfile
     volumes:
       - caddy_data:/data
@@ -453,7 +453,7 @@ services:
 
 # ─── Docker Configs ───
 configs:
-  caddyfile_v8:
+  caddyfile_v9:
     file: ./Caddyfile
   standby_entrypoint:
     file: ./docker/postgres/standby-entrypoint.sh
@@ -475,6 +475,8 @@ secrets:
   softhsm_pin:
     external: true
   softhsm_so_pin:
+    external: true
+  jwt_private_key:
     external: true
 
 # ─── Volumes ───
