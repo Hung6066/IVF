@@ -318,6 +318,13 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/admin/tenant-ca/tenant-ca.component').then((m) => m.TenantCaComponent),
       },
+      {
+        path: 'admin/dns-records',
+        loadComponent: () =>
+          import('./features/admin/dns-records/dns-records.component').then(
+            (m) => m.DnsRecordsComponent,
+          ),
+      },
 
       {
         path: 'forms',

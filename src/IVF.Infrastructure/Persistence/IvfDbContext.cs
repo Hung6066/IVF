@@ -98,6 +98,9 @@ public class IvfDbContext : DbContext
     // Permission Definitions (dynamic RBAC metadata)
     public DbSet<PermissionDefinition> PermissionDefinitions => Set<PermissionDefinition>();
 
+    // DNS Management (Cloudflare integration)
+    public DbSet<DnsRecord> DnsRecords => Set<DnsRecord>();
+
     // Backup & Restore
     public DbSet<BackupOperation> BackupOperations => Set<BackupOperation>();
     public DbSet<BackupScheduleConfig> BackupScheduleConfigs => Set<BackupScheduleConfig>();

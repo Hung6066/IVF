@@ -1,0 +1,110 @@
+@use 'sass:math';
+
+// ════════════════════════════════════════════════════════════════════════════════════════
+// Animations
+// ════════════════════════════════════════════════════════════════════════════════════════
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(2rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.3s ease-out;
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════════════════════
+// Component Styles
+// ════════════════════════════════════════════════════════════════════════════════════════
+
+:host {
+  display: block;
+}
+
+// Input & Select Styles
+input[type='text'],
+select {
+  &:focus {
+    border-color: rgb(59, 130, 246);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+
+  &:disabled {
+    background-color: rgb(243, 244, 246);
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+}
+
+// Button States
+button {
+  transition: all 0.2s ease-in-out;
+
+  &:active:not(:disabled) {
+    transform: scale(0.98);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+// Table Responsive Design
+@media (max-width: 768px) {
+  table {
+    font-size: 0.875rem;
+
+    th,
+    td {
+      padding: 0.75rem 0.5rem;
+    }
+  }
+
+  button {
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+  }
+}
+
+// Dark mode support (optional)
+@media (prefers-color-scheme: dark) {
+  :host {
+    --bg-primary: rgb(17, 24, 39);
+    --bg-secondary: rgb(31, 41, 55);
+    --text-primary: rgb(243, 244, 246);
+    --text-secondary: rgb(209, 213, 219);
+  }
+}

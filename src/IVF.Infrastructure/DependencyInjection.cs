@@ -68,6 +68,7 @@ public static class DependencyInjection
         services.AddScoped<IPatientDocumentRepository, PatientDocumentRepository>();
         services.AddScoped<ITenantRepository, TenantRepository>();
         services.AddScoped<IPricingRepository, PricingRepository>();
+        services.AddScoped<IDnsRecordRepository, DnsRecordRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 
         // Register Services
@@ -78,6 +79,9 @@ public static class DependencyInjection
         services.AddSingleton<IDomainVerificationService, Services.DomainVerificationService>();
         services.AddScoped<ICaddyConfigService, Services.CaddyConfigService>();
         services.AddScoped<IFlowSeeder, FlowSeeder>();
+
+        // DNS Provider (Cloudflare)
+        services.AddHttpClient<IDnsProvider, Services.Dns.CloudflareDnsProvider>();
 
         // Key Vault & Zero Trust
         services.AddScoped<IApiKeyManagementRepository, ApiKeyManagementRepository>();

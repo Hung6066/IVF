@@ -70,6 +70,7 @@ const FALLBACK_MENU: MenuSection[] = [
       { icon: '🔔', label: 'Thông báo', route: '/admin/notifications', adminOnly: true },
       { icon: '🔏', label: 'Ký số', route: '/admin/digital-signing', adminOnly: true },
       { icon: '🏛️', label: 'Tenant CA', route: '/admin/tenant-ca', platformAdminOnly: true },
+      { icon: '📝', label: 'DNS Records', route: '/admin/dns-records', platformAdminOnly: true },
     ],
   },
   {

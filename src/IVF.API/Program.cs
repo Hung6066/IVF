@@ -740,6 +740,7 @@ try
     app.MapTenantEndpoints(); // Multi-tenant management — platform admin
     app.MapDomainManagementEndpoints(); // Domain management — Caddy config sync
     app.MapInfrastructureEndpoints(); // Infrastructure monitoring — VPS, Swarm, S3
+    app.MapDnsManagementEndpoints(); // DNS records management — Cloudflare integration
 
     // ── Config seeders: run in every environment (idempotent, no demo data) ──────
     {
