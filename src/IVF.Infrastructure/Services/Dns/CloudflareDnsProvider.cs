@@ -28,7 +28,6 @@ public class CloudflareDnsProvider : IDnsProvider
         _zoneId = cloudflareSection["ZoneId"] ?? throw new InvalidOperationException("Cloudflare:ZoneId not configured");
 
         _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {_apiToken}");
-        _httpClient.DefaultRequestHeaders.Add("Content-Type", "application/json");
     }
 
     public async Task<DnsProviderRecord> CreateRecordAsync(

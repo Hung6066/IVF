@@ -1,0 +1,57 @@
+# Git
+.git
+.github
+.gitignore
+
+# IDE
+.vscode
+.vs
+*.sln
+*.slnx
+*.user
+
+# Documentation
+docs/
+data-flow/
+deploys/
+developer_guide.md
+CLAUDE.md
+*.md
+!ivf-client/README.md
+
+# Infrastructure (not needed in build)
+ansible/
+backups/
+certs/
+docker/
+keys/
+scripts/
+secrets/
+skills/
+.agents/
+
+# Docker compose files
+docker-compose*.yml
+Caddyfile
+payload.json
+
+# Tests (not included in publish)
+tests/
+
+# Build artifacts
+**/bin/
+**/obj/
+**/node_modules/
+**/dist/
+**/.angular/
+
+# OS files
+**/Thumbs.db
+**/.DS_Store
+
+# Logs
+**/*.log
+
+# Tar files
+*.tar
+*.tar.gz

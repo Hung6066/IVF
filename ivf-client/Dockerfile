@@ -6,16 +6,20 @@
 # Run:   docker run -p 8080:80 ghcr.io/hung6066/ivf-client:latest
 # =====================================================
 
-# ──────────── Stage 1: Build Angular ────────────
-FROM node:20-alpine AS build
+# ──────────── Stage 1: Install deps (cached unless package*.json changes) ────
+FROM node:20-alpine AS deps
 
 WORKDIR /app
 
 # Copy package files first (cache layer)
 COPY ivf-client/package.json ivf-client/package-lock.json ./
 
-# Install dependencies
-RUN npm ci --ignore-scripts
+# Install dependencies with npm cache mount
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --ignore-scripts
+
+# ──────────── Stage 2: Build Angular ────────────
+FROM deps AS build
 
 # Copy source code
 COPY ivf-client/ .
@@ -23,7 +27,7 @@ COPY ivf-client/ .
 # Build production
 RUN npm run build -- --configuration production
 
-# ──────────── Stage 2: Serve with Caddy ────────────
+# ──────────── Stage 3: Serve with Caddy ────────────
 FROM caddy:2-alpine AS runtime
 
 # Copy built Angular app
