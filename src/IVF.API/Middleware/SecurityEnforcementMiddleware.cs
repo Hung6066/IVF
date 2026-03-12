@@ -196,7 +196,12 @@ public class SecurityEnforcementMiddleware
 
     private static string? GetClientIp(HttpContext context)
     {
-        // Check forwarded headers first (behind proxy/load balancer)
+        // Cloudflare: CF-Connecting-IP is the most reliable real client IP
+        var cfIp = context.Request.Headers["CF-Connecting-IP"].FirstOrDefault();
+        if (!string.IsNullOrEmpty(cfIp) && IPAddress.TryParse(cfIp.Trim(), out _))
+            return cfIp.Trim();
+
+        // Check forwarded headers (behind proxy/load balancer)
         var forwarded = context.Request.Headers["X-Forwarded-For"].FirstOrDefault();
         if (!string.IsNullOrEmpty(forwarded))
         {
@@ -205,6 +210,11 @@ public class SecurityEnforcementMiddleware
             if (IPAddress.TryParse(firstIp, out _))
                 return firstIp;
         }
+
+        // X-Real-IP fallback (Nginx/Caddy)
+        var realIp = context.Request.Headers["X-Real-IP"].FirstOrDefault();
+        if (!string.IsNullOrEmpty(realIp) && IPAddress.TryParse(realIp.Trim(), out _))
+            return realIp.Trim();
 
         return context.Connection.RemoteIpAddress?.ToString();
     }

@@ -103,3 +103,59 @@ natra.site {
 
 	encode gzip zstd
 }
+
+# Tenant subdomains — Caddy auto-provisions Let's Encrypt cert per subdomain
+# To add a new tenant: add "{slug}.natra.site" to the site address list below
+# When Cloudflare proxy is enabled, switch to Origin CA cert (see docs)
+ivf-dong-do.natra.site {
+	# Health checks
+	handle /health/* {
+		reverse_proxy api:8080
+	}
+
+	# API requests
+	handle /api/* {
+		reverse_proxy api:8080 {
+			health_uri      /health/live
+			health_interval 15s
+			health_timeout  5s
+			fail_duration   30s
+			lb_policy       round_robin
+			lb_retries      2
+		}
+	}
+
+	# SignalR hubs
+	handle /hubs/* {
+		reverse_proxy api:8080 {
+			health_uri      /health/live
+			health_interval 15s
+			health_timeout  5s
+			fail_duration   30s
+			lb_policy       ip_hash
+			header_up Connection {http.request.header.Connection}
+			header_up Upgrade    {http.request.header.Upgrade}
+		}
+	}
+
+	# Everything else -> Angular frontend
+	handle {
+		reverse_proxy frontend:80 {
+			health_uri      /
+			health_interval 30s
+			health_timeout  5s
+			fail_duration   30s
+		}
+	}
+
+	# Security headers
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		-Server
+	}
+
+	encode gzip zstd
+}

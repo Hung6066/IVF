@@ -84,24 +84,38 @@ public class TenantResolutionMiddleware
         await _next(context);
     }
 
+    private static readonly string[] SubdomainSuffixes = [".natra.site", ".ivf.clinic"];
+
     private static string? ExtractSubdomainSlug(string host)
     {
-        const string suffix = ".ivf.clinic";
-        if (host.EndsWith(suffix, StringComparison.OrdinalIgnoreCase)
-            && host.Length > suffix.Length)
+        // Strip port if present (e.g. localhost:5000)
+        var colonIdx = host.IndexOf(':');
+        if (colonIdx > 0)
+            host = host[..colonIdx];
+
+        foreach (var suffix in SubdomainSuffixes)
         {
-            var subdomain = host[..^suffix.Length];
-            // Only single-level subdomains (no dots), valid slug chars
-            if (!subdomain.Contains('.') && subdomain.Length > 0)
-                return subdomain.ToLowerInvariant();
+            if (host.EndsWith(suffix, StringComparison.OrdinalIgnoreCase)
+                && host.Length > suffix.Length)
+            {
+                var subdomain = host[..^suffix.Length];
+                // Only single-level subdomains (no dots), valid slug chars
+                if (!subdomain.Contains('.') && subdomain.Length > 0)
+                    return subdomain.ToLowerInvariant();
+            }
         }
         return null;
     }
 
     private static bool IsDefaultHost(string host)
     {
+        // Strip port if present
+        var colonIdx = host.IndexOf(':');
+        if (colonIdx > 0)
+            host = host[..colonIdx];
+
         return host is "localhost" or "127.0.0.1"
-            || host == "ivf.clinic";
+            || host is "natra.site" or "ivf.clinic";
     }
 }
 

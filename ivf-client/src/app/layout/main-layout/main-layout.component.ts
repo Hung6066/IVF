@@ -77,6 +77,7 @@ const FALLBACK_MENU: MenuSection[] = [
     platformAdminOnly: true,
     items: [
       { icon: '🏢', label: 'Quản lý Trung tâm', route: '/admin/tenants', platformAdminOnly: true },
+      { icon: '🌐', label: 'Quản lý Domain', route: '/admin/domains', platformAdminOnly: true },
       { icon: '💰', label: 'Bảng giá', route: '/pricing', platformAdminOnly: true },
       { icon: '🗄️', label: 'Sao lưu', route: '/admin/backup-restore', platformAdminOnly: true },
       { icon: '🛡️', label: 'Bảo mật', route: '/admin/security', platformAdminOnly: true },

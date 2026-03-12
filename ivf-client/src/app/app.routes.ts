@@ -340,6 +340,13 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'admin/domains',
+        loadComponent: () =>
+          import('./features/admin/domain-management/domain-management.component').then(
+            (m) => m.DomainManagementComponent,
+          ),
+      },
+      {
         path: 'pricing',
         loadComponent: () =>
           import('./features/pricing/pricing.component').then((m) => m.PricingComponent),

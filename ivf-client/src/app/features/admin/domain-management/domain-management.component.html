@@ -1,0 +1,171 @@
+<div class="domain-management">
+  <!-- Header -->
+  <div class="page-header">
+    <div class="header-content">
+      <h1><i class="fa-solid fa-globe"></i> Quản lý Domain</h1>
+      <p class="subtitle">Quản lý domain và cấu hình Caddy reverse proxy cho các tenant</p>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-primary" (click)="syncConfig()" [disabled]="syncing()">
+        @if (syncing()) {
+          <i class="fa-solid fa-spinner fa-spin"></i> Đang đồng bộ...
+        } @else {
+          <i class="fa-solid fa-arrows-rotate"></i> Đồng bộ Caddy
+        }
+      </button>
+    </div>
+  </div>
+
+  <!-- Sync result message -->
+  @if (syncMessage()) {
+    <div class="alert" [class.alert-success]="syncSuccess()" [class.alert-error]="syncSuccess() === false">
+      <i [class]="syncSuccess() ? 'fa-solid fa-check-circle' : 'fa-solid fa-exclamation-circle'"></i>
+      {{ syncMessage() }}
+    </div>
+  }
+
+  <!-- Stats -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-value">{{ domains().length }}</div>
+      <div class="stat-label">Tổng Tenant</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">{{ getActiveDomainCount() }}</div>
+      <div class="stat-label">Domain Active</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">{{ getCustomDomainCount() }}</div>
+      <div class="stat-label">Custom Domain</div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab" [class.active]="activeTab() === 'domains'" (click)="switchTab('domains')">
+      <i class="fa-solid fa-list"></i> Danh sách Domain
+    </button>
+    <button class="tab" [class.active]="activeTab() === 'preview'" (click)="switchTab('preview')">
+      <i class="fa-solid fa-file-code"></i> Xem trước Caddyfile
+    </button>
+    <button class="tab" [class.active]="activeTab() === 'current'" (click)="switchTab('current')">
+      <i class="fa-solid fa-server"></i> Cấu hình đang chạy
+    </button>
+  </div>
+
+  <!-- Domains Tab -->
+  @if (activeTab() === 'domains') {
+    <div class="table-container">
+      @if (loading()) {
+        <div class="loading-state">
+          <i class="fa-solid fa-spinner fa-spin"></i> Đang tải...
+        </div>
+      } @else {
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Tenant</th>
+              <th>Slug</th>
+              <th>Subdomain</th>
+              <th>Custom Domain</th>
+              <th>Trạng thái Domain</th>
+              <th>Trạng thái</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (domain of domains(); track domain.tenantId) {
+              <tr [class.inactive]="!domain.isActive">
+                <td class="tenant-name">{{ domain.tenantName }}</td>
+                <td><code>{{ domain.slug }}</code></td>
+                <td>
+                  @if (domain.subdomain) {
+                    <a [href]="'https://' + domain.subdomain" target="_blank" class="domain-link">
+                      {{ domain.subdomain }}
+                      <i class="fa-solid fa-external-link-alt"></i>
+                    </a>
+                  } @else {
+                    <span class="text-muted">—</span>
+                  }
+                </td>
+                <td>
+                  @if (domain.customDomain) {
+                    <a [href]="'https://' + domain.customDomain" target="_blank" class="domain-link">
+                      {{ domain.customDomain }}
+                      <i class="fa-solid fa-external-link-alt"></i>
+                    </a>
+                  } @else {
+                    <span class="text-muted">—</span>
+                  }
+                </td>
+                <td>
+                  <span class="badge" [class]="'badge-' + domain.customDomainStatus.toLowerCase()">
+                    {{ domain.customDomainStatus }}
+                  </span>
+                </td>
+                <td>
+                  @if (domain.isActive) {
+                    <span class="badge badge-active">
+                      <i class="fa-solid fa-check-circle"></i> Active
+                    </span>
+                  } @else {
+                    <span class="badge badge-inactive">
+                      <i class="fa-solid fa-pause-circle"></i> Inactive
+                    </span>
+                  }
+                </td>
+              </tr>
+            }
+            @if (domains().length === 0) {
+              <tr>
+                <td colspan="6" class="empty-state">Chưa có tenant nào</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+    </div>
+  }
+
+  <!-- Preview Tab -->
+  @if (activeTab() === 'preview') {
+    <div class="config-viewer">
+      @if (previewLoading()) {
+        <div class="loading-state">
+          <i class="fa-solid fa-spinner fa-spin"></i> Đang tạo Caddyfile...
+        </div>
+      } @else {
+        <div class="config-header">
+          <span>Caddyfile (sẽ được gửi tới Caddy khi đồng bộ)</span>
+        </div>
+        <pre class="config-content">{{ caddyfilePreview() }}</pre>
+      }
+    </div>
+  }
+
+  <!-- Current Config Tab -->
+  @if (activeTab() === 'current') {
+    <div class="config-viewer">
+      @if (configLoading()) {
+        <div class="loading-state">
+          <i class="fa-solid fa-spinner fa-spin"></i> Đang tải cấu hình...
+        </div>
+      } @else {
+        <div class="config-header">
+          <span>Cấu hình Caddy đang chạy (JSON)</span>
+        </div>
+        <pre class="config-content json">{{ currentConfig() }}</pre>
+      }
+    </div>
+  }
+
+  <!-- Help info -->
+  <div class="help-box">
+    <h3><i class="fa-solid fa-circle-info"></i> Hướng dẫn</h3>
+    <ol>
+      <li>Tạo tenant mới trong <strong>Quản lý Trung tâm</strong> — slug sẽ được dùng làm subdomain</li>
+      <li>Thêm DNS A record cho <code>slug.natra.site</code> trỏ đến IP server</li>
+      <li>Nhấn <strong>Đồng bộ Caddy</strong> để cập nhật cấu hình — Caddy tự động cấp chứng chỉ Let's Encrypt</li>
+      <li>(Tùy chọn) Cấu hình custom domain trong trang chi tiết tenant, verify DNS rồi đồng bộ lại</li>
+    </ol>
+  </div>
+</div>

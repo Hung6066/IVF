@@ -1,0 +1,219 @@
+# ═══════════════════════════════════════════════════════════════
+#  IVF Platform — Selective Deployment Playbook
+# ═══════════════════════════════════════════════════════════════
+#
+#  Tham số:
+#    - deploy_backend: true|false (default: true)
+#    - deploy_frontend: true|false (default: true)
+#    - image_tag: Docker image tag (default: latest)
+#    - ghcr_token: GitHub Container Registry token (required)
+#
+#  Sử dụng:
+#    # Deploy cả backend và frontend
+#    ansible-playbook -i hosts.yml deploy.yml \
+#      --extra-vars "image_tag=sha-c7d4766 ghcr_token=YOUR_TOKEN"
+#
+#    # Chỉ deploy backend
+#    ansible-playbook -i hosts.yml deploy.yml \
+#      --extra-vars "deploy_backend=true deploy_frontend=false image_tag=sha-c7d4766 ghcr_token=YOUR_TOKEN"
+#
+#    # Chỉ deploy frontend
+#    ansible-playbook -i hosts.yml deploy.yml \
+#      --extra-vars "deploy_backend=false deploy_frontend=true image_tag=sha-c7d4766 ghcr_token=YOUR_TOKEN"
+#
+# ═══════════════════════════════════════════════════════════════
+
+---
+- name: "IVF Production Deployment — Selective Deploy"
+  hosts: managers
+  become: true
+  serial: 1
+
+  vars:
+    deploy_backend: "{{ deploy_backend | default(true) }}"
+    deploy_frontend: "{{ deploy_frontend | default(true) }}"
+    image_tag: "{{ image_tag | default('latest') }}"
+    ghcr_token: "{{ ghcr_token | default('') }}"
+    registry: "ghcr.io"
+    image_name: "hung6066/ivf"
+    image_api: "{{ registry }}/{{ image_name }}:{{ image_tag }}"
+    image_frontend: "{{ registry }}/{{ image_name }}-client:{{ image_tag }}"
+    api_service: "ivf_api"
+    frontend_service: "ivf_frontend"
+
+  pre_tasks:
+    - name: "Validate required variables"
+      fail:
+        msg: "ghcr_token is required for GHCR authentication"
+      when: ghcr_token == ''
+
+    - name: "Deploy configuration"
+      debug:
+        msg: |
+          🚀 Deployment Configuration:
+          ================================
+          Backend:    {{ deploy_backend | ternary('✅ YES', '❌ NO') }}
+          Frontend:   {{ deploy_frontend | ternary('✅ YES', '❌ NO') }}
+          Image Tag:  {{ image_tag }}
+          Registry:   {{ registry }}
+          API Image:  {{ image_api }}
+          FE Image:   {{ image_frontend }}
+
+  tasks:
+    - name: "GHCR Authentication"
+      shell: |
+        echo "{{ ghcr_token }}" | docker login {{ registry }} -u hung6066 --password-stdin
+      register: login_result
+      changed_when: "'Login Succeeded' in login_result.stdout"
+
+    # ──────────────── Backend Deployment ────────────────
+    - name: "Pull API image"
+      shell: "docker pull {{ image_api }}"
+      register: api_pull_result
+      when: deploy_backend | bool
+      changed_when: "'Downloaded' in api_pull_result.stdout or 'up to date' in api_pull_result.stdout"
+
+    - name: "Deploy API service (rolling update)"
+      shell: |
+        docker service update \
+          --image {{ image_api }} \
+          --update-parallelism 1 \
+          --update-delay 30s \
+          --update-order start-first \
+          --update-failure-action rollback \
+          --update-monitor 60s \
+          --with-registry-auth \
+          {{ api_service }}
+      register: api_deploy_result
+      when: deploy_backend | bool
+      changed_when: true
+
+    - name: "Wait for API rolling update to converge"
+      shell: |
+        #!/bin/bash
+        max_retries=60
+        retry_count=0
+        while [ $retry_count -lt $max_retries ]; do
+          STATE=$(docker service inspect {{ api_service }} --format '{{.UpdateStatus.State}}' 2>/dev/null || echo "unknown")
+          case "$STATE" in
+            "completed")
+              echo "✅ API service converged"
+              exit 0
+              ;;
+            "rollback_completed")
+              echo "❌ API service rolled back"
+              exit 1
+              ;;
+            "paused")
+              echo "❌ API service paused"
+              exit 1
+              ;;
+            *)
+              echo "⏳ Update state: $STATE (${retry_count}/${max_retries})"
+              sleep 5
+              retry_count=$((retry_count + 1))
+              ;;
+          esac
+        done
+        echo "❌ API update timed out"
+        exit 1
+      args:
+        executable: /bin/bash
+      register: api_converge_result
+      when: deploy_backend | bool
+      changed_when: "'✅' in api_converge_result.stdout"
+
+    # ──────────────── Frontend Deployment ────────────────
+    - name: "Pull Frontend image"
+      shell: "docker pull {{ image_frontend }} || echo '⚠️ Frontend image not found'"
+      register: frontend_pull_result
+      when: deploy_frontend | bool
+      changed_when: "'Downloaded' in frontend_pull_result.stdout"
+      ignore_errors: true
+
+    - name: "Deploy Frontend service (rolling update)"
+      shell: |
+        docker service update \
+          --image {{ image_frontend }} \
+          --update-parallelism 1 \
+          --update-delay 30s \
+          --update-order start-first \
+          --with-registry-auth \
+          {{ frontend_service }}
+      register: frontend_deploy_result
+      when: deploy_frontend | bool
+      changed_when: true
+      ignore_errors: true
+
+    - name: "Wait for Frontend rolling update to converge"
+      shell: |
+        #!/bin/bash
+        max_retries=60
+        retry_count=0
+        while [ $retry_count -lt $max_retries ]; do
+          STATE=$(docker service inspect {{ frontend_service }} --format '{{.UpdateStatus.State}}' 2>/dev/null || echo "unknown")
+          case "$STATE" in
+            "completed")
+              echo "✅ Frontend service converged"
+              exit 0
+              ;;
+            "rollback_completed")
+              echo "❌ Frontend service rolled back"
+              exit 1
+              ;;
+            "paused")
+              echo "❌ Frontend service paused"
+              exit 1
+              ;;
+            *)
+              echo "⏳ Update state: $STATE (${retry_count}/${max_retries})"
+              sleep 5
+              retry_count=$((retry_count + 1))
+              ;;
+          esac
+        done
+        echo "❌ Frontend update timed out"
+        exit 1
+      args:
+        executable: /bin/bash
+      register: frontend_converge_result
+      when: deploy_frontend | bool
+      changed_when: "'✅' in frontend_converge_result.stdout"
+      ignore_errors: true
+
+    # ──────────────── Verification ────────────────
+    - name: "Verify API service status"
+      shell: |
+        docker service ps {{ api_service }} --no-trunc --format "table {{.Name}}\t{{.Image}}\t{{.CurrentState}}" | head -3
+      register: api_status_result
+      when: deploy_backend | bool
+      changed_when: false
+
+    - name: "Verify Frontend service status"
+      shell: |
+        docker service ps {{ frontend_service }} --no-trunc --format "table {{.Name}}\t{{.Image}}\t{{.CurrentState}}" | head -3
+      register: frontend_status_result
+      when: deploy_frontend | bool
+      changed_when: false
+      ignore_errors: true
+
+  post_tasks:
+    - name: "Deployment Summary"
+      debug:
+        msg: |
+          
+          ✅ DEPLOYMENT COMPLETE
+          ══════════════════════════════════════════
+          {% if deploy_backend | bool %}
+          API Image:        {{ image_api }}
+          Status:           ✅ Deployed
+          {{ api_status_result.stdout | indent(24) }}
+          {% endif %}
+          {% if deploy_frontend | bool %}
+          Frontend Image:   {{ image_frontend }}
+          Status:           ✅ Deployed
+          {{ frontend_status_result.stdout | indent(24) }}
+          {% endif %}
+          
+          Monitor at: https://natra.site/grafana/
+          API Health: https://natra.site/api/health/live

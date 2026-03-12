@@ -738,6 +738,7 @@ try
     app.MapComplianceMonitoringEndpoints(); // Phase 4: Continuous monitoring, health dashboard, AI alerts
     app.MapTrustPageEndpoints(); // Public trust/security page — no auth required
     app.MapTenantEndpoints(); // Multi-tenant management — platform admin
+    app.MapDomainManagementEndpoints(); // Domain management — Caddy config sync
     app.MapInfrastructureEndpoints(); // Infrastructure monitoring — VPS, Swarm, S3
 
     // ── Config seeders: run in every environment (idempotent, no demo data) ──────
