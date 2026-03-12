@@ -1,6 +1,7 @@
 using IVF.API.Services;
 using IVF.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace IVF.API.Endpoints;
 
@@ -25,6 +26,16 @@ public static class TenantCaEndpoints
             return Results.Ok(new { items, total = items.Count });
         })
         .WithName("ListTenantCAs");
+
+        // ─── List tenants without a Sub-CA (for provisioning) ───
+        group.MapGet("/available-tenants", async (
+            TenantCertificateService tenantCaService,
+            CancellationToken ct) =>
+        {
+            var tenants = await tenantCaService.ListAvailableTenantsAsync(ct);
+            return Results.Ok(tenants);
+        })
+        .WithName("ListAvailableTenants");
 
         // ─── Get specific tenant's Sub-CA status ────────────────
         group.MapGet("/{tenantId:guid}", async (
@@ -80,6 +91,10 @@ public static class TenantCaEndpoints
                     request.DefaultCertValidityDays,
                     request.RenewBeforeDays,
                     request.MaxWorkers,
+                    request.AutoProvisionEnabled,
+                    request.EjbcaCaName,
+                    request.EjbcaCertProfileName,
+                    request.EjbcaEeProfileName,
                     ct);
 
                 var status = await tenantCaService.GetTenantCaStatusAsync(tenantId, ct);
@@ -132,7 +147,93 @@ public static class TenantCaEndpoints
         })
         .WithName("RevokeTenantCA");
 
+        // ─── Delete (soft-delete) tenant Sub-CA ─────────────────
+        group.MapDelete("/{tenantId:guid}", async (
+            Guid tenantId,
+            TenantCertificateService tenantCaService,
+            CancellationToken ct) =>
+        {
+            try
+            {
+                await tenantCaService.DeleteTenantCaAsync(tenantId, ct);
+                return Results.Ok(new { success = true, message = "Đã xóa Sub-CA của tenant" });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Results.BadRequest(new { error = ex.Message });
+            }
+        })
+        .WithName("DeleteTenantCA");
+
+        // ─── List SignServer workers for a tenant (filtered by prefix) ──────
+        group.MapGet("/{tenantId:guid}/workers", async (
+            Guid tenantId,
+            TenantCertificateService tenantCaService,
+            IOptions<DigitalSigningOptions> options,
+            CancellationToken ct) =>
+        {
+            var opts = options.Value;
+            if (!opts.Enabled)
+                return Results.Ok(new { workers = Array.Empty<object>(), error = "Ký số chưa được bật" });
+
+            var tenantCa = await tenantCaService.GetTenantCaStatusAsync(tenantId, ct);
+            if (tenantCa is null)
+                return Results.NotFound(new { error = "Tenant chưa có Sub-CA" });
+
+            // Get all SignServer workers via CLI
+            var (output, error) = await RunSignServerCliAsync(opts, "getstatus brief all");
+            if (error != null)
+                return Results.Ok(new { workers = Array.Empty<object>(), prefix = tenantCa.WorkerNamePrefix, error });
+
+            var allWorkers = SigningAdminEndpoints.ParseGetStatusBriefOutput(output!);
+
+            // Filter by tenant's worker prefix
+            var tenantWorkers = allWorkers
+                .Where(w => w.Name.StartsWith(tenantCa.WorkerNamePrefix, StringComparison.OrdinalIgnoreCase))
+                .Select(w => new
+                {
+                    w.Id,
+                    w.Name,
+                    workerStatus = w.WorkerStatus,
+                    tokenStatus = w.TokenStatus,
+                    w.Signings
+                })
+                .ToList();
+
+            return Results.Ok(new { workers = tenantWorkers, prefix = tenantCa.WorkerNamePrefix });
+        })
+        .WithName("GetTenantWorkers");
+
+        // ─── List enrolled users (users with active cert) for a tenant ──────
+        group.MapGet("/{tenantId:guid}/enrolled-users", async (
+            Guid tenantId,
+            IVF.Infrastructure.Persistence.IvfDbContext db,
+            CancellationToken ct) =>
+        {
+            var enrolledUsers = await db.UserSignatures
+                .Include(s => s.User)
+                .Where(s => s.TenantId == tenantId && !s.IsDeleted && s.IsActive
+                    && s.WorkerName != null)
+                .Select(s => new
+                {
+                    userId = s.UserId,
+                    fullName = s.User != null ? s.User.FullName : "",
+                    username = s.User != null ? s.User.Username : "",
+                    role = s.User != null ? s.User.Role : "",
+                    workerName = s.WorkerName,
+                    certificateSubject = s.CertificateSubject,
+                    certificateExpiry = s.CertificateExpiry,
+                    certStatus = s.CertStatus.ToString(),
+                    createdAt = s.CreatedAt
+                })
+                .ToListAsync(ct);
+
+            return Results.Ok(new { items = enrolledUsers, total = enrolledUsers.Count });
+        })
+        .WithName("GetTenantEnrolledUsers");
+
         // ─── Provision user cert via tenant Sub-CA (EJBCA enrollment) ───────
+        // Enforces 1 user = 1 active certificate
         group.MapPost("/{tenantId:guid}/users/{userId:guid}/provision", async (
             Guid tenantId,
             Guid userId,
@@ -156,6 +257,25 @@ public static class TenantCaEndpoints
 
             if (sig is null)
                 return Results.BadRequest(new { error = "Người dùng chưa có chữ ký tay. Yêu cầu tải chữ ký trước." });
+
+            // ── 1 user = 1 certificate guard ──
+            // Check if user already has an active certificate/worker
+            if (!string.IsNullOrEmpty(sig.WorkerName) &&
+                sig.CertStatus != CertificateStatus.Revoked &&
+                sig.CertStatus != CertificateStatus.Error &&
+                sig.CertStatus != CertificateStatus.Expired)
+            {
+                return Results.Conflict(new
+                {
+                    success = false,
+                    error = $"Người dùng đã có chứng thư số đang hoạt động (Worker: {sig.WorkerName}). " +
+                            "Mỗi người dùng chỉ được cấp 1 chứng thư. Hãy thu hồi chứng thư cũ trước khi cấp mới.",
+                    existingWorkerName = sig.WorkerName,
+                    existingCertSubject = sig.CertificateSubject,
+                    existingCertExpiry = sig.CertificateExpiry,
+                    existingCertStatus = sig.CertStatus.ToString()
+                });
+            }
 
             try
             {
@@ -194,4 +314,9 @@ public static class TenantCaEndpoints
         .WithName("ProvisionUserCertViaTenantCA")
         .RequireRateLimiting("signing-provision");
     }
+
+    /// <summary>Delegate to SigningAdminEndpoints' CLI runner.</summary>
+    private static Task<(string? Output, string? Error)> RunSignServerCliAsync(
+        DigitalSigningOptions opts, string cliArgs) =>
+        SigningAdminEndpoints.RunSignServerCliAsync(opts, cliArgs);
 }

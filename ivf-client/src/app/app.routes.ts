@@ -316,9 +316,7 @@ export const routes: Routes = [
       {
         path: 'admin/tenant-ca',
         loadComponent: () =>
-          import('./features/admin/tenant-ca/tenant-ca.component').then(
-            (m) => m.TenantCaComponent,
-          ),
+          import('./features/admin/tenant-ca/tenant-ca.component').then((m) => m.TenantCaComponent),
       },
 
       {

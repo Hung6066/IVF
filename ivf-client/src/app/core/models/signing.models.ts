@@ -246,6 +246,10 @@ export interface TenantCaConfigRequest {
   defaultCertValidityDays?: number;
   renewBeforeDays?: number;
   maxWorkers?: number;
+  autoProvisionEnabled?: boolean;
+  ejbcaCaName?: string;
+  ejbcaCertProfileName?: string;
+  ejbcaEeProfileName?: string;
 }
 
 export interface TenantCaProvisionResponse {
@@ -279,3 +283,42 @@ export const TENANT_CA_STATUSES = [
   { value: 'Suspended', label: 'Tạm dừng', icon: '⏸️', cssClass: 'status-suspended' },
   { value: 'Revoked', label: 'Đã thu hồi', icon: '🚫', cssClass: 'status-revoked' },
 ] as const;
+
+export interface AvailableTenantDto {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+// ─── Tenant Worker & Enrolled User Models ───────────────────
+
+export interface TenantWorker {
+  id: number;
+  name: string;
+  workerStatus: string;
+  tokenStatus: string;
+  signings: number;
+}
+
+export interface TenantWorkersResponse {
+  workers: TenantWorker[];
+  prefix: string;
+  error?: string;
+}
+
+export interface TenantEnrolledUser {
+  userId: string;
+  fullName: string;
+  username: string;
+  role: string;
+  workerName: string;
+  certificateSubject: string;
+  certificateExpiry: string | null;
+  certStatus: string;
+  createdAt: string;
+}
+
+export interface TenantEnrolledUsersResponse {
+  items: TenantEnrolledUser[];
+  total: number;
+}

@@ -11,6 +11,9 @@ import {
   TenantCaConfigResponse,
   TenantCaActionResponse,
   TenantUserCertProvisionResponse,
+  AvailableTenantDto,
+  TenantWorkersResponse,
+  TenantEnrolledUsersResponse,
 } from '../models/signing.models';
 
 @Injectable({ providedIn: 'root' })
@@ -51,6 +54,14 @@ export class TenantCaService {
     return this.http.post<TenantCaActionResponse>(`${this.baseUrl}/${tenantId}/revoke`, {});
   }
 
+  deleteTenantCA(tenantId: string): Observable<TenantCaActionResponse> {
+    return this.http.delete<TenantCaActionResponse>(`${this.baseUrl}/${tenantId}`);
+  }
+
+  listAvailableTenants(): Observable<AvailableTenantDto[]> {
+    return this.http.get<AvailableTenantDto[]>(`${this.baseUrl}/available-tenants`);
+  }
+
   provisionUserCert(
     tenantId: string,
     userId: string,
@@ -59,5 +70,13 @@ export class TenantCaService {
       `${this.baseUrl}/${tenantId}/users/${userId}/provision`,
       {},
     );
+  }
+
+  getTenantWorkers(tenantId: string): Observable<TenantWorkersResponse> {
+    return this.http.get<TenantWorkersResponse>(`${this.baseUrl}/${tenantId}/workers`);
+  }
+
+  getEnrolledUsers(tenantId: string): Observable<TenantEnrolledUsersResponse> {
+    return this.http.get<TenantEnrolledUsersResponse>(`${this.baseUrl}/${tenantId}/enrolled-users`);
   }
 }

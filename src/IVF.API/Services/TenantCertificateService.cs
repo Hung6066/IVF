@@ -271,7 +271,9 @@ public sealed class TenantCertificateService(
 
     /// <summary>Update Sub-CA configuration for a tenant.</summary>
     public async Task UpdateTenantCaConfigAsync(
-        Guid tenantId, int? validityDays, int? renewBefore, int? maxWorkers, CancellationToken ct)
+        Guid tenantId, int? validityDays, int? renewBefore, int? maxWorkers,
+        bool? autoProvision, string? ejbcaCaName, string? ejbcaCertProfile,
+        string? ejbcaEeProfile, CancellationToken ct)
     {
         using var scope = scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<IvfDbContext>();
@@ -281,11 +283,12 @@ public sealed class TenantCertificateService(
             .FirstOrDefaultAsync(t => t.TenantId == tenantId && !t.IsDeleted, ct)
             ?? throw new InvalidOperationException("Tenant chưa có Sub-CA");
 
-        tenantSubCa.UpdateConfig(validityDays, renewBefore, maxWorkers);
+        tenantSubCa.UpdateConfig(validityDays, renewBefore, maxWorkers, autoProvision,
+            ejbcaCaName, ejbcaCertProfile, ejbcaEeProfile);
         await db.SaveChangesAsync(ct);
 
-        logger.LogInformation("Updated Sub-CA config for tenant {TenantId}: validity={V}, renew={R}, max={M}",
-            tenantId, validityDays, renewBefore, maxWorkers);
+        logger.LogInformation("Updated Sub-CA config for tenant {TenantId}: validity={V}, renew={R}, max={M}, auto={A}, ca={CA}",
+            tenantId, validityDays, renewBefore, maxWorkers, autoProvision, ejbcaCaName);
     }
 
     /// <summary>Suspend a tenant's Sub-CA — prevents new cert issuance.</summary>
@@ -326,6 +329,46 @@ public sealed class TenantCertificateService(
         await db.SaveChangesAsync(ct);
 
         logger.LogWarning("Revoked Sub-CA for tenant {TenantId} — all tenant certs revoked via EJBCA", tenantId);
+    }
+
+    /// <summary>Soft-delete a tenant's Sub-CA record (must be Revoked or Suspended first).</summary>
+    public async Task DeleteTenantCaAsync(Guid tenantId, CancellationToken ct)
+    {
+        using var scope = scopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<IvfDbContext>();
+
+        var tenantSubCa = await db.Set<TenantSubCa>()
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(t => t.TenantId == tenantId && !t.IsDeleted, ct)
+            ?? throw new InvalidOperationException("Tenant chưa có Sub-CA");
+
+        if (tenantSubCa.Status == TenantSubCaStatus.Active)
+            throw new InvalidOperationException("Không thể xóa Sub-CA đang hoạt động. Hãy tạm dừng hoặc thu hồi trước.");
+
+        tenantSubCa.MarkAsDeleted();
+        await db.SaveChangesAsync(ct);
+
+        logger.LogWarning("Deleted Sub-CA record for tenant {TenantId}", tenantId);
+    }
+
+    /// <summary>List all tenants that do not yet have a Sub-CA provisioned.</summary>
+    public async Task<List<AvailableTenantDto>> ListAvailableTenantsAsync(CancellationToken ct)
+    {
+        using var scope = scopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<IvfDbContext>();
+
+        var tenantsWithCa = await db.Set<TenantSubCa>()
+            .IgnoreQueryFilters()
+            .Where(t => !t.IsDeleted)
+            .Select(t => t.TenantId)
+            .ToListAsync(ct);
+
+        var available = await db.Tenants
+            .Where(t => !tenantsWithCa.Contains(t.Id))
+            .Select(t => new AvailableTenantDto(t.Id, t.Name, t.Slug))
+            .ToListAsync(ct);
+
+        return available;
     }
 
     // ═══════════════════════════════════════════════════════
@@ -424,7 +467,15 @@ public sealed class TenantCertificateService(
 
         if (addExit != 0)
         {
-            // Entity may already exist — reset status to NEW (10) for re-enrollment
+            // Check if entity actually exists before assuming re-enrollment
+            var (findExit, _) = await RunDockerExecWithExitCodeAsync(ejbcaContainer,
+                $"/opt/keyfactor/bin/ejbca.sh ra findendentity --username \"{eeUsername}\"");
+
+            if (findExit != 0)
+                throw new InvalidOperationException(
+                    $"EJBCA addendentity failed for '{eeUsername}'. Verify CA '{caName}', certProfile '{certProfile}', eeProfile '{eeProfile}' exist and are correctly configured.");
+
+            // Entity exists — reset status to NEW (10) for re-enrollment
             await UserSignatureEndpoints.RunDockerExecAsync(ejbcaContainer,
                 $"/opt/keyfactor/bin/ejbca.sh ra setendentitystatus \"{eeUsername}\" 10",
                 logger);
@@ -446,9 +497,9 @@ public sealed class TenantCertificateService(
         await UserSignatureEndpoints.RunDockerExecAsync(ejbcaContainer,
             "mkdir -p /tmp/ejbca-certs", logger);
 
-        // Batch generate PKCS#12
-        await UserSignatureEndpoints.RunDockerExecAsync(ejbcaContainer,
-            $"/opt/keyfactor/bin/ejbca.sh batch --username \"{eeUsername}\" -dir /tmp/ejbca-certs",
+        // Batch generate PKCS#12 — capture output for error diagnostics
+        var batchOutput = await UserSignatureEndpoints.RunProcessAsync("docker",
+            $"exec {ejbcaContainer} /opt/keyfactor/bin/ejbca.sh batch --username \"{eeUsername}\" -dir /tmp/ejbca-certs",
             logger);
 
         // Verify P12 was generated
@@ -457,8 +508,12 @@ public sealed class TenantCertificateService(
             $"test -f {p12Path}");
 
         if (exitCode != 0)
+        {
+            // Extract actionable error from EJBCA output
+            var errorDetail = ExtractEjbcaError(batchOutput);
             throw new InvalidOperationException(
-                $"EJBCA batch enrollment failed: PKCS#12 not generated at {p12Path}");
+                $"EJBCA batch enrollment failed for '{eeUsername}': {errorDetail}");
+        }
     }
 
     /// <summary>Copy PKCS#12 from EJBCA container to SignServer container via docker pipe.</summary>
@@ -762,6 +817,29 @@ public sealed class TenantCertificateService(
 
         return (process.ExitCode, stdout);
     }
+
+    /// <summary>Extract actionable error from EJBCA CLI output (stderr+stdout combined).</summary>
+    private static string ExtractEjbcaError(string output)
+    {
+        if (string.IsNullOrWhiteSpace(output))
+            return "No output from EJBCA batch command.";
+
+        // Look for common EJBCA error patterns
+        foreach (var line in output.Split('\n'))
+        {
+            var trimmed = line.Trim();
+            if (trimmed.Contains("is not active", StringComparison.OrdinalIgnoreCase))
+                return trimmed;
+            if (trimmed.Contains("EJBException:", StringComparison.OrdinalIgnoreCase))
+                return trimmed.Split("EJBException:")[^1].Trim();
+            if (trimmed.Contains("ERROR") && !trimmed.Contains("setting status to FAILED"))
+                return trimmed;
+        }
+
+        // Fallback: return last non-empty line
+        var lines = output.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        return lines.Length > 0 ? lines[^1].Trim() : "Unknown EJBCA error.";
+    }
 }
 
 // ═══════════════════════════════════════════════════════
@@ -794,9 +872,18 @@ public record TenantSubCaStatusDto(
 public record TenantCaConfigRequest(
     int? DefaultCertValidityDays,
     int? RenewBeforeDays,
-    int? MaxWorkers);
+    int? MaxWorkers,
+    bool? AutoProvisionEnabled,
+    string? EjbcaCaName,
+    string? EjbcaCertProfileName,
+    string? EjbcaEeProfileName);
 
 public record ProvisionTenantCaRequest(
     string? CaName,
     string? CertProfileName,
     string? EeProfileName);
+
+public record AvailableTenantDto(
+    Guid Id,
+    string Name,
+    string Slug);

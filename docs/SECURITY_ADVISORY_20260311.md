@@ -32,6 +32,7 @@ This secret was exposed in the Git history and detected by `gitleaks` scan.
 ## Impact Assessment
 
 **Blast Radius:**
+
 - **Development:** No impact (local dev environment only)
 - **Staging:** Potential if cloned from main
 - **Production:** CRITICAL - exposed credential could be used to access Prometheus metrics and dashboards
@@ -46,6 +47,7 @@ This secret was exposed in the Git history and detected by `gitleaks` scan.
 ## Remediation Steps (IMMEDIATE)
 
 ### 1. Rotate Prometheus Credential (URGENT)
+
 ```bash
 # On production Docker Swarm manager:
 ssh root@45.134.226.56
@@ -72,6 +74,7 @@ curl -u monitor:<new-password> http://localhost:9090/-/healthy
 ### 2. Clean Git History (Optional but Recommended)
 
 **Using BFG Repo-Cleaner** (removes secret from all commits):
+
 ```bash
 # Install BFG
 brew install bfg  # or choco install bfg / apt-get install bfg
@@ -91,6 +94,7 @@ git push --force
 ```
 
 **⚠️ WARNING:** Force-pushing rewrites history. Coordinate with team; all local branches must be refreshed:
+
 ```bash
 git fetch origin
 git reset --hard origin/main
@@ -100,6 +104,7 @@ git clean -fd
 ### 3. Code Changes (COMPLETED)
 
 ✅ **Completed in commits:**
+
 - `4b5ed7b` — Removed hardcoded secret from InfrastructureEndpoints.cs
   - Now reads `Monitoring:PrometheusAuth` from `IConfiguration`
   - Development: reads from `appsettings.Development.json`
@@ -112,6 +117,7 @@ git clean -fd
 ### 4. Verify CI/CD Passes
 
 The gitleaks job in GitHub Actions will now:
+
 - Run with updated `.gitleaks.toml` config
 - Allow Prometheus credential in `appsettings.Development.json` only
 - FAIL if credential appears in `appsettings.json` (production)
@@ -126,6 +132,7 @@ gitleaks detect --source . --config .gitleaks.toml --verbose --exit-code 1
 ## Long-Term Security Improvements
 
 ### 1. Use Azure Key Vault for Production Secrets
+
 ```csharp
 // In Program.cs (already configured in the app)
 builder.Configuration.AddAzureKeyVault(
@@ -135,6 +142,7 @@ builder.Configuration.AddAzureKeyVault(
 ```
 
 Store in Key Vault:
+
 ```bash
 az keyvault secret set --vault-name emr-viet-care \
   --name "Monitoring--PrometheusAuth" \
@@ -142,6 +150,7 @@ az keyvault secret set --vault-name emr-viet-care \
 ```
 
 ### 2. Use .NET User Secrets for Local Development
+
 ```bash
 cd src/IVF.API
 
@@ -183,11 +192,11 @@ pre-commit run --all-files
 
 ### 4. Secrets Management Best Practices
 
-| Environment | Store | Access |
-|---|---|---|
-| **Development** | `.dotnet user-secrets` | Local Windows Data Protection vault, not git |
-| **Staging** | Azure Key Vault | Staging service principal |
-| **Production** | Azure Key Vault + Docker Secrets | Production service principal + mTLS |
+| Environment     | Store                            | Access                                       |
+| --------------- | -------------------------------- | -------------------------------------------- |
+| **Development** | `.dotnet user-secrets`           | Local Windows Data Protection vault, not git |
+| **Staging**     | Azure Key Vault                  | Staging service principal                    |
+| **Production**  | Azure Key Vault + Docker Secrets | Production service principal + mTLS          |
 
 ### 5. Rotate All Related Credentials
 
@@ -203,11 +212,13 @@ pre-commit run --all-files
 ### Who Had Access?
 
 The credential was exposed in the public GitHub repository `Hung6066/IVF` (if public) since:
+
 - Commit: `0c523093793b83c1756bed26ac7e322383813eda`
 - Author: `Hung6066`
 - Date: `2026-03-11T01:20:38Z`
 
 **Check if repo was public:**
+
 ```bash
 git log --grep="prometheus" --oneline | head -5
 git show 0c523093793b83c1756bed26ac7e322383813eda
@@ -216,6 +227,7 @@ git show 0c523093793b83c1756bed26ac7e322383813eda
 ### Monitoring
 
 Watch Prometheus and Grafana logs for unauthorized access:
+
 ```bash
 # Prometheus logs
 docker logs ivf-prometheus | grep -i "monitor\|auth\|401\|403"

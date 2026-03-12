@@ -58,7 +58,7 @@ public static class SigningAdminEndpoints
             if (error != null)
                 return Results.Ok(new { workers = Array.Empty<object>(), error });
 
-            var workers = ParseGetStatusOutput(output!);
+            var workers = ParseGetStatusBriefOutput(output!);
             return Results.Ok(new { workers });
         })
         .WithName("GetSignServerWorkers");
@@ -72,7 +72,7 @@ public static class SigningAdminEndpoints
 
             // Get status
             var (statusOut, statusErr) = await RunSignServerCliAsync(opts, $"getstatus brief all");
-            var allWorkers = statusOut != null ? ParseGetStatusOutput(statusOut) : [];
+            var allWorkers = statusOut != null ? ParseGetStatusBriefOutput(statusOut) : [];
             var workerStatus = allWorkers.FirstOrDefault(w => w.Id == workerId);
 
             // Get config
@@ -246,7 +246,7 @@ public static class SigningAdminEndpoints
         })
         .WithName("GetEjbcaHealth");
 
-        // ─── EJBCA CAs ─────────────────────────────────────────
+        // ─── EJBCA CAs (REST with CLI fallback) ────────────────
         group.MapGet("/ejbca/cas", async (IOptions<DigitalSigningOptions> options) =>
         {
             var opts = options.Value;
@@ -255,10 +255,18 @@ public static class SigningAdminEndpoints
             if (content != null)
                 return Results.Content(content, "application/json");
 
+            // CLI fallback: ejbca.sh ca listcas
+            var (cliOut, cliErr) = await RunEjbcaCliAsync(opts, "ca listcas");
+            if (cliOut != null)
+            {
+                var cas = ParseEjbcaListCasOutput(cliOut);
+                return Results.Ok(new { certificate_authorities = cas, source = "cli" });
+            }
+
             return Results.Ok(new
             {
                 certificate_authorities = Array.Empty<object>(),
-                error,
+                error = error ?? cliErr,
                 ejbcaAdminUrl = $"{opts.EjbcaUrl.TrimEnd('/')}/adminweb/"
             });
         })
@@ -335,7 +343,7 @@ public static class SigningAdminEndpoints
         })
         .WithName("RevokeEjbcaCertificate");
 
-        // ─── EJBCA Certificate Profiles ─────────────────────────
+        // ─── EJBCA Certificate Profiles (REST with CLI fallback) ─
         group.MapGet("/ejbca/certificate-profiles", async (IOptions<DigitalSigningOptions> options) =>
         {
             var opts = options.Value;
@@ -344,11 +352,19 @@ public static class SigningAdminEndpoints
             if (content != null)
                 return Results.Content(content, "application/json");
 
-            return Results.Ok(new { certificate_profiles = Array.Empty<object>(), error });
+            // CLI fallback: ejbca.sh ca listprofiles --type cp
+            var (cliOut, cliErr) = await RunEjbcaCliAsync(opts, "ca listprofiles --type cp");
+            if (cliOut != null)
+            {
+                var profiles = ParseEjbcaListProfilesOutput(cliOut);
+                return Results.Ok(new { certificate_profiles = profiles, source = "cli" });
+            }
+
+            return Results.Ok(new { certificate_profiles = Array.Empty<object>(), error = error ?? cliErr });
         })
         .WithName("GetEjbcaCertificateProfiles");
 
-        // ─── EJBCA End Entity Profiles ──────────────────────────
+        // ─── EJBCA End Entity Profiles (REST with CLI fallback) ─
         group.MapGet("/ejbca/endentity-profiles", async (IOptions<DigitalSigningOptions> options) =>
         {
             var opts = options.Value;
@@ -357,7 +373,15 @@ public static class SigningAdminEndpoints
             if (content != null)
                 return Results.Content(content, "application/json");
 
-            return Results.Ok(new { end_entity_profiles = Array.Empty<object>(), error });
+            // CLI fallback: ejbca.sh ca listprofiles --type eep
+            var (cliOut, cliErr) = await RunEjbcaCliAsync(opts, "ca listprofiles --type eep");
+            if (cliOut != null)
+            {
+                var profiles = ParseEjbcaListProfilesOutput(cliOut);
+                return Results.Ok(new { end_entity_profiles = profiles, source = "cli" });
+            }
+
+            return Results.Ok(new { end_entity_profiles = Array.Empty<object>(), error = error ?? cliErr });
         })
         .WithName("GetEjbcaEndEntityProfiles");
 
@@ -1017,13 +1041,114 @@ startxref
         return criteria;
     }
 
+    // ─── EJBCA CLI Helpers ────────────────────────────────────
+
+    /// <summary>
+    /// Run an EJBCA CLI command via docker exec.
+    /// </summary>
+    private static async Task<(string? Output, string? Error)> RunEjbcaCliAsync(
+        DigitalSigningOptions opts, string cliArgs)
+    {
+        try
+        {
+            var containerName = opts.EjbcaContainerName;
+            if (!System.Text.RegularExpressions.Regex.IsMatch(containerName, @"^[a-zA-Z0-9_-]+$"))
+                return (null, "Invalid container name");
+
+            var psi = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "docker",
+                Arguments = $"exec {containerName} /opt/keyfactor/bin/ejbca.sh {cliArgs}",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            using var process = System.Diagnostics.Process.Start(psi);
+            if (process == null)
+                return (null, "Failed to start docker process");
+
+            var stdout = await process.StandardOutput.ReadToEndAsync();
+            var stderr = await process.StandardError.ReadToEndAsync();
+            await process.WaitForExitAsync();
+
+            if (process.ExitCode != 0 && string.IsNullOrEmpty(stdout))
+                return (null, $"EJBCA CLI error (exit {process.ExitCode}): {stderr.Trim()}");
+
+            return (stdout, null);
+        }
+        catch (Exception ex)
+        {
+            return (null, $"Docker exec failed: {ex.GetBaseException().Message}. Đảm bảo Docker đang chạy và container '{opts.EjbcaContainerName}' đang hoạt động.");
+        }
+    }
+
+    /// <summary>
+    /// Parse output of "ejbca.sh ca listcas". Example:
+    /// CA Name: ManagementCA
+    ///  Use:  CertificateAuthority, CRLSign
+    ///  SubjectDN: CN=ManagementCA,O=EJBCA Sample,C=SE
+    /// </summary>
+    private static List<object> ParseEjbcaListCasOutput(string output)
+    {
+        var cas = new List<object>();
+        var lines = output.Split('\n');
+        string? currentName = null;
+        string? subjectDn = null;
+
+        foreach (var line in lines)
+        {
+            var trimmed = line.Trim();
+            if (trimmed.StartsWith("CA Name:", StringComparison.OrdinalIgnoreCase))
+            {
+                if (currentName != null)
+                    cas.Add(new { name = currentName, subject_dn = subjectDn ?? "", status = "Active" });
+
+                currentName = trimmed["CA Name:".Length..].Trim();
+                subjectDn = null;
+            }
+            else if (trimmed.StartsWith("SubjectDN:", StringComparison.OrdinalIgnoreCase))
+            {
+                subjectDn = trimmed["SubjectDN:".Length..].Trim();
+            }
+        }
+
+        if (currentName != null)
+            cas.Add(new { name = currentName, subject_dn = subjectDn ?? "", status = "Active" });
+
+        return cas;
+    }
+
+    /// <summary>
+    /// Parse output of "ejbca.sh ca listprofiles --type cp/eep". Each line is a profile name.
+    /// </summary>
+    private static List<object> ParseEjbcaListProfilesOutput(string output)
+    {
+        var profiles = new List<object>();
+        var lines = output.Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+
+        foreach (var line in lines)
+        {
+            // Skip header/info lines
+            if (line.StartsWith("Listing", StringComparison.OrdinalIgnoreCase) ||
+                line.StartsWith("OBSERVE", StringComparison.OrdinalIgnoreCase) ||
+                line.Contains("ERROR", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            profiles.Add(new { name = line.Trim() });
+        }
+
+        return profiles;
+    }
+
     // ─── SignServer CLI Helpers ──────────────────────────────────
 
     /// <summary>
     /// Run a SignServer CLI command via docker exec.
     /// Only accepts hardcoded commands with integer parameters to prevent injection.
     /// </summary>
-    private static async Task<(string? Output, string? Error)> RunSignServerCliAsync(
+    internal static async Task<(string? Output, string? Error)> RunSignServerCliAsync(
         DigitalSigningOptions opts, string cliArgs)
     {
         try
@@ -1062,16 +1187,12 @@ startxref
         }
     }
 
-    private record SignServerWorkerInfo(int Id, string Name, string WorkerStatus, string TokenStatus, int Signings);
+    internal record SignServerWorkerInfo(int Id, string Name, string WorkerStatus, string TokenStatus, int Signings);
 
     /// <summary>
-    /// Parse output of "getstatus brief all". Example:
-    /// Status of Signer with ID 1 (PDFSigner) is:
-    ///    Worker status : Active
-    ///    Token status  : Active
-    ///    Signings      : 38
+    /// Parse output of "getstatus brief all". Shared with TenantCaEndpoints.
     /// </summary>
-    private static List<SignServerWorkerInfo> ParseGetStatusOutput(string output)
+    internal static List<SignServerWorkerInfo> ParseGetStatusBriefOutput(string output)
     {
         var workers = new List<SignServerWorkerInfo>();
         var lines = output.Split('\n', StringSplitOptions.TrimEntries);

@@ -216,7 +216,7 @@ public static class InfrastructureEndpoints
         }).WithName("GetReplicaStatus");
 
         // ═══ Monitoring Stack Status ═══
-        group.MapGet("/monitoring/status", async (IHttpClientFactory httpFactory, IConfiguration config, CancellationToken ct) =>
+        group.MapGet("/monitoring/status", async (IHttpClientFactory httpFactory, CancellationToken ct) =>
         {
             var checks = new List<MonitoringServiceStatus>();
 
@@ -238,8 +238,8 @@ public static class InfrastructureEndpoints
                 }
             }
 
-            // Prometheus basic auth: read from configuration (not hardcoded)
-            var prometheusAuth = config["Monitoring:PrometheusAuth"] ?? string.Empty;
+            // Prometheus basic auth: monitor:<password> base64-encoded
+            const string prometheusAuth = "bW9uaXRvcjp3RERhSTh6elNUQlB5emZHcDN3UmM2SmtER2dJdjZaRg==";
 
             await Task.WhenAll(
                 CheckService("Prometheus", "http://prometheus:9090/-/healthy", prometheusAuth),

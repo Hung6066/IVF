@@ -121,11 +121,16 @@ public class TenantSubCa : BaseEntity
         SetUpdated();
     }
 
-    public void UpdateConfig(int? validityDays, int? renewBefore, int? maxWorkerCount)
+    public void UpdateConfig(int? validityDays, int? renewBefore, int? maxWorkerCount, bool? autoProvision = null,
+        string? ejbcaCaName = null, string? ejbcaCertProfile = null, string? ejbcaEeProfile = null)
     {
         if (validityDays.HasValue) DefaultCertValidityDays = validityDays.Value;
         if (renewBefore.HasValue) RenewBeforeDays = renewBefore.Value;
         if (maxWorkerCount.HasValue) MaxWorkers = maxWorkerCount.Value;
+        if (autoProvision.HasValue) AutoProvisionEnabled = autoProvision.Value;
+        if (!string.IsNullOrWhiteSpace(ejbcaCaName)) EjbcaCaName = ejbcaCaName;
+        if (!string.IsNullOrWhiteSpace(ejbcaCertProfile)) EjbcaCertProfileName = ejbcaCertProfile;
+        if (!string.IsNullOrWhiteSpace(ejbcaEeProfile)) EjbcaEeProfileName = ejbcaEeProfile;
         SetUpdated();
     }
 }

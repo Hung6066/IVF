@@ -3,14 +3,18 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { TenantCaService } from '../../../core/services/tenant-ca.service';
 import { SigningAdminService } from '../../../core/services/signing-admin.service';
+import { UserService } from '../../../core/services/user.service';
 import {
   TenantSubCaStatusDto,
   ProvisionTenantCaRequest,
   TenantCaConfigRequest,
   TenantUserCertProvisionResponse,
+  AvailableTenantDto,
   TENANT_CA_STATUSES,
   EjbcaCA,
   EjbcaProfile,
+  TenantWorker,
+  TenantEnrolledUser,
 } from '../../../core/models/api.models';
 
 @Component({
@@ -36,7 +40,10 @@ export class TenantCaComponent implements OnInit {
   selectedTenant = signal<TenantSubCaStatusDto | null>(null);
   activeTab = 'list';
 
-  // Provision form
+  // Available tenants (for creating new Sub-CA)
+  availableTenants = signal<AvailableTenantDto[]>([]);
+
+  // Provision form (create new Sub-CA)
   showProvisionModal = signal(false);
   provisionTenantId = '';
   provisionRequest: ProvisionTenantCaRequest = {};
@@ -49,8 +56,12 @@ export class TenantCaComponent implements OnInit {
   updatingConfig = signal(false);
   configResult = signal<{ success: boolean; message?: string } | null>(null);
 
-  // Suspend/Revoke confirmation
-  confirmAction = signal<{ type: 'suspend' | 'revoke'; tenantId: string; tenantName: string } | null>(null);
+  // Suspend/Revoke/Delete confirmation
+  confirmAction = signal<{
+    type: 'suspend' | 'revoke' | 'delete';
+    tenantId: string;
+    tenantName: string;
+  } | null>(null);
   actionLoading = signal(false);
   actionResult = signal<{ success: boolean; message: string } | null>(null);
 
@@ -58,6 +69,9 @@ export class TenantCaComponent implements OnInit {
   showUserCertModal = signal(false);
   userCertTenantId = '';
   userCertUserId = '';
+  userSearchQuery = '';
+  userSearchResults = signal<any[]>([]);
+  searchingUsers = signal(false);
   provisioningUserCert = signal(false);
   userCertResult = signal<TenantUserCertProvisionResponse | null>(null);
 
@@ -66,9 +80,16 @@ export class TenantCaComponent implements OnInit {
   ejbcaCertProfiles = signal<EjbcaProfile[]>([]);
   ejbcaEeProfiles = signal<EjbcaProfile[]>([]);
 
+  // Tenant workers & enrolled users
+  tenantWorkers = signal<TenantWorker[]>([]);
+  enrolledUsers = signal<TenantEnrolledUser[]>([]);
+  loadingWorkers = signal(false);
+  loadingEnrolledUsers = signal(false);
+
   constructor(
     private tenantCaService: TenantCaService,
     private signingService: SigningAdminService,
+    private userService: UserService,
   ) {}
 
   ngOnInit() {
@@ -94,22 +115,74 @@ export class TenantCaComponent implements OnInit {
 
   loadEjbcaReferenceData() {
     this.signingService.getEjbcaCAs().subscribe({
-      next: (data) => this.ejbcaCAs.set(Array.isArray(data) ? data : data?.cas || []),
+      next: (data) =>
+        this.ejbcaCAs.set(
+          Array.isArray(data)
+            ? data
+            : data?.certificate_authorities || [],
+        ),
       error: () => {},
     });
     this.signingService.getEjbcaCertificateProfiles().subscribe({
-      next: (data) => this.ejbcaCertProfiles.set(Array.isArray(data) ? data : data?.profiles || []),
+      next: (data) =>
+        this.ejbcaCertProfiles.set(
+          Array.isArray(data)
+            ? data
+            : data?.certificate_profiles || [],
+        ),
       error: () => {},
     });
     this.signingService.getEjbcaEndEntityProfiles().subscribe({
-      next: (data) => this.ejbcaEeProfiles.set(Array.isArray(data) ? data : data?.profiles || []),
+      next: (data) =>
+        this.ejbcaEeProfiles.set(
+          Array.isArray(data)
+            ? data
+            : data?.end_entity_profiles || [],
+        ),
       error: () => {},
+    });
+  }
+
+  loadAvailableTenants() {
+    this.tenantCaService.listAvailableTenants().subscribe({
+      next: (tenants) => this.availableTenants.set(tenants),
+      error: () => this.availableTenants.set([]),
+    });
+  }
+
+  loadTenantWorkers(tenantId: string) {
+    this.loadingWorkers.set(true);
+    this.tenantCaService.getTenantWorkers(tenantId).subscribe({
+      next: (data) => {
+        this.tenantWorkers.set(data.workers || []);
+        this.loadingWorkers.set(false);
+      },
+      error: () => {
+        this.tenantWorkers.set([]);
+        this.loadingWorkers.set(false);
+      },
+    });
+  }
+
+  loadEnrolledUsers(tenantId: string) {
+    this.loadingEnrolledUsers.set(true);
+    this.tenantCaService.getEnrolledUsers(tenantId).subscribe({
+      next: (data) => {
+        this.enrolledUsers.set(data.items || []);
+        this.loadingEnrolledUsers.set(false);
+      },
+      error: () => {
+        this.enrolledUsers.set([]);
+        this.loadingEnrolledUsers.set(false);
+      },
     });
   }
 
   viewDetail(tenant: TenantSubCaStatusDto) {
     this.selectedTenant.set(tenant);
     this.activeTab = 'detail';
+    this.loadTenantWorkers(tenant.tenantId);
+    this.loadEnrolledUsers(tenant.tenantId);
   }
 
   backToList() {
@@ -123,14 +196,17 @@ export class TenantCaComponent implements OnInit {
       next: (data) => this.selectedTenant.set(data),
       error: (err) => console.error('Failed to refresh tenant CA detail:', err),
     });
+    this.loadTenantWorkers(tenantId);
+    this.loadEnrolledUsers(tenantId);
   }
 
-  // ─── Provision ──────────────────────────────────────────
+  // ─── Provision (Create new Sub-CA) ──────────────────────
 
-  openProvisionModal(tenantId: string) {
-    this.provisionTenantId = tenantId;
+  openProvisionModal(tenantId?: string) {
+    this.provisionTenantId = tenantId || '';
     this.provisionRequest = {};
     this.provisionResult.set(null);
+    this.loadAvailableTenants();
     this.showProvisionModal.set(true);
   }
 
@@ -140,14 +216,15 @@ export class TenantCaComponent implements OnInit {
   }
 
   provision() {
+    if (!this.provisionTenantId) return;
     this.provisioning.set(true);
     this.provisionResult.set(null);
     this.tenantCaService.provisionTenantCA(this.provisionTenantId, this.provisionRequest).subscribe({
       next: (result) => {
         this.provisionResult.set({ success: result.success, message: result.message });
         this.provisioning.set(false);
-        if (result.success && result.status) {
-          this.selectedTenant.set(result.status);
+        if (result.success) {
+          if (result.status) this.selectedTenant.set(result.status);
           setTimeout(() => {
             this.closeProvisionModal();
             this.loadTenantCAs();
@@ -155,7 +232,10 @@ export class TenantCaComponent implements OnInit {
         }
       },
       error: (err) => {
-        this.provisionResult.set({ success: false, message: err.error?.message || err.message });
+        this.provisionResult.set({
+          success: false,
+          message: err.error?.error || err.error?.message || err.message,
+        });
         this.provisioning.set(false);
       },
     });
@@ -168,6 +248,10 @@ export class TenantCaComponent implements OnInit {
       defaultCertValidityDays: tenant.defaultCertValidityDays,
       renewBeforeDays: tenant.renewBeforeDays,
       maxWorkers: tenant.maxWorkers,
+      autoProvisionEnabled: tenant.autoProvisionEnabled,
+      ejbcaCaName: tenant.ejbcaCaName,
+      ejbcaCertProfileName: tenant.ejbcaCertProfileName,
+      ejbcaEeProfileName: tenant.ejbcaEeProfileName,
     };
     this.configResult.set(null);
     this.showConfigModal.set(true);
@@ -194,15 +278,18 @@ export class TenantCaComponent implements OnInit {
         }
       },
       error: (err) => {
-        this.configResult.set({ success: false, message: err.error?.message || err.message });
+        this.configResult.set({
+          success: false,
+          message: err.error?.error || err.error?.message || err.message,
+        });
         this.updatingConfig.set(false);
       },
     });
   }
 
-  // ─── Suspend / Revoke ───────────────────────────────────
+  // ─── Suspend / Revoke / Delete ──────────────────────────
 
-  openConfirmAction(type: 'suspend' | 'revoke', tenantId: string, tenantName: string) {
+  openConfirmAction(type: 'suspend' | 'revoke' | 'delete', tenantId: string, tenantName: string) {
     this.confirmAction.set({ type, tenantId, tenantName });
     this.actionResult.set(null);
   }
@@ -219,24 +306,43 @@ export class TenantCaComponent implements OnInit {
     this.actionLoading.set(true);
     this.actionResult.set(null);
 
-    const obs = action.type === 'suspend'
-      ? this.tenantCaService.suspendTenantCA(action.tenantId)
-      : this.tenantCaService.revokeTenantCA(action.tenantId);
+    let obs;
+    switch (action.type) {
+      case 'suspend':
+        obs = this.tenantCaService.suspendTenantCA(action.tenantId);
+        break;
+      case 'revoke':
+        obs = this.tenantCaService.revokeTenantCA(action.tenantId);
+        break;
+      case 'delete':
+        obs = this.tenantCaService.deleteTenantCA(action.tenantId);
+        break;
+    }
 
     obs.subscribe({
       next: (result) => {
         this.actionResult.set(result);
         this.actionLoading.set(false);
         if (result.success) {
-          this.refreshDetail(action.tenantId);
-          setTimeout(() => {
-            this.cancelAction();
-            this.loadTenantCAs();
-          }, 1500);
+          if (action.type === 'delete') {
+            setTimeout(() => {
+              this.cancelAction();
+              this.backToList();
+            }, 1500);
+          } else {
+            this.refreshDetail(action.tenantId);
+            setTimeout(() => {
+              this.cancelAction();
+              this.loadTenantCAs();
+            }, 1500);
+          }
         }
       },
       error: (err) => {
-        this.actionResult.set({ success: false, message: err.error?.message || err.message });
+        this.actionResult.set({
+          success: false,
+          message: err.error?.error || err.error?.message || err.message,
+        });
         this.actionLoading.set(false);
       },
     });
@@ -247,6 +353,8 @@ export class TenantCaComponent implements OnInit {
   openUserCertModal(tenantId: string) {
     this.userCertTenantId = tenantId;
     this.userCertUserId = '';
+    this.userSearchQuery = '';
+    this.userSearchResults.set([]);
     this.userCertResult.set(null);
     this.showUserCertModal.set(true);
   }
@@ -254,6 +362,28 @@ export class TenantCaComponent implements OnInit {
   closeUserCertModal() {
     this.showUserCertModal.set(false);
     this.userCertResult.set(null);
+  }
+
+  searchUsers() {
+    const q = this.userSearchQuery.trim();
+    if (q.length < 2) return;
+    this.searchingUsers.set(true);
+    this.userService.getUsers(q, undefined, true, 1, 10).subscribe({
+      next: (data) => {
+        this.userSearchResults.set(data.items || []);
+        this.searchingUsers.set(false);
+      },
+      error: () => {
+        this.userSearchResults.set([]);
+        this.searchingUsers.set(false);
+      },
+    });
+  }
+
+  selectUser(user: any) {
+    this.userCertUserId = user.id;
+    this.userSearchQuery = user.fullName || user.username;
+    this.userSearchResults.set([]);
   }
 
   provisionUserCert() {
@@ -265,14 +395,12 @@ export class TenantCaComponent implements OnInit {
       next: (result) => {
         this.userCertResult.set(result);
         this.provisioningUserCert.set(false);
-        if (result.success) {
-          this.refreshDetail(this.userCertTenantId);
-        }
+        if (result.success) this.refreshDetail(this.userCertTenantId);
       },
       error: (err) => {
         this.userCertResult.set({
           success: false,
-          message: err.error?.message || err.message,
+          message: err.error?.error || err.error?.message || err.message,
         });
         this.provisioningUserCert.set(false);
       },

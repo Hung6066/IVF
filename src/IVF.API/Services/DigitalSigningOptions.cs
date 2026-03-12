@@ -90,17 +90,17 @@ public class DigitalSigningOptions
     /// EJBCA CA name used for signing certificate enrollment.
     /// Can be overridden per-tenant via TenantSubCa.EjbcaCaName.
     /// </summary>
-    public string EjbcaDefaultCaName { get; set; } = "ManagementCA";
+    public string EjbcaDefaultCaName { get; set; } = "IVF Signing CA";
 
     /// <summary>
     /// Default EJBCA Certificate Profile for PDF signer certificates.
     /// </summary>
-    public string EjbcaDefaultCertProfile { get; set; } = "IVF-PDFSigner-Profile";
+    public string EjbcaDefaultCertProfile { get; set; } = "ENDUSER";
 
     /// <summary>
     /// Default EJBCA End Entity Profile for PDF signer enrollment.
     /// </summary>
-    public string EjbcaDefaultEeProfile { get; set; } = "IVF-Signer-EEProfile";
+    public string EjbcaDefaultEeProfile { get; set; } = "EMPTY";
 
     /// <summary>
     /// PKCS#12 keystore password used for EJBCA-enrolled certificates.

@@ -870,14 +870,14 @@ All endpoints are under `/api/security/advanced/*` with `AdminOnly` authorizatio
 
 ### Hubs
 
-| Hub               | Endpoint               | Purpose                                      |
-| ----------------- | ---------------------- | -------------------------------------------- |
-| QueueHub          | `/hubs/queue`          | Queue ticket updates (call, complete, stats) |
-| NotificationHub   | `/hubs/notifications`  | Push notifications to users                  |
-| FingerprintHub    | `/hubs/fingerprint`    | Biometric matching progress                  |
-| BackupHub         | `/hubs/backup`         | Backup/restore/deploy progress               |
-| EvidenceHub       | `/hubs/evidence`       | Evidence/audit trail real-time events        |
-| InfrastructureHub | `/hubs/infrastructure` | Real-time VPS metrics streaming              |
+| Hub                | Endpoint                | Purpose                                      |
+| ------------------ | ----------------------- | -------------------------------------------- |
+| QueueHub           | `/hubs/queue`           | Queue ticket updates (call, complete, stats) |
+| NotificationHub    | `/hubs/notifications`   | Push notifications to users                  |
+| FingerprintHub     | `/hubs/fingerprint`     | Biometric matching progress                  |
+| BackupHub          | `/hubs/backup`          | Backup/restore/deploy progress               |
+| EvidenceHub        | `/hubs/evidence`        | Evidence/audit trail real-time events        |
+| InfrastructureHub  | `/hubs/infrastructure`  | Real-time VPS metrics streaming              |
 
 ### Client Connection (Angular)
 
