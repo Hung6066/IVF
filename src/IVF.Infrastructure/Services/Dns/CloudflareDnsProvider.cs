@@ -109,19 +109,34 @@ public class CloudflareDnsProvider : IDnsProvider
     {
         try
         {
-            var request = new HttpRequestMessage(HttpMethod.Get, $"{BaseUrl}/zones/{_zoneId}/dns_records");
+            _logger.LogInformation("Fetching DNS records from Cloudflare with ZoneId: {ZoneId}", _zoneId);
+            
+            var request = new HttpRequestMessage(HttpMethod.Get, $"{BaseUrl}/zones/{_zoneId}/dns_records?per_page=100");
             var response = await _httpClient.SendAsync(request, ct);
             var responseContent = await response.Content.ReadAsStringAsync(ct);
 
             if (!response.IsSuccessStatusCode)
             {
-                _logger.LogError("Cloudflare list error: {StatusCode} - {Content}", response.StatusCode, responseContent);
-                throw new InvalidOperationException($"Cloudflare list error: {response.StatusCode}");
+                _logger.LogError("Cloudflare API error [{StatusCode}]: {Content}", response.StatusCode, responseContent);
+                throw new InvalidOperationException($"Cloudflare API returned {response.StatusCode}");
             }
 
             var result = JsonSerializer.Deserialize<CloudflareListResponse>(responseContent, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            
+            if (result?.Success == false)
+            {
+                var errors = string.Join("; ", result.Errors ?? new List<string>());
+                _logger.LogError("Cloudflare API returned success=false: {Errors}", errors);
+                throw new InvalidOperationException($"Cloudflare API error: {errors}");
+            }
+
             if (result?.Result == null)
+            {
+                _logger.LogWarning("Cloudflare returned null result");
                 return new List<DnsProviderRecord>();
+            }
+
+            _logger.LogInformation("Successfully fetched {Count} records from Cloudflare", result.Result.Count);
 
             return result.Result.Select(r => new DnsProviderRecord
             {
@@ -135,7 +150,7 @@ public class CloudflareDnsProvider : IDnsProvider
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to list DNS records from Cloudflare");
+            _logger.LogError(ex, "Failed to list DNS records from Cloudflare. ZoneId: {ZoneId}", _zoneId);
             throw;
         }
     }
@@ -151,6 +166,7 @@ public class CloudflareDnsProvider : IDnsProvider
     {
         public List<CloudflareDnsRecord> Result { get; set; } = new();
         public bool Success { get; set; }
+        public List<string> Errors { get; set; } = new();
     }
 
     private class CloudflareDnsRecord
