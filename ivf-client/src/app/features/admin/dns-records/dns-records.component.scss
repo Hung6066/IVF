@@ -1,6 +1,29 @@
 @use 'sass:math';
 
 // ════════════════════════════════════════════════════════════════════════════════════════
+// CSS Variables (Design Tokens)
+// ════════════════════════════════════════════════════════════════════════════════════════
+
+:root {
+  --primary-color: rgb(59, 130, 246); // blue-500
+  --primary-hover: rgb(37, 99, 235); // blue-600
+  --danger-color: rgb(239, 68, 68); // red-500
+  --danger-hover: rgb(220, 38, 38); // red-600
+  --success-color: rgb(34, 197, 94); // green-500
+  --success-hover: rgb(22, 163, 74); // green-600
+  --border-color: rgb(229, 231, 235); // gray-200
+  --bg-light: rgb(249, 250, 251); // gray-50
+  --text-primary: rgb(17, 24, 39); // gray-900
+  --text-secondary: rgb(107, 114, 128); // gray-500
+  --text-muted: rgb(156, 163, 175); // gray-400
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+  --radius: 0.5rem;
+  --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+// ════════════════════════════════════════════════════════════════════════════════════════
 // Animations
 // ════════════════════════════════════════════════════════════════════════════════════════
 
@@ -24,16 +47,15 @@
   }
 }
 
-.animate-fade-in {
-  animation: fadeIn 0.3s ease-in-out;
-}
-
-.animate-slide-up {
-  animation: slideUp 0.3s ease-out;
-}
-
-.animate-spin {
-  animation: spin 1s linear infinite;
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-1rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes spin {
@@ -45,6 +67,36 @@
   }
 }
 
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.3s ease-out;
+}
+
+.animate-slide-down {
+  animation: slideDown 0.3s ease-out;
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
 // ════════════════════════════════════════════════════════════════════════════════════════
 // Component Styles
 // ════════════════════════════════════════════════════════════════════════════════════════
@@ -53,11 +105,111 @@
   display: block;
 }
 
+// Header Section
+.dns-header {
+  margin-bottom: 2rem;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 1.5rem;
+
+  h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0 0 0.5rem 0;
+  }
+
+  .description {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+  }
+}
+
+// Records Count Badge
+.records-count {
+  display: inline-block;
+  background-color: var(--primary-color);
+  color: white;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-top: 0.5rem;
+}
+
+// Form Section
+.form-container {
+  background-color: var(--bg-light);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+  box-shadow: var(--shadow-sm);
+
+  &.form-hidden {
+    max-height: 0;
+    overflow: hidden;
+    padding: 0;
+    margin: 0;
+    transition: all 0.3s ease;
+  }
+
+  h3 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 1.5rem 0;
+  }
+}
+
+// Form Groups
+.form-group {
+  margin-bottom: 1.25rem;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+
+  label {
+    display: block;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+    font-size: 0.95rem;
+
+    .required {
+      color: var(--danger-color);
+      margin-left: 0.25rem;
+    }
+  }
+
+  .help-text {
+    display: block;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-top: 0.25rem;
+  }
+}
+
 // Input & Select Styles
 input[type='text'],
 select {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  font-size: 0.95rem;
+  background-color: white;
+  color: var(--text-primary);
+  transition: var(--transition);
+  font-family: inherit;
+
+  &:hover {
+    border-color: rgb(209, 213, 219); // gray-300
+  }
+
   &:focus {
-    border-color: rgb(59, 130, 246);
+    outline: none;
+    border-color: var(--primary-color);
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
   }
 
@@ -66,11 +218,40 @@ select {
     cursor: not-allowed;
     opacity: 0.6;
   }
+
+  &::placeholder {
+    color: var(--text-muted);
+  }
 }
 
-// Button States
+select {
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236B7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+  background-position: right 0.5rem center;
+  background-repeat: no-repeat;
+  background-size: 1.5em 1.5em;
+  padding-right: 2.5rem;
+  appearance: none;
+}
+
+// Form Actions
+.form-actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 2rem;
+  flex-wrap: wrap;
+}
+
+// Button Styles
 button {
-  transition: all 0.2s ease-in-out;
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition);
+  font-family: inherit;
 
   &:active:not(:disabled) {
     transform: scale(0.98);
@@ -80,22 +261,357 @@ button {
     opacity: 0.5;
     cursor: not-allowed;
   }
+
+  // Primary Button
+  &.btn-primary {
+    background-color: var(--primary-color);
+    color: white;
+
+    &:hover:not(:disabled) {
+      background-color: var(--primary-hover);
+      box-shadow: var(--shadow-md);
+    }
+
+    &:focus:not(:disabled) {
+      outline: 2px solid var(--primary-color);
+      outline-offset: 2px;
+    }
+  }
+
+  // Danger Button
+  &.btn-danger {
+    background-color: var(--danger-color);
+    color: white;
+
+    &:hover:not(:disabled) {
+      background-color: var(--danger-hover);
+      box-shadow: var(--shadow-md);
+    }
+  }
+
+  // Secondary Button
+  &.btn-secondary {
+    background-color: white;
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+
+    &:hover:not(:disabled) {
+      background-color: var(--bg-light);
+      border-color: rgb(209, 213, 219);
+    }
+  }
+
+  // Success Button
+  &.btn-success {
+    background-color: var(--success-color);
+    color: white;
+
+    &:hover:not(:disabled) {
+      background-color: var(--success-hover);
+      box-shadow: var(--shadow-md);
+    }
+  }
+
+  // Icon in Button
+  .icon {
+    margin-right: 0.5rem;
+    font-size: 1.1em;
+  }
 }
 
-// Table Responsive Design
+// Table Styles
+.table-container {
+  overflow-x: auto;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border-color);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background-color: white;
+
+  thead {
+    background-color: var(--bg-light);
+    border-bottom: 2px solid var(--border-color);
+
+    th {
+      padding: 1rem;
+      text-align: left;
+      font-weight: 600;
+      color: var(--text-primary);
+      font-size: 0.875rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      white-space: nowrap;
+    }
+  }
+
+  tbody {
+    tr {
+      border-bottom: 1px solid var(--border-color);
+      transition: var(--transition);
+
+      &:hover {
+        background-color: var(--bg-light);
+      }
+
+      &:last-child {
+        border-bottom: none;
+      }
+
+      td {
+        padding: 1rem;
+        color: var(--text-primary);
+        font-size: 0.95rem;
+
+        // Record Type Badge
+        .record-type {
+          display: inline-block;
+          background-color: var(--primary-color);
+          color: white;
+          padding: 0.25rem 0.75rem;
+          border-radius: 9999px;
+          font-weight: 600;
+          font-size: 0.8rem;
+        }
+
+        // Active Status Badge
+        .status-badge {
+          display: inline-block;
+          padding: 0.25rem 0.75rem;
+          border-radius: 9999px;
+          font-size: 0.8rem;
+          font-weight: 500;
+
+          &.status-active {
+            background-color: rgba(34, 197, 94, 0.1);
+            color: var(--success-color);
+          }
+
+          &.status-inactive {
+            background-color: rgba(107, 114, 128, 0.1);
+            color: var(--text-secondary);
+          }
+        }
+
+        // Content Text (truncated)
+        .content-text {
+          max-width: 200px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          color: var(--text-secondary);
+        }
+
+        // Action Buttons
+        .action-buttons {
+          display: flex;
+          gap: 0.5rem;
+
+          button {
+            padding: 0.5rem 1rem;
+            font-size: 0.85rem;
+            background-color: white;
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+
+            &:hover {
+              background-color: var(--bg-light);
+            }
+
+            &.btn-delete {
+              color: var(--danger-color);
+              border-color: var(--danger-color);
+
+              &:hover {
+                background-color: rgba(239, 68, 68, 0.05);
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+// Empty State
+.empty-state {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--text-secondary);
+
+  .icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+  }
+
+  p {
+    font-size: 1rem;
+    margin: 0.5rem 0;
+  }
+
+  .hint {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+  }
+}
+
+// Loading State
+.loading-spinner {
+  display: inline-block;
+  animation: spin 1s linear infinite;
+  text-align: center;
+  margin: 2rem 0;
+
+  svg {
+    width: 2rem;
+    height: 2rem;
+    color: var(--primary-color);
+  }
+}
+
+// Error Message
+.error-message {
+  background-color: rgba(239, 68, 68, 0.1);
+  border: 1px solid var(--danger-color);
+  border-radius: var(--radius);
+  padding: 1rem;
+  margin-bottom: 1rem;
+  color: var(--danger-color);
+  display: flex;
+  gap: 0.75rem;
+
+  .icon {
+    flex-shrink: 0;
+  }
+
+  p {
+    margin: 0;
+    font-size: 0.95rem;
+  }
+}
+
+// Success Message
+.success-message {
+  background-color: rgba(34, 197, 94, 0.1);
+  border: 1px solid var(--success-color);
+  border-radius: var(--radius);
+  padding: 1rem;
+  margin-bottom: 1rem;
+  color: var(--success-color);
+  display: flex;
+  gap: 0.75rem;
+
+  .icon {
+    flex-shrink: 0;
+  }
+
+  p {
+    margin: 0;
+    font-size: 0.95rem;
+  }
+}
+
+// Modal / Dialog Styles
+.modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.2s ease-in-out;
+}
+
+.modal {
+  background-color: white;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  padding: 1.5rem;
+  max-width: 500px;
+  width: 90%;
+  animation: slideUp 0.3s ease-out;
+
+  h3 {
+    margin: 0 0 1rem 0;
+    color: var(--text-primary);
+  }
+
+  .modal-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+    margin-top: 1.5rem;
+  }
+}
+
+// Responsive Design
 @media (max-width: 768px) {
+  .dns-header {
+    h1 {
+      font-size: 1.5rem;
+    }
+  }
+
+  .form-container {
+    padding: 1rem;
+  }
+
   table {
     font-size: 0.875rem;
 
-    th,
-    td {
+    thead th {
       padding: 0.75rem 0.5rem;
+      font-size: 0.75rem;
+    }
+
+    tbody td {
+      padding: 0.75rem 0.5rem;
+
+      .content-text {
+        max-width: 100px;
+      }
+
+      .action-buttons {
+        flex-direction: column;
+        gap: 0.25rem;
+
+        button {
+          width: 100%;
+        }
+      }
     }
   }
 
   button {
     padding: 0.5rem 1rem;
     font-size: 0.875rem;
+  }
+
+  .form-actions {
+    flex-direction: column;
+
+    button {
+      width: 100%;
+    }
+  }
+
+  .modal {
+    width: 95%;
+
+    .modal-actions {
+      flex-direction: column;
+
+      button {
+        width: 100%;
+      }
+    }
   }
 }
 
