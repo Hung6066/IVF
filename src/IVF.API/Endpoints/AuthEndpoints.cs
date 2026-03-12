@@ -167,6 +167,35 @@ public static class AuthEndpoints
                 }, statusCode: 403);
             }
 
+            // 3.5. Check tenant status (suspended/cancelled tenants cannot login)
+            if (!user.IsPlatformAdmin)
+            {
+                var tenant = await db.Tenants.AsNoTracking()
+                    .FirstOrDefaultAsync(t => t.Id == user.TenantId && !t.IsDeleted);
+                if (tenant is null || tenant.Status == TenantStatus.Suspended || tenant.Status == TenantStatus.Cancelled)
+                {
+                    var statusLabel = tenant?.Status.ToString() ?? "NotFound";
+                    await securityEvents.LogEventAsync(SecurityEvent.Create(
+                        eventType: SecurityEventTypes.LoginFailed,
+                        severity: "High",
+                        userId: user.Id,
+                        username: user.Username,
+                        ipAddress: ipAddress,
+                        userAgent: userAgent,
+                        requestPath: "/api/auth/login",
+                        requestMethod: "POST",
+                        responseStatusCode: 403,
+                        correlationId: httpContext.TraceIdentifier,
+                        details: $"{{\"reason\":\"tenant_{statusLabel.ToLowerInvariant()}\"}}"));
+
+                    return Results.Json(new
+                    {
+                        error = "Trung tâm của bạn đã bị tạm ngưng hoạt động. Vui lòng liên hệ quản trị viên.",
+                        code = "TENANT_SUSPENDED"
+                    }, statusCode: 403);
+                }
+            }
+
             // 4. Clear brute force counter on success
             await threatDetection.ClearFailedAttemptsAsync(request.Username);
 

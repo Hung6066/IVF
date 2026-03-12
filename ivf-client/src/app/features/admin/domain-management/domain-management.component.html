@@ -18,8 +18,14 @@
 
   <!-- Sync result message -->
   @if (syncMessage()) {
-    <div class="alert" [class.alert-success]="syncSuccess()" [class.alert-error]="syncSuccess() === false">
-      <i [class]="syncSuccess() ? 'fa-solid fa-check-circle' : 'fa-solid fa-exclamation-circle'"></i>
+    <div
+      class="alert"
+      [class.alert-success]="syncSuccess()"
+      [class.alert-error]="syncSuccess() === false"
+    >
+      <i
+        [class]="syncSuccess() ? 'fa-solid fa-check-circle' : 'fa-solid fa-exclamation-circle'"
+      ></i>
       {{ syncMessage() }}
     </div>
   }
@@ -51,15 +57,16 @@
     <button class="tab" [class.active]="activeTab() === 'current'" (click)="switchTab('current')">
       <i class="fa-solid fa-server"></i> Cấu hình đang chạy
     </button>
+    <button class="tab" [class.active]="activeTab() === 'dns'" (click)="switchTab('dns')">
+      <i class="fa-solid fa-pen-to-square"></i> DNS Records
+    </button>
   </div>
 
   <!-- Domains Tab -->
   @if (activeTab() === 'domains') {
     <div class="table-container">
       @if (loading()) {
-        <div class="loading-state">
-          <i class="fa-solid fa-spinner fa-spin"></i> Đang tải...
-        </div>
+        <div class="loading-state"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải...</div>
       } @else {
         <table class="data-table">
           <thead>
@@ -76,7 +83,9 @@
             @for (domain of domains(); track domain.tenantId) {
               <tr [class.inactive]="!domain.isActive">
                 <td class="tenant-name">{{ domain.tenantName }}</td>
-                <td><code>{{ domain.slug }}</code></td>
+                <td>
+                  <code>{{ domain.slug }}</code>
+                </td>
                 <td>
                   @if (domain.subdomain) {
                     <a [href]="'https://' + domain.subdomain" target="_blank" class="domain-link">
@@ -89,7 +98,11 @@
                 </td>
                 <td>
                   @if (domain.customDomain) {
-                    <a [href]="'https://' + domain.customDomain" target="_blank" class="domain-link">
+                    <a
+                      [href]="'https://' + domain.customDomain"
+                      target="_blank"
+                      class="domain-link"
+                    >
                       {{ domain.customDomain }}
                       <i class="fa-solid fa-external-link-alt"></i>
                     </a>
@@ -158,14 +171,26 @@
     </div>
   }
 
+  <!-- DNS Records Tab -->
+  @if (activeTab() === 'dns') {
+    <app-dns-records [embedded]="true"></app-dns-records>
+  }
+
   <!-- Help info -->
   <div class="help-box">
     <h3><i class="fa-solid fa-circle-info"></i> Hướng dẫn</h3>
     <ol>
-      <li>Tạo tenant mới trong <strong>Quản lý Trung tâm</strong> — slug sẽ được dùng làm subdomain</li>
+      <li>
+        Tạo tenant mới trong <strong>Quản lý Trung tâm</strong> — slug sẽ được dùng làm subdomain
+      </li>
       <li>Thêm DNS A record cho <code>slug.natra.site</code> trỏ đến IP server</li>
-      <li>Nhấn <strong>Đồng bộ Caddy</strong> để cập nhật cấu hình — Caddy tự động cấp chứng chỉ Let's Encrypt</li>
-      <li>(Tùy chọn) Cấu hình custom domain trong trang chi tiết tenant, verify DNS rồi đồng bộ lại</li>
+      <li>
+        Nhấn <strong>Đồng bộ Caddy</strong> để cập nhật cấu hình — Caddy tự động cấp chứng chỉ Let's
+        Encrypt
+      </li>
+      <li>
+        (Tùy chọn) Cấu hình custom domain trong trang chi tiết tenant, verify DNS rồi đồng bộ lại
+      </li>
     </ol>
   </div>
 </div>

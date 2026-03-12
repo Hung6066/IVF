@@ -2,11 +2,12 @@ import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { DomainManagementService } from '../../../core/services/domain-management.service';
 import { TenantDomainInfo } from '../../../core/models/domain-management.model';
+import { DnsRecordsComponent } from '../dns-records/dns-records.component';
 
 @Component({
   selector: 'app-domain-management',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, DnsRecordsComponent],
   templateUrl: './domain-management.component.html',
   styleUrls: ['./domain-management.component.scss'],
 })
@@ -16,7 +17,7 @@ export class DomainManagementComponent implements OnInit {
   syncing = signal(false);
   syncMessage = signal('');
   syncSuccess = signal<boolean | null>(null);
-  activeTab = signal<'domains' | 'preview' | 'current'>('domains');
+  activeTab = signal<'domains' | 'preview' | 'current' | 'dns'>('domains');
   caddyfilePreview = signal('');
   currentConfig = signal('');
   previewLoading = signal(false);
@@ -87,13 +88,13 @@ export class DomainManagementComponent implements OnInit {
     });
   }
 
-  switchTab(tab: 'domains' | 'preview' | 'current'): void {
+  switchTab(tab: 'domains' | 'preview' | 'current' | 'dns'): void {
     if (tab === 'preview') {
       this.loadPreview();
     } else if (tab === 'current') {
       this.loadCurrentConfig();
     } else {
-      this.activeTab.set('domains');
+      this.activeTab.set(tab);
     }
   }
 

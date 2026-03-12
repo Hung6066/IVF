@@ -1,4 +1,3 @@
-
 # 🚀 IVF Production Deployment Guide
 
 Hướng dẫn triển khai ứng dụng đến production sử dụng **Ansible** và **WSL** (Windows Subsystem for Linux).
@@ -8,11 +7,13 @@ Hướng dẫn triển khai ứng dụng đến production sử dụng **Ansible
 ## 📋 Yêu cầu
 
 ### Windows
+
 - Windows 10 hoặc cao hơn
 - WSL 2 được cài đặt
 - PowerShell 7+ (khuyến nghị)
 
 ### WSL
+
 - Ubuntu 20.04+ (hoặc distro khác)
 - Python 3.8+
 - pip
@@ -20,6 +21,7 @@ Hướng dẫn triển khai ứng dụng đến production sử dụng **Ansible
 - Git (tùy chọn, để auto-detect commit tag)
 
 ### Production VPS
+
 - SSH key-based authentication được cấu hình
 - Docker và Docker Swarm
 - Acccess tới GitHub Container Registry (GHCR)
@@ -51,6 +53,7 @@ pip install ansible
 ```
 
 Kiểm tra:
+
 ```bash
 ansible-playbook --version
 ```
@@ -58,6 +61,7 @@ ansible-playbook --version
 ### 3. Cấu hình SSH Keys
 
 Từ WSL:
+
 ```bash
 # Tạo SSH key (nếu chưa có)
 ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519
@@ -80,14 +84,14 @@ File: `ansible/hosts.yml`
 all:
   vars:
     # ... (các biến khác)
-    
+
   children:
     managers:
       hosts:
         vps1:
           ansible_host: 45.134.226.56
           ansible_user: root
-          ansible_ssh_private_key_file: ~/.ssh/id_ed25519  # ✅ Đảm bảo path chính xác
+          ansible_ssh_private_key_file: ~/.ssh/id_ed25519 # ✅ Đảm bảo path chính xác
 
     workers:
       hosts:
@@ -234,6 +238,7 @@ Khi triển khai, theo dõi tại:
 ### 1. "ansible-playbook not found"
 
 WSL chưa cài Ansible:
+
 ```bash
 pip install ansible
 ```
@@ -241,11 +246,13 @@ pip install ansible
 ### 2. "Cannot connect to VPS manager"
 
 Kiểm tra SSH:
+
 ```bash
 ssh -v root@45.134.226.56 "echo OK"
 ```
 
 Nếu lỗi key, copy lại:
+
 ```bash
 ssh-copy-id -i ~/.ssh/id_ed25519 root@45.134.226.56
 ```
@@ -257,6 +264,7 @@ Token hết hạn hoặc sai. Tạo token mới tại: https://github.com/settin
 ### 4. "Update failed, service rolled back"
 
 Kiểm tra logs:
+
 ```bash
 ssh root@45.134.226.56 "docker service logs ivf_api --tail=100"
 ```
@@ -329,6 +337,7 @@ Script tự động detect git commit tag. Để manual:
 ```
 
 Format tag:
+
 - `sha-c7d4766` - Git commit short hash (auto-detected)
 - `v1.2.3` - Version tag
 - `prod-20240312` - Custom format
@@ -341,6 +350,7 @@ Format tag:
 Để tự động deploy khi push tới main:
 
 **GitHub Actions** sẽ tự động:
+
 1. Build Docker images
 2. Push tới GHCR
 3. Trigger deployment workflow
@@ -354,11 +364,13 @@ Xem: `.github/workflows/deploy-production.yml`
 Nếu gặp vấn đề:
 
 1. Kiểm tra logs:
+
    ```bash
    ssh root@45.134.226.56 "docker service logs ivf_api --tail=200"
    ```
 
 2. Xem Ansible output chi tiết:
+
    ```bash
    ./deploy.sh --full -v  # (WSL)
    # hoặc

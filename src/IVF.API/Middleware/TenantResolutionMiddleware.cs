@@ -41,6 +41,23 @@ public class TenantResolutionMiddleware
             }
             else
             {
+                // Check tenant status — block suspended/cancelled tenants
+                var tenantRepo = context.RequestServices.GetService<ITenantRepository>();
+                if (tenantRepo is not null)
+                {
+                    var tenant = await tenantRepo.GetByIdAsync(tenantId);
+                    if (tenant is null || tenant.Status == TenantStatus.Suspended || tenant.Status == TenantStatus.Cancelled)
+                    {
+                        context.Response.StatusCode = 403;
+                        await context.Response.WriteAsJsonAsync(new
+                        {
+                            code = "TENANT_SUSPENDED",
+                            error = "Trung tâm của bạn đã bị tạm ngưng hoạt động. Vui lòng liên hệ quản trị viên."
+                        });
+                        return;
+                    }
+                }
+
                 dbContext.SetCurrentTenant(tenantId);
             }
         }

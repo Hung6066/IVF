@@ -104,3 +104,6 @@ ansible/hosts.yml
 .env.production
 
 /backups
+# Large files
+*.tar
+*.tar.gz

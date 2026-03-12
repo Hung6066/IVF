@@ -45,7 +45,7 @@ public class CloudflareDnsProvider : IDnsProvider
                 name = name,
                 content = content,
                 ttl = ttl,
-                proxied = false
+                proxied = true
             };
 
             var json = JsonSerializer.Serialize(payload);
@@ -110,29 +110,34 @@ public class CloudflareDnsProvider : IDnsProvider
         try
         {
             _logger.LogInformation("Fetching DNS records from Cloudflare with ZoneId: {ZoneId}", _zoneId);
-            
+
             var request = new HttpRequestMessage(HttpMethod.Get, $"{BaseUrl}/zones/{_zoneId}/dns_records?per_page=100");
             var response = await _httpClient.SendAsync(request, ct);
             var responseContent = await response.Content.ReadAsStringAsync(ct);
 
+            _logger.LogInformation("Cloudflare API response [{StatusCode}]: {ContentLength} bytes",
+                response.StatusCode, responseContent.Length);
+
             if (!response.IsSuccessStatusCode)
             {
                 _logger.LogError("Cloudflare API error [{StatusCode}]: {Content}", response.StatusCode, responseContent);
-                throw new InvalidOperationException($"Cloudflare API returned {response.StatusCode}");
+                throw new InvalidOperationException($"Cloudflare API returned {response.StatusCode}: {responseContent}");
             }
 
             var result = JsonSerializer.Deserialize<CloudflareListResponse>(responseContent, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-            
+
             if (result?.Success == false)
             {
-                var errors = string.Join("; ", result.Errors ?? new List<string>());
+                var errors = result.Errors != null
+                    ? string.Join("; ", result.Errors.Select(e => $"[{e.Code}] {e.Message}"))
+                    : "Unknown error";
                 _logger.LogError("Cloudflare API returned success=false: {Errors}", errors);
                 throw new InvalidOperationException($"Cloudflare API error: {errors}");
             }
 
-            if (result?.Result == null)
+            if (result?.Result == null || result.Result.Count == 0)
             {
-                _logger.LogWarning("Cloudflare returned null result");
+                _logger.LogWarning("Cloudflare returned null/empty result. Raw response: {Content}", responseContent);
                 return new List<DnsProviderRecord>();
             }
 
@@ -160,13 +165,20 @@ public class CloudflareDnsProvider : IDnsProvider
     {
         public CloudflareDnsRecord? Result { get; set; }
         public bool Success { get; set; }
+        public List<CloudflareError>? Errors { get; set; }
     }
 
     private class CloudflareListResponse
     {
-        public List<CloudflareDnsRecord> Result { get; set; } = new();
+        public List<CloudflareDnsRecord>? Result { get; set; }
         public bool Success { get; set; }
-        public List<string> Errors { get; set; } = new();
+        public List<CloudflareError>? Errors { get; set; }
+    }
+
+    private class CloudflareError
+    {
+        public int Code { get; set; }
+        public string Message { get; set; } = string.Empty;
     }
 
     private class CloudflareDnsRecord

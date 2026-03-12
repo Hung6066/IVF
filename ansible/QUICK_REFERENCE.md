@@ -2,12 +2,12 @@
 
 ## 📌 Files Created
 
-| File | Purpose |
-|------|---------|
-| `ansible/deploy.yml` | Main Ansible playbook (parameterized) |
-| `ansible/deploy.sh` | Bash script wrapper cho WSL |
-| `ansible/deploy.ps1` | PowerShell wrapper cho Windows |
-| `ansible/DEPLOYMENT.md` | Full deployment guide (chi tiết) |
+| File                    | Purpose                               |
+| ----------------------- | ------------------------------------- |
+| `ansible/deploy.yml`    | Main Ansible playbook (parameterized) |
+| `ansible/deploy.sh`     | Bash script wrapper cho WSL           |
+| `ansible/deploy.ps1`    | PowerShell wrapper cho Windows        |
+| `ansible/DEPLOYMENT.md` | Full deployment guide (chi tiết)      |
 
 ---
 
@@ -124,12 +124,12 @@ $env:GHCR_TOKEN = "ghp_abc123..."
 
 ## 📊 Deployment Targets
 
-| Option | Backend | Frontend |
-|--------|---------|----------|
-| `-Full` | ✅ | ✅ |
-| `-Backend` | ✅ | ❌ |
-| `-Frontend` | ❌ | ✅ |
-| (default) | ✅ | ✅ |
+| Option      | Backend | Frontend |
+| ----------- | ------- | -------- |
+| `-Full`     | ✅      | ✅       |
+| `-Backend`  | ✅      | ❌       |
+| `-Frontend` | ❌      | ✅       |
+| (default)   | ✅      | ✅       |
 
 ---
 
@@ -170,11 +170,11 @@ While deploying, check:
 ### Rolling Update Strategy
 
 ```yaml
-parallelism: 1              # 1 task at a time
-delay: 30s                  # Wait 30s between tasks
-order: start-first          # New container before old shutdown
-failure-action: rollback    # Auto rollback on failure
-monitor-time: 60s           # Monitor 60s after update
+parallelism: 1 # 1 task at a time
+delay: 30s # Wait 30s between tasks
+order: start-first # New container before old shutdown
+failure-action: rollback # Auto rollback on failure
+monitor-time: 60s # Monitor 60s after update
 ```
 
 ### Auto-Rollback
@@ -186,16 +186,19 @@ If new version fails health checks, Swarm automatically rolls back to previous v
 ## 🛠️ Troubleshooting
 
 ### Script won't run (WSL)
+
 ```bash
 chmod +x ~/IVF/ansible/deploy.sh
 ```
 
 ### Permission denied (PowerShell)
+
 ```powershell
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 ```
 
 ### SSH connection fails
+
 ```bash
 # Test SSH
 ssh root@45.134.226.56 "docker ps"
@@ -205,9 +208,11 @@ ssh-copy-id -i ~/.ssh/id_ed25519 root@45.134.226.56
 ```
 
 ### Token invalid/expired
+
 Create new token: https://github.com/settings/tokens
 
 ### Check deployment logs
+
 ```bash
 # SSH to VPS and view service logs
 ssh root@45.134.226.56 "docker service logs ivf_api --tail=100"

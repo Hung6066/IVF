@@ -1,0 +1,56 @@
+version: 2
+updates:
+  # .NET (NuGet) — backend dependencies
+  - package-ecosystem: "nuget"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "backend"
+    groups:
+      # Group minor/patch updates to reduce PR noise
+      dotnet-minor:
+        update-types:
+          - "minor"
+          - "patch"
+
+  # npm — frontend dependencies
+  - package-ecosystem: "npm"
+    directory: "/ivf-client"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "frontend"
+    groups:
+      angular:
+        patterns:
+          - "@angular/*"
+          - "@angular-devkit/*"
+      npm-minor:
+        update-types:
+          - "minor"
+          - "patch"
+
+  # Docker — base image updates
+  - package-ecosystem: "docker"
+    directory: "/src/IVF.API"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "docker"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "ci"

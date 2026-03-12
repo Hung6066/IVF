@@ -1,4 +1,4 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, signal, input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -18,6 +18,7 @@ import {
   styleUrls: ['./dns-records.component.scss'],
 })
 export class DnsRecordsComponent implements OnInit {
+  embedded = input(false);
   records = signal<DnsListResponse[]>([]);
   loading = signal(false);
   isCreating = signal(false);
@@ -42,6 +43,7 @@ export class DnsRecordsComponent implements OnInit {
 
   // TTL options
   ttlOptions = [
+    { label: 'Auto', value: 1 },
     { label: '5 phút', value: 300 },
     { label: '30 phút', value: 1800 },
     { label: '1 giờ', value: 3600 },
@@ -68,11 +70,7 @@ export class DnsRecordsComponent implements OnInit {
       error: (err: HttpErrorResponse) => {
         console.error('Failed to load DNS records:', err);
         this.error.set('Không thể tải DNS records. Vui lòng thử lại.');
-        this.notificationService.error(
-          'Lỗi',
-          'Không thể tải DNS records',
-          7000,
-        );
+        this.notificationService.error('Lỗi', 'Không thể tải DNS records', 7000);
       },
       complete: () => this.loading.set(false),
     });
@@ -117,10 +115,7 @@ export class DnsRecordsComponent implements OnInit {
 
   createRecord(): void {
     if (!this.isFormValid()) {
-      this.notificationService.warning(
-        'Cảnh báo',
-        'Vui lòng kiểm tra lại dữ liệu nhập vào',
-      );
+      this.notificationService.warning('Cảnh báo', 'Vui lòng kiểm tra lại dữ liệu nhập vào');
       return;
     }
 
@@ -135,10 +130,7 @@ export class DnsRecordsComponent implements OnInit {
 
     this.dnsService.createRecord(request).subscribe({
       next: (response) => {
-        this.notificationService.success(
-          'Thành công',
-          `DNS record ${request.name} đã được tạo`,
-        );
+        this.notificationService.success('Thành công', `DNS record ${request.name} đã được tạo`);
         this.formVisible.set(false);
         this.resetForm();
         this.loadRecords();
@@ -154,9 +146,7 @@ export class DnsRecordsComponent implements OnInit {
 
   confirmDelete(id: string, name: string): void {
     if (
-      !confirm(
-        `Bạn có chắc chắn muốn xóa DNS record "${name}"? Hành động này không thể hoàn tác.`,
-      )
+      !confirm(`Bạn có chắc chắn muốn xóa DNS record "${name}"? Hành động này không thể hoàn tác.`)
     ) {
       return;
     }
@@ -167,10 +157,7 @@ export class DnsRecordsComponent implements OnInit {
   deleteRecord(id: string): void {
     this.dnsService.deleteRecord(id).subscribe({
       next: () => {
-        this.notificationService.success(
-          'Thành công',
-          'DNS record đã được xóa',
-        );
+        this.notificationService.success('Thành công', 'DNS record đã được xóa');
         this.loadRecords();
       },
       error: (err: HttpErrorResponse) => {

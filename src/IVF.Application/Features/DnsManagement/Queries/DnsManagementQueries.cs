@@ -35,6 +35,8 @@ public class GetTenantDnsRecordsHandler : IRequestHandler<GetTenantDnsRecordsQue
             // Fetch actual records from Cloudflare API
             var cloudflareRecords = await _dnsProvider.ListRecordsAsync(ct);
 
+            _logger.LogInformation("Cloudflare returned {Count} DNS records", cloudflareRecords.Count);
+
             // Convert to DTO and return Cloudflare's actual records
             return cloudflareRecords
                 .OrderByDescending(r => r.Type)
@@ -50,7 +52,7 @@ public class GetTenantDnsRecordsHandler : IRequestHandler<GetTenantDnsRecordsQue
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to fetch DNS records from Cloudflare");
+            _logger.LogError(ex, "Failed to fetch DNS records from Cloudflare, falling back to local DB");
             // Fallback to local database records if Cloudflare API fails
             var localRecords = await _dnsRepo.GetAllAsync(ct);
             return localRecords

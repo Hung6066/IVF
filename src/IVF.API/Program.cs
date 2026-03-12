@@ -430,14 +430,13 @@ try
                     if (allowedOrigins.Any(a => string.Equals(a, origin, StringComparison.OrdinalIgnoreCase)))
                         return true;
 
-                    // Check if origin matches a verified tenant custom domain
+                    // Check if origin matches a tenant subdomain (*.natra.site)
                     if (Uri.TryCreate(origin, UriKind.Absolute, out var uri))
                     {
                         var host = uri.Host;
-                        // Tenant custom domain validation is deferred to middleware
-                        // Allow any HTTPS origin and let tenant resolution handle auth
-                        // This avoids DB calls in CORS policy evaluation
-                        return uri.Scheme == "https";
+                        // Only allow HTTPS subdomains of natra.site
+                        return uri.Scheme == "https"
+                            && host.EndsWith(".natra.site", StringComparison.OrdinalIgnoreCase);
                     }
                     return false;
                 })

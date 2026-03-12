@@ -14,7 +14,7 @@ export enum DnsRecordTypeEnum {
   CNAME = 'CNAME',
   MX = 'MX',
   TXT = 'TXT',
-  NS = 'NS'
+  NS = 'NS',
 }
 
 export interface CreateDnsRecordRequest {

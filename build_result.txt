@@ -1,0 +1,49 @@
+  Determining projects to restore...
+D:\Pr.Net\IVF\src\IVF.Application\IVF.Application.csproj : warning NU1903: Package 'Microsoft.Extensions.Caching.Memory' 8.0.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-qj66-m88j-hmgj [D:\Pr.Net\IVF\src\IVF.API\IVF.API.csproj]
+D:\Pr.Net\IVF\src\IVF.Domain\IVF.Domain.csproj : warning NU1903: Package 'Microsoft.Extensions.Caching.Memory' 8.0.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-qj66-m88j-hmgj [D:\Pr.Net\IVF\src\IVF.API\IVF.API.csproj]
+D:\Pr.Net\IVF\src\IVF.Domain\IVF.Domain.csproj : warning NU1903: Package 'Npgsql' 8.0.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-x9vc-6hfv-hg8c [D:\Pr.Net\IVF\src\IVF.API\IVF.API.csproj]
+D:\Pr.Net\IVF\src\IVF.Application\IVF.Application.csproj : warning NU1903: Package 'Npgsql' 8.0.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-x9vc-6hfv-hg8c [D:\Pr.Net\IVF\src\IVF.API\IVF.API.csproj]
+D:\Pr.Net\IVF\src\IVF.API\IVF.API.csproj : warning NU1603: IVF.Infrastructure depends on Fido2.AspNet (>= 4.0.0-beta.24) but Fido2.AspNet 4.0.0-beta.24 was not found. Fido2.AspNet 4.0.0-beta1 was resolved instead.
+D:\Pr.Net\IVF\src\IVF.API\IVF.API.csproj : warning NU1603: IVF.API depends on OpenTelemetry.Exporter.Prometheus.AspNetCore (>= 1.12.0-rc.1) but OpenTelemetry.Exporter.Prometheus.AspNetCore 1.12.0-rc.1 was not found. OpenTelemetry.Exporter.Prometheus.AspNetCore 1.13.0-beta.1 was resolved instead.
+D:\Pr.Net\IVF\src\IVF.Infrastructure\IVF.Infrastructure.csproj : warning NU1603: IVF.Infrastructure depends on Fido2.AspNet (>= 4.0.0-beta.24) but Fido2.AspNet 4.0.0-beta.24 was not found. Fido2.AspNet 4.0.0-beta1 was resolved instead. [D:\Pr.Net\IVF\src\IVF.API\IVF.API.csproj]
+D:\Pr.Net\IVF\src\IVF.Infrastructure\IVF.Infrastructure.csproj : warning NU1902: Package 'Microsoft.IdentityModel.JsonWebTokens' 6.23.1 has a known moderate severity vulnerability, https://github.com/advisories/GHSA-59j7-ghrg-fj52 [D:\Pr.Net\IVF\src\IVF.API\IVF.API.csproj]
+D:\Pr.Net\IVF\src\IVF.Infrastructure\IVF.Infrastructure.csproj : warning NU1902: Package 'System.IdentityModel.Tokens.Jwt' 6.23.1 has a known moderate severity vulnerability, https://github.com/advisories/GHSA-59j7-ghrg-fj52 [D:\Pr.Net\IVF\src\IVF.API\IVF.API.csproj]
+  All projects are up-to-date for restore.
+D:\Pr.Net\IVF\src\IVF.API\IVF.API.csproj : warning NU1603: IVF.Infrastructure depends on Fido2.AspNet (>= 4.0.0-beta.24) but Fido2.AspNet 4.0.0-beta.24 was not found. Fido2.AspNet 4.0.0-beta1 was resolved instead.
+D:\Pr.Net\IVF\src\IVF.API\IVF.API.csproj : warning NU1603: IVF.API depends on OpenTelemetry.Exporter.Prometheus.AspNetCore (>= 1.12.0-rc.1) but OpenTelemetry.Exporter.Prometheus.AspNetCore 1.12.0-rc.1 was not found. OpenTelemetry.Exporter.Prometheus.AspNetCore 1.13.0-beta.1 was resolved instead.
+D:\Pr.Net\IVF\src\IVF.Domain\IVF.Domain.csproj : warning NU1903: Package 'Microsoft.Extensions.Caching.Memory' 8.0.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-qj66-m88j-hmgj
+D:\Pr.Net\IVF\src\IVF.Domain\IVF.Domain.csproj : warning NU1903: Package 'Npgsql' 8.0.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-x9vc-6hfv-hg8c
+D:\Pr.Net\IVF\src\IVF.Infrastructure\IVF.Infrastructure.csproj : warning NU1603: IVF.Infrastructure depends on Fido2.AspNet (>= 4.0.0-beta.24) but Fido2.AspNet 4.0.0-beta.24 was not found. Fido2.AspNet 4.0.0-beta1 was resolved instead.
+D:\Pr.Net\IVF\src\IVF.Infrastructure\IVF.Infrastructure.csproj : warning NU1902: Package 'Microsoft.IdentityModel.JsonWebTokens' 6.23.1 has a known moderate severity vulnerability, https://github.com/advisories/GHSA-59j7-ghrg-fj52
+D:\Pr.Net\IVF\src\IVF.Infrastructure\IVF.Infrastructure.csproj : warning NU1902: Package 'System.IdentityModel.Tokens.Jwt' 6.23.1 has a known moderate severity vulnerability, https://github.com/advisories/GHSA-59j7-ghrg-fj52
+D:\Pr.Net\IVF\src\IVF.Application\IVF.Application.csproj : warning NU1903: Package 'Microsoft.Extensions.Caching.Memory' 8.0.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-qj66-m88j-hmgj
+D:\Pr.Net\IVF\src\IVF.Application\IVF.Application.csproj : warning NU1903: Package 'Npgsql' 8.0.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-x9vc-6hfv-hg8c
+  IVF.Domain -> D:\Pr.Net\IVF\src\IVF.Domain\bin\Debug\net10.0\IVF.Domain.dll
+  IVF.Application -> D:\Pr.Net\IVF\src\IVF.Application\bin\Debug\net10.0\IVF.Application.dll
+  IVF.Infrastructure -> D:\Pr.Net\IVF\src\IVF.Infrastructure\bin\Debug\net10.0\IVF.Infrastructure.dll
+  IVF.API -> D:\Pr.Net\IVF\src\IVF.API\bin\Debug\net10.0\IVF.API.dll
+
+Build succeeded.
+
+D:\Pr.Net\IVF\src\IVF.Application\IVF.Application.csproj : warning NU1903: Package 'Microsoft.Extensions.Caching.Memory' 8.0.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-qj66-m88j-hmgj [D:\Pr.Net\IVF\src\IVF.API\IVF.API.csproj]
+D:\Pr.Net\IVF\src\IVF.Domain\IVF.Domain.csproj : warning NU1903: Package 'Microsoft.Extensions.Caching.Memory' 8.0.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-qj66-m88j-hmgj [D:\Pr.Net\IVF\src\IVF.API\IVF.API.csproj]
+D:\Pr.Net\IVF\src\IVF.Domain\IVF.Domain.csproj : warning NU1903: Package 'Npgsql' 8.0.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-x9vc-6hfv-hg8c [D:\Pr.Net\IVF\src\IVF.API\IVF.API.csproj]
+D:\Pr.Net\IVF\src\IVF.Application\IVF.Application.csproj : warning NU1903: Package 'Npgsql' 8.0.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-x9vc-6hfv-hg8c [D:\Pr.Net\IVF\src\IVF.API\IVF.API.csproj]
+D:\Pr.Net\IVF\src\IVF.API\IVF.API.csproj : warning NU1603: IVF.Infrastructure depends on Fido2.AspNet (>= 4.0.0-beta.24) but Fido2.AspNet 4.0.0-beta.24 was not found. Fido2.AspNet 4.0.0-beta1 was resolved instead.
+D:\Pr.Net\IVF\src\IVF.API\IVF.API.csproj : warning NU1603: IVF.API depends on OpenTelemetry.Exporter.Prometheus.AspNetCore (>= 1.12.0-rc.1) but OpenTelemetry.Exporter.Prometheus.AspNetCore 1.12.0-rc.1 was not found. OpenTelemetry.Exporter.Prometheus.AspNetCore 1.13.0-beta.1 was resolved instead.
+D:\Pr.Net\IVF\src\IVF.Infrastructure\IVF.Infrastructure.csproj : warning NU1603: IVF.Infrastructure depends on Fido2.AspNet (>= 4.0.0-beta.24) but Fido2.AspNet 4.0.0-beta.24 was not found. Fido2.AspNet 4.0.0-beta1 was resolved instead. [D:\Pr.Net\IVF\src\IVF.API\IVF.API.csproj]
+D:\Pr.Net\IVF\src\IVF.Infrastructure\IVF.Infrastructure.csproj : warning NU1902: Package 'Microsoft.IdentityModel.JsonWebTokens' 6.23.1 has a known moderate severity vulnerability, https://github.com/advisories/GHSA-59j7-ghrg-fj52 [D:\Pr.Net\IVF\src\IVF.API\IVF.API.csproj]
+D:\Pr.Net\IVF\src\IVF.Infrastructure\IVF.Infrastructure.csproj : warning NU1902: Package 'System.IdentityModel.Tokens.Jwt' 6.23.1 has a known moderate severity vulnerability, https://github.com/advisories/GHSA-59j7-ghrg-fj52 [D:\Pr.Net\IVF\src\IVF.API\IVF.API.csproj]
+D:\Pr.Net\IVF\src\IVF.API\IVF.API.csproj : warning NU1603: IVF.Infrastructure depends on Fido2.AspNet (>= 4.0.0-beta.24) but Fido2.AspNet 4.0.0-beta.24 was not found. Fido2.AspNet 4.0.0-beta1 was resolved instead.
+D:\Pr.Net\IVF\src\IVF.API\IVF.API.csproj : warning NU1603: IVF.API depends on OpenTelemetry.Exporter.Prometheus.AspNetCore (>= 1.12.0-rc.1) but OpenTelemetry.Exporter.Prometheus.AspNetCore 1.12.0-rc.1 was not found. OpenTelemetry.Exporter.Prometheus.AspNetCore 1.13.0-beta.1 was resolved instead.
+D:\Pr.Net\IVF\src\IVF.Domain\IVF.Domain.csproj : warning NU1903: Package 'Microsoft.Extensions.Caching.Memory' 8.0.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-qj66-m88j-hmgj
+D:\Pr.Net\IVF\src\IVF.Domain\IVF.Domain.csproj : warning NU1903: Package 'Npgsql' 8.0.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-x9vc-6hfv-hg8c
+D:\Pr.Net\IVF\src\IVF.Infrastructure\IVF.Infrastructure.csproj : warning NU1603: IVF.Infrastructure depends on Fido2.AspNet (>= 4.0.0-beta.24) but Fido2.AspNet 4.0.0-beta.24 was not found. Fido2.AspNet 4.0.0-beta1 was resolved instead.
+D:\Pr.Net\IVF\src\IVF.Infrastructure\IVF.Infrastructure.csproj : warning NU1902: Package 'Microsoft.IdentityModel.JsonWebTokens' 6.23.1 has a known moderate severity vulnerability, https://github.com/advisories/GHSA-59j7-ghrg-fj52
+D:\Pr.Net\IVF\src\IVF.Infrastructure\IVF.Infrastructure.csproj : warning NU1902: Package 'System.IdentityModel.Tokens.Jwt' 6.23.1 has a known moderate severity vulnerability, https://github.com/advisories/GHSA-59j7-ghrg-fj52
+D:\Pr.Net\IVF\src\IVF.Application\IVF.Application.csproj : warning NU1903: Package 'Microsoft.Extensions.Caching.Memory' 8.0.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-qj66-m88j-hmgj
+D:\Pr.Net\IVF\src\IVF.Application\IVF.Application.csproj : warning NU1903: Package 'Npgsql' 8.0.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-x9vc-6hfv-hg8c
+    18 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:02.63
