@@ -21,16 +21,11 @@ namespace IVF.API.Endpoints;
 
 public static class AuthEndpoints
 {
-    // Pending MFA tokens: mfaToken -> (userId, username, ipAddress, userAgent, expiry)
-    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, MfaPendingInfo> _pendingMfa = new();
-
     // Fido2 serialization options (same as AdvancedSecurityEndpoints)
     private static readonly JsonSerializerOptions _fidoJsonOptions = new(JsonSerializerDefaults.Web);
 
     // Pending passkey assertions for login
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, AssertionOptions> _loginPendingAssertions = new();
-
-    private record MfaPendingInfo(Guid UserId, string Username, string IpAddress, string? UserAgent, DateTime ExpiresAt, string MfaMethod);
 
     public static void MapAuthEndpoints(this IEndpointRouteBuilder app)
     {
@@ -205,9 +200,10 @@ public static class AuthEndpoints
             if (mfaSettings is not null)
             {
                 var mfaToken = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(32));
-                _pendingMfa[mfaToken] = new MfaPendingInfo(
+                var mfaPending = httpContext.RequestServices.GetRequiredService<MfaPendingService>();
+                await mfaPending.StoreAsync(mfaToken, new MfaPendingService.MfaPendingInfo(
                     user.Id, user.Username, ipAddress, userAgent,
-                    DateTime.UtcNow.AddMinutes(5), mfaSettings.MfaMethod);
+                    DateTime.UtcNow.AddMinutes(5), mfaSettings.MfaMethod));
 
                 return Results.Json(new
                 {
@@ -257,9 +253,10 @@ public static class AuthEndpoints
 
                 // Require MFA step-up even if MFA wasn't originally enabled
                 var mfaToken = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(32));
-                _pendingMfa[mfaToken] = new MfaPendingInfo(
+                var mfaPendingStepUp = httpContext.RequestServices.GetRequiredService<MfaPendingService>();
+                await mfaPendingStepUp.StoreAsync(mfaToken, new MfaPendingService.MfaPendingInfo(
                     user.Id, user.Username, ipAddress, userAgent,
-                    DateTime.UtcNow.AddMinutes(5), "totp");
+                    DateTime.UtcNow.AddMinutes(5), "totp"));
 
                 await securityEvents.LogEventAsync(SecurityEvent.Create(
                     eventType: SecurityEventTypes.StepUpRequired,
@@ -348,7 +345,7 @@ public static class AuthEndpoints
             var tokenFamily = httpContext.RequestServices.GetRequiredService<RefreshTokenFamilyService>();
             tokenFamily.RegisterToken(user.Id, refreshToken, null);
 
-            user.UpdateRefreshToken(refreshToken, DateTime.UtcNow.AddDays(7));
+            user.UpdateRefreshToken(HashRefreshToken(refreshToken), DateTime.UtcNow.AddDays(7));
             await userRepo.UpdateAsync(user);
             await uow.SaveChangesAsync();
 
@@ -378,6 +375,7 @@ public static class AuthEndpoints
             await RecordEnterpriseLoginAsync(httpContext.RequestServices, user, ipAddress, userAgent, "password", true,
                 assessment.RiskScore, session.SessionId, token);
 
+            SetAuthCookie(httpContext, token);
             return Results.Ok(new AuthResponse(token, refreshToken, 3600, UserDto.FromEntity(user)));
         });
 
@@ -395,7 +393,7 @@ public static class AuthEndpoints
             // DB-level validation via GetByRefreshTokenAsync below provides additional
             // token reuse protection: after rotation, the old token no longer matches.
 
-            var user = await userRepo.GetByRefreshTokenAsync(request.RefreshToken);
+            var user = await userRepo.GetByRefreshTokenAsync(HashRefreshToken(request.RefreshToken));
             if (user == null || user.RefreshTokenExpiryTime <= DateTime.UtcNow)
             {
                 await securityEvents.LogEventAsync(SecurityEvent.Create(
@@ -422,7 +420,7 @@ public static class AuthEndpoints
             // Register new token in family (tracks lineage for reuse detection)
             tokenFamily.RegisterToken(user.Id, refreshToken, request.RefreshToken);
 
-            user.UpdateRefreshToken(refreshToken, DateTime.UtcNow.AddDays(7));
+            user.UpdateRefreshToken(HashRefreshToken(refreshToken), DateTime.UtcNow.AddDays(7));
             await userRepo.UpdateAsync(user);
             await uow.SaveChangesAsync();
 
@@ -434,6 +432,7 @@ public static class AuthEndpoints
                 ipAddress: GetClientIp(httpContext),
                 correlationId: httpContext.TraceIdentifier));
 
+            SetAuthCookie(httpContext, token);
             return Results.Ok(new AuthResponse(token, refreshToken, 3600, UserDto.FromEntity(user)));
         });
 
@@ -510,10 +509,9 @@ public static class AuthEndpoints
             IvfDbContext db,
             HttpContext httpContext) =>
         {
-            if (!_pendingMfa.TryRemove(request.MfaToken, out var pending))
-                return Results.Json(new { error = "Phiên xác thực MFA đã hết hạn", code = "MFA_EXPIRED" }, statusCode: 401);
-
-            if (DateTime.UtcNow > pending.ExpiresAt)
+            var mfaPendingVerify = httpContext.RequestServices.GetRequiredService<MfaPendingService>();
+            var pending = await mfaPendingVerify.RemoveAsync(request.MfaToken);
+            if (pending is null)
                 return Results.Json(new { error = "Phiên xác thực MFA đã hết hạn", code = "MFA_EXPIRED" }, statusCode: 401);
 
             var mfa = await db.UserMfaSettings.FirstOrDefaultAsync(m =>
@@ -586,7 +584,7 @@ public static class AuthEndpoints
             var tokenFamilyMfa = httpContext.RequestServices.GetRequiredService<RefreshTokenFamilyService>();
             tokenFamilyMfa.RegisterToken(user.Id, refreshToken, null);
 
-            user.UpdateRefreshToken(refreshToken, DateTime.UtcNow.AddDays(7));
+            user.UpdateRefreshToken(HashRefreshToken(refreshToken), DateTime.UtcNow.AddDays(7));
             await userRepo.UpdateAsync(user);
             await uow.SaveChangesAsync();
 
@@ -606,19 +604,19 @@ public static class AuthEndpoints
             await RecordEnterpriseLoginAsync(httpContext.RequestServices, user, ipAddress, userAgent, "mfa", true,
                 sessionId: session.SessionId, jwtToken: token);
 
+            SetAuthCookie(httpContext, token);
             return Results.Ok(new AuthResponse(token, refreshToken, 3600, UserDto.FromEntity(user)));
         });
 
         // ─── MFA Send SMS OTP (for login MFA step) ───
         group.MapPost("/mfa-send-sms", async (
             MfaSendSmsRequest request,
+            MfaPendingService mfaPendingSms,
             IvfDbContext db) =>
         {
-            if (!_pendingMfa.TryGetValue(request.MfaToken, out var pending))
+            var pending = await mfaPendingSms.GetAsync(request.MfaToken);
+            if (pending is null)
                 return Results.Json(new { error = "Phiên MFA không hợp lệ", code = "MFA_EXPIRED" }, statusCode: 401);
-
-            if (DateTime.UtcNow > pending.ExpiresAt)
-                return Results.Json(new { error = "Phiên MFA đã hết hạn", code = "MFA_EXPIRED" }, statusCode: 401);
 
             var mfa = await db.UserMfaSettings.FirstOrDefaultAsync(m =>
                 m.UserId == pending.UserId && m.IsPhoneVerified && !m.IsDeleted);
@@ -739,7 +737,7 @@ public static class AuthEndpoints
             var tokenFamilyPk = context.RequestServices.GetRequiredService<RefreshTokenFamilyService>();
             tokenFamilyPk.RegisterToken(user.Id, refreshToken, null);
 
-            user.UpdateRefreshToken(refreshToken, DateTime.UtcNow.AddDays(7));
+            user.UpdateRefreshToken(HashRefreshToken(refreshToken), DateTime.UtcNow.AddDays(7));
             await userRepo.UpdateAsync(user);
             await uow.SaveChangesAsync();
 
@@ -759,6 +757,7 @@ public static class AuthEndpoints
             await RecordEnterpriseLoginAsync(context.RequestServices, user, ipAddress, userAgent, "passkey", true,
                 sessionId: session.SessionId, jwtToken: token);
 
+            SetAuthCookie(context, token);
             return Results.Ok(new AuthResponse(token, refreshToken, 3600, UserDto.FromEntity(user)));
         });
 
@@ -784,6 +783,7 @@ public static class AuthEndpoints
             // Revoke active enterprise sessions
             await enterpriseRepo.RevokeAllSessionsAsync(userId, "User logout", "user");
 
+            ClearAuthCookie(httpContext);
             return Results.Ok(new { message = "Logged out" });
         }).RequireAuthorization();
     }
@@ -905,7 +905,7 @@ public static class AuthEndpoints
         return (deviceType, os, browser);
     }
 
-    private static string GenerateJwtToken(User user, IConfiguration config, string? deviceFingerprint = null, string? sessionId = null, string? amr = null)
+    internal static string GenerateJwtToken(User user, IConfiguration config, string? deviceFingerprint = null, string? sessionId = null, string? amr = null)
     {
         var jwtSettings = config.GetSection("JwtSettings");
         var tokenHandler = new JwtSecurityTokenHandler();
@@ -950,7 +950,7 @@ public static class AuthEndpoints
         return tokenHandler.WriteToken(tokenHandler.CreateToken(tokenDescriptor));
     }
 
-    private static string GenerateRefreshToken()
+    internal static string GenerateRefreshToken()
     {
         var bytes = new byte[64];
         using var rng = RandomNumberGenerator.Create();
@@ -958,7 +958,17 @@ public static class AuthEndpoints
         return Convert.ToBase64String(bytes);
     }
 
-    private static string GetClientIp(HttpContext context)
+    /// <summary>
+    /// SHA-256 hash refresh token before storing in DB.
+    /// Client receives plaintext; DB stores hash — if DB leaks, tokens are safe.
+    /// </summary>
+    internal static string HashRefreshToken(string token)
+    {
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(token));
+        return Convert.ToHexStringLower(hash);
+    }
+
+    internal static string GetClientIp(HttpContext context)
     {
         var forwarded = context.Request.Headers["X-Forwarded-For"].FirstOrDefault();
         if (!string.IsNullOrEmpty(forwarded))
@@ -968,5 +978,36 @@ public static class AuthEndpoints
                 return firstIp;
         }
         return context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+    }
+
+    /// <summary>
+    /// Set httpOnly secure cookie with JWT for browser clients (HIPAA compliance).
+    /// Cookie name uses __Host- prefix for maximum security (requires Secure, no Domain, Path=/).
+    /// </summary>
+    internal static void SetAuthCookie(HttpContext context, string token)
+    {
+        context.Response.Cookies.Append("__Host-ivf-token", token, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.Strict,
+            Path = "/",
+            MaxAge = TimeSpan.FromHours(1),
+            IsEssential = true
+        });
+    }
+
+    /// <summary>
+    /// Clear the auth cookie on logout.
+    /// </summary>
+    private static void ClearAuthCookie(HttpContext context)
+    {
+        context.Response.Cookies.Delete("__Host-ivf-token", new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.Strict,
+            Path = "/"
+        });
     }
 }

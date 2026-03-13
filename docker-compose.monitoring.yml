@@ -12,19 +12,26 @@ services:
   prometheus:
     image: prom/prometheus:latest
     container_name: ivf-prometheus
+    environment:
+      - MONITORING_PASSWORD=${MONITORING_PASSWORD}
     volumes:
-      - ./docker/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./docker/monitoring/prometheus.yml:/etc/prometheus/prometheus.template.yml:ro
       - ./docker/monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro
       - ./docker/monitoring/prometheus-web.yml:/etc/prometheus/web.yml:ro
       - prometheus_data:/prometheus
+    entrypoint: ["/bin/sh", "-c"]
     command:
-      - "--config.file=/etc/prometheus/prometheus.yml"
-      - "--storage.tsdb.path=/prometheus"
-      - "--storage.tsdb.retention.time=30d"
-      - "--web.enable-lifecycle"
-      - "--web.config.file=/etc/prometheus/web.yml"
-      - "--web.external-url=https://natra.site/prometheus"
-      - "--web.route-prefix=/prometheus"
+      - |
+        cp /etc/prometheus/prometheus.template.yml /tmp/prometheus.yml
+        sed -i "s|MONITORING_PASSWORD_PLACEHOLDER|$${MONITORING_PASSWORD}|g" /tmp/prometheus.yml
+        exec /bin/prometheus \
+          --config.file=/tmp/prometheus.yml \
+          --storage.tsdb.path=/prometheus \
+          --storage.tsdb.retention.time=30d \
+          --web.enable-lifecycle \
+          --web.config.file=/etc/prometheus/web.yml \
+          --web.external-url=https://natra.site/prometheus \
+          --web.route-prefix=/prometheus
     ports:
       - "127.0.0.1:9090:9090"
     networks:
@@ -33,16 +40,7 @@ services:
     security_opt:
       - no-new-privileges:true
     healthcheck:
-      test:
-        [
-          "CMD",
-          "wget",
-          "--no-verbose",
-          "--tries=1",
-          "--spider",
-          "--header=Authorization: Basic bW9uaXRvcjp3RERhSTh6elNUQlB5emZHcDN3UmM2SmtER2dJdjZaRg==",
-          "http://localhost:9090/prometheus/-/healthy",
-        ]
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider --user=monitor --password=$$MONITORING_PASSWORD http://localhost:9090/prometheus/-/healthy"]
       interval: 15s
       timeout: 5s
       retries: 3
@@ -56,7 +54,7 @@ services:
     container_name: ivf-grafana
     environment:
       - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=wDDaI8zzSTBPyzfGp3wRc6JkDGgIv6ZF
+      - GF_SECURITY_ADMIN_PASSWORD=${MONITORING_PASSWORD}
       - GF_USERS_ALLOW_SIGN_UP=false
       - GF_USERS_ALLOW_ORG_CREATE=false
       - GF_AUTH_ANONYMOUS_ENABLED=false

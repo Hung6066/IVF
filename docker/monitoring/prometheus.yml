@@ -57,6 +57,6 @@ scrape_configs:
     metrics_path: "/prometheus/metrics"
     basic_auth:
       username: monitor
-      password: "wDDaI8zzSTBPyzfGp3wRc6JkDGgIv6ZF"
+      password: "MONITORING_PASSWORD_PLACEHOLDER"
     static_configs:
       - targets: ["localhost:9090"]

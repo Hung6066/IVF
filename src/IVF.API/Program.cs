@@ -6,6 +6,7 @@ using IVF.API.Endpoints;
 using IVF.API.Middleware;
 using IVF.API.Services;
 using IVF.Application;
+using IVF.API.Extensions;
 using IVF.Application.Common.Interfaces;
 using IVF.Infrastructure;
 using IVF.Infrastructure.Persistence;
@@ -184,6 +185,10 @@ try
         new IVF.API.Services.RefreshTokenFamilyService(
             sp.GetRequiredService<ILogger<IVF.API.Services.RefreshTokenFamilyService>>(),
             sp.GetService<StackExchange.Redis.IConnectionMultiplexer>()));
+    builder.Services.AddSingleton<IVF.API.Services.MfaPendingService>(sp =>
+        new IVF.API.Services.MfaPendingService(
+            sp.GetRequiredService<ILogger<IVF.API.Services.MfaPendingService>>(),
+            sp.GetService<StackExchange.Redis.IConnectionMultiplexer>()));
     builder.Services.AddSingleton<IVF.API.Services.PasswordPolicyService>();
 
     // JWT Authentication — RS256 Asymmetric (Google/Microsoft standard)
@@ -213,16 +218,27 @@ try
             };
 
             // Support SignalR authentication via query string token
+            // + httpOnly cookie fallback for browser clients (HIPAA compliance)
             options.Events = new JwtBearerEvents
             {
                 OnMessageReceived = context =>
                 {
+                    // 1. SignalR: token via query string
                     var accessToken = context.Request.Query["access_token"];
                     var path = context.HttpContext.Request.Path;
                     if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs"))
                     {
                         context.Token = accessToken;
+                        return Task.CompletedTask;
                     }
+
+                    // 2. Browser: httpOnly cookie fallback (when no Authorization header)
+                    if (string.IsNullOrEmpty(context.Request.Headers.Authorization)
+                        && context.Request.Cookies.TryGetValue("__Host-ivf-token", out var cookieToken))
+                    {
+                        context.Token = cookieToken;
+                    }
+
                     return Task.CompletedTask;
                 }
             };
@@ -257,7 +273,9 @@ try
     {
         options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
             RateLimitPartition.GetFixedWindowLimiter(
-                partitionKey: context.User.Identity?.Name ?? context.Request.Headers.Host.ToString(),
+                partitionKey: context.User.Identity?.Name
+                    ?? context.Connection.RemoteIpAddress?.ToString()
+                    ?? "anonymous",
                 factory: partition => new FixedWindowRateLimiterOptions
                 {
                     AutoReplenishment = true,
@@ -334,6 +352,17 @@ try
     builder.Services.AddSingleton<IVF.API.Services.ComplianceAuditorService>();
     builder.Services.AddHostedService(sp => sp.GetRequiredService<IVF.API.Services.WalBackupSchedulerService>());
 
+    // ─── Automated Compliance Scanning (Phase 4) ───
+    builder.Services.AddHostedService<IVF.API.Services.ComplianceScanSchedulerService>();
+
+    // ─── Certificate Transparency Log Monitoring (Phase 4) ───
+    builder.Services.AddHttpClient("ct-log-monitor");
+    builder.Services.AddHostedService<IVF.API.Services.CtLogMonitorService>();
+
+    // ─── Cloudflare WAF Monitoring (Phase 3) ───
+    builder.Services.AddHttpClient("cloudflare-waf");
+    builder.Services.AddSingleton<IVF.API.Services.CloudflareWafService>();
+
     // ─── Infrastructure Monitoring (VPS metrics, Swarm, S3) ───
     builder.Services.AddSingleton<IVF.API.Services.InfrastructureMonitorService>();
     builder.Services.AddHttpClient<IVF.API.Services.DiscordAlertService>();
@@ -404,6 +433,9 @@ try
         builder.Services.AddSingleton<IVF.Application.Common.Interfaces.IBiometricMatcher>(sp => sp.GetRequiredService<IVF.API.Services.StubBiometricMatcherService>());
     }
     builder.Services.AddScoped<IVF.API.Services.SignedPdfGenerationService>();
+
+    // ─── OpenTelemetry: Metrics + Distributed Tracing + Prometheus export ───
+    builder.Services.AddIvfOpenTelemetry(builder.Configuration);
 
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen();
@@ -681,9 +713,13 @@ try
     app.MapHub<IVF.API.Hubs.EvidenceHub>("/hubs/evidence");
     app.MapHub<IVF.API.Hubs.InfrastructureHub>("/hubs/infrastructure");
 
+    // OpenTelemetry Prometheus scraping endpoint
+    app.MapPrometheusScrapingEndpoint();
+
     // Register Endpoints
     app.MapHealthEndpoints();
     app.MapAuthEndpoints();
+    app.MapSsoEndpoints();
     app.MapPatientEndpoints();
     app.MapPatientBiometricsEndpoints();
     app.MapCoupleEndpoints();
@@ -740,6 +776,7 @@ try
     app.MapDomainManagementEndpoints(); // Domain management — Caddy config sync
     app.MapInfrastructureEndpoints(); // Infrastructure monitoring — VPS, Swarm, S3
     app.MapDnsManagementEndpoints(); // DNS records management — Cloudflare integration
+    app.MapWafEndpoints(); // WAF management — Cloudflare WAF status + events
 
     // ── Config seeders: run in every environment (idempotent, no demo data) ──────
     {

@@ -4,9 +4,10 @@ using IVF.Application.Common.Interfaces;
 namespace IVF.API.Middleware;
 
 /// <summary>
-/// Middleware that authenticates requests using an X-API-Key header or apiKey query parameter.
+/// Middleware that authenticates requests using an X-API-Key header.
 /// If a valid API key is present, creates a ClaimsPrincipal with key metadata.
 /// Falls through to JWT/VaultToken authentication if no API key is provided.
+/// API keys via query parameters are not accepted (URL logging risk).
 /// </summary>
 public class ApiKeyMiddleware
 {
@@ -14,7 +15,6 @@ public class ApiKeyMiddleware
     private readonly ILogger<ApiKeyMiddleware> _logger;
 
     private const string ApiKeyHeader = "X-API-Key";
-    private const string ApiKeyQuery = "apiKey";
 
     public ApiKeyMiddleware(RequestDelegate next, ILogger<ApiKeyMiddleware> logger)
     {
@@ -31,8 +31,7 @@ public class ApiKeyMiddleware
             return;
         }
 
-        var rawKey = context.Request.Headers[ApiKeyHeader].FirstOrDefault()
-                  ?? context.Request.Query[ApiKeyQuery].FirstOrDefault();
+        var rawKey = context.Request.Headers[ApiKeyHeader].FirstOrDefault();
 
         if (!string.IsNullOrWhiteSpace(rawKey))
         {
@@ -64,7 +63,11 @@ public class ApiKeyMiddleware
             }
             else
             {
-                _logger.LogDebug("Invalid API key presented");
+                // Invalid API key presented — reject immediately
+                _logger.LogWarning("Invalid API key presented from {Ip}", context.Connection.RemoteIpAddress);
+                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                await context.Response.WriteAsJsonAsync(new { error = "Invalid API key", code = "INVALID_API_KEY" });
+                return;
             }
         }
 
@@ -76,7 +79,7 @@ public static class ApiKeyMiddlewareExtensions
 {
     /// <summary>
     /// Adds API key authentication middleware. Place before UseAuthentication().
-    /// Requests with a valid X-API-Key header or apiKey query param are authenticated.
+    /// Requests with a valid X-API-Key header are authenticated.
     /// </summary>
     public static IApplicationBuilder UseApiKeyAuth(this IApplicationBuilder app)
     {

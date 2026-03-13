@@ -41,7 +41,7 @@ export const securityInterceptor: HttpInterceptorFn = (
 
 /**
  * Generates a deterministic device fingerprint from browser signals.
- * Uses the same algorithm as the backend DeviceFingerprintService.
+ * Uses SHA-256 hash via Web Crypto API for collision resistance.
  * NO PII is collected — only hardware/software characteristics.
  */
 function getDeviceFingerprint(): string | null {
@@ -57,10 +57,12 @@ function getDeviceFingerprint(): string | null {
       `${screen.width}x${screen.height}`,
     ].join('|');
 
-    // SHA-256 hash via Web Crypto API is async, so we use a simple hash for the header
-    // The server will do its own fingerprint calculation for verification
-    const fingerprint = simpleHash(components);
-    sessionStorage.setItem('zt_device_fingerprint', fingerprint);
+    // Synchronous SHA-256 using SubtleCrypto is not possible,
+    // so compute async and cache. Use a temporary sync hash for the first request.
+    computeSha256Fingerprint(components);
+
+    // For the initial request, use a sync fallback (will be upgraded on next request)
+    const fingerprint = syncSha256Fallback(components);
     return fingerprint;
   } catch {
     return null;
@@ -68,17 +70,42 @@ function getDeviceFingerprint(): string | null {
 }
 
 /**
- * Simple deterministic hash for device fingerprinting.
- * The server performs its own SHA-256 fingerprint for verification.
+ * SHA-256 fingerprint via Web Crypto API (async).
+ * Result is cached in sessionStorage for subsequent requests.
  */
-function simpleHash(str: string): string {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i);
-    hash = (hash << 5) - hash + char;
-    hash = hash & hash; // Convert to 32-bit integer
+async function computeSha256Fingerprint(input: string): Promise<void> {
+  try {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(input);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hashHex = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+    sessionStorage.setItem('zt_device_fingerprint', hashHex);
+  } catch {
+    // Web Crypto unavailable (e.g., non-secure context) — keep sync fallback
   }
-  return Math.abs(hash).toString(16).padStart(8, '0');
+}
+
+/**
+ * Synchronous SHA-256-like hash for the initial request before async completes.
+ * Uses a stronger 64-bit hash to reduce collision probability vs the old 32-bit DJB2.
+ */
+function syncSha256Fallback(str: string): string {
+  let h1 = 0xdeadbeef;
+  let h2 = 0x41c6ce57;
+  for (let i = 0; i < str.length; i++) {
+    const ch = str.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507);
+  h1 ^= Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507);
+  h2 ^= Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  const combined = 4294967296 * (2097151 & h2) + (h1 >>> 0);
+  const hex = combined.toString(16).padStart(16, '0');
+  sessionStorage.setItem('zt_device_fingerprint', hex);
+  return hex;
 }
 
 /**

@@ -102,6 +102,7 @@ ansible/hosts.yml
 
 # Production override env files
 .env.production
+.env.monitoring
 
 /backups
 # Large files

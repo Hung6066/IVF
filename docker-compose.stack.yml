@@ -30,6 +30,7 @@ services:
         published: 5433
         protocol: tcp
         mode: host
+        # SECURITY: Access via SSH tunnel only (ssh -L 5433:127.0.0.1:5433)
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - postgres_archive:/var/lib/postgresql/archive
@@ -77,8 +78,8 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
       - ASPNETCORE_HTTP_PORTS=8080
-      - ConnectionStrings__DefaultConnection=Host=db;Database=ivf_db;Username=postgres;Password=FILE:/run/secrets/ivf_db_password
-      - ConnectionStrings__Redis=redis:6379,abortConnect=false
+      - ConnectionStrings__DefaultConnection=Host=db;Database=ivf_db;Username=postgres;Password=FILE:/run/secrets/ivf_db_password;SSL Mode=Prefer;Trust Server Certificate=true
+      - ConnectionStrings__Redis=redis:6379,password=FILE:/run/secrets/redis_password,abortConnect=false
       - JwtSettings__Secret=FILE:/run/secrets/jwt_secret
       - JwtSettings__Issuer=IVF_System
       - JwtSettings__Audience=IVF_Users
@@ -104,11 +105,13 @@ services:
       - jwt_secret
       - minio_access_key
       - minio_secret_key
+      - redis_password
       - source: jwt_private_key
         target: /app/keys/jwt/jwt-private.pem
         mode: 0400
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+    # SECURITY: Docker socket access via restricted proxy (no direct mount)
+    environment:
+      - DOCKER_HOST=tcp://docker-proxy:2375
     networks:
       - ivf-public
       - ivf-data
@@ -147,14 +150,42 @@ services:
         limits:
           memory: 1G
 
+  # ─── Docker Socket Proxy (restricted API for infrastructure monitoring) ───
+  docker-proxy:
+    image: tecnativa/docker-socket-proxy:latest
+    environment:
+      - CONTAINERS=1
+      - SERVICES=1
+      - TASKS=1
+      - NODES=1
+      - NETWORKS=0
+      - VOLUMES=0
+      - IMAGES=0
+      - EXEC=0
+      - SWARM=1
+      - POST=0
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - ivf-data
+    deploy:
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        limits:
+          memory: 64M
+
   # ─── Redis ───
-  # Admin access: ssh -L 16379:127.0.0.1:6379 root@VPS → redis-cli -h 127.0.0.1 -p 16379
+  # Admin access: ssh -L 16379:127.0.0.1:6379 root@VPS → redis-cli -h 127.0.0.1 -p 16379 -a PASSWORD
   redis:
     image: redis:alpine
-    command: >
-      redis-server
-      --maxmemory 256mb
-      --maxmemory-policy allkeys-lru
+    entrypoint:
+      - /bin/sh
+      - -c
+      - 'redis-server --requirepass "$$(cat /run/secrets/redis_password)" --maxmemory 256mb --maxmemory-policy allkeys-lru'
+    secrets:
+      - redis_password
     ports:
       - target: 6379
         published: 6379
@@ -164,7 +195,7 @@ services:
       - ivf-data
       - ivf-monitoring
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "redis-cli -a $$(cat /run/secrets/redis_password) --no-auth-warning ping | grep PONG"]
       interval: 10s
       timeout: 3s
       retries: 3
@@ -185,8 +216,14 @@ services:
   # ─── Redis Exporter (Prometheus metrics) ───
   redis-exporter:
     image: oliver006/redis_exporter:latest
+    entrypoint:
+      - /bin/sh
+      - -c
+      - 'export REDIS_PASSWORD=$$(cat /run/secrets/redis_password) && /redis_exporter'
     environment:
       - REDIS_ADDR=redis://redis:6379
+    secrets:
+      - redis_password
     networks:
       - ivf-data
       - ivf-monitoring
@@ -221,7 +258,7 @@ services:
       - ejbca_persistent:/opt/keyfactor/persistent
       - ejbca_wildfly_cfg:/opt/keyfactor/appserver/standalone/configuration
     networks:
-      - ivf-public
+      # SECURITY: Removed from ivf-public — no public-facing access needed
       - ivf-signing
       - ivf-data
     deploy:
@@ -285,7 +322,7 @@ services:
       - signserver_wildfly_cfg:/opt/keyfactor/wildfly-35.0.1.Final/standalone/configuration
       - softhsm_tokens:/opt/keyfactor/persistent/softhsm/tokens
     networks:
-      - ivf-public
+      # SECURITY: Removed from ivf-public — no public-facing access needed
       - ivf-signing
       - ivf-data
     deploy:
@@ -467,11 +504,12 @@ services:
   # ─── Redis Replica ───
   redis-replica:
     image: redis:alpine
-    command: >
-      redis-server
-      --replicaof redis 6379
-      --maxmemory 256mb
-      --maxmemory-policy allkeys-lru
+    entrypoint:
+      - /bin/sh
+      - -c
+      - 'redis-server --replicaof redis 6379 --masterauth "$$(cat /run/secrets/redis_password)" --requirepass "$$(cat /run/secrets/redis_password)" --maxmemory 256mb --maxmemory-policy allkeys-lru'
+    secrets:
+      - redis_password
     networks:
       - ivf-data
     deploy:
@@ -510,6 +548,8 @@ secrets:
     external: true
   jwt_private_key:
     external: true
+  redis_password:
+    external: true
 
 # ─── Volumes ───
 volumes:
@@ -531,14 +571,20 @@ volumes:
 networks:
   ivf-public:
     driver: overlay
+    driver_opts:
+      encrypted: "true"
 
   ivf-signing:
     driver: overlay
     internal: true
+    driver_opts:
+      encrypted: "true"
 
   ivf-data:
     driver: overlay
     internal: true
+    driver_opts:
+      encrypted: "true"
 
   ivf-monitoring:
     external: true

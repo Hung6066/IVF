@@ -25,18 +25,19 @@ $ErrorActionPreference = "Stop"
 # and Docker Swarm ingress only listens on IPv4.
 # Local ports use 1xxxx prefix to avoid conflicts with local Docker dev containers.
 $services = @{
-    ejbca      = @{ LocalPort = 18443; RemotePort = 8443; Protocol = "https"; Path = "/ejbca/adminweb/";           Name = "EJBCA CA Admin" }
-    signserver = @{ LocalPort = 19443; RemotePort = 9443; Protocol = "https"; Path = "/signserver/adminweb/";      Name = "SignServer Admin" }
-    minio      = @{ LocalPort = 19001; RemotePort = 9001; Protocol = "http";  Path = "/";                          Name = "MinIO Console" }
-    db         = @{ LocalPort = 15433; RemotePort = 5433; Protocol = "tcp";   Path = $null;                        Name = "PostgreSQL" }
-    redis      = @{ LocalPort = 26379; RemotePort = 6379; Protocol = "tcp";   Path = $null;                        Name = "Redis" }
-    grafana    = @{ LocalPort = 13000; RemotePort = 3000; Protocol = "http";  Path = "/";                          Name = "Grafana" }
+    ejbca      = @{ LocalPort = 18443; RemotePort = 8443; Protocol = "https"; Path = "/ejbca/adminweb/"; Name = "EJBCA CA Admin" }
+    signserver = @{ LocalPort = 19443; RemotePort = 9443; Protocol = "https"; Path = "/signserver/adminweb/"; Name = "SignServer Admin" }
+    minio      = @{ LocalPort = 19001; RemotePort = 9001; Protocol = "http"; Path = "/"; Name = "MinIO Console" }
+    db         = @{ LocalPort = 15433; RemotePort = 5433; Protocol = "tcp"; Path = $null; Name = "PostgreSQL" }
+    redis      = @{ LocalPort = 26379; RemotePort = 6379; Protocol = "tcp"; Path = $null; Name = "Redis" }
+    grafana    = @{ LocalPort = 13000; RemotePort = 3000; Protocol = "http"; Path = "/"; Name = "Grafana" }
 }
 
 # ─── Select services ───
 if ($Service -eq "all") {
     $selected = $services.Keys
-} else {
+}
+else {
     $selected = @($Service)
 }
 
@@ -63,7 +64,8 @@ foreach ($svc in $selected) {
         $url = "$($s.Protocol)://127.0.0.1:$($s.LocalPort)$($s.Path)"
         Write-Host "  $($s.Name):" -ForegroundColor Green -NoNewline
         Write-Host " $url"
-    } else {
+    }
+    else {
         Write-Host "  $($s.Name):" -ForegroundColor Green -NoNewline
         Write-Host " 127.0.0.1:$($s.LocalPort)"
     }
@@ -85,6 +87,7 @@ $sshArgs = @(
 
 try {
     & ssh @sshArgs
-} catch {
+}
+catch {
     Write-Host "SSH tunnel closed." -ForegroundColor Yellow
 }

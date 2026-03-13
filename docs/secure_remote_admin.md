@@ -56,13 +56,13 @@
 
 ## 5 lớp bảo mật
 
-| Lớp | Cơ chế | Trạng thái | Tương đương Enterprise |
-|-----|--------|------------|------------------------|
-| **1. Network** | Fail2ban + UFW firewall | ✅ Deployed | AWS WAF / Azure DDoS Protection |
-| **2. VPN** | WireGuard (10.200.0.0/24) | ✅ Deployed | AWS Client VPN / Azure VPN Gateway |
-| **3. Transport** | SSH tunnel (key-based) + PostgreSQL SSL | ✅ Deployed | Azure Bastion / AWS SSM |
-| **4. Authentication** | SSH key + TOTP 2FA | ⚠️ Chưa activate | Azure MFA / AWS IAM |
-| **5. Application** | mTLS client cert (EJBCA/SignServer) | ✅ Deployed | Mutual TLS / Managed Identity |
+| Lớp                   | Cơ chế                                  | Trạng thái       | Tương đương Enterprise             |
+| --------------------- | --------------------------------------- | ---------------- | ---------------------------------- |
+| **1. Network**        | Fail2ban + UFW firewall                 | ✅ Deployed      | AWS WAF / Azure DDoS Protection    |
+| **2. VPN**            | WireGuard (10.200.0.0/24)               | ✅ Deployed      | AWS Client VPN / Azure VPN Gateway |
+| **3. Transport**      | SSH tunnel (key-based) + PostgreSQL SSL | ✅ Deployed      | Azure Bastion / AWS SSM            |
+| **4. Authentication** | SSH key + TOTP 2FA                      | ⚠️ Chưa activate | Azure MFA / AWS IAM                |
+| **5. Application**    | mTLS client cert (EJBCA/SignServer)     | ✅ Deployed      | Mutual TLS / Managed Identity      |
 
 ---
 
@@ -132,6 +132,7 @@ ssh -N \
 ### Grafana / Prometheus (Đã có Caddy proxy)
 
 Không cần SSH tunnel vì đã được Caddy proxy với basic auth:
+
 - **Grafana**: https://natra.site/grafana/ (user: `monitor`)
 - **Prometheus**: https://natra.site/prometheus/ (user: `monitor`)
 
@@ -151,14 +152,14 @@ Không cần SSH tunnel vì đã được Caddy proxy với basic auth:
 
 Sau khi connect WireGuard, truy cập trực tiếp (không cần tunnel):
 
-| Service | URL / Host | Ghi chú |
-|---------|-----------|---------|
-| **EJBCA** | `https://10.200.0.1:8443/ejbca/adminweb/` | Cần client cert (`admin.p12`) |
-| **SignServer** | `https://10.200.0.1:9443/signserver/adminweb/` | Cần client cert (`admin.p12`) |
-| **MinIO Console** | `http://10.200.0.1:9001` | MinIO root credentials |
-| **PostgreSQL** | `10.200.0.1:5433` | SSL require, scram-sha-256 |
-| **Redis** | `10.200.0.1:6379` | No auth (internal only) |
-| **Grafana** | `http://10.200.0.1:3000` | Hoặc qua Caddy: `https://natra.site/grafana/` |
+| Service           | URL / Host                                     | Ghi chú                                       |
+| ----------------- | ---------------------------------------------- | --------------------------------------------- |
+| **EJBCA**         | `https://10.200.0.1:8443/ejbca/adminweb/`      | Cần client cert (`admin.p12`)                 |
+| **SignServer**    | `https://10.200.0.1:9443/signserver/adminweb/` | Cần client cert (`admin.p12`)                 |
+| **MinIO Console** | `http://10.200.0.1:9001`                       | MinIO root credentials                        |
+| **PostgreSQL**    | `10.200.0.1:5433`                              | SSL require, scram-sha-256                    |
+| **Redis**         | `10.200.0.1:6379`                              | No auth (internal only)                       |
+| **Grafana**       | `http://10.200.0.1:3000`                       | Hoặc qua Caddy: `https://natra.site/grafana/` |
 
 ### PostgreSQL qua WireGuard
 
@@ -220,17 +221,17 @@ docker stack deploy -c docker-compose.stack.yml ivf
 
 ## So sánh với Azure / AWS
 
-| Tính năng | Azure | AWS | IVF System |
-|-----------|-------|-----|------------|
-| Bastion/Jump Host | Azure Bastion | AWS SSM Session Manager | SSH tunnel (key-based) |
-| Network Isolation | NSG + Private Endpoint | Security Groups + VPC | UFW/iptables + Docker overlay |
-| Identity | Entra ID + MFA | IAM + MFA | SSH key + mTLS client cert |
-| Admin UI Access | Azure Portal (RBAC) | AWS Console (IAM) | SSH tunnel → localhost |
-| DB Access | Private Link | RDS Private Subnet | No port exposure + SSH tunnel |
-| Secret Management | Key Vault | Secrets Manager | Docker Secrets (/run/secrets/) |
-| Audit | Activity Log | CloudTrail | Serilog + Loki + audit_logs |
-| Encryption at Rest | AES-256 (auto) | KMS (auto) | PostgreSQL TDE + MinIO SSE |
-| Encryption in Transit | TLS 1.2+ (auto) | TLS 1.2+ (auto) | Caddy auto-TLS + mTLS signing |
+| Tính năng             | Azure                  | AWS                     | IVF System                     |
+| --------------------- | ---------------------- | ----------------------- | ------------------------------ |
+| Bastion/Jump Host     | Azure Bastion          | AWS SSM Session Manager | SSH tunnel (key-based)         |
+| Network Isolation     | NSG + Private Endpoint | Security Groups + VPC   | UFW/iptables + Docker overlay  |
+| Identity              | Entra ID + MFA         | IAM + MFA               | SSH key + mTLS client cert     |
+| Admin UI Access       | Azure Portal (RBAC)    | AWS Console (IAM)       | SSH tunnel → localhost         |
+| DB Access             | Private Link           | RDS Private Subnet      | No port exposure + SSH tunnel  |
+| Secret Management     | Key Vault              | Secrets Manager         | Docker Secrets (/run/secrets/) |
+| Audit                 | Activity Log           | CloudTrail              | Serilog + Loki + audit_logs    |
+| Encryption at Rest    | AES-256 (auto)         | KMS (auto)              | PostgreSQL TDE + MinIO SSE     |
+| Encryption in Transit | TLS 1.2+ (auto)        | TLS 1.2+ (auto)         | Caddy auto-TLS + mTLS signing  |
 
 ---
 
@@ -239,6 +240,7 @@ docker stack deploy -c docker-compose.stack.yml ivf
 ### Option A: WireGuard VPN (Thay thế SSH tunnel)
 
 Giống **Azure VPN Gateway** / **AWS Client VPN**. Chỉ cần khi:
+
 - Có nhiều admin cùng truy cập
 - Cần truy cập thường xuyên (WireGuard auto-reconnect)
 - Muốn full network-level isolation
@@ -277,17 +279,20 @@ Giống **Azure Entra Application Proxy**. Thêm identity layer (email OTP, SSO)
 EJBCA và SignServer production đã cấu hình mTLS client certificate authentication:
 
 **Client Certificate**: `certs/admin/admin.p12`
+
 - Subject: `CN=IVF Admin, OU=IT Department, O=IVF Clinic, S=Ho Chi Minh, C=VN`
 - Issuer: `CN=IVF Internal Root CA`
 - Password: xem `secrets/admin_cert_password.txt`
 - Hết hạn: 02/2027
 
 **Import vào trình duyệt:**
+
 1. **Chrome/Edge**: Settings → Privacy and Security → Security → Manage certificates → Import → chọn `admin.p12` → nhập password
 2. **Firefox**: Settings → Privacy & Security → Certificates → View Certificates → Your Certificates → Import
 
 **EJBCA**: IVF Internal Root CA đã được import → IVF Admin là Super Administrator
 **SignServer**: Truststore + Elytron mTLS đã cấu hình (2026-03-13)
+
 - Truststore: `/opt/keyfactor/persistent/truststore.jks` (chứa IVF Internal Root CA)
 - Elytron: `trustKS` (key-store) → `httpsTM` (trust-manager) → `httpsSSC` (ssl-context)
 - `want-client-auth=true` → server yêu cầu client cert khi TLS handshake
@@ -332,6 +337,7 @@ ssh root@45.134.226.56 'bash -s -- --disable-root' < scripts/setup-admin-user.sh
 ```
 
 Sau khi disable root, cập nhật `scripts/admin-tunnel.ps1`:
+
 ```powershell
 # Đổi $SshUser = "root" → $SshUser = "ivfadmin" trong admin-tunnel.ps1
 ```
@@ -344,15 +350,15 @@ Sau khi disable root, cập nhật `scripts/admin-tunnel.ps1`:
 
 Kết nối trực tiếp qua VPN — không cần SSH tunnel, nhanh hơn:
 
-| Setting | Value |
-|---------|-------|
-| Host | `10.200.0.1` |
-| Port | `5433` |
-| Database | `ivf_db` (underscore, KHÔNG phải `ivf-db`) |
-| Username | `postgres` |
+| Setting  | Value                                          |
+| -------- | ---------------------------------------------- |
+| Host     | `10.200.0.1`                                   |
+| Port     | `5433`                                         |
+| Database | `ivf_db` (underscore, KHÔNG phải `ivf-db`)     |
+| Username | `postgres`                                     |
 | Password | Docker secret `ivf_db_password` (xem bên dưới) |
-| SSL | **require** (verified TLSv1.3) |
-| Auth | Database (scram-sha-256) |
+| SSL      | **require** (verified TLSv1.3)                 |
+| Auth     | Database (scram-sha-256)                       |
 
 ```powershell
 # PowerShell — kết nối qua WireGuard
@@ -363,15 +369,15 @@ psql -h 10.200.0.1 -p 5433 -U postgres -d ivf_db
 
 ### Cách 2: SSH Tunnel
 
-| Setting | Value |
-|---------|-------|
-| Host | `127.0.0.1` (KHÔNG dùng `localhost`) |
-| Port | `15433` |
-| Database | `ivf_db` |
-| Username | `postgres` |
+| Setting  | Value                                          |
+| -------- | ---------------------------------------------- |
+| Host     | `127.0.0.1` (KHÔNG dùng `localhost`)           |
+| Port     | `15433`                                        |
+| Database | `ivf_db`                                       |
+| Username | `postgres`                                     |
 | Password | Docker secret `ivf_db_password` (xem bên dưới) |
-| SSL | **require** |
-| Auth | Database (scram-sha-256) |
+| SSL      | **require**                                    |
+| Auth     | Database (scram-sha-256)                       |
 
 ```bash
 # Mở tunnel trước
@@ -396,6 +402,7 @@ ssh root@45.134.226.56 'docker exec $(docker ps -q -f name=ivf_db) cat /run/secr
 ### Đã triển khai ✅
 
 **Lớp 1 — Network & Firewall**
+
 - [x] SSH key-only authentication (no password login)
 - [x] Admin ports: firewall-blocked (UFW deny trên eth0)
 - [x] SSH tunnel: `127.0.0.1` binding, `1xxxx` prefix ports
@@ -412,6 +419,7 @@ ssh root@45.134.226.56 'docker exec $(docker ps -q -f name=ivf_db) cat /run/secr
   - Split tunnel: chỉ route `10.200.0.0/24` qua VPN
 
 **Lớp 2 — Encryption**
+
 - [x] PostgreSQL SSL — TLS encryption cho DB connections (triển khai 2026-03-13)
   - CA: `IVF PostgreSQL CA` (10-year, RSA 4096)
   - SANs: `db`, `localhost`, `ivf_db`, `127.0.0.1`
@@ -421,26 +429,30 @@ ssh root@45.134.226.56 'docker exec $(docker ps -q -f name=ivf_db) cat /run/secr
 - [x] JWT key shared via Docker Secret (`jwt_private_key`)
 
 **Lớp 3 — Authentication & mTLS**
+
 - [x] EJBCA: mTLS client cert (IVF Admin → Super Administrator)
 - [x] SignServer: mTLS client cert (Elytron truststore + wsadmins), verified via WireGuard (2026-03-13)
 - [x] API: Triple auth pipeline (VaultToken → ApiKey → JWT)
 - [x] SSH 2FA — Google Authenticator TOTP (cấu hình 2026-03-13, chưa activate)
-  - TOTP secret: `5DMVMQFID7RY7ZRR2BI3NCW32Q`
-  - 5 emergency scratch codes đã lưu
+  - TOTP secret: lưu trên VPS tại `/root/.google_authenticator` (KHÔNG commit vào git)
+  - Emergency scratch codes: xem trên VPS (`tail -5 /root/.google_authenticator`)
   - AuthenticationMethods: `publickey,keyboard-interactive`
   - **Chưa active** — cần `systemctl reload ssh` sau khi add TOTP vào app
 
 **Lớp 4 — Monitoring & Logging**
+
 - [x] Grafana/Prometheus: Caddy reverse proxy với basic auth
 - [x] Serilog structured logging + Loki aggregation
 - [x] Audit logging (partitioned PostgreSQL table)
 
 **Lớp 5 — PKI & Certificate**
+
 - [x] WildFly Elytron config persistent (Docker volume `signserver_wildfly_cfg` + `ejbca_wildfly_cfg`)
 - [x] EJBCA Public Access Role removal script (`scripts/secure-ejbca-access.sh`)
 - [x] Dedicated admin user script (`scripts/setup-admin-user.sh` — thay root SSH)
 
 ### Cần thực hiện ⚡
+
 - [ ] **Activate SSH 2FA**: Add TOTP secret vào authenticator app → `systemctl reload ssh`
 - [x] **WireGuard client `admin1`**: Connected, `10.200.0.2/32`, config: `secrets/wg-admin1.conf`
 - [x] **SignServer mTLS via WireGuard**: Elytron truststore + trust-manager + want-client-auth configured, admin cert authorized
@@ -451,6 +463,7 @@ ssh root@45.134.226.56 'docker exec $(docker ps -q -f name=ivf_db) cat /run/secr
 - [ ] `bash scripts/init-mtls-production.sh` → re-init mTLS (sau khi redeploy với volume mới)
 
 ### Optional — Scripts sẵn sàng
+
 - [ ] Cloudflare Access → `scripts/setup-cloudflare-access.sh`
 
 ---
@@ -495,15 +508,15 @@ Tự động ban IP sau 5 lần đăng nhập sai. Recidive jail: ban 1 tuần n
 
 ### Cấu hình hiện tại trên VPS
 
-| Setting | sshd jail | recidive jail |
-|---------|-----------|---------------|
-| **enabled** | `true` | `true` |
-| **maxretry** | 5 | 3 (bans) |
-| **findtime** | 600s (10 phút) | 43200s (12 giờ) |
-| **bantime** | 3600s (1 giờ) | 604800s (1 tuần) |
-| **backend** | systemd | auto |
-| **banaction** | iptables-multiport | iptables-allports |
-| **ignoreip** | `127.0.0.1/8 ::1 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 115.79.197.0/24` | (inherits DEFAULT) |
+| Setting       | sshd jail                                                                 | recidive jail      |
+| ------------- | ------------------------------------------------------------------------- | ------------------ |
+| **enabled**   | `true`                                                                    | `true`             |
+| **maxretry**  | 5                                                                         | 3 (bans)           |
+| **findtime**  | 600s (10 phút)                                                            | 43200s (12 giờ)    |
+| **bantime**   | 3600s (1 giờ)                                                             | 604800s (1 tuần)   |
+| **backend**   | systemd                                                                   | auto               |
+| **banaction** | iptables-multiport                                                        | iptables-allports  |
+| **ignoreip**  | `127.0.0.1/8 ::1 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 115.79.197.0/24` | (inherits DEFAULT) |
 
 ### Vận hành
 
@@ -596,15 +609,9 @@ ssh root@45.134.226.56 "sed -i '/pam_google_authenticator/d' /etc/pam.d/sshd && 
 
 ### Emergency scratch codes
 
-Lưu ở nơi an toàn. Mỗi code chỉ dùng được **1 lần**:
-
-```
-36072330
-43070711
-15299740
-91819660
-44054059
-```
+> ⚠️ **KHÔNG lưu scratch codes trong git repo.** Codes được lưu trên VPS tại `/root/.google_authenticator`.
+> Xem codes: `ssh root@VPS "tail -5 /root/.google_authenticator"`
+> Nếu cần regenerate: chạy lại `setup-ssh-2fa.sh`.
 
 ### Vận hành
 
@@ -660,14 +667,14 @@ Clients bên ngoài (admin) — 2 cách kết nối:
 
 ### Cấu hình hiện tại
 
-| Setting | Value |
-|---------|-------|
-| **ssl** | `on` |
-| **ssl_cert_file** | `/var/lib/postgresql/certs/server.crt` |
-| **ssl_key_file** | `/var/lib/postgresql/certs/server.key` |
-| **ssl_ca_file** | `/var/lib/postgresql/certs/pg-ca.crt` |
-| **Auth method** | `scram-sha-256` |
-| **pg_hba.conf** | `hostssl all all 0.0.0.0/0 scram-sha-256` |
+| Setting           | Value                                     |
+| ----------------- | ----------------------------------------- |
+| **ssl**           | `on`                                      |
+| **ssl_cert_file** | `/var/lib/postgresql/certs/server.crt`    |
+| **ssl_key_file**  | `/var/lib/postgresql/certs/server.key`    |
+| **ssl_ca_file**   | `/var/lib/postgresql/certs/pg-ca.crt`     |
+| **Auth method**   | `scram-sha-256`                           |
+| **pg_hba.conf**   | `hostssl all all 0.0.0.0/0 scram-sha-256` |
 
 ### Vận hành
 
@@ -696,29 +703,30 @@ psql -h 10.200.0.1 -p 5433 -U postgres -d ivf_db -c "SELECT ssl, version FROM pg
 
 **Cách 1: Qua WireGuard VPN (khuyến nghị)**
 
-| Setting | Value |
-|---------|-------|
-| Host | `10.200.0.1` (qua WireGuard VPN) |
-| Port | `5433` |
-| Database | `ivf_db` |
-| User | `postgres` |
-| Password | Docker secret `ivf_db_password` |
-| SSL | **require** |
-| CA cert | `certs/postgres/pg-ca.crt` (optional, cho verify-ca) |
+| Setting  | Value                                                |
+| -------- | ---------------------------------------------------- |
+| Host     | `10.200.0.1` (qua WireGuard VPN)                     |
+| Port     | `5433`                                               |
+| Database | `ivf_db`                                             |
+| User     | `postgres`                                           |
+| Password | Docker secret `ivf_db_password`                      |
+| SSL      | **require**                                          |
+| CA cert  | `certs/postgres/pg-ca.crt` (optional, cho verify-ca) |
 
 **Cách 2: Qua SSH Tunnel**
 
-| Setting | Value |
-|---------|-------|
-| Host | `127.0.0.1` (qua SSH tunnel) |
-| Port | `15433` (local) → `5433` (VPS) → `5432` (container) |
-| Database | `ivf_db` |
-| User | `postgres` |
-| Password | Docker secret `ivf_db_password` |
-| SSL | **require** |
-| CA cert | `certs/postgres/pg-ca.crt` (optional, cho verify-ca) |
+| Setting  | Value                                                |
+| -------- | ---------------------------------------------------- |
+| Host     | `127.0.0.1` (qua SSH tunnel)                         |
+| Port     | `15433` (local) → `5433` (VPS) → `5432` (container)  |
+| Database | `ivf_db`                                             |
+| User     | `postgres`                                           |
+| Password | Docker secret `ivf_db_password`                      |
+| SSL      | **require**                                          |
+| CA cert  | `certs/postgres/pg-ca.crt` (optional, cho verify-ca) |
 
 Lấy password:
+
 ```bash
 ssh root@45.134.226.56 'docker exec $(docker ps -q -f name=ivf_db) cat /run/secrets/ivf_db_password'
 ```
@@ -759,14 +767,14 @@ VPN cho phép nhiều admin truy cập admin ports mà không cần SSH tunnel.
 
 ### Cấu hình server hiện tại
 
-| Setting | Value |
-|---------|-------|
-| **Interface** | `wg0` |
-| **Address** | `10.200.0.1/24` |
-| **ListenPort** | `51820` |
+| Setting              | Value                                          |
+| -------------------- | ---------------------------------------------- |
+| **Interface**        | `wg0`                                          |
+| **Address**          | `10.200.0.1/24`                                |
+| **ListenPort**       | `51820`                                        |
 | **Server PublicKey** | `d9OmaqufAT2Tgo1DjV1LmtJqMVoVxUN+dXL5OvodPks=` |
-| **Config file** | `/etc/wireguard/wg0.conf` |
-| **Systemd** | `wg-quick@wg0.service` (enabled, active) |
+| **Config file**      | `/etc/wireguard/wg0.conf`                      |
+| **Systemd**          | `wg-quick@wg0.service` (enabled, active)       |
 
 ### UFW rules cho WireGuard
 
@@ -782,8 +790,8 @@ VPN cho phép nhiều admin truy cập admin ports mà không cần SSH tunnel.
 
 ### Clients hiện tại
 
-| Client | IP | Trạng thái | Config file |
-|--------|-----|-----------|-------------|
+| Client   | IP              | Trạng thái   | Config file              |
+| -------- | --------------- | ------------ | ------------------------ |
 | `admin1` | `10.200.0.2/32` | ✅ Connected | `secrets/wg-admin1.conf` |
 
 ### Thêm client mới
@@ -823,13 +831,13 @@ ssh root@45.134.226.56 "systemctl restart wg-quick@wg0"
 
 ### So sánh: SSH Tunnel vs WireGuard
 
-| | SSH Tunnel | WireGuard VPN |
-|---|-----------|---------------|
-| **Cách dùng** | Mỗi port cần 1 `-L` flag | Connect VPN → truy cập tất cả |
-| **Multi-admin** | Chỉ ai có SSH key | Mỗi admin có WG config riêng |
-| **Performance** | TCP-over-TCP (chậm) | UDP-based (nhanh) |
-| **Persistent** | Phải mở terminal SSH | Chạy nền, auto-reconnect |
-| **Setup** | Đơn giản (SSH sẵn có) | Cần cài WireGuard client |
+|                 | SSH Tunnel               | WireGuard VPN                 |
+| --------------- | ------------------------ | ----------------------------- |
+| **Cách dùng**   | Mỗi port cần 1 `-L` flag | Connect VPN → truy cập tất cả |
+| **Multi-admin** | Chỉ ai có SSH key        | Mỗi admin có WG config riêng  |
+| **Performance** | TCP-over-TCP (chậm)      | UDP-based (nhanh)             |
+| **Persistent**  | Phải mở terminal SSH     | Chạy nền, auto-reconnect      |
+| **Setup**       | Đơn giản (SSH sẵn có)    | Cần cài WireGuard client      |
 
 ---
 
@@ -849,6 +857,7 @@ ssh root@45.134.226.56 'bash -s -- --uninstall' < scripts/setup-cloudflare-acces
 ```
 
 **Setup trong Cloudflare Dashboard:**
+
 1. Zero Trust → Networks → Tunnels → Create → `ivf-admin`
 2. Copy tunnel token → chạy script trên VPS
 3. Zero Trust → Access → Applications → Add:

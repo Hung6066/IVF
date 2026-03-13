@@ -54,7 +54,11 @@ public class VaultTokenMiddleware
             }
             else
             {
-                _logger.LogDebug("Invalid vault token presented");
+                // Invalid vault token presented — reject immediately instead of falling through
+                _logger.LogWarning("Invalid vault token presented from {Ip}", context.Connection.RemoteIpAddress);
+                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                await context.Response.WriteAsJsonAsync(new { error = "Invalid vault token", code = "INVALID_VAULT_TOKEN" });
+                return;
             }
         }
 

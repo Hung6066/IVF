@@ -1,0 +1,212 @@
+<div class="waf-dashboard">
+  <div class="page-header">
+    <h2>🛡️ Tường lửa ứng dụng Web (WAF)</h2>
+    <p class="subtitle">Cloudflare WAF — Bảo vệ edge layer</p>
+  </div>
+
+  @if (loading()) {
+    <div class="loading-state">
+      <div class="spinner"></div>
+      <p>Đang tải trạng thái WAF...</p>
+    </div>
+  } @else if (error()) {
+    <div class="error-banner">
+      <span class="error-icon">⚠️</span>
+      <span>{{ error() }}</span>
+      <button class="btn-retry" (click)="loadStatus()">Thử lại</button>
+    </div>
+  } @else if (status(); as s) {
+    <!-- Tabs -->
+    <div class="tab-bar">
+      <button class="tab-btn" [class.active]="activeTab() === 'overview'" (click)="activeTab.set('overview')">
+        📊 Tổng quan
+      </button>
+      <button class="tab-btn" [class.active]="activeTab() === 'rules'" (click)="activeTab.set('rules')">
+        📋 Quy tắc ({{ s.totalRuleCount }})
+      </button>
+      <button class="tab-btn" [class.active]="activeTab() === 'events'" (click)="activeTab.set('events')">
+        📜 Sự kiện ({{ events().length }})
+      </button>
+    </div>
+
+    <!-- Overview Tab -->
+    @if (activeTab() === 'overview') {
+      <div class="stats-grid">
+        <div class="stat-card stat-primary">
+          <div class="stat-icon">🛡️</div>
+          <div class="stat-value">{{ s.totalRuleCount }}</div>
+          <div class="stat-label">Tổng quy tắc</div>
+        </div>
+        <div class="stat-card stat-success">
+          <div class="stat-icon">✅</div>
+          <div class="stat-value">{{ s.managedRules.length }}</div>
+          <div class="stat-label">Managed Rulesets</div>
+        </div>
+        <div class="stat-card stat-warning">
+          <div class="stat-icon">⚡</div>
+          <div class="stat-value">{{ s.customRules.length }}</div>
+          <div class="stat-label">Custom Rules</div>
+        </div>
+        <div class="stat-card stat-info">
+          <div class="stat-icon">🚦</div>
+          <div class="stat-value">{{ s.rateLimitRules.length }}</div>
+          <div class="stat-label">Rate Limiting</div>
+        </div>
+      </div>
+
+      <div class="settings-grid">
+        <div class="setting-item">
+          <span class="setting-label">Mức bảo mật</span>
+          <span class="setting-value badge-info">{{ s.securityLevel }}</span>
+        </div>
+        <div class="setting-item">
+          <span class="setting-label">TLS tối thiểu</span>
+          <span class="setting-value badge-success">{{ s.minTlsVersion }}</span>
+        </div>
+        <div class="setting-item">
+          <span class="setting-label">Trạng thái</span>
+          <span class="setting-value badge-success">Hoạt động</span>
+        </div>
+      </div>
+
+      <!-- Recent Events Preview -->
+      @if (events().length > 0) {
+        <div class="section">
+          <h3>Sự kiện gần đây</h3>
+          <div class="events-preview">
+            @for (event of events().slice(0, 5); track event.timestamp) {
+              <div class="event-row">
+                <span class="event-badge" [class]="getActionBadgeClass(event.action)">{{ getActionLabel(event.action) }}</span>
+                <span class="event-method">{{ event.method }}</span>
+                <span class="event-path">{{ event.path }}</span>
+                <span class="event-ip">{{ event.clientIp }}</span>
+                <span class="event-country">{{ event.country }}</span>
+                <span class="event-time">{{ formatTime(event.timestamp) }}</span>
+              </div>
+            }
+          </div>
+        </div>
+      }
+    }
+
+    <!-- Rules Tab -->
+    @if (activeTab() === 'rules') {
+      <!-- Managed Rulesets -->
+      @if (s.managedRules.length > 0) {
+        <div class="section">
+          <h3>🔒 Managed Rulesets</h3>
+          <p class="section-desc">Cloudflare Managed + OWASP Core Ruleset — phát hiện mối đe dọa tự động</p>
+          <div class="rules-table">
+            @for (rule of s.managedRules; track rule.id) {
+              <div class="rule-row">
+                <span class="rule-status" [class.enabled]="rule.enabled" [class.disabled]="!rule.enabled">
+                  {{ rule.enabled ? '✅' : '❌' }}
+                </span>
+                <div class="rule-info">
+                  <div class="rule-desc">{{ rule.description }}</div>
+                  <div class="rule-meta">
+                    <span class="rule-action" [class]="getActionBadgeClass(rule.action)">{{ getActionLabel(rule.action) }}</span>
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+      }
+
+      <!-- Custom Rules -->
+      @if (s.customRules.length > 0) {
+        <div class="section">
+          <h3>⚡ Custom Rules</h3>
+          <p class="section-desc">Quy tắc tùy chỉnh cho hệ thống IVF — chặn scanner, path traversal, bảo vệ login</p>
+          <div class="rules-table">
+            @for (rule of s.customRules; track rule.id) {
+              <div class="rule-row">
+                <span class="rule-status" [class.enabled]="rule.enabled" [class.disabled]="!rule.enabled">
+                  {{ rule.enabled ? '✅' : '❌' }}
+                </span>
+                <div class="rule-info">
+                  <div class="rule-desc">{{ rule.description }}</div>
+                  <div class="rule-meta">
+                    <span class="rule-action" [class]="getActionBadgeClass(rule.action)">{{ getActionLabel(rule.action) }}</span>
+                    <code class="rule-expr">{{ rule.expression }}</code>
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+      }
+
+      <!-- Rate Limiting -->
+      @if (s.rateLimitRules.length > 0) {
+        <div class="section">
+          <h3>🚦 Rate Limiting</h3>
+          <p class="section-desc">Giới hạn tốc độ tại edge — bảo vệ login, auth, API endpoints</p>
+          <div class="rules-table">
+            @for (rule of s.rateLimitRules; track rule.id) {
+              <div class="rule-row">
+                <span class="rule-status" [class.enabled]="rule.enabled" [class.disabled]="!rule.enabled">
+                  {{ rule.enabled ? '✅' : '❌' }}
+                </span>
+                <div class="rule-info">
+                  <div class="rule-desc">{{ rule.description }}</div>
+                  <div class="rule-meta">
+                    <span class="rule-action" [class]="getActionBadgeClass(rule.action)">{{ getActionLabel(rule.action) }}</span>
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+      }
+    }
+
+    <!-- Events Tab -->
+    @if (activeTab() === 'events') {
+      <div class="section">
+        <div class="section-header">
+          <h3>📜 Firewall Events (1 giờ gần nhất)</h3>
+          <button class="btn-refresh" (click)="loadEvents()" [disabled]="eventsLoading()">
+            🔄 Làm mới
+          </button>
+        </div>
+
+        @if (eventsLoading()) {
+          <div class="loading-inline">
+            <div class="spinner-sm"></div>
+            Đang tải...
+          </div>
+        } @else if (events().length === 0) {
+          <div class="empty-state">
+            <span class="empty-icon">✨</span>
+            <p>Không có sự kiện WAF trong 1 giờ qua — hệ thống an toàn!</p>
+          </div>
+        } @else {
+          <div class="events-table">
+            <div class="events-header">
+              <span>Hành động</span>
+              <span>Phương thức</span>
+              <span>Đường dẫn</span>
+              <span>IP</span>
+              <span>Quốc gia</span>
+              <span>Nguồn</span>
+              <span>Thời gian</span>
+            </div>
+            @for (event of events(); track event.timestamp + event.clientIp) {
+              <div class="event-detail-row">
+                <span class="event-badge" [class]="getActionBadgeClass(event.action)">{{ getActionLabel(event.action) }}</span>
+                <span class="event-method">{{ event.method }}</span>
+                <span class="event-path" [title]="event.path">{{ event.path }}</span>
+                <span class="event-ip">{{ event.clientIp }}</span>
+                <span class="event-country">{{ event.country }}</span>
+                <span class="event-source">{{ event.source }}</span>
+                <span class="event-time">{{ formatTime(event.timestamp) }}</span>
+              </div>
+            }
+          </div>
+        }
+      </div>
+    }
+  }
+</div>

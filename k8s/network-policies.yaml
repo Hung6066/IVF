@@ -1,0 +1,225 @@
+# =====================================================
+# Network Policies — Kubernetes + Linkerd mTLS
+# =====================================================
+# Defense-in-depth: Linkerd provides automatic mTLS,
+# NetworkPolicies provide pod-level firewall rules.
+# Mirrors Docker Swarm overlay network isolation:
+#   ivf-public  → frontend, api, caddy
+#   ivf-data    → db, redis, minio, api
+#   ivf-signing → ejbca, signserver, api
+# =====================================================
+
+# ─── Default Deny All ───
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: ivf
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+
+---
+# ─── API: Allow ingress from ingress controller + internal services ───
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-api-traffic
+  namespace: ivf
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: ivf-api
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # From ingress controller (external traffic)
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - port: 8080
+          protocol: TCP
+    # From Linkerd control plane (health checks)
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: linkerd
+  egress:
+    # To PostgreSQL
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: ivf-db
+      ports:
+        - port: 5432
+          protocol: TCP
+    # To Redis
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: ivf-redis
+      ports:
+        - port: 6379
+          protocol: TCP
+    # To MinIO
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: ivf-minio
+      ports:
+        - port: 9000
+          protocol: TCP
+    # To DNS (kube-dns)
+    - to: []
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    # To external (OIDC providers, CT logs, Cloudflare API)
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - port: 443
+          protocol: TCP
+
+---
+# ─── Database: Only accept from API ───
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-db-from-api
+  namespace: ivf
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: ivf-db
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: ivf-api
+      ports:
+        - port: 5432
+          protocol: TCP
+    # Linkerd control plane
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: linkerd
+  egress:
+    # DNS only
+    - to: []
+      ports:
+        - port: 53
+          protocol: UDP
+
+---
+# ─── Redis: Only accept from API ───
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-redis-from-api
+  namespace: ivf
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: ivf-redis
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: ivf-api
+      ports:
+        - port: 6379
+          protocol: TCP
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: linkerd
+  egress:
+    - to: []
+      ports:
+        - port: 53
+          protocol: UDP
+
+---
+# ─── MinIO: Only accept from API ───
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-minio-from-api
+  namespace: ivf
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: ivf-minio
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: ivf-api
+      ports:
+        - port: 9000
+          protocol: TCP
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: linkerd
+  egress:
+    - to: []
+      ports:
+        - port: 53
+          protocol: UDP
+
+---
+# ─── Frontend: Only accept from ingress controller ───
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-frontend-ingress
+  namespace: ivf
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: ivf-frontend
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - port: 80
+          protocol: TCP
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: linkerd
+  egress:
+    # DNS only
+    - to: []
+      ports:
+        - port: 53
+          protocol: UDP

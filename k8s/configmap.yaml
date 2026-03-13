@@ -1,0 +1,43 @@
+# =====================================================
+# IVF System — ConfigMaps
+# =====================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ivf-api-config
+  namespace: ivf
+  labels:
+    app.kubernetes.io/name: ivf-api
+    app.kubernetes.io/part-of: ivf-system
+data:
+  ASPNETCORE_ENVIRONMENT: "Production"
+  ASPNETCORE_HTTP_PORTS: "8080"
+  JwtSettings__Issuer: "IVF_System"
+  JwtSettings__Audience: "IVF_Users"
+  DigitalSigning__Enabled: "true"
+  DigitalSigning__SkipTlsValidation: "false"
+  DigitalSigning__RequireMtls: "true"
+  DigitalSigning__WorkerName: "PDFSigner"
+  DigitalSigning__SignServerUrl: "https://signserver:8443/signserver"
+  DigitalSigning__EjbcaUrl: "https://ejbca:8443/ejbca"
+  DigitalSigning__CertExpiryWarningDays: "30"
+  DigitalSigning__CertExpiryCheckIntervalMinutes: "60"
+  DigitalSigning__SigningRateLimitPerMinute: "30"
+  MinIO__Endpoint: "minio:9000"
+  MinIO__UseSSL: "false"
+  MinIO__DocumentsBucket: "ivf-documents"
+  MinIO__SignedPdfsBucket: "ivf-signed-pdfs"
+  MinIO__MedicalImagesBucket: "ivf-medical-images"
+  Cors__AllowedOrigins__0: "https://natra.site"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ivf-db-config
+  namespace: ivf
+  labels:
+    app.kubernetes.io/name: ivf-db
+    app.kubernetes.io/part-of: ivf-system
+data:
+  POSTGRES_USER: "postgres"
+  POSTGRES_DB: "ivf_db"

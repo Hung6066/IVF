@@ -272,6 +272,13 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'admin/waf',
+        loadComponent: () =>
+          import('./features/admin/waf-dashboard/waf-dashboard.component').then(
+            (m) => m.WafDashboardComponent,
+          ),
+      },
+      {
         path: 'admin/certificates',
         loadComponent: () =>
           import('./features/admin/certificate-management/certificate-management.component').then(

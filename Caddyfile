@@ -49,6 +49,10 @@ natra.site {
 
 	# API requests
 	handle /api/* {
+		# Limit request body (10MB) to prevent resource exhaustion
+		request_body {
+			max_size 10MB
+		}
 		reverse_proxy api:8080 {
 			health_uri      /health/live
 			health_interval 15s
@@ -72,15 +76,7 @@ natra.site {
 		}
 	}
 
-	# Swagger
-	handle /swagger/* {
-		reverse_proxy api:8080 {
-			health_uri      /health/live
-			health_interval 15s
-			health_timeout  5s
-			fail_duration   30s
-		}
-	}
+	# SECURITY: Swagger not proxied in production (API gates via IsDevelopment())
 
 	# Everything else -> Angular frontend
 	handle {
@@ -92,17 +88,20 @@ natra.site {
 		}
 	}
 
-	# Security headers
+	# Security headers (aligned with API-level OWASP headers)
 	header {
 		X-Content-Type-Options nosniff
 		X-Frame-Options DENY
-		Referrer-Policy strict-origin-when-cross-origin
+		X-XSS-Protection "0"
+		Referrer-Policy no-referrer
 		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
-		Content-Security-Policy "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' wss: ws:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests"
-		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+		Content-Security-Policy "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' wss: ws:; frame-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'; upgrade-insecure-requests; block-all-mixed-content; require-trusted-types-for 'script'"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=(), accelerometer=(), gyroscope=(), magnetometer=(), autoplay=(), display-capture=(), document-domain=(), fullscreen=(self), publickey-credentials-get=(self)"
+		Cross-Origin-Embedder-Policy require-corp
 		Cross-Origin-Opener-Policy same-origin
 		Cross-Origin-Resource-Policy same-origin
 		X-Permitted-Cross-Domain-Policies none
+		X-Download-Options noopen
 		X-DNS-Prefetch-Control off
 		-Server
 		-X-Powered-By
@@ -120,6 +119,9 @@ md.natra.site {
 
 	# API requests
 	handle /api/* {
+		request_body {
+			max_size 10MB
+		}
 		reverse_proxy api:8080 {
 			health_uri      /health/live
 			health_interval 15s
@@ -157,13 +159,16 @@ md.natra.site {
 	header {
 		X-Content-Type-Options nosniff
 		X-Frame-Options DENY
-		Referrer-Policy strict-origin-when-cross-origin
+		X-XSS-Protection "0"
+		Referrer-Policy no-referrer
 		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
-		Content-Security-Policy "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' wss: ws:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests"
-		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+		Content-Security-Policy "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' wss: ws:; frame-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'; upgrade-insecure-requests; block-all-mixed-content; require-trusted-types-for 'script'"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=(), accelerometer=(), gyroscope=(), magnetometer=(), autoplay=(), display-capture=(), document-domain=(), fullscreen=(self), publickey-credentials-get=(self)"
+		Cross-Origin-Embedder-Policy require-corp
 		Cross-Origin-Opener-Policy same-origin
 		Cross-Origin-Resource-Policy same-origin
 		X-Permitted-Cross-Domain-Policies none
+		X-Download-Options noopen
 		X-DNS-Prefetch-Control off
 		-Server
 		-X-Powered-By
@@ -181,6 +186,9 @@ ivf-dong-do.natra.site {
 
 	# API requests
 	handle /api/* {
+		request_body {
+			max_size 10MB
+		}
 		reverse_proxy api:8080 {
 			health_uri      /health/live
 			health_interval 15s
@@ -218,13 +226,16 @@ ivf-dong-do.natra.site {
 	header {
 		X-Content-Type-Options nosniff
 		X-Frame-Options DENY
-		Referrer-Policy strict-origin-when-cross-origin
+		X-XSS-Protection "0"
+		Referrer-Policy no-referrer
 		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
-		Content-Security-Policy "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' wss: ws:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests"
-		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+		Content-Security-Policy "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' wss: ws:; frame-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'; upgrade-insecure-requests; block-all-mixed-content; require-trusted-types-for 'script'"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=(), accelerometer=(), gyroscope=(), magnetometer=(), autoplay=(), display-capture=(), document-domain=(), fullscreen=(self), publickey-credentials-get=(self)"
+		Cross-Origin-Embedder-Policy require-corp
 		Cross-Origin-Opener-Policy same-origin
 		Cross-Origin-Resource-Policy same-origin
 		X-Permitted-Cross-Domain-Policies none
+		X-Download-Options noopen
 		X-DNS-Prefetch-Control off
 		-Server
 		-X-Powered-By

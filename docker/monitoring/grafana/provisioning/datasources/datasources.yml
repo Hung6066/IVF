@@ -17,7 +17,7 @@ datasources:
     basicAuth: true
     basicAuthUser: monitor
     secureJsonData:
-      basicAuthPassword: "wDDaI8zzSTBPyzfGp3wRc6JkDGgIv6ZF"
+      basicAuthPassword: "$MONITORING_PASSWORD"
     jsonData:
       timeInterval: "15s"
       httpMethod: POST

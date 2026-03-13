@@ -1,0 +1,108 @@
+# =====================================================
+# MinIO — StatefulSet + Service
+# =====================================================
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: ivf-minio
+  namespace: ivf
+  labels:
+    app.kubernetes.io/name: ivf-minio
+    app.kubernetes.io/component: storage
+    app.kubernetes.io/part-of: ivf-system
+spec:
+  serviceName: ivf-minio
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ivf-minio
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ivf-minio
+        app.kubernetes.io/component: storage
+        app.kubernetes.io/part-of: ivf-system
+      annotations:
+        # MinIO S3 API uses HTTP — Linkerd can handle protocol detection
+        config.linkerd.io/opaque-ports: "9001"
+    spec:
+      containers:
+        - name: minio
+          image: minio/minio:latest
+          args:
+            - server
+            - /data
+            - --console-address
+            - ":9001"
+          ports:
+            - name: s3
+              containerPort: 9000
+              protocol: TCP
+            - name: console
+              containerPort: 9001
+              protocol: TCP
+          env:
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: ivf-minio-credentials
+                  key: access-key
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ivf-minio-credentials
+                  key: secret-key
+            - name: MINIO_PROMETHEUS_AUTH_TYPE
+              value: "public"
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          livenessProbe:
+            httpGet:
+              path: /minio/health/live
+              port: s3
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /minio/health/ready
+              port: s3
+            initialDelaySeconds: 10
+            periodSeconds: 5
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 20Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio
+  namespace: ivf
+  labels:
+    app.kubernetes.io/name: ivf-minio
+    app.kubernetes.io/part-of: ivf-system
+spec:
+  type: ClusterIP
+  ports:
+    - port: 9000
+      targetPort: s3
+      protocol: TCP
+      name: s3
+    - port: 9001
+      targetPort: console
+      protocol: TCP
+      name: console
+  selector:
+    app.kubernetes.io/name: ivf-minio

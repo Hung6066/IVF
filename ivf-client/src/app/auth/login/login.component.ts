@@ -1,8 +1,10 @@
-import { Component, signal } from '@angular/core';
+import { Component, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
+import { SsoService } from '../../core/services/sso.service';
+import { SsoProvider } from '../../core/models/waf.model';
 import { coerceToArrayBuffer, coerceToBase64Url } from '../../core/utils/webauthn.utils';
 
 @Component({
@@ -82,6 +84,25 @@ import { coerceToArrayBuffer, coerceToBase64Url } from '../../core/utils/webauth
             >
               🔑 Đăng nhập bằng Passkey
             </button>
+
+            @if (ssoProviders().length > 0) {
+              <div class="divider"><span>SSO</span></div>
+              @for (provider of ssoProviders(); track provider.id) {
+                <button
+                  type="button"
+                  class="btn-sso"
+                  (click)="onSsoLogin(provider)"
+                  [disabled]="loading()"
+                >
+                  @if (provider.iconUrl) {
+                    <img [src]="provider.iconUrl" [alt]="provider.displayName" class="sso-icon" />
+                  } @else {
+                    <span class="sso-icon-fallback">🌐</span>
+                  }
+                  {{ provider.displayName }}
+                </button>
+              }
+            }
           </form>
         }
 
@@ -390,6 +411,39 @@ import { coerceToArrayBuffer, coerceToBase64Url } from '../../core/utils/webauth
         cursor: not-allowed;
       }
 
+      .btn-sso {
+        padding: 0.75rem;
+        background: white;
+        color: #374151;
+        border: 1px solid #d1d5db;
+        border-radius: 12px;
+        font-size: 0.9rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+      }
+      .btn-sso:hover:not(:disabled) {
+        background: #f9fafb;
+        border-color: #667eea;
+        color: #667eea;
+      }
+      .btn-sso:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      .sso-icon {
+        width: 20px;
+        height: 20px;
+        object-fit: contain;
+      }
+      .sso-icon-fallback {
+        font-size: 1.1rem;
+      }
+
       .mfa-info {
         text-align: center;
         margin-bottom: 0.5rem;
@@ -448,7 +502,7 @@ import { coerceToArrayBuffer, coerceToBase64Url } from '../../core/utils/webauth
     `,
   ],
 })
-export class LoginComponent {
+export class LoginComponent implements OnInit {
   username = '';
   password = '';
   mfaCode = '';
@@ -459,11 +513,103 @@ export class LoginComponent {
   mfaToken = signal<string | null>(null);
   mfaMethod = signal<string>('totp');
   lockUnlocksAt = signal<string | null>(null);
+  ssoProviders = signal<SsoProvider[]>([]);
 
   constructor(
     private authService: AuthService,
+    private ssoService: SsoService,
     private router: Router,
   ) {}
+
+  ngOnInit(): void {
+    this.loadSsoProviders();
+    this.handleSsoCallback();
+  }
+
+  private loadSsoProviders(): void {
+    this.ssoService.getProviders().subscribe({
+      next: (providers) => this.ssoProviders.set(providers),
+      error: () => {}, // SSO not configured — no providers shown
+    });
+  }
+
+  async onSsoLogin(provider: SsoProvider): Promise<void> {
+    this.loading.set(true);
+    this.error.set(null);
+
+    try {
+      const codeVerifier = await this.ssoService.generateCodeVerifier();
+      const codeChallenge = await this.ssoService.generateCodeChallenge(codeVerifier);
+      const state = this.ssoService.generateState();
+
+      // Store PKCE state for callback
+      sessionStorage.setItem('sso_code_verifier', codeVerifier);
+      sessionStorage.setItem('sso_state', state);
+      sessionStorage.setItem('sso_provider', provider.id);
+
+      const redirectUri = `${window.location.origin}/login`;
+
+      this.ssoService.getAuthorizeUrl(provider.id, redirectUri, codeChallenge, state).subscribe({
+        next: (res) => {
+          window.location.href = res.authorizeUrl;
+        },
+        error: () => {
+          this.loading.set(false);
+          this.error.set('Không thể kết nối tới nhà cung cấp SSO');
+        },
+      });
+    } catch {
+      this.loading.set(false);
+      this.error.set('Lỗi tạo PKCE challenge');
+    }
+  }
+
+  private handleSsoCallback(): void {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
+    const state = params.get('state');
+
+    if (!code || !state) return;
+
+    const savedState = sessionStorage.getItem('sso_state');
+    const codeVerifier = sessionStorage.getItem('sso_code_verifier');
+    const providerId = sessionStorage.getItem('sso_provider');
+
+    // Clean up
+    sessionStorage.removeItem('sso_state');
+    sessionStorage.removeItem('sso_code_verifier');
+    sessionStorage.removeItem('sso_provider');
+
+    // Clear URL params
+    window.history.replaceState({}, '', window.location.pathname);
+
+    if (state !== savedState || !codeVerifier || !providerId) {
+      this.error.set('Phiên SSO không hợp lệ. Vui lòng thử lại.');
+      return;
+    }
+
+    this.loading.set(true);
+    const redirectUri = `${window.location.origin}/login`;
+
+    this.ssoService.exchangeToken(providerId, code, redirectUri, codeVerifier).subscribe({
+      next: (response) => {
+        if (response.accessToken) {
+          // Store the tokens (same as normal login)
+          localStorage.setItem('ivf_access_token', response.accessToken);
+          localStorage.setItem('ivf_refresh_token', response.refreshToken);
+          localStorage.setItem('ivf_user', JSON.stringify(response.user));
+          this.router.navigate(['/dashboard']);
+        } else {
+          this.loading.set(false);
+          this.error.set(response.error || 'Đăng nhập SSO thất bại');
+        }
+      },
+      error: (err) => {
+        this.loading.set(false);
+        this.error.set(err.error?.error || 'Đăng nhập SSO thất bại');
+      },
+    });
+  }
 
   getErrorIcon(): string {
     switch (this.errorCode()) {

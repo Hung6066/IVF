@@ -83,8 +83,10 @@ public class SecurityEnforcementMiddleware
         }
 
         // ── 2. Geo-blocking check ──
-        // Only applies when the request has country info (set by upstream middleware/headers)
-        var country = context.Request.Headers["X-Country-Code"].FirstOrDefault()
+        // Only use trusted sources: Cloudflare CF-IPCountry header (set by Cloudflare edge,
+        // not spoofable by client) or server-side GeoCountry set by upstream middleware.
+        // NEVER trust X-Country-Code from the client — it can be spoofed.
+        var country = context.Request.Headers["CF-IPCountry"].FirstOrDefault()
             ?? context.Items["GeoCountry"]?.ToString();
 
         if (!string.IsNullOrEmpty(country))

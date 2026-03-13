@@ -116,3 +116,196 @@ groups:
         annotations:
           summary: "Container {{ $labels.swarm_service }} restarting frequently"
           description: "{{ $value }} restart events in 10 minutes. Possible crash loop."
+
+  # ═══════════════════════════════════════════
+  # SIEM — Security Event Correlation Rules
+  # ═══════════════════════════════════════════
+  - name: ivf-siem-auth
+    rules:
+      # Credential stuffing — high volume failed logins from distributed sources
+      - alert: CredentialStuffingDetected
+        expr: |
+          sum(count_over_time({swarm_service=~"ivf_api.*"} |~ "(?i)(authentication failed|invalid credentials|login failed)" [10m])) > 50
+        for: 5m
+        labels:
+          severity: critical
+          category: siem
+          attack_type: credential-stuffing
+        annotations:
+          summary: "Credential stuffing attack detected"
+          description: "{{ $value }} failed login attempts in 10 minutes. Activate IP blocklist and review rate limiter thresholds."
+
+      # MFA bypass attempts — repeated MFA failures for same user
+      - alert: MfaBruteForce
+        expr: |
+          sum(count_over_time({swarm_service=~"ivf_api.*"} |~ "(?i)(mfa.*failed|totp.*invalid|invalid.*verification.*code|mfa.*expired)" [5m])) > 10
+        for: 2m
+        labels:
+          severity: critical
+          category: siem
+          attack_type: mfa-bypass
+        annotations:
+          summary: "MFA brute force attempt detected"
+          description: "{{ $value }} failed MFA verification attempts in 5 minutes. Account may be compromised."
+
+      # Token replay/reuse detection
+      - alert: TokenReplayDetected
+        expr: |
+          sum(count_over_time({swarm_service=~"ivf_api.*"} |~ "(?i)(token.*reuse|refresh.*token.*family|token.*already.*used|token.*revoked)" [5m])) > 3
+        for: 1m
+        labels:
+          severity: critical
+          category: siem
+          attack_type: token-replay
+        annotations:
+          summary: "Token replay attack detected"
+          description: "{{ $value }} token reuse attempts detected. Refresh token family rotation triggered — possible session hijacking."
+
+      # Session anomaly — device fingerprint mismatch
+      - alert: SessionHijackingAttempt
+        expr: |
+          sum(count_over_time({swarm_service=~"ivf_api.*"} |~ "(?i)(fingerprint.*mismatch|device.*mismatch|session.*binding.*failed|token.*binding.*violation)" [5m])) > 5
+        for: 2m
+        labels:
+          severity: critical
+          category: siem
+          attack_type: session-hijacking
+        annotations:
+          summary: "Session hijacking attempt detected"
+          description: "{{ $value }} device fingerprint mismatches in 5 minutes. Sessions may be stolen."
+
+  - name: ivf-siem-access
+    rules:
+      # Privilege escalation — accessing admin APIs without proper role
+      - alert: PrivilegeEscalationAttempt
+        expr: |
+          sum(count_over_time({swarm_service=~"ivf_api.*"} |~ "(?i)(unauthorized.*admin|role.*required|insufficient.*role|forbidden.*admin|access.*denied.*admin)" [5m])) > 5
+        for: 2m
+        labels:
+          severity: critical
+          category: siem
+          attack_type: privilege-escalation
+        annotations:
+          summary: "Privilege escalation attempt detected"
+          description: "{{ $value }} unauthorized admin access attempts in 5 minutes."
+
+      # Cross-tenant access attempt
+      - alert: CrossTenantAccess
+        expr: |
+          sum(count_over_time({swarm_service=~"ivf_api.*"} |~ "(?i)(tenant.*mismatch|cross.*tenant|wrong.*tenant|tenant.*violation|unauthorized.*tenant)" [5m])) > 1
+        for: 0m
+        labels:
+          severity: critical
+          category: siem
+          attack_type: cross-tenant
+        annotations:
+          summary: "Cross-tenant access attempt detected"
+          description: "{{ $value }} cross-tenant access violations. Multi-tenancy boundary breached — investigate immediately."
+
+      # Mass data export — unusually high number of list/export requests
+      - alert: MassDataExfiltration
+        expr: |
+          sum(count_over_time({swarm_service=~"ivf_api.*"} |~ "(?i)(export|download|bulk.*get|pageSize=[5-9][0-9]{2,})" [10m])) > 50
+        for: 5m
+        labels:
+          severity: warning
+          category: siem
+          attack_type: data-exfiltration
+        annotations:
+          summary: "Possible data exfiltration attempt"
+          description: "{{ $value }} export/bulk requests in 10 minutes. Verify if authorized."
+
+      # Vault access anomaly — excessive secret reads
+      - alert: VaultAccessAnomaly
+        expr: |
+          sum(count_over_time({swarm_service=~"ivf_api.*"} |~ "(?i)(vault.*access|secret.*read|keyvault.*get|decrypt)" [5m])) > 100
+        for: 5m
+        labels:
+          severity: warning
+          category: siem
+          attack_type: vault-abuse
+        annotations:
+          summary: "Unusual vault/secret access pattern"
+          description: "{{ $value }} vault operations in 5 minutes. Possible credential harvesting."
+
+  - name: ivf-siem-injection
+    rules:
+      # SQL injection patterns in logs
+      - alert: SqlInjectionAttempt
+        expr: |
+          sum(count_over_time({swarm_service=~"ivf_api.*"} |~ "(?i)(sql.*injection|union.*select|drop.*table|;.*delete|1=1|or.*1.*=.*1|exec.*xp_)" [5m])) > 1
+        for: 0m
+        labels:
+          severity: critical
+          category: siem
+          attack_type: sql-injection
+        annotations:
+          summary: "SQL injection attempt detected"
+          description: "{{ $value }} SQL injection patterns found in request logs."
+
+      # Path traversal attempts
+      - alert: PathTraversalAttempt
+        expr: |
+          sum(count_over_time({swarm_service=~"ivf_api.*"} |~ "(?i)(\\.\\./|\\.\\.\\\\|%2e%2e|path.*traversal|directory.*traversal)" [5m])) > 3
+        for: 1m
+        labels:
+          severity: critical
+          category: siem
+          attack_type: path-traversal
+        annotations:
+          summary: "Path traversal attack detected"
+          description: "{{ $value }} path traversal attempts in 5 minutes."
+
+      # XSS patterns
+      - alert: XssAttempt
+        expr: |
+          sum(count_over_time({swarm_service=~"ivf_api.*"} |~ "(?i)(<script|javascript:|onerror=|onload=|<iframe|<object)" [5m])) > 3
+        for: 1m
+        labels:
+          severity: warning
+          category: siem
+          attack_type: xss
+        annotations:
+          summary: "XSS injection attempt detected"
+          description: "{{ $value }} XSS patterns in request logs. CSP should block execution."
+
+  - name: ivf-siem-infrastructure
+    rules:
+      # Certificate errors — PKI issues
+      - alert: CertificateErrors
+        expr: |
+          sum(count_over_time({swarm_service=~"ivf_api.*"} |~ "(?i)(certificate.*error|ssl.*error|tls.*handshake.*failed|certificate.*expired|certificate.*revoked)" [5m])) > 3
+        for: 2m
+        labels:
+          severity: warning
+          category: siem
+          attack_type: pki-failure
+        annotations:
+          summary: "Certificate/TLS errors detected"
+          description: "{{ $value }} certificate errors in 5 minutes. Check PKI health and cert expiry."
+
+      # API rate limit exhaustion
+      - alert: RateLimitExhaustion
+        expr: |
+          sum(count_over_time({swarm_service=~"ivf_api.*"} |~ "(?i)(rate.*limit.*exceeded|429|too.*many.*requests|throttled)" [5m])) > 30
+        for: 2m
+        labels:
+          severity: warning
+          category: siem
+          attack_type: dos
+        annotations:
+          summary: "Rate limit exhaustion — possible DoS"
+          description: "{{ $value }} rate-limited requests in 5 minutes. Possible denial-of-service attack."
+
+      # Suspicious user agent patterns
+      - alert: SuspiciousUserAgent
+        expr: |
+          sum(count_over_time({swarm_service=~"ivf_api.*"} |~ "(?i)(sqlmap|nikto|nmap|masscan|burpsuite|acunetix|nessus|dirbuster|gobuster)" [5m])) > 1
+        for: 0m
+        labels:
+          severity: critical
+          category: siem
+          attack_type: scanning
+        annotations:
+          summary: "Security scanner detected"
+          description: "{{ $value }} requests from known security scanners. Active reconnaissance in progress."

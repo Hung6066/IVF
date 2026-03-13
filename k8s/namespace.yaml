@@ -1,0 +1,16 @@
+# =====================================================
+# IVF System — Kubernetes Namespace
+# =====================================================
+# Linkerd auto-injection enabled: all pods in this
+# namespace automatically get Linkerd sidecar proxy
+# for mTLS between services.
+# =====================================================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ivf
+  labels:
+    app.kubernetes.io/part-of: ivf-system
+  annotations:
+    # Linkerd auto-injection: all pods get mTLS sidecar
+    linkerd.io/inject: enabled

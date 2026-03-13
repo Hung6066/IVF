@@ -1,0 +1,89 @@
+# =====================================================
+# Frontend (Angular) — Deployment + Service
+# =====================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ivf-frontend
+  namespace: ivf
+  labels:
+    app.kubernetes.io/name: ivf-frontend
+    app.kubernetes.io/component: frontend
+    app.kubernetes.io/part-of: ivf-system
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ivf-frontend
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ivf-frontend
+        app.kubernetes.io/component: frontend
+        app.kubernetes.io/part-of: ivf-system
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: frontend
+          image: ghcr.io/hung6066/ivf-client:latest
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: ivf-frontend
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ivf-frontend
+  namespace: ivf
+  labels:
+    app.kubernetes.io/name: ivf-frontend
+    app.kubernetes.io/part-of: ivf-system
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: ivf-frontend

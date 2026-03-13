@@ -1,0 +1,92 @@
+# =====================================================
+# Linkerd Service Profiles — Traffic Policy & Retries
+# =====================================================
+# Service profiles define per-route metrics, timeouts,
+# and retry policies for Linkerd meshed services.
+# =====================================================
+apiVersion: linkerd.io/v1alpha2
+kind: ServiceProfile
+metadata:
+  name: ivf-api.ivf.svc.cluster.local
+  namespace: ivf
+spec:
+  routes:
+    # Health endpoints — fast timeout, no retries
+    - name: GET /health/live
+      condition:
+        method: GET
+        pathRegex: /health/live
+      timeout: 5s
+      isRetryable: false
+
+    - name: GET /health/ready
+      condition:
+        method: GET
+        pathRegex: /health/ready
+      timeout: 10s
+      isRetryable: false
+
+    # Auth endpoints — NO retry (mutations, side effects)
+    - name: POST /api/auth/login
+      condition:
+        method: POST
+        pathRegex: /api/auth/login
+      timeout: 15s
+      isRetryable: false
+
+    - name: POST /api/auth/refresh
+      condition:
+        method: POST
+        pathRegex: /api/auth/refresh
+      timeout: 10s
+      isRetryable: false
+
+    # SSO endpoints
+    - name: GET /api/auth/sso/providers
+      condition:
+        method: GET
+        pathRegex: /api/auth/sso/providers
+      timeout: 5s
+      isRetryable: true
+
+    - name: POST /api/auth/sso/token
+      condition:
+        method: POST
+        pathRegex: /api/auth/sso/[^/]+/token
+      timeout: 30s
+      isRetryable: false
+
+    # Read-only API queries — retryable with budget
+    - name: GET /api/*
+      condition:
+        method: GET
+        pathRegex: /api/.*
+      timeout: 30s
+      isRetryable: true
+
+    # Mutations — NO retry
+    - name: POST /api/*
+      condition:
+        method: POST
+        pathRegex: /api/.*
+      timeout: 60s
+      isRetryable: false
+
+    - name: PUT /api/*
+      condition:
+        method: PUT
+        pathRegex: /api/.*
+      timeout: 60s
+      isRetryable: false
+
+    - name: DELETE /api/*
+      condition:
+        method: DELETE
+        pathRegex: /api/.*
+      timeout: 30s
+      isRetryable: false
+
+  retryBudget:
+    retryRatio: 0.2
+    minRetriesPerSecond: 10
+    ttl: 10s
