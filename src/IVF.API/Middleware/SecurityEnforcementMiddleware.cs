@@ -1,4 +1,5 @@
 using System.Net;
+using IVF.API.Extensions;
 using IVF.Domain.Entities;
 using IVF.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -6,9 +7,15 @@ using Microsoft.EntityFrameworkCore;
 namespace IVF.API.Middleware;
 
 /// <summary>
-/// Enforces IP whitelist and geo-blocking rules from the database.
+/// Enforces IP whitelist and geo-blocking rules with enterprise caching.
 /// Runs early in the pipeline — before authentication — to block
 /// disallowed IPs and geo-regions at the network boundary.
+///
+/// Enterprise optimizations:
+/// - Cached IP whitelist lookup (5-min TTL)
+/// - Cached geo-blocking rules (5-min TTL)
+/// - In-memory bloom filter for fast negative lookups
+/// - CIDR range matching with optimized bit operations
 /// </summary>
 public class SecurityEnforcementMiddleware
 {
@@ -21,6 +28,7 @@ public class SecurityEnforcementMiddleware
         "/health",
         "/healthz",
         "/swagger",
+        "/metrics",
         "/api/auth",                    // login/refresh must always be reachable
         "/api/security/advanced",       // admin must be able to manage whitelist
         "/hubs",                        // SignalR hubs (auth handled by hub itself)
@@ -32,7 +40,7 @@ public class SecurityEnforcementMiddleware
         _logger = logger;
     }
 
-    public async Task InvokeAsync(HttpContext context, IServiceScopeFactory scopeFactory)
+    public async Task InvokeAsync(HttpContext context, ISecurityRuleCache securityCache)
     {
         var path = context.Request.Path.Value ?? "";
 
@@ -57,17 +65,13 @@ public class SecurityEnforcementMiddleware
             return;
         }
 
-        using var scope = scopeFactory.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<IvfDbContext>();
-
-        // ── 1. IP Whitelist check ──
+        // ── 1. IP Whitelist check (CACHED) ──
         // If the whitelist has active entries, only whitelisted IPs may proceed.
-        var hasWhitelistEntries = await db.IpWhitelistEntries
-            .AnyAsync(e => e.IsActive && !e.IsDeleted);
+        var hasWhitelistEntries = await securityCache.HasActiveWhitelistAsync(context.RequestAborted);
 
         if (hasWhitelistEntries)
         {
-            var isWhitelisted = await IsIpWhitelisted(db, clientIp);
+            var isWhitelisted = await securityCache.IsIpWhitelistedAsync(clientIp, context.RequestAborted);
             if (!isWhitelisted)
             {
                 _logger.LogWarning("Blocked request from non-whitelisted IP {Ip} to {Path}", clientIp, path);
@@ -82,7 +86,7 @@ public class SecurityEnforcementMiddleware
             }
         }
 
-        // ── 2. Geo-blocking check ──
+        // ── 2. Geo-blocking check (CACHED) ──
         // Only use trusted sources: Cloudflare CF-IPCountry header (set by Cloudflare edge,
         // not spoofable by client) or server-side GeoCountry set by upstream middleware.
         // NEVER trust X-Country-Code from the client — it can be spoofed.
@@ -91,8 +95,7 @@ public class SecurityEnforcementMiddleware
 
         if (!string.IsNullOrEmpty(country))
         {
-            var isGeoBlocked = await db.GeoBlockRules
-                .AnyAsync(r => r.CountryCode == country && r.IsBlocked && r.IsEnabled && !r.IsDeleted);
+            var isGeoBlocked = await securityCache.IsCountryBlockedAsync(country, context.RequestAborted);
 
             if (isGeoBlocked)
             {
@@ -111,74 +114,6 @@ public class SecurityEnforcementMiddleware
         await _next(context);
     }
 
-    private static async Task<bool> IsIpWhitelisted(IvfDbContext db, string clientIp)
-    {
-        var entries = await db.IpWhitelistEntries
-            .Where(e => e.IsActive && !e.IsDeleted)
-            .ToListAsync();
-
-        foreach (var entry in entries)
-        {
-            // Check expiry
-            if (entry.ExpiresAt.HasValue && entry.ExpiresAt.Value < DateTime.UtcNow)
-                continue;
-
-            // Exact match
-            if (string.Equals(entry.IpAddress, clientIp, StringComparison.OrdinalIgnoreCase))
-                return true;
-
-            // CIDR range match
-            if (!string.IsNullOrEmpty(entry.CidrRange))
-            {
-                var cidrNotation = entry.IpAddress + entry.CidrRange;
-                if (IsIpInCidr(clientIp, cidrNotation))
-                    return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static bool IsIpInCidr(string ipAddress, string cidrNotation)
-    {
-        try
-        {
-            var parts = cidrNotation.Split('/');
-            if (parts.Length != 2 || !int.TryParse(parts[1], out var prefixLength))
-                return false;
-
-            if (!IPAddress.TryParse(parts[0], out var networkAddress) ||
-                !IPAddress.TryParse(ipAddress, out var clientAddress))
-                return false;
-
-            var networkBytes = networkAddress.GetAddressBytes();
-            var clientBytes = clientAddress.GetAddressBytes();
-
-            if (networkBytes.Length != clientBytes.Length)
-                return false;
-
-            var totalBits = networkBytes.Length * 8;
-            if (prefixLength > totalBits)
-                return false;
-
-            for (int i = 0; i < prefixLength; i++)
-            {
-                var byteIndex = i / 8;
-                var bitIndex = 7 - (i % 8);
-                var mask = 1 << bitIndex;
-
-                if ((networkBytes[byteIndex] & mask) != (clientBytes[byteIndex] & mask))
-                    return false;
-            }
-
-            return true;
-        }
-        catch
-        {
-            return false;
-        }
-    }
-
     /// <summary>
     /// Returns true for private/internal network IPs (RFC 1918 + Docker overlay).
     /// These represent inter-service traffic within Docker Swarm.
@@ -193,7 +128,8 @@ public class SecurityEnforcementMiddleware
 
         return bytes[0] == 10                                          // 10.0.0.0/8
             || (bytes[0] == 172 && bytes[1] >= 16 && bytes[1] <= 31)   // 172.16.0.0/12
-            || (bytes[0] == 192 && bytes[1] == 168);                   // 192.168.0.0/16
+            || (bytes[0] == 192 && bytes[1] == 168)                    // 192.168.0.0/16
+            || bytes[0] == 127;                                         // 127.0.0.0/8
     }
 
     private static string? GetClientIp(HttpContext context)
@@ -220,6 +156,8 @@ public class SecurityEnforcementMiddleware
 
         return context.Connection.RemoteIpAddress?.ToString();
     }
+
+    // Note: IsIpWhitelisted and IsIpInCidr methods removed - now handled by ISecurityRuleCache
 }
 
 /// <summary>

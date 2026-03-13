@@ -184,4 +184,10 @@ public static class SecurityEventTypes
     // Bot detection events
     public const string BotDetected = "THREAT_BOT_DETECTED";
     public const string CaptchaFailed = "THREAT_CAPTCHA_FAILED";
+
+    // WAF events
+    public const string WafBlocked = "WAF_BLOCKED";
+    public const string WafChallenged = "WAF_CHALLENGED";
+    public const string WafRateLimited = "WAF_RATE_LIMITED";
+    public const string WafBypassed = "WAF_BYPASSED";
 }

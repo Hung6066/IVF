@@ -1,0 +1,424 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# IVF API — Enterprise Kubernetes Configuration
+# ═══════════════════════════════════════════════════════════════════════════════
+# Optimized for 10,000+ concurrent users, 99.99% uptime
+# Features:
+#   - HorizontalPodAutoscaler (HPA) with custom metrics
+#   - PodDisruptionBudget (PDB) for high availability
+#   - Topology spread constraints for zone redundancy
+#   - Resource quotas and limits for predictable performance
+#   - Pod anti-affinity for failure domain isolation
+# ═══════════════════════════════════════════════════════════════════════════════
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ivf-api
+  namespace: ivf
+  labels:
+    app.kubernetes.io/name: ivf-api
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/part-of: ivf-system
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: kubectl
+  annotations:
+    config.linkerd.io/skip-outbound-ports: "8443,9443"
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8080"
+    prometheus.io/path: "/metrics"
+spec:
+  replicas: 4
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ivf-api
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ivf-api
+        app.kubernetes.io/component: backend
+        app.kubernetes.io/part-of: ivf-system
+      annotations:
+        config.linkerd.io/proxy-cpu-request: "25m"
+        config.linkerd.io/proxy-memory-request: "50Mi"
+        config.linkerd.io/proxy-memory-limit: "300Mi"
+        config.linkerd.io/proxy-log-level: "warn"
+        # Force restart on config change
+        checksum/config: "{{ include (print $.Template.BasePath \"/configmap.yaml\") . | sha256sum }}"
+    spec:
+      serviceAccountName: ivf-api
+      terminationGracePeriodSeconds: 60
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+
+      # Pod anti-affinity: spread across nodes and zones
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app.kubernetes.io/name
+                    operator: In
+                    values:
+                      - ivf-api
+              topologyKey: kubernetes.io/hostname
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app.kubernetes.io/name
+                      operator: In
+                      values:
+                        - ivf-api
+                topologyKey: topology.kubernetes.io/zone
+
+      # Topology spread for zone redundancy
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: ivf-api
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: ivf-api
+
+      containers:
+        - name: api
+          image: ghcr.io/hung6066/ivf:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: ivf-api-config
+          env:
+            # Database
+            - name: ConnectionStrings__DefaultConnection
+              valueFrom:
+                secretKeyRef:
+                  name: ivf-db-credentials
+                  key: connection-string
+            - name: Database__MinPoolSize
+              value: "20"
+            - name: Database__MaxPoolSize
+              value: "100"
+            - name: Database__CommandTimeout
+              value: "30"
+
+            # Redis
+            - name: ConnectionStrings__Redis
+              valueFrom:
+                secretKeyRef:
+                  name: ivf-redis-credentials
+                  key: connection-string
+
+            # JWT
+            - name: JwtSettings__Secret
+              valueFrom:
+                secretKeyRef:
+                  name: ivf-jwt-secret
+                  key: secret
+
+            # MinIO
+            - name: MinIO__AccessKey
+              valueFrom:
+                secretKeyRef:
+                  name: ivf-minio-credentials
+                  key: access-key
+            - name: MinIO__SecretKey
+              valueFrom:
+                secretKeyRef:
+                  name: ivf-minio-credentials
+                  key: secret-key
+
+            # OpenTelemetry
+            - name: OpenTelemetry__Enabled
+              value: "true"
+            - name: OpenTelemetry__Endpoint
+              value: "http://otel-collector.monitoring:4317"
+            - name: OpenTelemetry__SamplingRatio
+              value: "0.1"
+
+            # Rate Limiting
+            - name: RateLimiting__GlobalLimit
+              value: "10000"
+            - name: RateLimiting__PerUserLimit
+              value: "100"
+
+            # Pod identity
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+
+          volumeMounts:
+            - name: jwt-key
+              mountPath: /app/keys/jwt
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+
+          # Startup probe: allow 2 minutes for initial startup
+          startupProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 24
+
+          # Liveness probe: restart if unhealthy
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            initialDelaySeconds: 0
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          # Readiness probe: remove from service if not ready
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            initialDelaySeconds: 0
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2
+            successThreshold: 1
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 1000
+            capabilities:
+              drop: ["ALL"]
+
+          lifecycle:
+            preStop:
+              exec:
+                # Graceful shutdown: wait for in-flight requests
+                command: ["/bin/sh", "-c", "sleep 10"]
+
+      volumes:
+        - name: jwt-key
+          secret:
+            secretName: ivf-jwt-private-key
+            defaultMode: 0400
+        - name: tmp
+          emptyDir: {}
+
+      # Priority class for critical workloads
+      priorityClassName: high-priority
+
+---
+# ═══════════════════════════════════════════════════════════════════════════════
+# Horizontal Pod Autoscaler (HPA)
+# ═══════════════════════════════════════════════════════════════════════════════
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: ivf-api-hpa
+  namespace: ivf
+  labels:
+    app.kubernetes.io/name: ivf-api
+    app.kubernetes.io/part-of: ivf-system
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: ivf-api
+  minReplicas: 4
+  maxReplicas: 20
+  metrics:
+    # CPU-based scaling
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+
+    # Memory-based scaling
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+
+    # Custom metrics (requests per second)
+    - type: Pods
+      pods:
+        metric:
+          name: http_requests_per_second
+        target:
+          type: AverageValue
+          averageValue: "1000"
+
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+        - type: Pods
+          value: 4
+          periodSeconds: 60
+        - type: Percent
+          value: 100
+          periodSeconds: 60
+      selectPolicy: Max
+
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Pods
+          value: 2
+          periodSeconds: 120
+        - type: Percent
+          value: 25
+          periodSeconds: 120
+      selectPolicy: Min
+
+---
+# ═══════════════════════════════════════════════════════════════════════════════
+# Pod Disruption Budget (PDB)
+# ═══════════════════════════════════════════════════════════════════════════════
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: ivf-api-pdb
+  namespace: ivf
+  labels:
+    app.kubernetes.io/name: ivf-api
+    app.kubernetes.io/part-of: ivf-system
+spec:
+  # At least 75% of pods must remain available during voluntary disruptions
+  minAvailable: 75%
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ivf-api
+
+---
+# ═══════════════════════════════════════════════════════════════════════════════
+# Service (ClusterIP)
+# ═══════════════════════════════════════════════════════════════════════════════
+apiVersion: v1
+kind: Service
+metadata:
+  name: ivf-api
+  namespace: ivf
+  labels:
+    app.kubernetes.io/name: ivf-api
+    app.kubernetes.io/part-of: ivf-system
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8080"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  sessionAffinity: None
+  ports:
+    - port: 8080
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: ivf-api
+
+---
+# ═══════════════════════════════════════════════════════════════════════════════
+# ServiceAccount
+# ═══════════════════════════════════════════════════════════════════════════════
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ivf-api
+  namespace: ivf
+  labels:
+    app.kubernetes.io/name: ivf-api
+    app.kubernetes.io/part-of: ivf-system
+automountServiceAccountToken: false
+
+---
+# ═══════════════════════════════════════════════════════════════════════════════
+# Priority Class for High-Priority Workloads
+# ═══════════════════════════════════════════════════════════════════════════════
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: high-priority
+value: 1000000
+globalDefault: false
+description: "Priority class for IVF API critical workloads"
+
+---
+# ═══════════════════════════════════════════════════════════════════════════════
+# Vertical Pod Autoscaler (VPA) - Recommendations Only
+# ═══════════════════════════════════════════════════════════════════════════════
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: ivf-api-vpa
+  namespace: ivf
+  labels:
+    app.kubernetes.io/name: ivf-api
+    app.kubernetes.io/part-of: ivf-system
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: ivf-api
+  updatePolicy:
+    updateMode: "Off"  # Recommendation only, don't auto-update
+  resourcePolicy:
+    containerPolicies:
+      - containerName: api
+        minAllowed:
+          cpu: 250m
+          memory: 256Mi
+        maxAllowed:
+          cpu: "4"
+          memory: 4Gi
+        controlledResources: ["cpu", "memory"]
+        controlledValues: RequestsAndLimits

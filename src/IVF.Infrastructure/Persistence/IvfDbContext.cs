@@ -150,6 +150,10 @@ public class IvfDbContext : DbContext
     public DbSet<PermissionDelegation> PermissionDelegations => Set<PermissionDelegation>();
     public DbSet<NotificationPreference> NotificationPreferences => Set<NotificationPreference>();
 
+    // Application-Level WAF
+    public DbSet<WafRule> WafRules => Set<WafRule>();
+    public DbSet<WafEvent> WafEvents => Set<WafEvent>();
+
     // Compliance — Breach Notification & Training Tracking
     public DbSet<BreachNotification> BreachNotifications => Set<BreachNotification>();
     public DbSet<ComplianceTraining> ComplianceTrainings => Set<ComplianceTraining>();

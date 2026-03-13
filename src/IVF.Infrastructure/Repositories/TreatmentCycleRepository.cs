@@ -1,6 +1,7 @@
 using IVF.Application.Common.Interfaces;
 using IVF.Domain.Constants;
 using IVF.Domain.Entities;
+using IVF.Domain.Enums;
 using IVF.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -72,7 +73,7 @@ public class TreatmentCycleRepository : ITreatmentCycleRepository
         return cycles.ToDictionary(x => x.Method, x => x.Count);
     }
 
-    public async Task<Dictionary<IVF.Domain.Enums.CyclePhase, int>> GetPhaseCountsAsync(CancellationToken ct = default)
+    public async Task<Dictionary<CyclePhase, int>> GetPhaseCountsAsync(CancellationToken ct = default)
     {
         return await _context.TreatmentCycles
             .GroupBy(c => c.CurrentPhase)

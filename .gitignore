@@ -52,6 +52,11 @@ python-ml-service/experiments
 # .NET / Visual Studio
 bin/
 obj/
+**/bin/
+**/obj/
+# Catch Windows-style backslash paths (bin\Debug) created by dotnet on macOS
+*bin\*/
+*obj\*/
 .vs/
 !.vs/ProjectSettings.json
 !.vs/slnx.sqlite

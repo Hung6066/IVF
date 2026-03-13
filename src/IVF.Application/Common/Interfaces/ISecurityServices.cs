@@ -472,3 +472,97 @@ public record BreachedPasswordResult(
     bool IsBreached,
     int BreachCount // Number of times seen in breaches
 );
+
+// ─── Application-Level WAF ───
+
+/// <summary>
+/// Application-level WAF rule engine — database-driven, admin-configurable.
+/// Evaluates every HTTP request against active rules (cached).
+/// </summary>
+public interface IWafService
+{
+    /// <summary>
+    /// Evaluates a request against all active WAF rules.
+    /// Returns the first blocking match (by priority) or an allow result.
+    /// </summary>
+    Task<WafEvaluationResult> EvaluateRequestAsync(WafRequestContext context, CancellationToken ct = default);
+
+    /// <summary>
+    /// Loads active WAF rules from cache (Redis → memory → DB fallback).
+    /// </summary>
+    Task<List<WafRuleCacheEntry>> GetActiveRulesAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Invalidates the WAF rule cache (called after CRUD operations).
+    /// </summary>
+    Task InvalidateCacheAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Records a WAF event via fire-and-forget channel (non-blocking).
+    /// </summary>
+    void RecordEvent(WafEventData eventData);
+}
+
+public record WafRequestContext(
+    string ClientIp,
+    string? Country,
+    string RequestPath,
+    string RequestMethod,
+    string? QueryString,
+    string? UserAgent,
+    Dictionary<string, string>? Headers,
+    string? Body,
+    string? CorrelationId
+);
+
+public record WafEvaluationResult(
+    bool IsBlocked,
+    bool IsChallenge,
+    bool IsRateLimited,
+    bool IsLogged,
+    string? RuleName,
+    Guid? RuleId,
+    IVF.Domain.Enums.WafAction Action,
+    string? BlockMessage,
+    double ProcessingTimeMs
+);
+
+public record WafRuleCacheEntry(
+    Guid Id,
+    string Name,
+    int Priority,
+    IVF.Domain.Enums.WafRuleGroup RuleGroup,
+    IVF.Domain.Enums.WafAction Action,
+    IVF.Domain.Enums.WafMatchType MatchType,
+    bool NegateMatch,
+    List<string>? UriPathPatterns,
+    List<string>? QueryStringPatterns,
+    List<string>? HeaderPatterns,
+    List<string>? BodyPatterns,
+    List<string>? Methods,
+    List<string>? IpCidrList,
+    List<string>? CountryCodes,
+    List<string>? UserAgentPatterns,
+    int? RateLimitRequests,
+    int? RateLimitWindowSeconds,
+    string? BlockResponseMessage
+);
+
+public record WafEventData(
+    Guid? WafRuleId,
+    string RuleName,
+    IVF.Domain.Enums.WafRuleGroup RuleGroup,
+    IVF.Domain.Enums.WafAction Action,
+    string ClientIp,
+    string? Country,
+    string RequestPath,
+    string RequestMethod,
+    string? QueryString,
+    string? UserAgent,
+    string? MatchedPattern,
+    string? MatchedValue,
+    int? ResponseStatusCode,
+    string? Headers,
+    string? CorrelationId,
+    double ProcessingTimeMs
+);

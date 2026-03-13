@@ -410,6 +410,11 @@ try
     builder.Services.AddScoped<IVF.Application.Common.Interfaces.ISecurityNotificationService, IVF.Infrastructure.Services.SecurityNotificationService>();
     builder.Services.AddHostedService<IVF.Infrastructure.Services.DataRetentionService>();
 
+    // ─── Application-Level WAF ───
+    builder.Services.AddSingleton<IVF.Infrastructure.Services.WafEventChannel>();
+    builder.Services.AddScoped<IVF.Application.Common.Interfaces.IWafService, IVF.Infrastructure.Services.WafService>();
+    builder.Services.AddHostedService<IVF.Infrastructure.Services.WafEventWriter>();
+
     // ─── Vault Policy Authorization ───
     builder.Services.AddVaultPolicyAuthorization();
 
@@ -538,7 +543,7 @@ try
             var exception = context.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>()?.Error;
             var correlationId = context.Items["CorrelationId"]?.ToString() ?? context.TraceIdentifier;
 
-            if (exception is ValidationException validationException)
+            if (exception is FluentValidation.ValidationException validationException)
             {
                 Log.Warning(exception,
                     "Validation failed for {RequestMethod} {RequestPath} — {ErrorCount} errors [CorrelationId={CorrelationId}]",
@@ -692,6 +697,7 @@ try
     });
 
     // app.UseCors("AllowAngular"); // Moved to top
+    app.UseWaf(); // Application-Level WAF — first security gate (before rate limiter)
     app.UseRateLimiter(); // Rate Limiting BEFORE auth (protect from brute force — Google/AWS standard)
     app.UseSecurityEnforcement(); // IP whitelist & geo-blocking enforcement (before auth)
     app.UseVaultTokenAuth(); // Vault token authentication (X-Vault-Token header)
@@ -806,6 +812,7 @@ try
         await EncryptionConfigSeeder.SeedAsync(db);      // default encryption configs
         await VaultComplianceSeeder.SeedAsync(db, scope.ServiceProvider);        // vault compliance baseline data
         await EnterpriseSecuritySeeder.SeedAsync(db);    // default enterprise security config
+        await IVF.Infrastructure.Persistence.WafSeeder.SeedAsync(db);  // managed WAF rulesets (OWASP, Bot, Protocol)
         await TenantSeeder.SeedAsync(scope.ServiceProvider);  // default tenant + migrate existing data
 
         // Permission definitions must always be present

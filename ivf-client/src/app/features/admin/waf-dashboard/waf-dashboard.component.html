@@ -1,54 +1,315 @@
 <div class="waf-dashboard">
   <div class="page-header">
-    <h2>🛡️ Tường lửa ứng dụng Web (WAF)</h2>
-    <p class="subtitle">Cloudflare WAF — Bảo vệ edge layer</p>
+    <div>
+      <h2>WAF &mdash; Tường lửa ứng dụng</h2>
+      <p class="subtitle">Quản lý quy tắc bảo vệ, phân tích sự kiện, giám sát Cloudflare edge</p>
+    </div>
+    <button class="btn-action btn-primary" (click)="invalidateCache()">Làm mới cache</button>
   </div>
 
-  @if (loading()) {
-    <div class="loading-state">
-      <div class="spinner"></div>
-      <p>Đang tải trạng thái WAF...</p>
-    </div>
-  } @else if (error()) {
-    <div class="error-banner">
-      <span class="error-icon">⚠️</span>
-      <span>{{ error() }}</span>
-      <button class="btn-retry" (click)="loadStatus()">Thử lại</button>
-    </div>
-  } @else if (status(); as s) {
-    <!-- Tabs -->
-    <div class="tab-bar">
-      <button class="tab-btn" [class.active]="activeTab() === 'overview'" (click)="activeTab.set('overview')">
-        📊 Tổng quan
-      </button>
-      <button class="tab-btn" [class.active]="activeTab() === 'rules'" (click)="activeTab.set('rules')">
-        📋 Quy tắc ({{ s.totalRuleCount }})
-      </button>
-      <button class="tab-btn" [class.active]="activeTab() === 'events'" (click)="activeTab.set('events')">
-        📜 Sự kiện ({{ events().length }})
-      </button>
-    </div>
+  <!-- Tabs -->
+  <div class="tab-bar">
+    <button class="tab-btn" [class.active]="activeTab() === 'analytics'" (click)="switchTab('analytics')">
+      Phân tích
+    </button>
+    <button class="tab-btn" [class.active]="activeTab() === 'rules'" (click)="switchTab('rules')">
+      Quy tắc ({{ rules().length }})
+    </button>
+    <button class="tab-btn" [class.active]="activeTab() === 'events'" (click)="switchTab('events')">
+      Sự kiện
+    </button>
+    <button class="tab-btn" [class.active]="activeTab() === 'cloudflare'" (click)="switchTab('cloudflare')">
+      Cloudflare
+    </button>
+  </div>
 
-    <!-- Overview Tab -->
-    @if (activeTab() === 'overview') {
+  <!-- ════════════════════════════════════════════════════════ -->
+  <!-- ANALYTICS TAB -->
+  <!-- ════════════════════════════════════════════════════════ -->
+  @if (activeTab() === 'analytics') {
+    @if (analyticsLoading()) {
+      <div class="loading-state"><div class="spinner"></div><p>Đang tải phân tích...</p></div>
+    } @else if (analytics(); as a) {
+      <!-- Stats Cards -->
       <div class="stats-grid">
         <div class="stat-card stat-primary">
-          <div class="stat-icon">🛡️</div>
+          <div class="stat-value">{{ a.totalEvents }}</div>
+          <div class="stat-label">Tổng sự kiện (24h)</div>
+        </div>
+        <div class="stat-card stat-danger">
+          <div class="stat-value">{{ a.blockedCount }}</div>
+          <div class="stat-label">Đã chặn</div>
+        </div>
+        <div class="stat-card stat-warning">
+          <div class="stat-value">{{ a.challengedCount }}</div>
+          <div class="stat-label">Thách thức</div>
+        </div>
+        <div class="stat-card stat-info">
+          <div class="stat-value">{{ a.loggedCount }}</div>
+          <div class="stat-label">Ghi log</div>
+        </div>
+        <div class="stat-card stat-orange">
+          <div class="stat-value">{{ a.rateLimitedCount }}</div>
+          <div class="stat-label">Giới hạn</div>
+        </div>
+        <div class="stat-card stat-success">
+          <div class="stat-value">{{ a.blockRate }}%</div>
+          <div class="stat-label">Tỷ lệ chặn</div>
+        </div>
+      </div>
+
+      <!-- Rule summary -->
+      <div class="stats-grid stats-grid-3">
+        <div class="stat-card">
+          <div class="stat-value">{{ rules().length }}</div>
+          <div class="stat-label">Tổng quy tắc</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">{{ managedRulesCount }}</div>
+          <div class="stat-label">Managed</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">{{ enabledRulesCount }}</div>
+          <div class="stat-label">Đang bật</div>
+        </div>
+      </div>
+
+      <div class="two-col">
+        <!-- Top Blocked IPs -->
+        @if (a.topBlockedIps.length > 0) {
+          <div class="section">
+            <h3>Top IP bị chặn</h3>
+            <div class="list-table">
+              @for (item of a.topBlockedIps; track item.ip) {
+                <div class="list-row">
+                  <span class="mono">{{ item.ip }}</span>
+                  <span class="badge-danger count-badge">{{ item.count }}</span>
+                </div>
+              }
+            </div>
+          </div>
+        }
+
+        <!-- Top Triggered Rules -->
+        @if (a.topTriggeredRules.length > 0) {
+          <div class="section">
+            <h3>Top quy tắc kích hoạt</h3>
+            <div class="list-table">
+              @for (item of a.topTriggeredRules; track item.ruleName) {
+                <div class="list-row">
+                  <span>{{ item.ruleName }}</span>
+                  <span class="badge-info count-badge">{{ item.count }}</span>
+                </div>
+              }
+            </div>
+          </div>
+        }
+      </div>
+
+      <!-- Hourly Breakdown -->
+      @if (a.hourlyBreakdown.length > 0) {
+        <div class="section">
+          <h3>Phân bố theo giờ (24h)</h3>
+          <div class="hourly-chart">
+            @for (h of a.hourlyBreakdown; track h.hour) {
+              <div class="hour-bar-wrapper" [title]="formatTime(h.hour) + ': ' + h.count + ' sự kiện'">
+                <div class="hour-bar" [style.height.%]="a.totalEvents > 0 ? (h.count / a.totalEvents * 100) : 0"></div>
+                <div class="hour-label">{{ h.hour | date:'HH' }}</div>
+              </div>
+            }
+          </div>
+        </div>
+      }
+
+      <button class="btn-action btn-secondary" (click)="loadAnalytics()">Làm mới phân tích</button>
+    } @else {
+      <div class="empty-state">
+        <span class="empty-icon">📊</span>
+        <p>Chưa có dữ liệu phân tích</p>
+      </div>
+    }
+  }
+
+  <!-- ════════════════════════════════════════════════════════ -->
+  <!-- RULES TAB -->
+  <!-- ════════════════════════════════════════════════════════ -->
+  @if (activeTab() === 'rules') {
+    <div class="rules-toolbar">
+      <div class="toolbar-left">
+        <select [(ngModel)]="ruleGroupFilter" (ngModelChange)="loadRules()" class="filter-select">
+          <option value="">Tất cả nhóm</option>
+          @for (g of wafRuleGroups; track g.value) {
+            <option [value]="g.value">{{ g.icon }} {{ g.label }}</option>
+          }
+        </select>
+      </div>
+      <div class="toolbar-right">
+        <button class="btn-action btn-primary" (click)="openCreateForm()">Tạo quy tắc</button>
+      </div>
+    </div>
+
+    @if (rulesLoading()) {
+      <div class="loading-inline"><div class="spinner-sm"></div> Đang tải...</div>
+    } @else if (rules().length === 0) {
+      <div class="empty-state">
+        <span class="empty-icon">📋</span>
+        <p>Chưa có quy tắc WAF</p>
+      </div>
+    } @else {
+      <div class="rules-table">
+        @for (rule of rules(); track rule.id) {
+          <div class="rule-card" [class.disabled-rule]="!rule.isEnabled">
+            <div class="rule-header">
+              <div class="rule-title-row">
+                <span class="rule-priority">#{{ rule.priority }}</span>
+                <span class="rule-name">{{ rule.name }}</span>
+                @if (rule.isManaged) {
+                  <span class="managed-badge">Managed</span>
+                }
+              </div>
+              <div class="rule-actions">
+                <button
+                  class="btn-sm"
+                  [class.btn-toggle-on]="rule.isEnabled"
+                  [class.btn-toggle-off]="!rule.isEnabled"
+                  (click)="toggleRule(rule)"
+                  [title]="rule.isEnabled ? 'Tắt' : 'Bật'"
+                >
+                  {{ rule.isEnabled ? 'Bật' : 'Tắt' }}
+                </button>
+                @if (!rule.isManaged) {
+                  <button class="btn-sm btn-edit" (click)="openEditForm(rule)">Sửa</button>
+                  <button class="btn-sm btn-delete" (click)="deleteRule(rule)">Xóa</button>
+                }
+              </div>
+            </div>
+
+            <div class="rule-body">
+              @if (rule.description) {
+                <p class="rule-desc">{{ rule.description }}</p>
+              }
+              <div class="rule-meta">
+                <span class="meta-tag group-tag">{{ getGroupIcon(rule.ruleGroup) }} {{ getGroupLabel(rule.ruleGroup) }}</span>
+                <span class="meta-tag" [class]="'badge-' + getActionBadge(rule.action).color">{{ getActionBadge(rule.action).label }}</span>
+                <span class="meta-tag badge-secondary">{{ rule.matchType === 'Any' ? 'OR' : 'AND' }}</span>
+                @if (rule.negateMatch) {
+                  <span class="meta-tag badge-warning">Phủ định</span>
+                }
+                @if (rule.hitCount > 0) {
+                  <span class="meta-tag badge-secondary">{{ rule.hitCount }} lần</span>
+                }
+              </div>
+              @if (rule.expression) {
+                <code class="rule-expr">{{ rule.expression }}</code>
+              }
+            </div>
+          </div>
+        }
+      </div>
+    }
+  }
+
+  <!-- ════════════════════════════════════════════════════════ -->
+  <!-- EVENTS TAB -->
+  <!-- ════════════════════════════════════════════════════════ -->
+  @if (activeTab() === 'events') {
+    <div class="rules-toolbar">
+      <div class="toolbar-left">
+        <input
+          [(ngModel)]="eventsFilterIp"
+          placeholder="Lọc theo IP..."
+          class="filter-input"
+        />
+        <select [(ngModel)]="eventsFilterAction" class="filter-select">
+          <option value="">Tất cả hành động</option>
+          @for (a of wafActions; track a.value) {
+            <option [value]="a.value">{{ a.label }}</option>
+          }
+        </select>
+      </div>
+      <div class="toolbar-right">
+        <button class="btn-action btn-secondary" (click)="eventsPage.set(1); loadEvents()">Tìm kiếm</button>
+      </div>
+    </div>
+
+    @if (eventsLoading()) {
+      <div class="loading-inline"><div class="spinner-sm"></div> Đang tải...</div>
+    } @else if (events().length === 0) {
+      <div class="empty-state">
+        <span class="empty-icon">✨</span>
+        <p>Không có sự kiện WAF</p>
+      </div>
+    } @else {
+      <div class="events-table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Hành động</th>
+              <th>Quy tắc</th>
+              <th>Method</th>
+              <th>Đường dẫn</th>
+              <th>IP</th>
+              <th>Quốc gia</th>
+              <th>Thời gian xử lý</th>
+              <th>Thời điểm</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (ev of events(); track ev.id) {
+              <tr>
+                <td>
+                  <span class="meta-tag" [class]="'badge-' + getActionBadge(ev.action).color">
+                    {{ getActionBadge(ev.action).label }}
+                  </span>
+                </td>
+                <td class="cell-rule">{{ ev.ruleName }}</td>
+                <td><span class="method-tag">{{ ev.requestMethod }}</span></td>
+                <td class="cell-path" [title]="ev.requestPath">{{ ev.requestPath }}</td>
+                <td class="mono">{{ ev.clientIp }}</td>
+                <td>{{ ev.country || '—' }}</td>
+                <td class="mono">{{ ev.processingTimeMs | number:'1.1-1' }}ms</td>
+                <td class="cell-time">{{ formatTime(ev.createdAt) }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Pagination -->
+      <div class="pagination">
+        <button class="btn-sm" (click)="eventsPrevPage()" [disabled]="eventsPage() <= 1">Trước</button>
+        <span class="page-info">Trang {{ eventsPage() }} / {{ eventsTotalPages }} ({{ eventsTotalCount() }} sự kiện)</span>
+        <button class="btn-sm" (click)="eventsNextPage()" [disabled]="eventsPage() >= eventsTotalPages">Sau</button>
+      </div>
+    }
+  }
+
+  <!-- ════════════════════════════════════════════════════════ -->
+  <!-- CLOUDFLARE TAB -->
+  <!-- ════════════════════════════════════════════════════════ -->
+  @if (activeTab() === 'cloudflare') {
+    @if (cfLoading()) {
+      <div class="loading-state"><div class="spinner"></div><p>Đang tải Cloudflare WAF...</p></div>
+    } @else if (cfError()) {
+      <div class="error-banner">
+        <span>{{ cfError() }}</span>
+        <button class="btn-retry" (click)="loadCloudflare()">Thử lại</button>
+      </div>
+    } @else if (cfStatus(); as s) {
+      <div class="stats-grid">
+        <div class="stat-card stat-primary">
           <div class="stat-value">{{ s.totalRuleCount }}</div>
           <div class="stat-label">Tổng quy tắc</div>
         </div>
         <div class="stat-card stat-success">
-          <div class="stat-icon">✅</div>
           <div class="stat-value">{{ s.managedRules.length }}</div>
           <div class="stat-label">Managed Rulesets</div>
         </div>
         <div class="stat-card stat-warning">
-          <div class="stat-icon">⚡</div>
           <div class="stat-value">{{ s.customRules.length }}</div>
           <div class="stat-label">Custom Rules</div>
         </div>
         <div class="stat-card stat-info">
-          <div class="stat-icon">🚦</div>
           <div class="stat-value">{{ s.rateLimitRules.length }}</div>
           <div class="stat-label">Rate Limiting</div>
         </div>
@@ -63,150 +324,195 @@
           <span class="setting-label">TLS tối thiểu</span>
           <span class="setting-value badge-success">{{ s.minTlsVersion }}</span>
         </div>
-        <div class="setting-item">
-          <span class="setting-label">Trạng thái</span>
-          <span class="setting-value badge-success">Hoạt động</span>
-        </div>
       </div>
 
-      <!-- Recent Events Preview -->
-      @if (events().length > 0) {
+      <!-- Cloudflare Events -->
+      @if (cfEvents().length > 0) {
         <div class="section">
-          <h3>Sự kiện gần đây</h3>
-          <div class="events-preview">
-            @for (event of events().slice(0, 5); track event.timestamp) {
-              <div class="event-row">
-                <span class="event-badge" [class]="getActionBadgeClass(event.action)">{{ getActionLabel(event.action) }}</span>
-                <span class="event-method">{{ event.method }}</span>
-                <span class="event-path">{{ event.path }}</span>
-                <span class="event-ip">{{ event.clientIp }}</span>
-                <span class="event-country">{{ event.country }}</span>
-                <span class="event-time">{{ formatTime(event.timestamp) }}</span>
-              </div>
-            }
+          <h3>Sự kiện Cloudflare gần đây</h3>
+          <div class="events-table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Hành động</th>
+                  <th>Method</th>
+                  <th>Đường dẫn</th>
+                  <th>IP</th>
+                  <th>Quốc gia</th>
+                  <th>Nguồn</th>
+                  <th>Thời gian</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (event of cfEvents(); track event.timestamp + event.clientIp) {
+                  <tr>
+                    <td><span class="meta-tag" [class]="getCfActionBadgeClass(event.action)">{{ getCfActionLabel(event.action) }}</span></td>
+                    <td><span class="method-tag">{{ event.method }}</span></td>
+                    <td class="cell-path" [title]="event.path">{{ event.path }}</td>
+                    <td class="mono">{{ event.clientIp }}</td>
+                    <td>{{ event.country }}</td>
+                    <td>{{ event.source }}</td>
+                    <td class="cell-time">{{ formatTime(event.timestamp) }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
           </div>
         </div>
       }
+    } @else {
+      <div class="empty-state">
+        <span class="empty-icon">☁️</span>
+        <p>Nhấn tab để tải dữ liệu Cloudflare</p>
+      </div>
     }
+  }
 
-    <!-- Rules Tab -->
-    @if (activeTab() === 'rules') {
-      <!-- Managed Rulesets -->
-      @if (s.managedRules.length > 0) {
-        <div class="section">
-          <h3>🔒 Managed Rulesets</h3>
-          <p class="section-desc">Cloudflare Managed + OWASP Core Ruleset — phát hiện mối đe dọa tự động</p>
-          <div class="rules-table">
-            @for (rule of s.managedRules; track rule.id) {
-              <div class="rule-row">
-                <span class="rule-status" [class.enabled]="rule.enabled" [class.disabled]="!rule.enabled">
-                  {{ rule.enabled ? '✅' : '❌' }}
-                </span>
-                <div class="rule-info">
-                  <div class="rule-desc">{{ rule.description }}</div>
-                  <div class="rule-meta">
-                    <span class="rule-action" [class]="getActionBadgeClass(rule.action)">{{ getActionLabel(rule.action) }}</span>
-                  </div>
-                </div>
-              </div>
-            }
+  <!-- ════════════════════════════════════════════════════════ -->
+  <!-- CREATE / EDIT RULE MODAL -->
+  <!-- ════════════════════════════════════════════════════════ -->
+  @if (formVisible()) {
+    <div class="modal-backdrop" (click)="closeForm()">
+      <div class="modal-panel" (click)="$event.stopPropagation()">
+        <h3>{{ editingRule() ? 'Sửa quy tắc' : 'Tạo quy tắc mới' }}</h3>
+
+        <div class="form-grid">
+          <!-- Name -->
+          <div class="form-group full-width">
+            <label>Tên quy tắc <span class="required">*</span></label>
+            <input [(ngModel)]="formName" placeholder="VD: Block SQL Injection" class="form-input" />
+          </div>
+
+          <!-- Description -->
+          <div class="form-group full-width">
+            <label>Mô tả</label>
+            <input [(ngModel)]="formDescription" placeholder="Mô tả quy tắc..." class="form-input" />
+          </div>
+
+          <!-- Priority -->
+          <div class="form-group">
+            <label>Ưu tiên</label>
+            <input [(ngModel)]="formPriority" type="number" min="0" max="9999" class="form-input" />
+          </div>
+
+          <!-- Rule Group (only for create) -->
+          @if (!editingRule()) {
+            <div class="form-group">
+              <label>Nhóm</label>
+              <select [(ngModel)]="formRuleGroup" class="form-input">
+                @for (g of wafRuleGroups; track g.value) {
+                  <option [value]="g.value">{{ g.icon }} {{ g.label }}</option>
+                }
+              </select>
+            </div>
+          }
+
+          <!-- Action -->
+          <div class="form-group">
+            <label>Hành động</label>
+            <select [(ngModel)]="formAction" class="form-input">
+              @for (a of wafActions; track a.value) {
+                <option [value]="a.value">{{ a.icon }} {{ a.label }}</option>
+              }
+            </select>
+          </div>
+
+          <!-- Match Type -->
+          <div class="form-group">
+            <label>Điều kiện</label>
+            <select [(ngModel)]="formMatchType" class="form-input">
+              @for (m of wafMatchTypes; track m.value) {
+                <option [value]="m.value">{{ m.label }}</option>
+              }
+            </select>
+          </div>
+
+          <!-- Negate -->
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input type="checkbox" [(ngModel)]="formNegateMatch" />
+              Phủ định kết quả
+            </label>
+          </div>
+
+          <!-- Rate limit fields -->
+          @if (formAction() === 'RateLimit') {
+            <div class="form-group">
+              <label>Giới hạn (requests)</label>
+              <input [(ngModel)]="formRateLimitRequests" type="number" min="1" class="form-input" />
+            </div>
+            <div class="form-group">
+              <label>Cửa sổ (giây)</label>
+              <input [(ngModel)]="formRateLimitWindowSeconds" type="number" min="1" class="form-input" />
+            </div>
+          }
+
+          <!-- Block message -->
+          <div class="form-group full-width">
+            <label>Thông báo chặn</label>
+            <input [(ngModel)]="formBlockResponseMessage" placeholder="Request blocked by WAF" class="form-input" />
+          </div>
+
+          <!-- Expression -->
+          <div class="form-group full-width">
+            <label>Expression (hiển thị)</label>
+            <input [(ngModel)]="formExpression" placeholder="VD: (http.request.uri.query contains 'UNION SELECT')" class="form-input" />
+          </div>
+
+          <!-- Pattern fields -->
+          <div class="form-group full-width">
+            <label>URI Path Patterns (mỗi dòng 1 regex)</label>
+            <textarea [(ngModel)]="formUriPathPatterns" rows="3" class="form-input" placeholder="(?i)\.\./&#10;%2e%2e"></textarea>
+          </div>
+
+          <div class="form-group full-width">
+            <label>Query String Patterns</label>
+            <textarea [(ngModel)]="formQueryStringPatterns" rows="3" class="form-input" placeholder="(?i)union\s+select&#10;(?i)' or 1=1"></textarea>
+          </div>
+
+          <div class="form-group full-width">
+            <label>Body Patterns</label>
+            <textarea [(ngModel)]="formBodyPatterns" rows="3" class="form-input" placeholder="(?i)<script&#10;(?i)eval\("></textarea>
+          </div>
+
+          <div class="form-group full-width">
+            <label>User-Agent Patterns</label>
+            <textarea [(ngModel)]="formUserAgentPatterns" rows="2" class="form-input" placeholder="(?i)sqlmap&#10;(?i)nikto"></textarea>
+          </div>
+
+          <div class="form-group full-width">
+            <label>Header Patterns</label>
+            <textarea [(ngModel)]="formHeaderPatterns" rows="2" class="form-input" placeholder="(?i)content-type:\s*text/xml"></textarea>
+          </div>
+
+          <div class="form-group">
+            <label>HTTP Methods (phẩy cách)</label>
+            <input [(ngModel)]="formMethods" placeholder="TRACE, TRACK, CONNECT" class="form-input" />
+          </div>
+
+          <div class="form-group">
+            <label>Country Codes (phẩy cách)</label>
+            <input [(ngModel)]="formCountryCodes" placeholder="CN, RU, KP" class="form-input" />
+          </div>
+
+          <div class="form-group full-width">
+            <label>IP CIDR List (mỗi dòng 1 IP/CIDR)</label>
+            <textarea [(ngModel)]="formIpCidrList" rows="2" class="form-input" placeholder="192.168.1.0/24&#10;10.0.0.1"></textarea>
           </div>
         </div>
-      }
 
-      <!-- Custom Rules -->
-      @if (s.customRules.length > 0) {
-        <div class="section">
-          <h3>⚡ Custom Rules</h3>
-          <p class="section-desc">Quy tắc tùy chỉnh cho hệ thống IVF — chặn scanner, path traversal, bảo vệ login</p>
-          <div class="rules-table">
-            @for (rule of s.customRules; track rule.id) {
-              <div class="rule-row">
-                <span class="rule-status" [class.enabled]="rule.enabled" [class.disabled]="!rule.enabled">
-                  {{ rule.enabled ? '✅' : '❌' }}
-                </span>
-                <div class="rule-info">
-                  <div class="rule-desc">{{ rule.description }}</div>
-                  <div class="rule-meta">
-                    <span class="rule-action" [class]="getActionBadgeClass(rule.action)">{{ getActionLabel(rule.action) }}</span>
-                    <code class="rule-expr">{{ rule.expression }}</code>
-                  </div>
-                </div>
-              </div>
+        <!-- Buttons -->
+        <div class="form-actions">
+          <button class="btn-action btn-secondary" (click)="closeForm()">Hủy</button>
+          <button class="btn-action btn-primary" (click)="saveRule()" [disabled]="formSaving()">
+            @if (formSaving()) {
+              Đang lưu...
+            } @else {
+              {{ editingRule() ? 'Cập nhật' : 'Tạo' }}
             }
-          </div>
-        </div>
-      }
-
-      <!-- Rate Limiting -->
-      @if (s.rateLimitRules.length > 0) {
-        <div class="section">
-          <h3>🚦 Rate Limiting</h3>
-          <p class="section-desc">Giới hạn tốc độ tại edge — bảo vệ login, auth, API endpoints</p>
-          <div class="rules-table">
-            @for (rule of s.rateLimitRules; track rule.id) {
-              <div class="rule-row">
-                <span class="rule-status" [class.enabled]="rule.enabled" [class.disabled]="!rule.enabled">
-                  {{ rule.enabled ? '✅' : '❌' }}
-                </span>
-                <div class="rule-info">
-                  <div class="rule-desc">{{ rule.description }}</div>
-                  <div class="rule-meta">
-                    <span class="rule-action" [class]="getActionBadgeClass(rule.action)">{{ getActionLabel(rule.action) }}</span>
-                  </div>
-                </div>
-              </div>
-            }
-          </div>
-        </div>
-      }
-    }
-
-    <!-- Events Tab -->
-    @if (activeTab() === 'events') {
-      <div class="section">
-        <div class="section-header">
-          <h3>📜 Firewall Events (1 giờ gần nhất)</h3>
-          <button class="btn-refresh" (click)="loadEvents()" [disabled]="eventsLoading()">
-            🔄 Làm mới
           </button>
         </div>
-
-        @if (eventsLoading()) {
-          <div class="loading-inline">
-            <div class="spinner-sm"></div>
-            Đang tải...
-          </div>
-        } @else if (events().length === 0) {
-          <div class="empty-state">
-            <span class="empty-icon">✨</span>
-            <p>Không có sự kiện WAF trong 1 giờ qua — hệ thống an toàn!</p>
-          </div>
-        } @else {
-          <div class="events-table">
-            <div class="events-header">
-              <span>Hành động</span>
-              <span>Phương thức</span>
-              <span>Đường dẫn</span>
-              <span>IP</span>
-              <span>Quốc gia</span>
-              <span>Nguồn</span>
-              <span>Thời gian</span>
-            </div>
-            @for (event of events(); track event.timestamp + event.clientIp) {
-              <div class="event-detail-row">
-                <span class="event-badge" [class]="getActionBadgeClass(event.action)">{{ getActionLabel(event.action) }}</span>
-                <span class="event-method">{{ event.method }}</span>
-                <span class="event-path" [title]="event.path">{{ event.path }}</span>
-                <span class="event-ip">{{ event.clientIp }}</span>
-                <span class="event-country">{{ event.country }}</span>
-                <span class="event-source">{{ event.source }}</span>
-                <span class="event-time">{{ formatTime(event.timestamp) }}</span>
-              </div>
-            }
-          </div>
-        }
       </div>
-    }
+    </div>
   }
 </div>
