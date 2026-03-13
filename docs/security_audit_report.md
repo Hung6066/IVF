@@ -25,29 +25,29 @@
 
 ### Security Maturity Score: **95/100** — "Enterprise+" tier ✅ (trước đây: 72 → 91 → 93 → 94 → 95)
 
-| Lĩnh vực                         | Điểm       | Trước  | Đánh giá                                |
-| -------------------------------- | ---------- | ------ | --------------------------------------- |
-| API Security (Application Layer) | **93/100** | 88     | 🟢 Enterprise-grade (rate limiter fixed, request body limits) |
-| Authentication & Authorization   | **95/100** | 85     | 🟢 Enterprise (SHA-256 refresh tokens, MFA Redis, httpOnly cookie, device fingerprint) |
-| Security Headers & CSP           | **96/100** | 92     | 🟢 OWASP A+ (Caddy + API aligned, Trusted Types) |
-| MediatR Pipeline (Zero Trust)    | **95/100** | 95     | 🟢 Google BeyondCorp level              |
-| Docker & Container Security      | **82/100** | 58     | 🟢 Hardened (socket proxy, encrypted overlays, Redis auth) |
-| Network & Firewall               | **92/100** | 70     | 🟢 Strong (overlay encryption, Cloudflare WAF, Linkerd mTLS ready) |
-| Secret Management                | **85/100** | 65     | 🟢 Strong (monitoring passwords externalized, Docker secrets) |
-| PKI & Certificate Mgmt           | **82/100** | 82     | 🟢 Strong                               |
-| Monitoring & Logging             | **88/100** | 78     | 🟢 Strong (OpenTelemetry, SIEM rules, Prometheus + Grafana) |
-| Frontend Security                | **90/100** | 75     | 🟢 Strong (SHA-256 fingerprint, httpOnly cookie, improved headers) |
-| Remote Access (VPN/SSH)          | **85/100** | 72     | 🟢 Strong (SSH 2FA activated, admin user deployed, root disabled) |
-| Compliance (HIPAA/GDPR)          | **86/100** | 70     | 🟢 Strong (httpOnly cookie, encrypted data, defense in depth) |
+| Lĩnh vực                         | Điểm       | Trước | Đánh giá                                                                               |
+| -------------------------------- | ---------- | ----- | -------------------------------------------------------------------------------------- |
+| API Security (Application Layer) | **93/100** | 88    | 🟢 Enterprise-grade (rate limiter fixed, request body limits)                          |
+| Authentication & Authorization   | **95/100** | 85    | 🟢 Enterprise (SHA-256 refresh tokens, MFA Redis, httpOnly cookie, device fingerprint) |
+| Security Headers & CSP           | **96/100** | 92    | 🟢 OWASP A+ (Caddy + API aligned, Trusted Types)                                       |
+| MediatR Pipeline (Zero Trust)    | **95/100** | 95    | 🟢 Google BeyondCorp level                                                             |
+| Docker & Container Security      | **82/100** | 58    | 🟢 Hardened (socket proxy, encrypted overlays, Redis auth)                             |
+| Network & Firewall               | **92/100** | 70    | 🟢 Strong (overlay encryption, Cloudflare WAF, Linkerd mTLS ready)                     |
+| Secret Management                | **85/100** | 65    | 🟢 Strong (monitoring passwords externalized, Docker secrets)                          |
+| PKI & Certificate Mgmt           | **82/100** | 82    | 🟢 Strong                                                                              |
+| Monitoring & Logging             | **88/100** | 78    | 🟢 Strong (OpenTelemetry, SIEM rules, Prometheus + Grafana)                            |
+| Frontend Security                | **90/100** | 75    | 🟢 Strong (SHA-256 fingerprint, httpOnly cookie, improved headers)                     |
+| Remote Access (VPN/SSH)          | **85/100** | 72    | 🟢 Strong (SSH 2FA activated, admin user deployed, root disabled)                      |
+| Compliance (HIPAA/GDPR)          | **86/100** | 70    | 🟢 Strong (httpOnly cookie, encrypted data, defense in depth)                          |
 
 ### Phân bổ lỗ hổng (sau remediation)
 
-| Mức độ      | Trước | Sau | Mô tả                              |
-| ----------- | ----- | --- | ---------------------------------- |
+| Mức độ      | Trước | Sau | Mô tả                               |
+| ----------- | ----- | --- | ----------------------------------- |
 | 🔴 Critical | 4     | 0   | ✅ Đã fix hết                       |
 | 🟠 High     | 12    | 0   | ✅ Đã fix hết (SSH 2FA, monitoring) |
-| 🟡 Medium   | 16    | 1   | ⬇️ Còn: HSM                            |
-| 🟢 Low      | 8     | 6   | Cải thiện khi có thời gian         |
+| 🟡 Medium   | 16    | 1   | ⬇️ Còn: HSM                         |
+| 🟢 Low      | 8     | 6   | Cải thiện khi có thời gian          |
 
 ---
 
@@ -72,44 +72,44 @@
 
 #### 2.1 Zero Trust Architecture
 
-| Capability                   | Google BeyondCorp                | IVF System                            | Gap                                 |
-| ---------------------------- | -------------------------------- | ------------------------------------- | ----------------------------------- |
-| Identity-based access        | ✅ Context-aware proxy           | ✅ JWT + MFA + Device fingerprint     | Tương đương                         |
-| Device trust scoring         | ✅ Device certificates + context | ✅ SHA-256 device fingerprint + session | Improved — thiếu cert-based trust |
-| Per-request authorization    | ✅ Access Proxy                  | ✅ ZeroTrustBehavior pipeline         | Tương đương                         |
-| Continuous auth verification | ✅ Session re-evaluation         | ✅ Token binding + session validation | Tương đương                         |
-| Network is untrusted         | ✅ No VPN needed                 | ⚠️ Still relies on VPN for admin      | **Gap** — BeyondCorp eliminates VPN |
-| Micro-segmentation           | ✅ Per-service policies          | ✅ K8s NetworkPolicies + Linkerd mTLS (ready) | Tương đương (K8s migration ready) |
+| Capability                   | Google BeyondCorp                | IVF System                                    | Gap                                 |
+| ---------------------------- | -------------------------------- | --------------------------------------------- | ----------------------------------- |
+| Identity-based access        | ✅ Context-aware proxy           | ✅ JWT + MFA + Device fingerprint             | Tương đương                         |
+| Device trust scoring         | ✅ Device certificates + context | ✅ SHA-256 device fingerprint + session       | Improved — thiếu cert-based trust   |
+| Per-request authorization    | ✅ Access Proxy                  | ✅ ZeroTrustBehavior pipeline                 | Tương đương                         |
+| Continuous auth verification | ✅ Session re-evaluation         | ✅ Token binding + session validation         | Tương đương                         |
+| Network is untrusted         | ✅ No VPN needed                 | ⚠️ Still relies on VPN for admin              | **Gap** — BeyondCorp eliminates VPN |
+| Micro-segmentation           | ✅ Per-service policies          | ✅ K8s NetworkPolicies + Linkerd mTLS (ready) | Tương đương (K8s migration ready)   |
 
 **Điểm:** IVF đạt ~90% Zero Trust maturity. MediatR pipeline (6 behaviors) + SHA-256 device fingerprint + overlay encryption + Linkerd mTLS (K8s manifests ready) là điểm sáng.
 
 #### 2.2 Authentication Stack
 
-| Capability       | AWS IAM / Microsoft Entra     | IVF System                               | Gap                          |
-| ---------------- | ----------------------------- | ---------------------------------------- | ---------------------------- |
-| MFA              | ✅ TOTP/FIDO2/SMS             | ✅ TOTP + Passkey (WebAuthn)             | Tương đương                  |
-| SSO/Federation   | ✅ SAML/OIDC                  | ✅ OIDC federation (Google, Microsoft Entra ID) | Tương đương               |
-| Passwordless     | ✅ FIDO2/Windows Hello        | ✅ Passkey support                       | Tương đương                  |
-| Token management | ✅ STS/Managed Identity       | ✅ JWT RS256 3072-bit + refresh families | Tương đương                  |
-| API key security | ✅ IAM access keys + rotation | ✅ BCrypt hashed + constant-time compare | Tương đương                  |
-| Session binding  | ✅ IP/Device binding          | ✅ Token binding middleware              | Tương đương                  |
-| Vault/KMS        | ✅ AWS KMS / Azure Key Vault  | ✅ Custom vault (AES-256-GCM + KEK)      | Functional parity, ít mature |
+| Capability       | AWS IAM / Microsoft Entra     | IVF System                                      | Gap                          |
+| ---------------- | ----------------------------- | ----------------------------------------------- | ---------------------------- |
+| MFA              | ✅ TOTP/FIDO2/SMS             | ✅ TOTP + Passkey (WebAuthn)                    | Tương đương                  |
+| SSO/Federation   | ✅ SAML/OIDC                  | ✅ OIDC federation (Google, Microsoft Entra ID) | Tương đương                  |
+| Passwordless     | ✅ FIDO2/Windows Hello        | ✅ Passkey support                              | Tương đương                  |
+| Token management | ✅ STS/Managed Identity       | ✅ JWT RS256 3072-bit + refresh families        | Tương đương                  |
+| API key security | ✅ IAM access keys + rotation | ✅ BCrypt hashed + constant-time compare        | Tương đương                  |
+| Session binding  | ✅ IP/Device binding          | ✅ Token binding middleware                     | Tương đương                  |
+| Vault/KMS        | ✅ AWS KMS / Azure Key Vault  | ✅ Custom vault (AES-256-GCM + KEK)             | Functional parity, ít mature |
 
 **Điểm:** Auth stack rất mạnh. JWT RS256 3072-bit + refresh token families + BCrypt API keys + passkey support + SSO/OIDC federation — ngang tầm enterprise.
 
 #### 2.3 Infrastructure Security
 
-| Capability              | AWS/Azure/GCP                      | IVF System                        | Gap                                               |
-| ----------------------- | ---------------------------------- | --------------------------------- | ------------------------------------------------- |
-| Container orchestration | ✅ EKS/AKS/GKE + PodSecurityPolicy | ⚠️ Docker Swarm (no pod security) | **Gap lớn**                                       |
-| Secret management       | ✅ AWS Secrets Manager / Azure KV  | ✅ Docker Secrets + custom vault   | Tương đương (monitoring externalized)             |
-| Image scanning          | ✅ ECR scanning / Trivy            | ❌ Chưa có                        | **Gap**                                           |
-| Network encryption      | ✅ VPC encryption, mTLS mesh       | ✅ Overlay encrypted + Linkerd mTLS | Tương đương (K8s + Linkerd ready)                 |
-| WAF                     | ✅ AWS WAF / Cloudflare WAF        | ✅ Cloudflare WAF (Managed + OWASP + custom) | Tương đương                              |
-| DDoS protection         | ✅ AWS Shield / CF Spectrum        | ✅ Cloudflare DDoS + edge rate limiting | Tương đương                                  |
-| IDS/IPS                 | ✅ GuardDuty / Sentinel            | ❌ Chưa có                        | **Gap**                                           |
-| Audit trail             | ✅ CloudTrail / Azure Monitor      | ✅ Application-level audit log    | Chấp nhận được                                    |
-| Compliance automation   | ✅ AWS Config / Azure Policy       | ❌ Manual only                    | **Gap**                                           |
+| Capability              | AWS/Azure/GCP                      | IVF System                                   | Gap                                   |
+| ----------------------- | ---------------------------------- | -------------------------------------------- | ------------------------------------- |
+| Container orchestration | ✅ EKS/AKS/GKE + PodSecurityPolicy | ⚠️ Docker Swarm (no pod security)            | **Gap lớn**                           |
+| Secret management       | ✅ AWS Secrets Manager / Azure KV  | ✅ Docker Secrets + custom vault             | Tương đương (monitoring externalized) |
+| Image scanning          | ✅ ECR scanning / Trivy            | ❌ Chưa có                                   | **Gap**                               |
+| Network encryption      | ✅ VPC encryption, mTLS mesh       | ✅ Overlay encrypted + Linkerd mTLS          | Tương đương (K8s + Linkerd ready)     |
+| WAF                     | ✅ AWS WAF / Cloudflare WAF        | ✅ Cloudflare WAF (Managed + OWASP + custom) | Tương đương                           |
+| DDoS protection         | ✅ AWS Shield / CF Spectrum        | ✅ Cloudflare DDoS + edge rate limiting      | Tương đương                           |
+| IDS/IPS                 | ✅ GuardDuty / Sentinel            | ❌ Chưa có                                   | **Gap**                               |
+| Audit trail             | ✅ CloudTrail / Azure Monitor      | ✅ Application-level audit log               | Chấp nhận được                        |
+| Compliance automation   | ✅ AWS Config / Azure Policy       | ❌ Manual only                               | **Gap**                               |
 
 **Điểm:** Đã thu hẹp đáng kể. Cloudflare WAF + Linkerd mTLS manifests bổ sung edge + inter-service protection. Gap còn lại: HSM, IDS/IPS.
 
@@ -127,14 +127,14 @@
 
 #### 2.5 Monitoring & Response
 
-| Capability                 | Enterprise SOC                     | IVF System                        | Gap                      |
-| -------------------------- | ---------------------------------- | --------------------------------- | ------------------------ |
-| Centralized logging        | ✅ SIEM (Splunk/Sentinel)          | ✅ Loki + Promtail                | Tương đương về chức năng |
-| Metrics & alerting         | ✅ Datadog/CloudWatch              | ✅ Prometheus + Grafana + Discord | Tương đương              |
-| Distributed tracing        | ✅ Jaeger/X-Ray                    | ✅ OpenTelemetry + Correlation ID  | Tương đương              |
-| Incident response          | ✅ PagerDuty/Opsgenie              | ⚠️ Discord alerts only            | **Gap**                  |
-| Log retention policy       | ✅ Compliant retention (7yr HIPAA) | ⚠️ Loki default retention         | **Gap**                  |
-| Security event correlation | ✅ SIEM rules                      | ✅ Loki SIEM rules (15 alert rules) | Tương đương           |
+| Capability                 | Enterprise SOC                     | IVF System                          | Gap                      |
+| -------------------------- | ---------------------------------- | ----------------------------------- | ------------------------ |
+| Centralized logging        | ✅ SIEM (Splunk/Sentinel)          | ✅ Loki + Promtail                  | Tương đương về chức năng |
+| Metrics & alerting         | ✅ Datadog/CloudWatch              | ✅ Prometheus + Grafana + Discord   | Tương đương              |
+| Distributed tracing        | ✅ Jaeger/X-Ray                    | ✅ OpenTelemetry + Correlation ID   | Tương đương              |
+| Incident response          | ✅ PagerDuty/Opsgenie              | ⚠️ Discord alerts only              | **Gap**                  |
+| Log retention policy       | ✅ Compliant retention (7yr HIPAA) | ⚠️ Loki default retention           | **Gap**                  |
+| Security event correlation | ✅ SIEM rules                      | ✅ Loki SIEM rules (15 alert rules) | Tương đương              |
 
 ### Tổng kết so sánh
 
@@ -233,7 +233,7 @@ Request → ValidationBehavior → FeatureGateBehavior → VaultPolicyBehavior
 | I4  | 🟠 High     | EJBCA/SignServer admin ports trên all interfaces               | docker-compose.stack.yml                   |
 | I5  | 🟠 High     | PostgreSQL port 5433 trên all interfaces                       | docker-compose.stack.yml                   |
 | I6  | 🟠 High     | EJBCA/SignServer trên `ivf-public` network                     | docker-compose.stack.yml                   |
-| I7  | ~~🟠 High~~     | ~~Monitoring password plaintext trong 3+ files committed~~     | ✅ Fixed — externalized to .env.monitoring |
+| I7  | ~~🟠 High~~ | ~~Monitoring password plaintext trong 3+ files committed~~     | ✅ Fixed — externalized to .env.monitoring |
 | I8  | 🟠 High     | Redis không có password trong stack file                       | docker-compose.stack.yml                   |
 | I9  | 🟠 High     | Overlay networks KHÔNG encrypted                               | docker-compose.stack.yml                   |
 | I10 | 🟡 Medium   | Containers chạy root (không có `user:` directive)              | Tất cả compose files                       |
@@ -261,13 +261,13 @@ Request → ValidationBehavior → FeatureGateBehavior → VaultPolicyBehavior
 
 ### 5.2 Lỗ hổng
 
-| #   | Mức độ    | Vấn đề                                        | Chi tiết                                                                      |
-| --- | --------- | --------------------------------------------- | ----------------------------------------------------------------------------- |
-| F1  | ~~🟡 Medium~~ | ~~JWT trong localStorage~~                    | ✅ Fixed — httpOnly cookie `__Host-ivf-token` + Bearer dual-mode                  |
-| F2  | ~~🟡 Medium~~ | ~~Weak device fingerprint hash (32-bit)~~     | ✅ Fixed — SHA-256 via Web Crypto API                                             |
-| F3  | 🟡 Medium | `isAuthenticated()` chỉ check token existence | Không validate expiry client-side                                             |
-| F4  | 🟢 Low    | `alert()` cho error messages                  | Nên dùng toast service                                                        |
-| F5  | 🟢 Low    | Fingerprint cache trong sessionStorage        | Regenerate mỗi tab — inconsistent                                             |
+| #   | Mức độ        | Vấn đề                                        | Chi tiết                                                         |
+| --- | ------------- | --------------------------------------------- | ---------------------------------------------------------------- |
+| F1  | ~~🟡 Medium~~ | ~~JWT trong localStorage~~                    | ✅ Fixed — httpOnly cookie `__Host-ivf-token` + Bearer dual-mode |
+| F2  | ~~🟡 Medium~~ | ~~Weak device fingerprint hash (32-bit)~~     | ✅ Fixed — SHA-256 via Web Crypto API                            |
+| F3  | 🟡 Medium     | `isAuthenticated()` chỉ check token existence | Không validate expiry client-side                                |
+| F4  | 🟢 Low        | `alert()` cho error messages                  | Nên dùng toast service                                           |
+| F5  | 🟢 Low        | Fingerprint cache trong sessionStorage        | Regenerate mỗi tab — inconsistent                                |
 
 ---
 
@@ -288,17 +288,17 @@ Request → ValidationBehavior → FeatureGateBehavior → VaultPolicyBehavior
 
 ### 6.2 Lỗ hổng
 
-| #   | Mức độ      | Vấn đề                                         | Chi tiết                                                    |
-| --- | ----------- | ---------------------------------------------- | ----------------------------------------------------------- |
-| N1  | 🔴 Critical | TOTP secret + emergency codes committed to git | secure_remote_admin.md — cần regenerate + scrub git history |
-| N2  | ~~🟠 High~~     | ~~SSH 2FA chưa activated~~                         | ✅ Fixed — `systemctl reload ssh` đã thực hiện    |
-| N3  | ~~🟠 High~~     | ~~Root SSH vẫn active~~                            | ✅ Fixed — Admin user deployed, root login disabled |
-| N4  | ✅ Resolved  | Cloudflare WAF deployed (Managed + OWASP + custom + rate limiting) | deploy-cloudflare-waf.sh + CloudflareWafService + WafEndpoints    |
-| N5  | 🟡 Medium   | CA key password là `changeit`                  | Nên rotate sang strong passphrase                           |
-| N6  | 🟡 Medium   | EJBCA Public Access Role chưa remove           | Cần chạy `secure-ejbca-access.sh`                           |
-| N7  | 🟡 Medium   | WireGuard port open to entire internet         | Nên restrict source IPs nếu static                          |
-| N8  | 🟢 Low      | Không có explicit TLS min version trong Caddy  | Caddy default TLS 1.2+, nhưng nên explicit                  |
-| N9  | 🟢 Low      | Single VPN subnet, no role segmentation        | Chia subnet theo role khi team grows                        |
+| #   | Mức độ      | Vấn đề                                                             | Chi tiết                                                       |
+| --- | ----------- | ------------------------------------------------------------------ | -------------------------------------------------------------- |
+| N1  | 🔴 Critical | TOTP secret + emergency codes committed to git                     | secure_remote_admin.md — cần regenerate + scrub git history    |
+| N2  | ~~🟠 High~~ | ~~SSH 2FA chưa activated~~                                         | ✅ Fixed — `systemctl reload ssh` đã thực hiện                 |
+| N3  | ~~🟠 High~~ | ~~Root SSH vẫn active~~                                            | ✅ Fixed — Admin user deployed, root login disabled            |
+| N4  | ✅ Resolved | Cloudflare WAF deployed (Managed + OWASP + custom + rate limiting) | deploy-cloudflare-waf.sh + CloudflareWafService + WafEndpoints |
+| N5  | 🟡 Medium   | CA key password là `changeit`                                      | Nên rotate sang strong passphrase                              |
+| N6  | 🟡 Medium   | EJBCA Public Access Role chưa remove                               | Cần chạy `secure-ejbca-access.sh`                              |
+| N7  | 🟡 Medium   | WireGuard port open to entire internet                             | Nên restrict source IPs nếu static                             |
+| N8  | 🟢 Low      | Không có explicit TLS min version trong Caddy                      | Caddy default TLS 1.2+, nhưng nên explicit                     |
+| N9  | 🟢 Low      | Single VPN subnet, no role segmentation                            | Chia subnet theo role khi team grows                           |
 
 ---
 
@@ -315,41 +315,41 @@ Request → ValidationBehavior → FeatureGateBehavior → VaultPolicyBehavior
 
 ### 🟠 High — Fix trong 1-2 tuần (12 issues → ALL FIXED ✅)
 
-| #   | Vấn đề                                      | Remediation                                         |
-| --- | ------------------------------------------- | --------------------------------------------------- |
-| 5   | ~~Docker socket mount~~                      | ✅ Docker socket proxy (tecnativa/docker-socket-proxy) |
-| 6   | Admin ports (8443/9443) trên all interfaces | UFW đã chặn, nhưng nên bind `127.0.0.1`             |
-| 7   | PostgreSQL port 5433 all interfaces         | Bind `127.0.0.1` hoặc remove host port              |
-| 8   | ~~EJBCA/SignServer trên `ivf-public` network~~  | ✅ Chỉ để trên `ivf-signing` + `ivf-data`       |
-| 9   | ~~Monitoring password plaintext in git~~     | ✅ Externalized → .env.monitoring                   |
-| 10  | ~~Redis không password (stack file)~~        | ✅ `--requirepass` với Docker secret                |
-| 11  | ~~Overlay networks unencrypted~~             | ✅ `driver_opts: encrypted: "true"`                 |
-| 12  | ~~SSH 2FA chưa activated~~                   | ✅ `systemctl reload ssh` đã thực hiện              |
-| 13  | ~~Root SSH vẫn active~~                      | ✅ Admin user deployed, root login disabled         |
-| 14  | ~~Rate limiter dùng `Host` header fallback~~ | ✅ Dùng client IP                                  |
-| 15  | ~~Geo-blocking trust client header~~         | ✅ Server-side GeoIP (chỉ trust CF-IPCountry)      |
-| 16  | No custom `pg_hba.conf`                     | SSL enforcement + client cert auth                  |
+| #   | Vấn đề                                         | Remediation                                            |
+| --- | ---------------------------------------------- | ------------------------------------------------------ |
+| 5   | ~~Docker socket mount~~                        | ✅ Docker socket proxy (tecnativa/docker-socket-proxy) |
+| 6   | Admin ports (8443/9443) trên all interfaces    | UFW đã chặn, nhưng nên bind `127.0.0.1`                |
+| 7   | PostgreSQL port 5433 all interfaces            | Bind `127.0.0.1` hoặc remove host port                 |
+| 8   | ~~EJBCA/SignServer trên `ivf-public` network~~ | ✅ Chỉ để trên `ivf-signing` + `ivf-data`              |
+| 9   | ~~Monitoring password plaintext in git~~       | ✅ Externalized → .env.monitoring                      |
+| 10  | ~~Redis không password (stack file)~~          | ✅ `--requirepass` với Docker secret                   |
+| 11  | ~~Overlay networks unencrypted~~               | ✅ `driver_opts: encrypted: "true"`                    |
+| 12  | ~~SSH 2FA chưa activated~~                     | ✅ `systemctl reload ssh` đã thực hiện                 |
+| 13  | ~~Root SSH vẫn active~~                        | ✅ Admin user deployed, root login disabled            |
+| 14  | ~~Rate limiter dùng `Host` header fallback~~   | ✅ Dùng client IP                                      |
+| 15  | ~~Geo-blocking trust client header~~           | ✅ Server-side GeoIP (chỉ trust CF-IPCountry)          |
+| 16  | No custom `pg_hba.conf`                        | SSL enforcement + client cert auth                     |
 
 ### 🟡 Medium — Fix trong 1 tháng (16 issues → 3 remaining)
 
-| #   | Vấn đề                                                   |
-| --- | -------------------------------------------------------- |
+| #   | Vấn đề                                                                     |
+| --- | -------------------------------------------------------------------------- |
 | 17  | ~~JWT trong localStorage~~ ✅ httpOnly cookie `__Host-ivf-token` dual-mode |
-| 18  | ~~Weak device fingerprint hash~~ ✅ SHA-256 (Web Crypto API) |
-| 19  | Containers chạy root (Docker Swarm: no-new-privileges via daemon.json) |
-| 20  | ~~Không rate limiting ở Caddy~~ ✅ Request body limits 10MB |
-| 21  | ~~Swagger trong production~~ ✅ Gated (IsDevelopment())  |
-| 22  | ~~DB connections không SSL~~ ✅ SSL Mode=Prefer           |
-| 23  | ~~Invalid VaultToken/ApiKey fall through~~ ✅ Returns 401 |
-| 24  | ~~API key qua query parameter~~ ✅ Header only            |
-| 25  | ~~`_pendingMfa` in-memory~~ ✅ Redis (MfaPendingService) |
-| 26  | Loki auth disabled                                       |
-| 27  | Replication password hardcoded                           |
-| 28  | Token existence check only (no expiry check client-side) |
-| 29  | ~~Không có WAF/DDoS ở edge~~ → ✅ Cloudflare WAF deployed  |
-| 30  | CA key password `changeit`                               |
-| 31  | EJBCA Public Access Role                                 |
-| 32  | Monitoring basic auth password trong Caddyfile           |
+| 18  | ~~Weak device fingerprint hash~~ ✅ SHA-256 (Web Crypto API)               |
+| 19  | Containers chạy root (Docker Swarm: no-new-privileges via daemon.json)     |
+| 20  | ~~Không rate limiting ở Caddy~~ ✅ Request body limits 10MB                |
+| 21  | ~~Swagger trong production~~ ✅ Gated (IsDevelopment())                    |
+| 22  | ~~DB connections không SSL~~ ✅ SSL Mode=Prefer                            |
+| 23  | ~~Invalid VaultToken/ApiKey fall through~~ ✅ Returns 401                  |
+| 24  | ~~API key qua query parameter~~ ✅ Header only                             |
+| 25  | ~~`_pendingMfa` in-memory~~ ✅ Redis (MfaPendingService)                   |
+| 26  | Loki auth disabled                                                         |
+| 27  | Replication password hardcoded                                             |
+| 28  | Token existence check only (no expiry check client-side)                   |
+| 29  | ~~Không có WAF/DDoS ở edge~~ → ✅ Cloudflare WAF deployed                  |
+| 30  | CA key password `changeit`                                                 |
+| 31  | EJBCA Public Access Role                                                   |
+| 32  | Monitoring basic auth password trong Caddyfile                             |
 
 ### 🟢 Low (8 issues)
 
