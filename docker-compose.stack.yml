@@ -8,6 +8,7 @@
 
 services:
   # ─── PostgreSQL (IVF Main DB — Primary) ───
+  # Admin access: ssh -L 5433:127.0.0.1:5433 root@VPS → psql -h 127.0.0.1 -p 5433
   db:
     image: postgres:16-alpine
     command: >
@@ -24,6 +25,11 @@ services:
       - POSTGRES_PASSWORD_FILE=/run/secrets/ivf_db_password
     secrets:
       - ivf_db_password
+    ports:
+      - target: 5432
+        published: 5433
+        protocol: tcp
+        mode: host
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - postgres_archive:/var/lib/postgresql/archive
@@ -142,12 +148,18 @@ services:
           memory: 1G
 
   # ─── Redis ───
+  # Admin access: ssh -L 16379:127.0.0.1:6379 root@VPS → redis-cli -h 127.0.0.1 -p 16379
   redis:
     image: redis:alpine
     command: >
       redis-server
       --maxmemory 256mb
       --maxmemory-policy allkeys-lru
+    ports:
+      - target: 6379
+        published: 6379
+        protocol: tcp
+        mode: host
     networks:
       - ivf-data
       - ivf-monitoring
@@ -187,6 +199,8 @@ services:
           memory: 64M
 
   # ─── EJBCA (Certificate Authority) ───
+  # Admin UI: https://localhost:8443/ejbca/adminweb/
+  # Access: ssh -L 8443:localhost:8443 root@VPS → https://localhost:8443
   ejbca:
     image: keyfactor/ejbca-ce:latest
     hostname: ejbca.ivf.local
@@ -197,9 +211,15 @@ services:
       - TLS_SETUP_ENABLED=later
       - INITIAL_ADMIN=;CertificateAuthenticationToken:WITH_ISSUER_SERIAL;CN=ManagementCA,O=IVF Clinic;${EJBCA_ADMIN_CERT_SERIAL:-0};
     ports:
-      - "8443:8443"
+      - target: 8443
+        published: 8443
+        protocol: tcp
+        mode: host
+    # SECURITY: In production, use firewall (iptables/ufw) to block 8443 from WAN.
+    # Only accessible via SSH tunnel: ssh -L 8443:localhost:8443 root@VPS
     volumes:
       - ejbca_persistent:/opt/keyfactor/persistent
+      - ejbca_wildfly_cfg:/opt/keyfactor/appserver/standalone/configuration
     networks:
       - ivf-public
       - ivf-signing
@@ -234,6 +254,8 @@ services:
           - node.labels.role == primary
 
   # ─── SignServer (Document Signing) ───
+  # Admin UI: https://localhost:9443/signserver/adminweb/
+  # Access: ssh -L 9443:localhost:9443 root@VPS → https://localhost:9443
   signserver:
     image: keyfactor/signserver-ce:latest
     hostname: signserver.ivf.local
@@ -252,9 +274,15 @@ services:
       - softhsm_pin
       - softhsm_so_pin
     ports:
-      - "9443:8443"
+      - target: 8443
+        published: 9443
+        protocol: tcp
+        mode: host
+    # SECURITY: In production, use firewall (iptables/ufw) to block 9443 from WAN.
+    # Only accessible via SSH tunnel: ssh -L 9443:localhost:9443 root@VPS
     volumes:
       - signserver_persistent:/opt/keyfactor/persistent
+      - signserver_wildfly_cfg:/opt/keyfactor/wildfly-35.0.1.Final/standalone/configuration
       - softhsm_tokens:/opt/keyfactor/persistent/softhsm/tokens
     networks:
       - ivf-public
@@ -299,8 +327,12 @@ services:
     secrets:
       - minio_access_key
       - minio_secret_key
-    # Ports not published — access via internal Docker networking only
-    # Use SSH tunnel for admin: ssh -L 9001:localhost:9001 root@VPS
+    # Admin access: ssh -L 9001:127.0.0.1:9001 root@VPS → http://127.0.0.1:9001
+    ports:
+      - target: 9001
+        published: 9001
+        protocol: tcp
+        mode: host
     volumes:
       - minio_data:/data
     command: server /data --console-address ":9001"
@@ -386,7 +418,7 @@ services:
         published: 443
         mode: host
     configs:
-      - source: caddyfile_v10
+      - source: caddyfile_v11
         target: /etc/caddy/Caddyfile
     volumes:
       - caddy_data:/data
@@ -453,7 +485,7 @@ services:
 
 # ─── Docker Configs ───
 configs:
-  caddyfile_v10:
+  caddyfile_v11:
     file: ./Caddyfile
   standby_entrypoint:
     file: ./docker/postgres/standby-entrypoint.sh
@@ -485,8 +517,10 @@ volumes:
   postgres_archive:
   standby_data:
   ejbca_persistent:
+  ejbca_wildfly_cfg:
   ejbca_db_data:
   signserver_persistent:
+  signserver_wildfly_cfg:
   signserver_db_data:
   softhsm_tokens:
   minio_data:
