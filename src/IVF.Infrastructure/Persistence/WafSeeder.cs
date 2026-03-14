@@ -158,7 +158,7 @@ public static class WafSeeder
         logger?.LogInformation("Seeded {Count} new managed WAF rules", rules.Count);
     }
 
-    private static List<WafRule> BuildRules()
+    internal static List<WafRule> BuildRules()
     {
         var rules = new List<WafRule>();
 

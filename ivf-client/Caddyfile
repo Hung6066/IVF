@@ -5,11 +5,6 @@
 :80 {
 	root * /srv/frontend
 
-	# SPA fallback — all routes → index.html
-	try_files {path} /index.html
-
-	file_server
-
 	# Compression
 	encode gzip zstd
 
@@ -21,11 +16,18 @@
 		-Server
 	}
 
-	# Cache static assets
-	@static path *.js *.css *.png *.jpg *.jpeg *.gif *.svg *.ico *.woff *.woff2
-	header @static Cache-Control "public, max-age=31536000, immutable"
+	# Static assets — serve directly, 404 if missing (NO SPA fallback)
+	# Prevents returning index.html with text/html MIME for stale chunk requests
+	@static path *.js *.css *.png *.jpg *.jpeg *.gif *.svg *.ico *.woff *.woff2 *.map
+	handle @static {
+		header Cache-Control "public, max-age=31536000, immutable"
+		file_server
+	}
 
-	# No cache for index.html (always get latest)
-	@html path /index.html
-	header @html Cache-Control "no-cache, no-store, must-revalidate"
+	# Everything else — SPA fallback → index.html
+	handle {
+		try_files {path} /index.html
+		header Cache-Control "no-cache, no-store, must-revalidate"
+		file_server
+	}
 }

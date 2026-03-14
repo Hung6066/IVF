@@ -550,9 +550,133 @@ ssh root@45.134.226.56 "fail2ban-client set sshd addignoreip <IP>"
 
 ---
 
+## SSH Config Today (2026-03-14) — 2FA Now ACTIVE ✅
+
+> **Status: 2FA ACTIVATED** — SSH key + TOTP code both required for authentication.
+
+Error: `Permission denied (publickey)` when ssh fails can mean:
+1. Public key not on VPS's `authorized_keys` → fix with `ssh-copy-id`
+2. 2FA code not provided → SSH config missing `KbdInteractiveAuthentication yes`
+3. Wrong SSH key specified → verify which key is authorized on VPS
+
+### Quick Fix: Update SSH Config & Add 2FA Support
+
+Your SSH config was updated today to support 2FA:
+
+```
+Host 45.134.226.56
+  HostName 45.134.226.56
+  User root
+  IdentityFile ~/.ssh/id_rsa
+  IdentityFile ~/.ssh/id_ed25519_wsl
+  IdentitiesOnly yes
+  PubkeyAuthentication yes
+  KbdInteractiveAuthentication yes       ◄─ Enables 2FA prompt
+  KbdInteractiveDevices pam
+  StrictHostKeyChecking accept-new
+```
+
+### Test Connection with 2FA
+
+```powershell
+# This will prompt for 2FA code:
+ssh root@45.134.226.56
+
+# You'll see:
+# Verification code: [paste 6-digit code here]
+```
+
+If still getting "Permission denied (publickey)":
+
+**Step 1: Verify public key is authorized**
+```powershell
+ssh-copy-id -i ~/.ssh/id_rsa root@45.134.226.56
+# Prompts for password or 2FA code — add current key to authorized_keys
+```
+
+**Step 2: Check which key is authorized**
+```powershell
+ssh root@45.134.226.56 "grep -o 'ssh-rsa [^ ]*' ~/.ssh/authorized_keys | wc -l"
+# Should output: 1 (or more if multiple keys allowed)
+```
+
+**Step 3: Test with verbose output**
+```powershell
+ssh -v root@45.134.226.56 2>&1 | Select-String "Authentications|Offering|Received|code:"
+# Look for "Verification code:" prompt
+```
+
+### Docker Image Deployment with 2FA
+
+Since 2FA is now active, automated deployment scripts need modification:
+
+**Option A: Interactive Deployment (prompts for OTP)**
+
+```powershell
+# PowerShell script
+$DockerImage = "ghcr.io/hung6066/ivf:manual"
+$VpsHost = "root@45.134.226.56"
+
+# Build locally
+docker build -t $DockerImage -f src/IVF.API/Dockerfile . | Out-Null
+
+# Save & upload (will prompt for 2FA)
+docker save $DockerImage | gzip > ivf.tar.gz
+scp ivf.tar.gz $VpsHost`:/tmp/
+rm ivf.tar.gz
+
+# Deploy (will prompt for 2FA again)
+ssh $VpsHost @"
+  docker load -i /tmp/ivf.tar.gz && \
+  docker service update --image $DockerImage --update-order start-first --force ivf_api && \
+  rm /tmp/ivf.tar.gz
+"@
+```
+
+**Option B: Automated via SSH Batch (no 2FA interruption)**
+
+Create a separate deployment key *without 2FA* OR use SSH batch mode:
+
+```powershell
+# ssh.bat / deploy.ps1
+ssh -o BatchMode=yes -o ConnectTimeout=5 root@45.134.226.56 << 'EOF'
+docker load -i /tmp/ivf.tar.gz
+docker service update --image ghcr.io/hung6066/ivf:manual --update-order start-first --force ivf_api
+rm /tmp/ivf.tar.gz
+EOF
+```
+
+But `BatchMode=yes` will fail if 2FA is required. Better solution:
+
+**Recommended: Add separate deployment key to VPS**
+
+```bash
+# Step 1: Generate key for deployment (without 2FA)
+ssh-keygen -t ed25519 -f ~/.ssh/id_deploy -N "" -C "ivf-deployment"
+
+# Step 2: Add to authorized_keys but skip 2FA
+ssh root@45.134.226.56 "echo 'restrict,command=\"/usr/local/bin/deploy.sh\" $(cat ~/.ssh/id_deploy.pub)' >> ~/.ssh/authorized_keys"
+
+# Step 3: Create /usr/local/bin/deploy.sh on VPS
+ssh root@45.134.226.56 'cat > /usr/local/bin/deploy.sh << "SCRIPT"
+#!/bin/bash
+docker load -i /tmp/ivf.tar.gz
+docker service update --image ghcr.io/hung6066/ivf:manual --update-order start-first --force ivf_api
+rm /tmp/ivf.tar.gz
+SCRIPT
+chmod +x /usr/local/bin/deploy.sh
+'
+
+# Step 4: Use in automated script
+scp -i ~/.ssh/id_deploy ivf.tar.gz root@45.134.226.56:/tmp/
+ssh -i ~/.ssh/id_deploy root@45.134.226.56 # No 2FA needed
+```
+
+---
+
 ## Hardening — SSH 2FA (Google Authenticator)
 
-> **Trạng thái: ĐÃ CÀI ĐẶT, CHƯA ACTIVATE** (2026-03-13) — PAM configured, sshd NOT reloaded.
+> **Trạng thái: ĐÃ ACTIVATE** (2026-03-14) — PAM configured, sshd reloaded, 2FA required.
 
 TOTP two-factor: SSH key + mã 6 số từ app (Google Authenticator / Authy).
 

@@ -371,6 +371,9 @@ try
     builder.Services.AddSingleton<IVF.API.Services.InfrastructureMetricsPusher>();
     builder.Services.AddHostedService(sp => sp.GetRequiredService<IVF.API.Services.InfrastructureMetricsPusher>());
 
+    // ─── Enterprise Security (IP whitelist cache, device fingerprint, threat intel) ───
+    builder.Services.AddEnterpriseSecurity(builder.Configuration);
+
     // ─── Cloud Backup Provider Factory (dynamic, DB-backed) ───
     {
         var cloudSection = builder.Configuration.GetSection(IVF.API.Services.CloudBackupSettings.SectionName);
