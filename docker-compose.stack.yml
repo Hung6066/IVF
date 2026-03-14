@@ -74,7 +74,7 @@ services:
 
   # ─── IVF API ───
   api:
-    image: ghcr.io/hung6066/ivf:sha-9d2df1f
+    image: ghcr.io/hung6066/ivf:waf-analytics
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
       - ASPNETCORE_HTTP_PORTS=8080
