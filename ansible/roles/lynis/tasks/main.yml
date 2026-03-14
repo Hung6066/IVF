@@ -1,0 +1,71 @@
+# ═══════════════════════════════════════════════════════════
+#  Role: lynis — Security auditing tool
+#  Chạy trên: tất cả VPS
+#  Lynis thực hiện audit bảo mật hệ thống và lưu report vào /var/log/lynis/
+# ═══════════════════════════════════════════════════════════
+
+- name: Thêm Lynis APT key
+  apt_key:
+    url: https://packages.cisofy.com/keys/cisofy-software-public.key
+    state: present
+
+- name: Thêm Lynis APT repository
+  apt_repository:
+    repo: "deb https://packages.cisofy.com/community/lynis/deb/ stable main"
+    filename: cisofy-lynis
+    state: present
+    update_cache: yes
+
+- name: Cài đặt Lynis
+  apt:
+    name: lynis
+    state: present
+    update_cache: yes
+
+- name: Tạo thư mục log cho Lynis
+  file:
+    path: /var/log/lynis
+    state: directory
+    owner: root
+    group: root
+    mode: "0750"
+
+- name: Tạo thư mục report cho Lynis
+  file:
+    path: /var/log/lynis/reports
+    state: directory
+    owner: root
+    group: root
+    mode: "0750"
+
+- name: Deploy Lynis custom profile
+  template:
+    src: lynis-profile.j2
+    dest: /etc/lynis/custom.prf
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Deploy cronjob chạy Lynis hàng tuần
+  template:
+    src: lynis-cron.j2
+    dest: /etc/cron.d/lynis-audit
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Chạy Lynis audit lần đầu
+  command: >
+    lynis audit system
+    --profile /etc/lynis/custom.prf
+    --report-file /var/log/lynis/reports/lynis-{{ ansible_date_time.date }}.dat
+    --logfile /var/log/lynis/lynis.log
+    --no-colors
+    --quiet
+  register: lynis_first_run
+  changed_when: false
+  failed_when: false
+
+- name: Hiển thị kết quả Lynis lần đầu
+  debug:
+    msg: "Lynis audit hoàn tất trên {{ inventory_hostname }}. Xem report tại /var/log/lynis/reports/"

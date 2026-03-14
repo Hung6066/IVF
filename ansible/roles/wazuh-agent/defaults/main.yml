@@ -1,0 +1,18 @@
+---
+# Wazuh Manager connection
+wazuh_manager_ip: "{{ hostvars[groups['managers'][0]]['ansible_host'] }}"
+wazuh_manager_port: 1514
+wazuh_enrollment_port: 1515
+
+# Wazuh version
+wazuh_version: "4.9"
+wazuh_agent_version: "4.9.2-1"
+
+# Agent group (dùng để phân nhóm trong dashboard)
+wazuh_agent_group: "ivf-production"
+
+# Agent name (mặc định dùng hostname)
+wazuh_agent_name: "{{ inventory_hostname }}"
+
+# Enrollment password (để trống nếu dùng auto-enrollment không mật khẩu)
+wazuh_enrollment_password: ""

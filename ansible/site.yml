@@ -49,3 +49,16 @@
   tags: [deploy, app]
   roles:
     - app
+
+# ──────────── Phase 4: Security Monitoring (tất cả VPS, optional) ────────────
+- name: "Phase 4 — Lynis + Wazuh Agent"
+  hosts: swarm
+  become: true
+  tags: [security]
+  vars:
+    wazuh_manager_ip: "{{ hostvars[groups['managers'][0]]['ansible_host'] }}"
+  roles:
+    - role: lynis
+      tags: [lynis]
+    - role: wazuh-agent
+      tags: [wazuh]

@@ -1,0 +1,66 @@
+# ═══════════════════════════════════════════════════════════
+#  IVF Platform — Security Monitoring Playbook
+#  Cài đặt Lynis + Wazuh Agent trên tất cả VPS
+#
+#  Yêu cầu:
+#    - Wazuh Manager phải chạy trước (docker stack deploy wazuh)
+#    - wazuh_manager_ip phải đúng (mặc định: IP của managers group)
+#
+#  Sử dụng:
+#    # Cài đặt cả Lynis + Wazuh agent
+#    ansible-playbook -i hosts.yml security.yml
+#
+#    # Chỉ cài Lynis
+#    ansible-playbook -i hosts.yml security.yml --tags lynis
+#
+#    # Chỉ cài Wazuh agent
+#    ansible-playbook -i hosts.yml security.yml --tags wazuh
+#
+#    # Override Wazuh Manager IP (nếu dùng server riêng)
+#    ansible-playbook -i hosts.yml security.yml \
+#      --extra-vars "wazuh_manager_ip=10.200.0.1"
+#
+#    # Dry run
+#    ansible-playbook -i hosts.yml security.yml --check --diff
+# ═══════════════════════════════════════════════════════════
+
+- name: "Security Monitoring — Lynis + Wazuh Agent"
+  hosts: swarm
+  become: true
+  tags: [security]
+
+  vars:
+    # Mặc định dùng IP của manager node đầu tiên
+    # Override khi dùng Wazuh Manager trên server riêng:
+    #   --extra-vars "wazuh_manager_ip=<IP>"
+    wazuh_manager_ip: "{{ hostvars[groups['managers'][0]]['ansible_host'] }}"
+
+  roles:
+    - role: lynis
+      tags: [lynis]
+
+    - role: wazuh-agent
+      tags: [wazuh]
+
+  post_tasks:
+    - name: Kiểm tra Lynis version
+      command: lynis show version
+      register: lynis_version
+      changed_when: false
+      tags: [lynis, verify]
+
+    - name: Kiểm tra Wazuh agent version
+      command: /var/ossec/bin/wazuh-control info
+      register: wazuh_info
+      changed_when: false
+      failed_when: false
+      tags: [wazuh, verify]
+
+    - name: Tóm tắt cài đặt
+      debug:
+        msg:
+          - "Host: {{ inventory_hostname }}"
+          - "Lynis: {{ lynis_version.stdout | trim }}"
+          - "Wazuh: {{ wazuh_info.stdout_lines | default(['N/A']) | first }}"
+          - "Wazuh Manager: {{ wazuh_manager_ip }}"
+      tags: [verify]

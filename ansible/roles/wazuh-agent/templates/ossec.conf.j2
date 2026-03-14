@@ -1,0 +1,149 @@
+<ossec_config>
+  <!-- ─── Wazuh Manager Connection ─── -->
+  <client>
+    <server>
+      <address>{{ wazuh_manager_ip }}</address>
+      <port>{{ wazuh_manager_port }}</port>
+      <protocol>tcp</protocol>
+    </server>
+
+    <config-profile>{{ wazuh_agent_group }}</config-profile>
+    <notify_time>10</notify_time>
+    <time-reconnect>60</time-reconnect>
+    <auto_restart>yes</auto_restart>
+
+    <enrollment>
+      <enabled>yes</enabled>
+      <manager_address>{{ wazuh_manager_ip }}</manager_address>
+      <port>{{ wazuh_enrollment_port }}</port>
+      <agent_name>{{ wazuh_agent_name }}</agent_name>
+      {% if wazuh_enrollment_password != "" %}
+      <authorization_pass_path>/var/ossec/etc/authd.pass</authorization_pass_path>
+      {% endif %}
+    </enrollment>
+  </client>
+
+  <!-- ─── File Integrity Monitoring ─── -->
+  <syscheck>
+    <disabled>no</disabled>
+    <frequency>43200</frequency>
+    <scan_on_start>yes</scan_on_start>
+    <auto_ignore frequency="10" timeframe="3600">no</auto_ignore>
+
+    <!-- Thư mục quan trọng IVF -->
+    <directories check_all="yes" report_changes="yes" realtime="yes">/etc</directories>
+    <directories check_all="yes" report_changes="yes" realtime="yes">/usr/bin</directories>
+    <directories check_all="yes" report_changes="yes" realtime="yes">/usr/sbin</directories>
+    <directories check_all="yes" realtime="yes">/opt/ivf</directories>
+    <directories check_all="yes" realtime="yes">/var/ossec/etc</directories>
+
+    <!-- Bỏ qua các thư mục thay đổi liên tục -->
+    <ignore>/etc/mtab</ignore>
+    <ignore>/etc/hosts.deny</ignore>
+    <ignore>/etc/mail/statistics</ignore>
+    <ignore>/etc/random-seed</ignore>
+    <ignore>/etc/adjtime</ignore>
+    <ignore>/etc/httpd/logs</ignore>
+    <ignore>/etc/utmpx</ignore>
+    <ignore>/etc/wtmpx</ignore>
+    <ignore>/etc/cups/certs</ignore>
+    <ignore>/etc/dumpdates</ignore>
+    <ignore>/etc/svc/volatile</ignore>
+    <ignore type="sregex">.log$|.tmp$|.pid$</ignore>
+  </syscheck>
+
+  <!-- ─── Log Analysis ─── -->
+  <localfile>
+    <log_format>syslog</log_format>
+    <location>/var/log/syslog</location>
+  </localfile>
+
+  <localfile>
+    <log_format>syslog</log_format>
+    <location>/var/log/auth.log</location>
+  </localfile>
+
+  <localfile>
+    <log_format>syslog</log_format>
+    <location>/var/log/dpkg.log</location>
+  </localfile>
+
+  <localfile>
+    <log_format>syslog</log_format>
+    <location>/var/log/kern.log</location>
+  </localfile>
+
+  <!-- Docker logs -->
+  <localfile>
+    <log_format>syslog</log_format>
+    <location>/var/log/docker.log</location>
+  </localfile>
+
+  <!-- Lynis audit log -->
+  <localfile>
+    <log_format>syslog</log_format>
+    <location>/var/log/lynis/lynis.log</location>
+  </localfile>
+
+  <!-- IVF API logs (JSON) -->
+  <localfile>
+    <log_format>json</log_format>
+    <location>/var/lib/docker/containers/*/*.log</location>
+  </localfile>
+
+  <!-- ─── Rootcheck ─── -->
+  <rootcheck>
+    <disabled>no</disabled>
+    <check_files>yes</check_files>
+    <check_trojans>yes</check_trojans>
+    <check_dev>yes</check_dev>
+    <check_sys>yes</check_sys>
+    <check_pids>yes</check_pids>
+    <check_ports>yes</check_ports>
+    <check_if>yes</check_if>
+    <frequency>43200</frequency>
+    <rootkit_files>/var/ossec/etc/shared/rootkit_files.txt</rootkit_files>
+    <rootkit_trojans>/var/ossec/etc/shared/rootkit_trojans.txt</rootkit_trojans>
+  </rootcheck>
+
+  <!-- ─── System Inventory ─── -->
+  <wodle name="syscollector">
+    <disabled>no</disabled>
+    <interval>1h</interval>
+    <scan_on_start>yes</scan_on_start>
+    <hardware>yes</hardware>
+    <os>yes</os>
+    <network>yes</network>
+    <packages>yes</packages>
+    <ports all="no">yes</ports>
+    <processes>yes</processes>
+  </wodle>
+
+  <!-- ─── Vulnerability Detection ─── -->
+  <wodle name="vulnerability-detector">
+    <disabled>no</disabled>
+    <interval>5m</interval>
+    <run_on_start>yes</run_on_start>
+    <skip_on_error>yes</skip_on_error>
+  </wodle>
+
+  <!-- ─── Security Configuration Assessment ─── -->
+  <sca>
+    <enabled>yes</enabled>
+    <scan_on_start>yes</scan_on_start>
+    <interval>12h</interval>
+    <skip_nfs>yes</skip_nfs>
+  </sca>
+
+  <!-- ─── Active Response ─── -->
+  <active-response>
+    <disabled>no</disabled>
+    <ca_store>/var/ossec/etc/wpk_root.pem</ca_store>
+    <ca_verification>yes</ca_verification>
+  </active-response>
+
+  <!-- ─── Logging ─── -->
+  <logging>
+    <log_format>plain</log_format>
+  </logging>
+</ossec_config>

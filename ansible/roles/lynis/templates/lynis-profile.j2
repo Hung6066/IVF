@@ -1,0 +1,19 @@
+#
+# Lynis Custom Profile — IVF Platform
+# /etc/lynis/custom.prf
+#
+
+# Bỏ qua các warning không liên quan (container env)
+skip-test=HRDN-7222
+skip-test=NETW-3200
+skip-test=FIRE-4512
+
+# Màu sắc output (tắt để log sạch)
+colors=no
+
+# Không dừng khi có lỗi nhỏ
+quick=yes
+
+# Mức độ report
+log_tests_incorrect_os=yes
+report_file_prefix=lynis-{{ ansible_hostname }}-
