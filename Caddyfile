@@ -8,6 +8,18 @@
 	}
 }
 
+# ─── Wazuh Dashboard — truy cập trực tiếp qua WireGuard VPN ───────────────
+# URL: http://10.200.0.1:5601/wazuh/
+# Không basic_auth (WireGuard là lớp auth), không CSP override
+# Cloudflare không xử lý traffic VPN → không inject beacon.js
+http://10.200.0.1:5601 {
+	reverse_proxy wazuh-dashboard:5601 {
+		transport http {
+			tls_insecure_skip_verify
+		}
+	}
+}
+
 natra.site {
 	# Health checks (no auth required)
 	handle /health/* {
