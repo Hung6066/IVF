@@ -48,6 +48,9 @@ natra.site {
 			monitor $2b$12$i27omGvrtGdYIh93svxdZO6.BJRMU6a1Y//ZjK7qMqBSV2E/9srIC
 		}
 		reverse_proxy wazuh-dashboard:5601 {
+			# Strip Caddy basic-auth credential so OpenSearch Security
+			# does not try to authenticate the 'monitor' system user
+			header_up -Authorization
 			transport http {
 				tls_insecure_skip_verify
 			}
