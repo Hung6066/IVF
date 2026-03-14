@@ -176,7 +176,12 @@ public class WafService : IWafService
             conditions.Add(MatchesAnyPattern(rule.UriPathPatterns, ctx.RequestPath));
 
         if (rule.QueryStringPatterns is { Count: > 0 })
-            conditions.Add(MatchesAnyPattern(rule.QueryStringPatterns, ctx.QueryString));
+        {
+            var decodedQuery = ctx.QueryString is not null
+                ? Uri.UnescapeDataString(ctx.QueryString.Replace("+", " "))
+                : null;
+            conditions.Add(MatchesAnyPattern(rule.QueryStringPatterns, decodedQuery));
+        }
 
         if (rule.BodyPatterns is { Count: > 0 })
             conditions.Add(MatchesAnyPattern(rule.BodyPatterns, ctx.Body));
