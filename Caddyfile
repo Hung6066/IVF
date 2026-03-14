@@ -1,5 +1,5 @@
 {
-	# Admin API — only listen on internal overlay network for Prometheus scraping
+	# Admin API â€” only listen on internal overlay network for Prometheus scraping
 	admin 0.0.0.0:2019 {
 		origins 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 127.0.0.1
 	}
@@ -14,7 +14,7 @@ natra.site {
 		reverse_proxy api:8080
 	}
 
-	# Grafana — monitoring dashboard (basic auth protected)
+	# Grafana â€” monitoring dashboard (basic auth protected)
 	handle /grafana* {
 		basic_auth {
 			monitor $2b$12$i27omGvrtGdYIh93svxdZO6.BJRMU6a1Y//ZjK7qMqBSV2E/9srIC
@@ -22,7 +22,7 @@ natra.site {
 		reverse_proxy ivf-grafana:3000
 	}
 
-	# Prometheus — metrics (basic auth protected, proxied with upstream auth)
+	# Prometheus â€” metrics (basic auth protected, proxied with upstream auth)
 	handle /prometheus* {
 		basic_auth {
 			monitor $2b$12$i27omGvrtGdYIh93svxdZO6.BJRMU6a1Y//ZjK7qMqBSV2E/9srIC
@@ -32,7 +32,7 @@ natra.site {
 		}
 	}
 
-	# Loki — log aggregation (basic auth protected, strip /loki prefix)
+	# Loki â€” log aggregation (basic auth protected, strip /loki prefix)
 	handle_path /loki/* {
 		basic_auth {
 			monitor $2b$12$i27omGvrtGdYIh93svxdZO6.BJRMU6a1Y//ZjK7qMqBSV2E/9srIC
@@ -43,7 +43,7 @@ natra.site {
 		redir /loki/ permanent
 	}
 
-	# MinIO Console — access via SSH tunnel only:
+	# MinIO Console â€” access via SSH tunnel only:
 	# ssh -L 9001:localhost:9001 root@45.134.226.56
 	# Then open http://localhost:9001
 
@@ -95,9 +95,9 @@ natra.site {
 		X-XSS-Protection "0"
 		Referrer-Policy no-referrer
 		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
-		Content-Security-Policy "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' wss: ws:; frame-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'; upgrade-insecure-requests; block-all-mixed-content; require-trusted-types-for 'script'"
+		Content-Security-Policy "default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' wss: ws: https://api.ipify.org; frame-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'self' blob:; upgrade-insecure-requests"
 		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=(), accelerometer=(), gyroscope=(), magnetometer=(), autoplay=(), display-capture=(), document-domain=(), fullscreen=(self), publickey-credentials-get=(self)"
-		Cross-Origin-Embedder-Policy require-corp
+		Cross-Origin-Embedder-Policy unsafe-none
 		Cross-Origin-Opener-Policy same-origin
 		Cross-Origin-Resource-Policy same-origin
 		X-Permitted-Cross-Domain-Policies none
@@ -110,7 +110,7 @@ natra.site {
 	encode gzip zstd
 }
 
-# md.natra.site — Tenant subdomain (Cloudflare proxied)
+# md.natra.site â€” Tenant subdomain (Cloudflare proxied)
 md.natra.site {
 	# Health checks
 	handle /health/* {
@@ -162,9 +162,9 @@ md.natra.site {
 		X-XSS-Protection "0"
 		Referrer-Policy no-referrer
 		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
-		Content-Security-Policy "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' wss: ws:; frame-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'; upgrade-insecure-requests; block-all-mixed-content; require-trusted-types-for 'script'"
+		Content-Security-Policy "default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' wss: ws: https://api.ipify.org; frame-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'self' blob:; upgrade-insecure-requests"
 		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=(), accelerometer=(), gyroscope=(), magnetometer=(), autoplay=(), display-capture=(), document-domain=(), fullscreen=(self), publickey-credentials-get=(self)"
-		Cross-Origin-Embedder-Policy require-corp
+		Cross-Origin-Embedder-Policy unsafe-none
 		Cross-Origin-Opener-Policy same-origin
 		Cross-Origin-Resource-Policy same-origin
 		X-Permitted-Cross-Domain-Policies none
@@ -229,9 +229,9 @@ ivf-dong-do.natra.site {
 		X-XSS-Protection "0"
 		Referrer-Policy no-referrer
 		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
-		Content-Security-Policy "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' wss: ws:; frame-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'; upgrade-insecure-requests; block-all-mixed-content; require-trusted-types-for 'script'"
+		Content-Security-Policy "default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' wss: ws: https://api.ipify.org; frame-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'self' blob:; upgrade-insecure-requests"
 		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=(), accelerometer=(), gyroscope=(), magnetometer=(), autoplay=(), display-capture=(), document-domain=(), fullscreen=(self), publickey-credentials-get=(self)"
-		Cross-Origin-Embedder-Policy require-corp
+		Cross-Origin-Embedder-Policy unsafe-none
 		Cross-Origin-Opener-Policy same-origin
 		Cross-Origin-Resource-Policy same-origin
 		X-Permitted-Cross-Domain-Policies none
