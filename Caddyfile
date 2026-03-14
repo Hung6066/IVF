@@ -47,7 +47,7 @@ natra.site {
 		basic_auth {
 			monitor $2b$12$i27omGvrtGdYIh93svxdZO6.BJRMU6a1Y//ZjK7qMqBSV2E/9srIC
 		}
-		reverse_proxy wazuh.dashboard:5601 {
+		reverse_proxy wazuh-dashboard:5601 {
 			transport http {
 				tls_insecure_skip_verify
 			}

@@ -455,7 +455,7 @@ services:
         published: 443
         mode: host
     configs:
-      - source: caddyfile_v12
+      - source: ivf_caddyfile_v15
         target: /etc/caddy/Caddyfile
     volumes:
       - caddy_data:/data
@@ -523,8 +523,8 @@ services:
 
 # ─── Docker Configs ───
 configs:
-  caddyfile_v12:
-    file: ./Caddyfile
+  ivf_caddyfile_v15:
+    external: true
   standby_entrypoint:
     file: ./docker/postgres/standby-entrypoint.sh
 

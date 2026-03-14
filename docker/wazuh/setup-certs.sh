@@ -36,9 +36,9 @@ gen_cert() {
   rm -f "${name}.csr"
 }
 
-gen_cert "wazuh.indexer"  "wazuh.indexer"
-gen_cert "wazuh.manager"  "wazuh.manager"
-gen_cert "wazuh.dashboard" "wazuh.dashboard"
+gen_cert "wazuh-indexer"  "wazuh-indexer"
+gen_cert "wazuh-manager"  "wazuh-manager"
+gen_cert "wazuh-dashboard" "wazuh-dashboard"
 gen_cert "admin"          "admin"
 
 # Copy root-ca cho manager

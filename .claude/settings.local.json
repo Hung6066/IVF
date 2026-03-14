@@ -39,7 +39,8 @@
       "Bash(MSYS_NO_PATHCONV=1 docker exec ivf-ejbca ls -la /tmp/root-ca.pem /tmp/sub-ca.pem 2>&1)",
       "Bash(MSYS_NO_PATHCONV=1 docker cp \"ivf-ejbca:/tmp/root-ca.pem\" \"D:/Pr.Net/IVF/certs/ca/root-ca.pem\" 2>&1)",
       "Bash(MSYS_NO_PATHCONV=1 docker cp \"ivf-ejbca:/tmp/sub-ca.pem\" \"D:/Pr.Net/IVF/certs/ca/sub-ca.pem\" 2>&1 && ls -la D:/Pr.Net/IVF/certs/ca/ 2>&1)",
-      "Bash(MSYS_NO_PATHCONV=1 docker exec ivf-signserver which pkcs11-tool 2>&1 && echo \"found\" || echo \"not found\" && MSYS_NO_PATHCONV=1 docker exec ivf-signserver pkcs11-tool --version 2>&1)"
+      "Bash(MSYS_NO_PATHCONV=1 docker exec ivf-signserver which pkcs11-tool 2>&1 && echo \"found\" || echo \"not found\" && MSYS_NO_PATHCONV=1 docker exec ivf-signserver pkcs11-tool --version 2>&1)",
+      "Bash(MSYS_NO_PATHCONV=1 docker exec ivf-signserver /opt/signserver/bin/signserver activatecryptotoken 1 changeit 2>&1)"
     ]
   }
 }

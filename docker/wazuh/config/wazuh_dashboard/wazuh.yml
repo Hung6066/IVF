@@ -1,6 +1,6 @@
 hosts:
   - default:
-      url: https://wazuh.manager
+      url: https://wazuh-manager
       port: 55000
       username: wazuh-wui
       # password được đọc từ env var API_PASSWORD_FILE

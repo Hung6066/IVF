@@ -17,9 +17,9 @@ version: "3.8"
 
 services:
   # ─── Wazuh Manager ───────────────────────────────────────
-  wazuh.manager:
+  wazuh-manager:
     image: wazuh/wazuh-manager:4.9.2
-    hostname: wazuh.manager
+    hostname: wazuh-manager
     restart: unless-stopped
     ports:
       - target: 1514
@@ -35,7 +35,7 @@ services:
         protocol: tcp
         mode: host
     environment:
-      INDEXER_URL: https://wazuh.indexer:9200
+      INDEXER_URL: https://wazuh-indexer:9200
       INDEXER_USERNAME: admin
       INDEXER_PASSWORD_FILE: /run/secrets/wazuh_indexer_password
       FILEBEAT_SSL_VERIFICATION_MODE: full
@@ -57,8 +57,8 @@ services:
       - filebeat_etc:/etc/filebeat
       - filebeat_var:/var/lib/filebeat
       - ./config/wazuh_indexer_ssl_certs/root-ca-manager.pem:/etc/ssl/root-ca.pem
-      - ./config/wazuh_indexer_ssl_certs/wazuh.manager.pem:/etc/ssl/filebeat.pem
-      - ./config/wazuh_indexer_ssl_certs/wazuh.manager-key.pem:/etc/ssl/filebeat.key
+      - ./config/wazuh_indexer_ssl_certs/wazuh-manager.pem:/etc/ssl/filebeat.pem
+      - ./config/wazuh_indexer_ssl_certs/wazuh-manager-key.pem:/etc/ssl/filebeat.key
       - ./config/wazuh_cluster/wazuh_manager.conf:/wazuh-config-mount/etc/ossec.conf
     secrets:
       - wazuh_indexer_password
@@ -69,7 +69,7 @@ services:
     deploy:
       placement:
         constraints:
-          - node.role == manager
+          - node.hostname == vmi3129111
       resources:
         limits:
           memory: 1G
@@ -77,9 +77,9 @@ services:
           memory: 512M
 
   # ─── Wazuh Indexer (OpenSearch) ──────────────────────────
-  wazuh.indexer:
+  wazuh-indexer:
     image: wazuh/wazuh-indexer:4.9.2
-    hostname: wazuh.indexer
+    hostname: wazuh-indexer
     restart: unless-stopped
     environment:
       OPENSEARCH_JAVA_OPTS: "-Xms512m -Xmx512m"
@@ -87,8 +87,8 @@ services:
     volumes:
       - wazuh_indexer_data:/var/lib/wazuh-indexer
       - ./config/wazuh_indexer_ssl_certs/root-ca.pem:/usr/share/wazuh-indexer/certs/root-ca.pem
-      - ./config/wazuh_indexer_ssl_certs/wazuh.indexer-key.pem:/usr/share/wazuh-indexer/certs/wazuh.indexer.key
-      - ./config/wazuh_indexer_ssl_certs/wazuh.indexer.pem:/usr/share/wazuh-indexer/certs/wazuh.indexer.pem
+      - ./config/wazuh_indexer_ssl_certs/wazuh-indexer-key.pem:/usr/share/wazuh-indexer/certs/wazuh.indexer.key
+      - ./config/wazuh_indexer_ssl_certs/wazuh-indexer.pem:/usr/share/wazuh-indexer/certs/wazuh.indexer.pem
       - ./config/wazuh_indexer_ssl_certs/admin.pem:/usr/share/wazuh-indexer/certs/admin.pem
       - ./config/wazuh_indexer_ssl_certs/admin-key.pem:/usr/share/wazuh-indexer/certs/admin-key.pem
       - ./config/wazuh_indexer/wazuh.indexer.yml:/usr/share/wazuh-indexer/opensearch.yml
@@ -100,7 +100,7 @@ services:
     deploy:
       placement:
         constraints:
-          - node.role == manager
+          - node.hostname == vmi3129111
       resources:
         limits:
           memory: 1G
@@ -115,21 +115,21 @@ services:
         hard: 65536
 
   # ─── Wazuh Dashboard ─────────────────────────────────────
-  wazuh.dashboard:
+  wazuh-dashboard:
     image: wazuh/wazuh-dashboard:4.9.2
-    hostname: wazuh.dashboard
+    hostname: wazuh-dashboard
     restart: unless-stopped
     environment:
       INDEXER_USERNAME: admin
       INDEXER_PASSWORD_FILE: /run/secrets/wazuh_indexer_password
-      WAZUH_API_URL: https://wazuh.manager
+      WAZUH_API_URL: https://wazuh-manager
       DASHBOARD_USERNAME: kibanaserver
       DASHBOARD_PASSWORD_FILE: /run/secrets/wazuh_dashboard_password
       API_USERNAME: wazuh-wui
       API_PASSWORD_FILE: /run/secrets/wazuh_api_password
     volumes:
-      - ./config/wazuh_indexer_ssl_certs/wazuh.dashboard.pem:/usr/share/wazuh-dashboard/certs/wazuh-dashboard.pem
-      - ./config/wazuh_indexer_ssl_certs/wazuh.dashboard-key.pem:/usr/share/wazuh-dashboard/certs/wazuh-dashboard-key.pem
+      - ./config/wazuh_indexer_ssl_certs/wazuh-dashboard.pem:/usr/share/wazuh-dashboard/certs/wazuh-dashboard.pem
+      - ./config/wazuh_indexer_ssl_certs/wazuh-dashboard-key.pem:/usr/share/wazuh-dashboard/certs/wazuh-dashboard-key.pem
       - ./config/wazuh_indexer_ssl_certs/root-ca.pem:/usr/share/wazuh-dashboard/certs/root-ca.pem
       - ./config/wazuh_dashboard/opensearch_dashboards.yml:/usr/share/wazuh-dashboard/config/opensearch_dashboards.yml
       - ./config/wazuh_dashboard/wazuh.yml:/usr/share/wazuh-dashboard/data/wazuh/config/wazuh.yml
@@ -145,7 +145,7 @@ services:
     deploy:
       placement:
         constraints:
-          - node.role == manager
+          - node.hostname == vmi3129111
       resources:
         limits:
           memory: 512M
