@@ -82,7 +82,7 @@ services:
     hostname: wazuh-indexer
     restart: unless-stopped
     environment:
-      OPENSEARCH_JAVA_OPTS: "-Xms512m -Xmx512m"
+      OPENSEARCH_JAVA_OPTS: "-Xms512m -Xmx512m -XX:MaxDirectMemorySize=512m"
       bootstrap.memory_lock: "true"
     volumes:
       - wazuh_indexer_data:/var/lib/wazuh-indexer
@@ -103,9 +103,9 @@ services:
           - node.hostname == vmi3129111
       resources:
         limits:
-          memory: 1G
+          memory: 2G
         reservations:
-          memory: 512M
+          memory: 1G
     ulimits:
       memlock:
         soft: -1
