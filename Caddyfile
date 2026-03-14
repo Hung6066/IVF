@@ -42,7 +42,20 @@ natra.site {
 	handle /loki {
 		redir /loki/ permanent
 	}
-
+	# Wazuh Dashboard — SIEM security monitoring (basic auth protected)
+	handle /wazuh* {
+		basic_auth {
+			monitor $2b$12$i27omGvrtGdYIh93svxdZO6.BJRMU6a1Y//ZjK7qMqBSV2E/9srIC
+		}
+		reverse_proxy wazuh.dashboard:5601 {
+			transport http {
+				tls_insecure_skip_verify
+			}
+		}
+	}
+	handle /wazuh {
+		redir /wazuh/ permanent
+	}
 	# MinIO Console â€” access via SSH tunnel only:
 	# ssh -L 9001:localhost:9001 root@45.134.226.56
 	# Then open http://localhost:9001

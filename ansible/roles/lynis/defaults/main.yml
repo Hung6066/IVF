@@ -1,0 +1,6 @@
+---
+# ─── MinIO upload configuration ───
+# Ghi đè trong hosts.yml hoặc group_vars/all.yml
+lynis_minio_endpoint: "http://{{ hostvars[groups['managers'][0]]['ansible_host'] }}:9000"
+lynis_minio_access_key: "minioadmin"
+lynis_minio_secret_key: "minioadmin123"

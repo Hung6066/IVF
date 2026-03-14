@@ -786,6 +786,7 @@ try
     app.MapInfrastructureEndpoints(); // Infrastructure monitoring — VPS, Swarm, S3
     app.MapDnsManagementEndpoints(); // DNS records management — Cloudflare integration
     app.MapWafEndpoints(); // WAF management — Cloudflare WAF status + events
+    app.MapLynisEndpoints(); // Lynis security audit reports
 
     // ── Config seeders: run in every environment (idempotent, no demo data) ──────
     {

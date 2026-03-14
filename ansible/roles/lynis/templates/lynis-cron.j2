@@ -1,11 +1,12 @@
-# Lynis weekly audit — IVF Platform
+# Lynis weekly audit + MinIO ship — IVF Platform
 # Chạy mỗi Chủ nhật lúc 2:30 sáng
 30 2 * * 0 root /usr/sbin/lynis audit system \
   --profile /etc/lynis/custom.prf \
   --report-file /var/log/lynis/reports/lynis-$(date +\%Y-\%m-\%d).dat \
   --logfile /var/log/lynis/lynis.log \
   --no-colors \
-  --quiet 2>&1 | logger -t lynis
+  --quiet 2>&1 | logger -t lynis && /usr/local/bin/lynis-ship.sh 2>&1 | logger -t lynis-ship
 
 # Dọn report cũ hơn 90 ngày
 0 3 * * 0 root find /var/log/lynis/reports -name "*.dat" -mtime +90 -delete
+0 3 * * 0 root find /var/log/lynis/reports -name "*.json" -mtime +90 -delete

@@ -69,3 +69,33 @@
 - name: Hiển thị kết quả Lynis lần đầu
   debug:
     msg: "Lynis audit hoàn tất trên {{ inventory_hostname }}. Xem report tại /var/log/lynis/reports/"
+
+# ─── MinIO ship integration ───
+
+- name: Cài đặt MinIO client (mc)
+  get_url:
+    url: https://dl.min.io/client/mc/release/linux-amd64/mc
+    dest: /usr/local/bin/mc
+    mode: "0755"
+    force: false
+
+- name: Deploy script ship Lynis report lên MinIO
+  template:
+    src: lynis-ship.j2
+    dest: /usr/local/bin/lynis-ship.sh
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Thêm MinIO ship vào cronjob Lynis
+  template:
+    src: lynis-cron.j2
+    dest: /etc/cron.d/lynis-audit
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Ship report lần đầu lên MinIO
+  command: /usr/local/bin/lynis-ship.sh
+  changed_when: false
+  failed_when: false

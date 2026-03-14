@@ -279,6 +279,13 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'admin/lynis',
+        loadComponent: () =>
+          import('./features/admin/lynis-dashboard/lynis-dashboard.component').then(
+            (m) => m.LynisDashboardComponent,
+          ),
+      },
+      {
         path: 'admin/certificates',
         loadComponent: () =>
           import('./features/admin/certificate-management/certificate-management.component').then(

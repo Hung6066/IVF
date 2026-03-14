@@ -1,0 +1,290 @@
+<div class="p-6 space-y-6">
+
+  <!-- Header -->
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-bold text-white flex items-center gap-2">
+        <i class="fas fa-shield-halved text-blue-400"></i>
+        Lynis Security Audit
+      </h1>
+      <p class="text-gray-400 text-sm mt-1">Báo cáo kiểm tra bảo mật hệ thống theo chu kỳ</p>
+    </div>
+    <div class="flex items-center gap-3">
+      <!-- Host selector -->
+      @if (hosts().length > 0) {
+        <select
+          [ngModel]="selectedHost()"
+          (ngModelChange)="onHostChange($event)"
+          class="bg-gray-800 text-white border border-gray-600 rounded-lg px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+        >
+          @for (host of hosts(); track host) {
+            <option [value]="host">{{ host }}</option>
+          }
+        </select>
+      }
+      <button
+        (click)="loadHosts()"
+        class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2 transition"
+      >
+        <i class="fas fa-sync-alt" [class.fa-spin]="loading()"></i>
+        Làm mới
+      </button>
+    </div>
+  </div>
+
+  <!-- Error -->
+  @if (error()) {
+    <div class="bg-red-900/30 border border-red-700 rounded-lg p-4 text-red-300 flex items-center gap-3">
+      <i class="fas fa-exclamation-circle"></i>
+      {{ error() }}
+    </div>
+  }
+
+  <!-- Loading skeleton -->
+  @if (loading()) {
+    <div class="flex items-center justify-center py-20 text-gray-400">
+      <i class="fas fa-shield-halved fa-spin text-4xl"></i>
+    </div>
+  }
+
+  @if (!loading() && hosts().length === 0 && !error()) {
+    <div class="text-center py-20 text-gray-500">
+      <i class="fas fa-folder-open text-5xl mb-4"></i>
+      <p class="text-lg">Chưa có báo cáo Lynis nào.</p>
+      <p class="text-sm mt-2">Đảm bảo Ansible role lynis đã được chạy và MinIO đã được cấu hình.</p>
+    </div>
+  }
+
+  @if (!loading() && hosts().length > 0) {
+    <!-- Tabs -->
+    <div class="border-b border-gray-700">
+      <nav class="flex gap-1">
+        @for (tab of [
+          { id: 'overview', label: 'Tổng quan', icon: 'fa-chart-pie' },
+          { id: 'reports',  label: 'Lịch sử báo cáo', icon: 'fa-history' },
+          { id: 'detail',   label: 'Chi tiết', icon: 'fa-list-check' }
+        ]; track tab.id) {
+          <button
+            (click)="setTab(tab.id)"
+            [class.border-blue-500]="activeTab() === tab.id"
+            [class.text-blue-400]="activeTab() === tab.id"
+            [class.border-transparent]="activeTab() !== tab.id"
+            [class.text-gray-400]="activeTab() !== tab.id"
+            class="px-4 py-3 text-sm font-medium border-b-2 hover:text-white transition flex items-center gap-2"
+          >
+            <i [class]="'fas ' + tab.icon"></i>
+            {{ tab.label }}
+          </button>
+        }
+      </nav>
+    </div>
+
+    <!-- ── Tab: Tổng quan ── -->
+    @if (activeTab() === 'overview') {
+      @if (loadingReport()) {
+        <div class="flex justify-center py-12 text-gray-400">
+          <i class="fas fa-circle-notch fa-spin text-3xl"></i>
+        </div>
+      }
+      @if (!loadingReport() && selectedReport()) {
+        <div class="space-y-6">
+          <!-- Score card -->
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <!-- Hardening Index -->
+            <div [class]="'rounded-xl border p-6 text-center ' + scoreBg()">
+              <div class="text-sm text-gray-400 mb-2">Chỉ số bảo mật</div>
+              <div [class]="'text-6xl font-black ' + scoreColor()">
+                {{ selectedReport()!.hardening_index }}
+              </div>
+              <div class="text-sm mt-2 font-semibold" [ngClass]="scoreColor()">
+                {{ getScoreLabel(selectedReport()!.hardening_index) }}
+              </div>
+              <div class="text-xs text-gray-500 mt-1">/ 100</div>
+            </div>
+
+            <!-- Warnings -->
+            <div class="rounded-xl border border-yellow-700 bg-yellow-900/20 p-6 text-center">
+              <div class="text-sm text-gray-400 mb-2">Cảnh báo</div>
+              <div class="text-5xl font-bold text-yellow-400">
+                {{ selectedReport()!.warning_count }}
+              </div>
+              <div class="text-xs text-gray-500 mt-2">vấn đề cần xem xét</div>
+            </div>
+
+            <!-- Suggestions -->
+            <div class="rounded-xl border border-blue-700 bg-blue-900/20 p-6 text-center">
+              <div class="text-sm text-gray-400 mb-2">Đề xuất</div>
+              <div class="text-5xl font-bold text-blue-400">
+                {{ selectedReport()!.suggestion_count }}
+              </div>
+              <div class="text-xs text-gray-500 mt-2">cải thiện bảo mật</div>
+            </div>
+          </div>
+
+          <!-- System info -->
+          <div class="bg-gray-800 rounded-xl border border-gray-700 p-6">
+            <h3 class="text-white font-semibold mb-4 flex items-center gap-2">
+              <i class="fas fa-server text-blue-400"></i>
+              Thông tin hệ thống
+            </h3>
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+              <div>
+                <span class="text-gray-500">Hostname</span>
+                <div class="text-white font-mono mt-1">{{ selectedReport()!.hostname }}</div>
+              </div>
+              <div>
+                <span class="text-gray-500">OS</span>
+                <div class="text-white mt-1">{{ selectedReport()!.os }}</div>
+              </div>
+              <div>
+                <span class="text-gray-500">Kernel</span>
+                <div class="text-white font-mono mt-1">{{ selectedReport()!.kernel }}</div>
+              </div>
+              <div>
+                <span class="text-gray-500">Lynis version</span>
+                <div class="text-white mt-1">{{ selectedReport()!.lynis_version }}</div>
+              </div>
+              <div>
+                <span class="text-gray-500">Tests thực hiện</span>
+                <div class="text-white mt-1">{{ selectedReport()!.tests_executed }}</div>
+              </div>
+              <div>
+                <span class="text-gray-500">Ngày kiểm tra</span>
+                <div class="text-white mt-1">{{ selectedReport()!.report_date }}</div>
+              </div>
+              <div>
+                <span class="text-gray-500">Firewall</span>
+                <div class="mt-1" [ngClass]="selectedReport()!.firewall_active === 'yes' ? 'text-green-400' : 'text-red-400'">
+                  <i [class]="'fas ' + (selectedReport()!.firewall_active === 'yes' ? 'fa-check-circle' : 'fa-times-circle')"></i>
+                  {{ selectedReport()!.firewall_active === 'yes' ? 'Bật' : 'Tắt' }}
+                </div>
+              </div>
+              <div>
+                <span class="text-gray-500">Compiler</span>
+                <div class="mt-1" [ngClass]="selectedReport()!.compiler_installed === 'yes' ? 'text-yellow-400' : 'text-green-400'">
+                  {{ selectedReport()!.compiler_installed === 'yes' ? 'Đã cài (rủi ro)' : 'Không cài' }}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Vulnerable packages -->
+          @if (selectedReport()!.vulnerable_packages.length > 0) {
+            <div class="bg-gray-800 rounded-xl border border-red-700 p-6">
+              <h3 class="text-red-400 font-semibold mb-3 flex items-center gap-2">
+                <i class="fas fa-bug"></i>
+                Package có lỗ hổng ({{ selectedReport()!.vulnerable_packages.length }})
+              </h3>
+              <div class="flex flex-wrap gap-2">
+                @for (pkg of selectedReport()!.vulnerable_packages; track pkg) {
+                  <span class="bg-red-900/40 border border-red-700 text-red-300 px-3 py-1 rounded-full text-xs font-mono">
+                    {{ pkg }}
+                  </span>
+                }
+              </div>
+            </div>
+          }
+        </div>
+      }
+      @if (!loadingReport() && !selectedReport()) {
+        <div class="text-center py-12 text-gray-500">
+          <i class="fas fa-file-circle-xmark text-4xl mb-3"></i>
+          <p>Chưa có báo cáo cho host này.</p>
+        </div>
+      }
+    }
+
+    <!-- ── Tab: Lịch sử báo cáo ── -->
+    @if (activeTab() === 'reports') {
+      <div class="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-900 text-gray-400 text-xs uppercase">
+            <tr>
+              <th class="px-4 py-3 text-left">Host</th>
+              <th class="px-4 py-3 text-left">Ngày</th>
+              <th class="px-4 py-3 text-right">Kích thước</th>
+              <th class="px-4 py-3 text-left">Cập nhật</th>
+              <th class="px-4 py-3 text-center">Hành động</th>
+            </tr>
+          </thead>
+          <tbody>
+            @if (reports().length === 0) {
+              <tr>
+                <td colspan="5" class="px-4 py-8 text-center text-gray-500">Không có báo cáo nào.</td>
+              </tr>
+            }
+            @for (r of reports(); track trackByDate($index, r)) {
+              <tr class="border-t border-gray-700 hover:bg-gray-750 transition">
+                <td class="px-4 py-3 font-mono text-blue-300">{{ r.hostname }}</td>
+                <td class="px-4 py-3 text-white">{{ r.date }}</td>
+                <td class="px-4 py-3 text-right text-gray-400">{{ (r.size / 1024).toFixed(1) }} KB</td>
+                <td class="px-4 py-3 text-gray-400">{{ r.lastModified | date:'dd/MM/yyyy HH:mm' }}</td>
+                <td class="px-4 py-3 text-center">
+                  <button
+                    (click)="openReport(r)"
+                    class="text-blue-400 hover:text-blue-300 text-xs px-3 py-1 border border-blue-700 rounded-lg transition"
+                  >
+                    <i class="fas fa-eye mr-1"></i>Xem
+                  </button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+
+    <!-- ── Tab: Chi tiết ── -->
+    @if (activeTab() === 'detail') {
+      @if (loadingReport()) {
+        <div class="flex justify-center py-12 text-gray-400">
+          <i class="fas fa-circle-notch fa-spin text-3xl"></i>
+        </div>
+      }
+      @if (!loadingReport() && selectedReport()) {
+        <div class="space-y-4">
+          <!-- Warnings -->
+          <div class="bg-gray-800 rounded-xl border border-yellow-700 p-6">
+            <h3 class="text-yellow-400 font-semibold mb-4 flex items-center gap-2">
+              <i class="fas fa-exclamation-triangle"></i>
+              Cảnh báo ({{ selectedReport()!.warnings.length }})
+            </h3>
+            @if (selectedReport()!.warnings.length === 0) {
+              <p class="text-gray-500 text-sm">Không có cảnh báo.</p>
+            }
+            <ul class="space-y-2">
+              @for (w of selectedReport()!.warnings; track w) {
+                <li class="bg-yellow-900/20 border border-yellow-800 rounded-lg px-4 py-2 text-yellow-200 text-sm font-mono">
+                  <i class="fas fa-triangle-exclamation text-yellow-500 mr-2"></i>{{ w }}
+                </li>
+              }
+            </ul>
+          </div>
+
+          <!-- Suggestions -->
+          <div class="bg-gray-800 rounded-xl border border-blue-700 p-6">
+            <h3 class="text-blue-400 font-semibold mb-4 flex items-center gap-2">
+              <i class="fas fa-lightbulb"></i>
+              Đề xuất cải thiện ({{ selectedReport()!.suggestions.length }})
+            </h3>
+            @if (selectedReport()!.suggestions.length === 0) {
+              <p class="text-gray-500 text-sm">Không có đề xuất.</p>
+            }
+            <ul class="space-y-2">
+              @for (s of selectedReport()!.suggestions; track s) {
+                <li class="bg-blue-900/20 border border-blue-800 rounded-lg px-4 py-2 text-blue-200 text-sm font-mono">
+                  <i class="fas fa-arrow-right text-blue-500 mr-2"></i>{{ s }}
+                </li>
+              }
+            </ul>
+          </div>
+        </div>
+      }
+      @if (!loadingReport() && !selectedReport()) {
+        <div class="text-center py-12 text-gray-500">
+          <p>Chọn một báo cáo từ tab "Lịch sử" để xem chi tiết.</p>
+        </div>
+      }
+    }
+  }
+</div>
