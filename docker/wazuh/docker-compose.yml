@@ -127,6 +127,7 @@ services:
       DASHBOARD_PASSWORD_FILE: /run/secrets/wazuh_dashboard_password
       API_USERNAME: wazuh-wui
       API_PASSWORD_FILE: /run/secrets/wazuh_api_password
+      API_PASSWORD: wazuh-wui
     volumes:
       - ./config/wazuh_indexer_ssl_certs/wazuh-dashboard.pem:/usr/share/wazuh-dashboard/certs/wazuh-dashboard.pem
       - ./config/wazuh_indexer_ssl_certs/wazuh-dashboard-key.pem:/usr/share/wazuh-dashboard/certs/wazuh-dashboard-key.pem

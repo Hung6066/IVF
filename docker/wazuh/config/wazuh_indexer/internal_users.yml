@@ -1,0 +1,21 @@
+_meta:
+  type: "internalusers"
+  config_version: 2
+
+# admin user: password must match Docker secret wazuh_indexer_password
+# After fresh deploy, regenerate hash from the secret and run securityadmin.sh:
+#   HASH=$(docker exec <indexer> env JAVA_HOME=.../jdk bash .../hash.sh -p "$INDEXER_PASS" 2>/dev/null | tail -1)
+#   Then update this file and run: docker exec <indexer> securityadmin.sh -cd /usr/share/wazuh-indexer/opensearch-security/ ...
+admin:
+  hash: "$2y$12$5n0J8g2KidYAvoLtQv.6su7Tin.2RTV0NtnJj3w/cDdnz3e02NBfW"
+  reserved: true
+  backend_roles:
+    - "admin"
+  description: "Wazuh admin user"
+
+# kibanaserver: dashboard uses default password 'kibanaserver' (entrypoint.sh default)
+# Hash = bcrypt('kibanaserver')
+kibanaserver:
+  hash: "$2y$12$b53Um2v4S36Q2Li.e6AkXekGDq/QBxokmpCldFBrbe4oBc1zK2/Pu"
+  reserved: true
+  description: "Kibana server user"
