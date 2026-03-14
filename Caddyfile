@@ -43,6 +43,18 @@ natra.site {
 		redir /loki/ permanent
 	}
 	# Wazuh Dashboard — SIEM security monitoring (basic auth protected)
+	# Static UI assets (JS, CSS, fonts, favicons) skipped from basic_auth:
+	# browsers don't send credentials for PWA manifest/font fetches → 403
+	handle /wazuh/ui/* {
+		reverse_proxy wazuh-dashboard:5601 {
+			header_up -Authorization
+			# Strip OpenSearch Dashboards' own CSP — our route-level header takes effect
+			header_down -Content-Security-Policy
+			transport http {
+				tls_insecure_skip_verify
+			}
+		}
+	}
 	handle /wazuh* {
 		basic_auth {
 			monitor $2b$12$i27omGvrtGdYIh93svxdZO6.BJRMU6a1Y//ZjK7qMqBSV2E/9srIC
@@ -53,6 +65,8 @@ natra.site {
 			# Strip Caddy basic-auth credential so OpenSearch Security
 			# does not try to authenticate the 'monitor' system user
 			header_up -Authorization
+			# Strip OpenSearch Dashboards' own CSP — our header above takes effect
+			header_down -Content-Security-Policy
 			transport http {
 				tls_insecure_skip_verify
 			}
