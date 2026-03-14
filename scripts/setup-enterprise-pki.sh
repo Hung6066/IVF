@@ -598,78 +598,8 @@ if [ "$DRY_RUN" = false ]; then
             log_ok "SoftHSM2 token '$SOFTHSM_TOKEN_LABEL' ready"
         fi
 
-        # Generate RSA 4096 key pairs inside SoftHSM for each worker
-        log_info "Generating key pairs inside SoftHSM2 token..."
-
-        # Check if pkcs11-tool is available
-        if exec_signserver bash -c "command -v pkcs11-tool" >/dev/null 2>&1; then
-            PKCS11_TOOL_AVAILABLE=true
-        else
-            PKCS11_TOOL_AVAILABLE=false
-            log_warn "pkcs11-tool not found in SignServer -- will generate keys via SignServer CLI after worker setup"
-        fi
-
-        if [ "$PKCS11_TOOL_AVAILABLE" = true ]; then
-            HEX_ID_COUNTER=1
-
-            # Generate keys for PDF workers
-            for worker_def in "${PDF_WORKERS[@]}"; do
-                IFS='|' read -r wid wname wkeyalias wpurpose <<< "$worker_def"
-                HEX_ID=$(printf '%02x' "$HEX_ID_COUNTER")
-
-                # Check if key already exists
-                KEY_EXISTS=$(exec_signserver pkcs11-tool \
-                    --module "$SOFTHSM_LIB" --login --pin "$SOFTHSM_PIN" \
-                    --token-label "$SOFTHSM_TOKEN_LABEL" \
-                    --list-objects --type privkey 2>/dev/null \
-                    | grep -c "$wkeyalias" || echo "0")
-
-                if [ "$KEY_EXISTS" -gt 0 ] && [ "$FORCE" = false ]; then
-                    log_ok "Key '$wkeyalias' already exists in SoftHSM2 -- skipping"
-                else
-                    log_substep "Generating RSA 4096 key: $wkeyalias (id=$HEX_ID)"
-                    exec_signserver pkcs11-tool \
-                        --module "$SOFTHSM_LIB" --login --pin "$SOFTHSM_PIN" \
-                        --token-label "$SOFTHSM_TOKEN_LABEL" \
-                        --keypairgen --key-type rsa:4096 \
-                        --id "$HEX_ID" --label "$wkeyalias" 2>/dev/null && \
-                        log_ok "Key '$wkeyalias' generated in SoftHSM2" || \
-                        log_warn "Failed to generate key '$wkeyalias' in SoftHSM2"
-                fi
-
-                HEX_ID_COUNTER=$((HEX_ID_COUNTER + 1))
-            done
-
-            # Generate key for TSA worker
-            IFS='|' read -r tsa_id tsa_name tsa_keyalias tsa_purpose <<< "$TSA_WORKER"
-            HEX_ID=$(printf '%02x' "$HEX_ID_COUNTER")
-
-            KEY_EXISTS=$(exec_signserver pkcs11-tool \
-                --module "$SOFTHSM_LIB" --login --pin "$SOFTHSM_PIN" \
-                --token-label "$SOFTHSM_TOKEN_LABEL" \
-                --list-objects --type privkey 2>/dev/null \
-                | grep -c "$tsa_keyalias" || echo "0")
-
-            if [ "$KEY_EXISTS" -gt 0 ] && [ "$FORCE" = false ]; then
-                log_ok "Key '$tsa_keyalias' already exists in SoftHSM2 -- skipping"
-            else
-                log_substep "Generating RSA 4096 key: $tsa_keyalias (id=$HEX_ID)"
-                exec_signserver pkcs11-tool \
-                    --module "$SOFTHSM_LIB" --login --pin "$SOFTHSM_PIN" \
-                    --token-label "$SOFTHSM_TOKEN_LABEL" \
-                    --keypairgen --key-type rsa:4096 \
-                    --id "$HEX_ID" --label "$tsa_keyalias" 2>/dev/null && \
-                    log_ok "Key '$tsa_keyalias' generated in SoftHSM2" || \
-                    log_warn "Failed to generate key '$tsa_keyalias' in SoftHSM2"
-            fi
-
-            # Verify keys in token
-            log_info "Listing keys in SoftHSM2 token..."
-            exec_signserver pkcs11-tool \
-                --module "$SOFTHSM_LIB" --login --pin "$SOFTHSM_PIN" \
-                --token-label "$SOFTHSM_TOKEN_LABEL" \
-                --list-objects --type privkey 2>/dev/null || true
-        fi
+        # Keys will be generated via SignServer CLI during worker configuration (Phase 5)
+        # pkcs11-tool generated keys are not compatible with SignServer's Java PKCS#11 provider
 
         USE_PKCS11=true
         log_ok "SoftHSM2 setup complete -- workers will use PKCS#11 crypto tokens"
@@ -928,24 +858,26 @@ if [ "$SKIP_WORKERS" = false ]; then
             return 0
         fi
 
-        # Create properties file inside container
-        exec_signserver bash -c "cat > /tmp/worker_${worker_id}.properties << 'PROPEOF'
-WORKER${worker_id}.TYPE = PROCESSABLE
-WORKER${worker_id}.IMPLEMENTATION_CLASS = org.signserver.module.pdfsigner.PDFSigner
-WORKER${worker_id}.CRYPTOTOKEN_IMPLEMENTATION_CLASS = org.signserver.server.cryptotokens.PKCS11CryptoToken
-WORKER${worker_id}.NAME = ${worker_name}
-WORKER${worker_id}.AUTHTYPE = NOAUTH
-WORKER${worker_id}.SHAREDLIBRARYNAME = SoftHSM
-WORKER${worker_id}.SLOTLABELTYPE = SLOT_LABEL
-WORKER${worker_id}.SLOTLABELVALUE = ${SOFTHSM_TOKEN_LABEL}
-WORKER${worker_id}.PIN = ${SOFTHSM_PIN}
-WORKER${worker_id}.DEFAULTKEY = ${key_alias}
-PROPEOF"
+        # Remove conflicting P12 and old PKCS#11 properties
+        run_signserver removeproperty "$worker_id" KEYSTOREPATH 2>/dev/null || true
+        run_signserver removeproperty "$worker_id" KEYSTOREPASSWORD 2>/dev/null || true
+        run_signserver removeproperty "$worker_id" KEYSTORETYPE 2>/dev/null || true
+        run_signserver removeproperty "$worker_id" SHAREDLIBRARY 2>/dev/null || true
+        run_signserver removeproperty "$worker_id" SET_PERMISSIONS 2>/dev/null || true
 
-        # Load base properties
-        run_signserver setproperties "/tmp/worker_${worker_id}.properties" 2>/dev/null || true
+        # Set PKCS#11 worker properties
+        run_signserver setproperty "$worker_id" NAME "$worker_name" 2>/dev/null || true
+        run_signserver setproperty "$worker_id" TYPE PROCESSABLE 2>/dev/null || true
+        run_signserver setproperty "$worker_id" IMPLEMENTATION_CLASS org.signserver.module.pdfsigner.PDFSigner 2>/dev/null || true
+        run_signserver setproperty "$worker_id" CRYPTOTOKEN_IMPLEMENTATION_CLASS org.signserver.server.cryptotokens.PKCS11CryptoToken 2>/dev/null || true
+        run_signserver setproperty "$worker_id" AUTHTYPE NOAUTH 2>/dev/null || true
+        run_signserver setproperty "$worker_id" SHAREDLIBRARYNAME SoftHSM 2>/dev/null || true
+        run_signserver setproperty "$worker_id" SLOTLABELTYPE SLOT_LABEL 2>/dev/null || true
+        run_signserver setproperty "$worker_id" SLOTLABELVALUE "$SOFTHSM_TOKEN_LABEL" 2>/dev/null || true
+        run_signserver setproperty "$worker_id" PIN "$SOFTHSM_PIN" 2>/dev/null || true
+        run_signserver setproperty "$worker_id" DEFAULTKEY "$key_alias" 2>/dev/null || true
 
-        # Set additional PDF signing properties
+        # PDF signing properties
         run_signserver setproperty "$worker_id" CERTIFICATION_LEVEL NOT_CERTIFIED 2>/dev/null || true
         run_signserver setproperty "$worker_id" ADD_VISIBLE_SIGNATURE false 2>/dev/null || true
         run_signserver setproperty "$worker_id" REFUSE_DOUBLE_INDIRECT_OBJECTS true 2>/dev/null || true
@@ -953,21 +885,111 @@ PROPEOF"
         run_signserver setproperty "$worker_id" LOCATION "IVF Clinic" 2>/dev/null || true
         run_signserver setproperty "$worker_id" TSA_WORKER "TimeStampSigner" 2>/dev/null || true
         run_signserver setproperty "$worker_id" EMBED_CRL true 2>/dev/null || true
-        run_signserver setproperty "$worker_id" SET_PERMISSIONS "0xfffff3c4" 2>/dev/null || true
         run_signserver setproperty "$worker_id" DIGESTALGORITHM SHA256 2>/dev/null || true
 
-        # Reload worker
+        # Reload worker to pick up PKCS#11 config
         run_signserver reload "$worker_id" 2>/dev/null || true
 
-        # Activate crypto token
+        # Initial activation to connect to SoftHSM token (may fail if no key yet — that's OK)
+        run_signserver activatecryptotoken "$worker_id" "$SOFTHSM_PIN" 2>/dev/null || true
+
+        # Generate RSA 4096 key inside SoftHSM via SignServer
+        log_info "  Generating RSA 4096 key '$key_alias' via SignServer..."
+        run_signserver generatekey "$worker_id" -keyalg RSA -keyspec 4096 -alias "$key_alias" 2>/dev/null && \
+            log_ok "  Key '$key_alias' generated" || \
+            log_warn "  Key generation failed (key may already exist)"
+
+        # Reload and re-activate after key generation
+        run_signserver reload "$worker_id" 2>/dev/null || true
         local activate_result
         activate_result=$(run_signserver activatecryptotoken "$worker_id" "$SOFTHSM_PIN" 2>&1) || true
 
-        if echo "$activate_result" | grep -qi "successful\|activated"; then
-            log_ok "Worker $worker_id ($worker_name) -- PKCS#11 configured and activated"
+        if ! echo "$activate_result" | grep -qi "successful"; then
+            log_warn "Worker $worker_id activation failed after key gen: $activate_result"
+            return 1
+        fi
+
+        # Derive CN from worker name for cert
+        local cn
+        case "$worker_name" in
+            PDFSigner)                    cn="IVF PDF Signer" ;;
+            PDFSigner_technical)          cn="Ky Thuat Vien IVF" ;;
+            PDFSigner_head_department)    cn="Truong Khoa IVF" ;;
+            PDFSigner_doctor1)            cn="Bac Si IVF" ;;
+            PDFSigner_admin)              cn="Quan Tri IVF" ;;
+            *)                            cn="$worker_name" ;;
+        esac
+
+        # Generate CSR from PKCS#11 key
+        log_info "  Generating CSR..."
+        local csr_file="/tmp/worker_${worker_id}_csr.pem"
+        run_signserver generatecertreq "$worker_id" \
+            "CN=${cn},O=IVF Healthcare,OU=Digital Signing,C=VN" \
+            SHA256WithRSA "$csr_file" 2>/dev/null || {
+            log_warn "  CSR generation failed"
+            return 1
+        }
+
+        # Reuse existing EJBCA end entity from Phase 4 enrollment (reset to NEW for re-signing)
+        local ee_username="ivf-signer-${worker_id}"
+        log_info "  Reusing EJBCA end entity: $ee_username"
+        run_ejbca ra setendentitystatus "$ee_username" 10 2>/dev/null || true
+        run_ejbca ra setclearpwd "$ee_username" "$KEYSTORE_PASSWORD" 2>/dev/null || true
+
+        # Sign CSR with EJBCA
+        log_info "  Signing CSR with EJBCA ($ISSUING_CA)..."
+        local signed_cert="/tmp/worker_${worker_id}_signed.pem"
+
+        # Copy CSR from SignServer to EJBCA
+        docker exec "$SIGNSERVER_CONTAINER" cat "$csr_file" | \
+            docker exec -i "$EJBCA_CONTAINER" bash -c "cat > $csr_file"
+
+        run_ejbca createcert \
+            --username "$ee_username" \
+            --password "$KEYSTORE_PASSWORD" \
+            -c "$csr_file" \
+            -f "$signed_cert" 2>/dev/null || {
+            log_warn "  EJBCA cert signing failed"
+            return 1
+        }
+
+        # Extract PEM cert (strip header lines before BEGIN CERTIFICATE) and copy to SignServer
+        docker exec "$EJBCA_CONTAINER" bash -c \
+            "sed -n '/-----BEGIN CERTIFICATE-----/,/-----END CERTIFICATE-----/p' $signed_cert" | \
+            docker exec -i "$SIGNSERVER_CONTAINER" bash -c "cat > /tmp/worker_${worker_id}_cert.pem"
+
+        # Upload signer certificate
+        log_info "  Uploading signer certificate..."
+        run_signserver uploadsignercertificate "$worker_id" GLOB \
+            "/tmp/worker_${worker_id}_cert.pem" 2>/dev/null || {
+            log_warn "  Certificate upload failed"
+            return 1
+        }
+
+        # Build and upload certificate chain (signer + Sub-CA + Root CA)
+        log_info "  Uploading certificate chain..."
+        docker exec "$EJBCA_CONTAINER" bash -c "
+            sed -n '/-----BEGIN CERTIFICATE-----/,/-----END CERTIFICATE-----/p' $signed_cert
+            cat /tmp/sub-ca.pem 2>/dev/null || true
+            cat /tmp/root-ca.pem 2>/dev/null || true
+        " | docker exec -i "$SIGNSERVER_CONTAINER" bash -c "cat > /tmp/worker_${worker_id}_chain.pem"
+
+        run_signserver uploadsignercertificatechain "$worker_id" GLOB \
+            "/tmp/worker_${worker_id}_chain.pem" 2>/dev/null || \
+            log_warn "  Certificate chain upload failed"
+
+        # Final reload
+        run_signserver reload "$worker_id" 2>/dev/null || true
+
+        # Verify final status
+        local final_status
+        final_status=$(run_signserver getstatus brief "$worker_id" 2>&1) || true
+        if echo "$final_status" | grep -q "Worker status : Active"; then
+            log_ok "Worker $worker_id ($worker_name) -- PKCS#11 Active with EJBCA-signed cert"
             return 0
         else
-            log_warn "Worker $worker_id PKCS#11 activation result: $activate_result"
+            log_warn "Worker $worker_id not fully active after PKCS#11 setup"
+            echo "$final_status" | grep "Errors:" -A5 || true
             return 1
         fi
     }
@@ -1052,20 +1074,24 @@ PROPEOF"
             return 0
         fi
 
-        exec_signserver bash -c "cat > /tmp/worker_tsa.properties << 'PROPEOF'
-WORKER${tsa_id}.TYPE = PROCESSABLE
-WORKER${tsa_id}.IMPLEMENTATION_CLASS = org.signserver.module.tsa.TimeStampSigner
-WORKER${tsa_id}.CRYPTOTOKEN_IMPLEMENTATION_CLASS = org.signserver.server.cryptotokens.PKCS11CryptoToken
-WORKER${tsa_id}.NAME = ${tsa_name}
-WORKER${tsa_id}.AUTHTYPE = NOAUTH
-WORKER${tsa_id}.SHAREDLIBRARYNAME = SoftHSM
-WORKER${tsa_id}.SLOTLABELTYPE = SLOT_LABEL
-WORKER${tsa_id}.SLOTLABELVALUE = ${SOFTHSM_TOKEN_LABEL}
-WORKER${tsa_id}.PIN = ${SOFTHSM_PIN}
-WORKER${tsa_id}.DEFAULTKEY = ${tsa_keyalias}
-PROPEOF"
+        # Remove conflicting P12 and old PKCS#11 properties
+        run_signserver removeproperty "$tsa_id" KEYSTOREPATH 2>/dev/null || true
+        run_signserver removeproperty "$tsa_id" KEYSTOREPASSWORD 2>/dev/null || true
+        run_signserver removeproperty "$tsa_id" KEYSTORETYPE 2>/dev/null || true
+        run_signserver removeproperty "$tsa_id" SHAREDLIBRARY 2>/dev/null || true
+        run_signserver removeproperty "$tsa_id" SET_PERMISSIONS 2>/dev/null || true
 
-        run_signserver setproperties "/tmp/worker_tsa.properties" 2>/dev/null || true
+        # Set PKCS#11 worker properties
+        run_signserver setproperty "$tsa_id" NAME "$tsa_name" 2>/dev/null || true
+        run_signserver setproperty "$tsa_id" TYPE PROCESSABLE 2>/dev/null || true
+        run_signserver setproperty "$tsa_id" IMPLEMENTATION_CLASS org.signserver.module.tsa.TimeStampSigner 2>/dev/null || true
+        run_signserver setproperty "$tsa_id" CRYPTOTOKEN_IMPLEMENTATION_CLASS org.signserver.server.cryptotokens.PKCS11CryptoToken 2>/dev/null || true
+        run_signserver setproperty "$tsa_id" AUTHTYPE NOAUTH 2>/dev/null || true
+        run_signserver setproperty "$tsa_id" SHAREDLIBRARYNAME SoftHSM 2>/dev/null || true
+        run_signserver setproperty "$tsa_id" SLOTLABELTYPE SLOT_LABEL 2>/dev/null || true
+        run_signserver setproperty "$tsa_id" SLOTLABELVALUE "$SOFTHSM_TOKEN_LABEL" 2>/dev/null || true
+        run_signserver setproperty "$tsa_id" PIN "$SOFTHSM_PIN" 2>/dev/null || true
+        run_signserver setproperty "$tsa_id" DEFAULTKEY "$tsa_keyalias" 2>/dev/null || true
 
         # TSA-specific properties
         run_signserver setproperty "$tsa_id" DEFAULTTSAPOLICYOID "1.2.3.4.1" 2>/dev/null || true
@@ -1074,16 +1100,99 @@ PROPEOF"
         run_signserver setproperty "$tsa_id" ORDERING false 2>/dev/null || true
         run_signserver setproperty "$tsa_id" INCLUDESTATUSSTRING true 2>/dev/null || true
 
+        # Reload worker to pick up PKCS#11 config
         run_signserver reload "$tsa_id" 2>/dev/null || true
 
+        # Initial activation to connect to SoftHSM token (may fail if no key yet)
+        run_signserver activatecryptotoken "$tsa_id" "$SOFTHSM_PIN" 2>/dev/null || true
+
+        # Generate RSA 4096 key inside SoftHSM via SignServer
+        log_info "  Generating RSA 4096 key '$tsa_keyalias' via SignServer..."
+        run_signserver generatekey "$tsa_id" -keyalg RSA -keyspec 4096 -alias "$tsa_keyalias" 2>/dev/null && \
+            log_ok "  Key '$tsa_keyalias' generated" || \
+            log_warn "  Key generation failed (key may already exist)"
+
+        # Reload and re-activate after key generation
+        run_signserver reload "$tsa_id" 2>/dev/null || true
         local tsa_activate_result
         tsa_activate_result=$(run_signserver activatecryptotoken "$tsa_id" "$SOFTHSM_PIN" 2>&1) || true
 
-        if echo "$tsa_activate_result" | grep -qi "successful\|activated"; then
-            log_ok "TSA Worker $tsa_id ($tsa_name) -- PKCS#11 configured and activated"
+        if ! echo "$tsa_activate_result" | grep -qi "successful"; then
+            log_warn "TSA Worker $tsa_id activation failed after key gen: $tsa_activate_result"
+            return 1
+        fi
+
+        # Generate CSR from PKCS#11 key
+        local cn="IVF Timestamp Authority"
+        log_info "  Generating CSR..."
+        local csr_file="/tmp/worker_${tsa_id}_csr.pem"
+        run_signserver generatecertreq "$tsa_id" \
+            "CN=${cn},O=IVF Healthcare,OU=Digital Signing,C=VN" \
+            SHA256WithRSA "$csr_file" 2>/dev/null || {
+            log_warn "  CSR generation failed"
+            return 1
+        }
+
+        # Reuse existing EJBCA end entity from Phase 4 enrollment
+        local ee_username="ivf-tsa-${tsa_id}"
+        log_info "  Reusing EJBCA end entity: $ee_username"
+        run_ejbca ra setendentitystatus "$ee_username" 10 2>/dev/null || true
+        run_ejbca ra setclearpwd "$ee_username" "$KEYSTORE_PASSWORD" 2>/dev/null || true
+
+        # Sign CSR with EJBCA
+        log_info "  Signing CSR with EJBCA ($ISSUING_CA)..."
+        local signed_cert="/tmp/worker_${tsa_id}_signed.pem"
+
+        # Copy CSR from SignServer to EJBCA
+        docker exec "$SIGNSERVER_CONTAINER" cat "$csr_file" | \
+            docker exec -i "$EJBCA_CONTAINER" bash -c "cat > $csr_file"
+
+        run_ejbca createcert \
+            --username "$ee_username" \
+            --password "$KEYSTORE_PASSWORD" \
+            -c "$csr_file" \
+            -f "$signed_cert" 2>/dev/null || {
+            log_warn "  EJBCA cert signing failed"
+            return 1
+        }
+
+        # Extract PEM cert (strip header lines before BEGIN CERTIFICATE) and copy to SignServer
+        docker exec "$EJBCA_CONTAINER" bash -c \
+            "sed -n '/-----BEGIN CERTIFICATE-----/,/-----END CERTIFICATE-----/p' $signed_cert" | \
+            docker exec -i "$SIGNSERVER_CONTAINER" bash -c "cat > /tmp/worker_${tsa_id}_cert.pem"
+
+        # Upload signer certificate
+        log_info "  Uploading signer certificate..."
+        run_signserver uploadsignercertificate "$tsa_id" GLOB \
+            "/tmp/worker_${tsa_id}_cert.pem" 2>/dev/null || {
+            log_warn "  Certificate upload failed"
+            return 1
+        }
+
+        # Build and upload certificate chain (signer + Sub-CA + Root CA)
+        log_info "  Uploading certificate chain..."
+        docker exec "$EJBCA_CONTAINER" bash -c "
+            sed -n '/-----BEGIN CERTIFICATE-----/,/-----END CERTIFICATE-----/p' $signed_cert
+            cat /tmp/sub-ca.pem 2>/dev/null || true
+            cat /tmp/root-ca.pem 2>/dev/null || true
+        " | docker exec -i "$SIGNSERVER_CONTAINER" bash -c "cat > /tmp/worker_${tsa_id}_chain.pem"
+
+        run_signserver uploadsignercertificatechain "$tsa_id" GLOB \
+            "/tmp/worker_${tsa_id}_chain.pem" 2>/dev/null || \
+            log_warn "  Certificate chain upload failed"
+
+        # Final reload
+        run_signserver reload "$tsa_id" 2>/dev/null || true
+
+        # Verify final status
+        local final_status
+        final_status=$(run_signserver getstatus brief "$tsa_id" 2>&1) || true
+        if echo "$final_status" | grep -q "Worker status : Active"; then
+            log_ok "TSA Worker $tsa_id ($tsa_name) -- PKCS#11 Active with EJBCA-signed cert"
             return 0
         else
-            log_warn "TSA Worker $tsa_id PKCS#11 activation result: $tsa_activate_result"
+            log_warn "TSA Worker $tsa_id not fully active after PKCS#11 setup"
+            echo "$final_status" | grep "Errors:" -A5 || true
             return 1
         fi
     }
@@ -1137,34 +1246,6 @@ PROPEOF"
         }
     else
         configure_tsa_worker_p12
-    fi
-
-    # ── Generate keys via SignServer CLI if pkcs11-tool was not available ──
-    if [ "$USE_PKCS11" = true ] && [ "${PKCS11_TOOL_AVAILABLE:-true}" = false ]; then
-        log_info ""
-        log_info "Generating keys via SignServer CLI (pkcs11-tool was not available)..."
-
-        for worker_def in "${PDF_WORKERS[@]}"; do
-            IFS='|' read -r wid wname wkeyalias wpurpose <<< "$worker_def"
-            log_substep "Generating key for Worker $wid: $wkeyalias"
-            run_signserver generatekey "$wid" RSA 4096 "$wkeyalias" 2>/dev/null && \
-                log_ok "Key '$wkeyalias' generated via SignServer CLI" || \
-                log_warn "Key generation via SignServer CLI failed for $wkeyalias"
-        done
-
-        IFS='|' read -r tsa_id tsa_name tsa_keyalias tsa_purpose <<< "$TSA_WORKER"
-        log_substep "Generating key for TSA Worker $tsa_id: $tsa_keyalias"
-        run_signserver generatekey "$tsa_id" RSA 4096 "$tsa_keyalias" 2>/dev/null && \
-            log_ok "Key '$tsa_keyalias' generated via SignServer CLI" || \
-            log_warn "Key generation via SignServer CLI failed for $tsa_keyalias"
-
-        # Reload all workers after key generation
-        for worker_def in "${PDF_WORKERS[@]}"; do
-            IFS='|' read -r wid _ _ _ <<< "$worker_def"
-            run_signserver reload "$wid" 2>/dev/null || true
-        done
-        IFS='|' read -r tsa_id _ _ _ <<< "$TSA_WORKER"
-        run_signserver reload "$tsa_id" 2>/dev/null || true
     fi
 
 else
@@ -1366,13 +1447,17 @@ else
             log_ok "SoftHSM2 token '$SOFTHSM_TOKEN_LABEL' is present"
             VERIFY_PASS=$((VERIFY_PASS + 1))
 
-            # Count keys
-            KEY_COUNT=$(exec_signserver pkcs11-tool \
-                --module "$SOFTHSM_LIB" --login --pin "$SOFTHSM_PIN" \
-                --token-label "$SOFTHSM_TOKEN_LABEL" \
-                --list-objects --type privkey 2>/dev/null \
-                | grep -c "Private Key Object" || echo "0")
-            log_info "SoftHSM2 contains $KEY_COUNT private keys"
+            # Count keys (use pkcs11-tool if available, otherwise just log token presence)
+            if exec_signserver bash -c "command -v pkcs11-tool" >/dev/null 2>&1; then
+                KEY_COUNT=$(exec_signserver pkcs11-tool \
+                    --module "$SOFTHSM_LIB" --login --pin "$SOFTHSM_PIN" \
+                    --token-label "$SOFTHSM_TOKEN_LABEL" \
+                    --list-objects --type privkey 2>/dev/null \
+                    | grep -c "Private Key Object" || echo "0")
+                log_info "SoftHSM2 contains $KEY_COUNT private keys"
+            else
+                log_info "SoftHSM2 token present (pkcs11-tool not available for key count)"
+            fi
         else
             log_warn "SoftHSM2 token '$SOFTHSM_TOKEN_LABEL' not found"
             VERIFY_FAIL=$((VERIFY_FAIL + 1))

@@ -7,7 +7,7 @@
 #
 # Usage:
 #   docker compose --profile softhsm up -d
-#   docker exec ivf-signserver bash /opt/keyfactor/persistent/init-softhsm.sh
+#   bash scripts/setup-enterprise-pki.sh
 #
 # PKCS#11 advantages over P12:
 #   - Keys cannot be exported/copied (non-extractable flag)
@@ -36,10 +36,28 @@ RUN mkdir -p /opt/keyfactor/persistent/softhsm/tokens && \
 # SoftHSM2 configuration
 RUN printf 'directories.tokendir = /opt/keyfactor/persistent/softhsm/tokens\nobjectstore.backend = file\nlog.level = INFO\nslots.removable = false\nslots.mechanisms = ALL\n' > /etc/softhsm2.conf
 
-# Set SOFTHSM2_CONF environment variable so SignServer/Java can find it
-ENV SOFTHSM2_CONF=/etc/softhsm2.conf
+# Register SoftHSM2 PKCS#11 library in SignServer deploy config.
+# CRITICAL: This must be done at build time — SignServer CE only loads
+# SHAREDLIBRARYNAME entries that were present during deployment.
+RUN for f in \
+      /opt/keyfactor/signserver-custom/conf/signserver_deploy.properties \
+      /opt/keyfactor/signserver/conf/signserver_deploy.properties; do \
+    if [ -f "$f" ] && ! grep -q 'SoftHSM' "$f" 2>/dev/null; then \
+      printf '\n# SoftHSM2 PKCS#11 provider (added at build time)\ncryptotoken.p11.lib.83.name = SoftHSM\ncryptotoken.p11.lib.83.file = /usr/lib64/pkcs11/libsofthsm2.so\n' >> "$f"; \
+    fi; \
+    done
 
-# Detect SoftHSM library path (AlmaLinux puts it in /usr/lib64)
+# Re-deploy SignServer to pick up the new PKCS#11 library registration.
+# SignServer CE reads signserver_deploy.properties only during 'ant deploy'.
+RUN cd /opt/keyfactor/signserver && \
+    if [ -f bin/ant ]; then \
+      bin/ant deploy 2>/dev/null || true; \
+    elif command -v ant >/dev/null 2>&1; then \
+      ant deploy 2>/dev/null || true; \
+    fi
+
+# Set environment variables
+ENV SOFTHSM2_CONF=/etc/softhsm2.conf
 ENV PKCS11_LIBRARY_PATH=/usr/lib64/pkcs11/libsofthsm2.so
 
 # Switch back to SignServer user

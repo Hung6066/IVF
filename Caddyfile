@@ -55,32 +55,29 @@ natra.site {
 		redir /loki/ permanent
 	}
 	# Wazuh Dashboard — SIEM security monitoring (basic auth protected)
-	# Static UI assets (JS, CSS, fonts, favicons) skipped from basic_auth:
-	# browsers don't send credentials for PWA manifest/font fetches → 403
-	handle /wazuh/ui/* {
+	# Public assets: UI static files, bootstrap.js, and webpack bundles (versioned /49201/bundles/)
+	# skip basic_auth — browsers may not send cached credentials for dynamically-loaded scripts
+	@wazuh_public {
+		path /wazuh/ui/* /wazuh/bootstrap.js /wazuh/*/bundles/*
+	}
+	handle @wazuh_public {
 		reverse_proxy wazuh-dashboard:5601 {
 			header_up -Authorization
-			# Strip OpenSearch Dashboards' own CSP — our route-level header takes effect
-			header_down -Content-Security-Policy
 			transport http {
 				tls_insecure_skip_verify
 			}
 		}
 	}
+	# App pages and API — basic auth required
+	# Let OSD handle its own CSP natively (verified working via WireGuard)
 	handle /wazuh* {
 		basic_auth {
 			monitor $2b$12$i27omGvrtGdYIh93svxdZO6.BJRMU6a1Y//ZjK7qMqBSV2E/9srIC
 		}
-		# Wazuh/OpenSearch requires unsafe-eval (lodash templates) + manifest-src (favicons)
-		# worker-src blob: required — OSD uses blob: Web Workers; without it browser falls back
-		# to default-src 'self' which blocks blob: and causes app crash / security-requirements error
-		header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; worker-src blob: 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' wss: ws:; manifest-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
 		reverse_proxy wazuh-dashboard:5601 {
 			# Strip Caddy basic-auth credential so OpenSearch Security
 			# does not try to authenticate the 'monitor' system user
 			header_up -Authorization
-			# Strip OpenSearch Dashboards' own CSP — our header above takes effect
-			header_down -Content-Security-Policy
 			transport http {
 				tls_insecure_skip_verify
 			}

@@ -156,6 +156,7 @@ services:
       ejbca-db:
         condition: service_healthy
     networks:
+      - ivf-public
       - ivf-signing
       - ivf-data
     restart: unless-stopped
@@ -226,6 +227,7 @@ services:
       ejbca:
         condition: service_healthy
     networks:
+      - ivf-public
       - ivf-signing
       - ivf-data
     restart: unless-stopped
@@ -430,6 +432,7 @@ services:
       ejbca:
         condition: service_healthy
     networks:
+      - ivf-public
       - ivf-signing
       - ivf-data
     restart: unless-stopped
