@@ -47,6 +47,8 @@ natra.site {
 		basic_auth {
 			monitor $2b$12$i27omGvrtGdYIh93svxdZO6.BJRMU6a1Y//ZjK7qMqBSV2E/9srIC
 		}
+		# Wazuh/OpenSearch requires unsafe-eval for its bundled JS (lodash templates)
+		header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' wss: ws:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
 		reverse_proxy wazuh-dashboard:5601 {
 			# Strip Caddy basic-auth credential so OpenSearch Security
 			# does not try to authenticate the 'monitor' system user
