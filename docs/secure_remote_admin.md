@@ -555,6 +555,7 @@ ssh root@45.134.226.56 "fail2ban-client set sshd addignoreip <IP>"
 > **Status: 2FA ACTIVATED** — SSH key + TOTP code both required for authentication.
 
 Error: `Permission denied (publickey)` when ssh fails can mean:
+
 1. Public key not on VPS's `authorized_keys` → fix with `ssh-copy-id`
 2. 2FA code not provided → SSH config missing `KbdInteractiveAuthentication yes`
 3. Wrong SSH key specified → verify which key is authorized on VPS
@@ -589,18 +590,21 @@ ssh root@45.134.226.56
 If still getting "Permission denied (publickey)":
 
 **Step 1: Verify public key is authorized**
+
 ```powershell
 ssh-copy-id -i ~/.ssh/id_rsa root@45.134.226.56
 # Prompts for password or 2FA code — add current key to authorized_keys
 ```
 
 **Step 2: Check which key is authorized**
+
 ```powershell
 ssh root@45.134.226.56 "grep -o 'ssh-rsa [^ ]*' ~/.ssh/authorized_keys | wc -l"
 # Should output: 1 (or more if multiple keys allowed)
 ```
 
 **Step 3: Test with verbose output**
+
 ```powershell
 ssh -v root@45.134.226.56 2>&1 | Select-String "Authentications|Offering|Received|code:"
 # Look for "Verification code:" prompt
@@ -635,7 +639,7 @@ ssh $VpsHost @"
 
 **Option B: Automated via SSH Batch (no 2FA interruption)**
 
-Create a separate deployment key *without 2FA* OR use SSH batch mode:
+Create a separate deployment key _without 2FA_ OR use SSH batch mode:
 
 ```powershell
 # ssh.bat / deploy.ps1
