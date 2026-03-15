@@ -1,0 +1,243 @@
+<!--
+  Custom rules for Docker & Docker Swarm monitoring
+  Mount vào manager: /var/ossec/etc/rules/docker_swarm_rules.xml
+
+  Rule ID range: 100100–100199 (custom Docker/Swarm)
+-->
+
+<group name="docker,docker-swarm,ivf">
+
+  <!-- ═══ Docker Swarm Node Health ═══ -->
+
+  <!-- Base rule: Swarm node status received -->
+  <rule id="100100" level="0">
+    <decoded_as>docker-swarm-nodes</decoded_as>
+    <description>Docker Swarm: Node status report</description>
+    <group>docker-swarm-nodes</group>
+  </rule>
+
+  <!-- Node status is Down -->
+  <rule id="100101" level="12">
+    <if_sid>100100</if_sid>
+    <field name="status">Down</field>
+    <description>Docker Swarm: Node $(hostname) is DOWN</description>
+    <options>alert_by_email</options>
+    <group>docker-swarm-nodes,swarm-critical</group>
+  </rule>
+
+  <!-- Node availability is Drain (maintenance mode) -->
+  <rule id="100102" level="7">
+    <if_sid>100100</if_sid>
+    <field name="availability">Drain</field>
+    <description>Docker Swarm: Node $(hostname) is in DRAIN mode</description>
+    <group>docker-swarm-nodes,swarm-warning</group>
+  </rule>
+
+  <!-- Node is Pause -->
+  <rule id="100103" level="7">
+    <if_sid>100100</if_sid>
+    <field name="availability">Pause</field>
+    <description>Docker Swarm: Node $(hostname) is PAUSED</description>
+    <group>docker-swarm-nodes,swarm-warning</group>
+  </rule>
+
+  <!-- ═══ Docker Swarm Service Health ═══ -->
+
+  <!-- Base rule: Swarm service list received -->
+  <rule id="100110" level="0">
+    <decoded_as>docker-swarm-services</decoded_as>
+    <description>Docker Swarm: Service status report</description>
+    <group>docker-swarm-services</group>
+  </rule>
+
+  <!-- Service has 0 replicas (down) -->
+  <rule id="100111" level="12">
+    <if_sid>100110</if_sid>
+    <field name="replicas">0/\d+</field>
+    <description>Docker Swarm: Service $(name) has 0 running replicas</description>
+    <options>alert_by_email</options>
+    <group>docker-swarm-services,swarm-critical</group>
+  </rule>
+
+  <!-- Service has degraded replicas (not all running) -->
+  <rule id="100112" level="8">
+    <if_sid>100110</if_sid>
+    <field name="replicas" negate="yes">^(\d+)/\1$</field>
+    <description>Docker Swarm: Service $(name) has degraded replicas: $(replicas)</description>
+    <group>docker-swarm-services,swarm-warning</group>
+  </rule>
+
+  <!-- ═══ Docker Daemon Health ═══ -->
+
+  <!-- Base rule: Docker info received -->
+  <rule id="100120" level="0">
+    <decoded_as>docker-info</decoded_as>
+    <description>Docker: Daemon info report</description>
+    <group>docker-info</group>
+  </rule>
+
+  <!-- Swarm state is not active -->
+  <rule id="100121" level="10">
+    <if_sid>100120</if_sid>
+    <field name="Swarm" negate="yes">active</field>
+    <description>Docker: Swarm mode is NOT active (state: $(Swarm))</description>
+    <group>docker-info,swarm-critical</group>
+  </rule>
+
+  <!-- Too many stopped containers (>20) -->
+  <rule id="100122" level="5">
+    <if_sid>100120</if_sid>
+    <field name="ContainersStopped">^[2-9]\d$|^\d{3,}$</field>
+    <description>Docker: High number of stopped containers: $(ContainersStopped)</description>
+    <group>docker-info,docker-maintenance</group>
+  </rule>
+
+  <!-- ═══ Unhealthy Containers ═══ -->
+
+  <!-- Base rule: unhealthy container check -->
+  <rule id="100130" level="0">
+    <decoded_as>docker-unhealthy</decoded_as>
+    <description>Docker: Unhealthy container check</description>
+    <group>docker-unhealthy</group>
+  </rule>
+
+  <!-- Unhealthy container detected -->
+  <rule id="100131" level="10">
+    <if_sid>100130</if_sid>
+    <field name="name">\S+</field>
+    <description>Docker: Container $(name) is UNHEALTHY ($(image))</description>
+    <group>docker-unhealthy,swarm-critical</group>
+  </rule>
+
+  <!-- ═══ Docker Swarm Failed Tasks ═══ -->
+
+  <!-- Base rule: failed task check -->
+  <rule id="100140" level="0">
+    <decoded_as>docker-swarm-failed-tasks</decoded_as>
+    <description>Docker Swarm: Failed task check</description>
+    <group>docker-swarm-failed-tasks</group>
+  </rule>
+
+  <!-- Failed/rejected task detected -->
+  <rule id="100141" level="10">
+    <if_sid>100140</if_sid>
+    <field name="error">\S+</field>
+    <description>Docker Swarm: Task $(service) failed — $(error)</description>
+    <group>docker-swarm-failed-tasks,swarm-critical</group>
+  </rule>
+
+  <!-- ═══ SSH Brute Force — VPS specific ═══ -->
+
+  <!-- Multiple SSH failures from same IP (>10 in 2min) → block 30min -->
+  <rule id="100150" level="10" frequency="10" timeframe="120">
+    <if_matched_sid>5716</if_matched_sid>
+    <same_source_ip />
+    <description>SSH brute force (10+ failures in 2 min) from $(srcip)</description>
+    <group>authentication_failures,ssh-brute-force</group>
+  </rule>
+
+  <!-- ═══ Docker Config/Secret Changes ═══ -->
+
+  <!-- File change in /etc/docker/ -->
+  <rule id="100160" level="10">
+    <if_group>syscheck</if_group>
+    <field name="file">/etc/docker/</field>
+    <description>Docker daemon config modified: $(file)</description>
+    <group>syscheck,docker-config-change</group>
+  </rule>
+
+  <!-- File change in Docker Swarm secrets/configs -->
+  <rule id="100161" level="12">
+    <if_group>syscheck</if_group>
+    <field name="file">/var/lib/docker/swarm</field>
+    <description>Docker Swarm internal state modified: $(file)</description>
+    <group>syscheck,swarm-config-change,swarm-critical</group>
+  </rule>
+
+  <!-- IVF application config change -->
+  <rule id="100162" level="7">
+    <if_group>syscheck</if_group>
+    <field name="file">/opt/ivf/docker</field>
+    <description>IVF app config modified: $(file)</description>
+    <group>syscheck,ivf-config-change</group>
+  </rule>
+
+  <!-- SSH config change -->
+  <rule id="100163" level="10">
+    <if_group>syscheck</if_group>
+    <field name="file">/etc/ssh/sshd_config</field>
+    <description>SSH daemon config modified</description>
+    <group>syscheck,ssh-config-change</group>
+  </rule>
+
+  <!-- ═══ Disk Usage ═══ -->
+
+  <!-- Base rule: disk usage check -->
+  <rule id="100170" level="0">
+    <decoded_as>docker-disk-usage</decoded_as>
+    <description>Docker: Disk usage report</description>
+    <group>docker-disk-usage</group>
+  </rule>
+
+  <!-- ═══ Docker Listener Events ═══ -->
+
+  <!-- Container created -->
+  <rule id="100180" level="3">
+    <if_group>docker</if_group>
+    <field name="docker.Action">create</field>
+    <description>Docker: Container created — $(docker.Actor.Attributes.name)</description>
+    <group>docker-events</group>
+  </rule>
+
+  <!-- Container destroyed -->
+  <rule id="100181" level="5">
+    <if_group>docker</if_group>
+    <field name="docker.Action">destroy</field>
+    <description>Docker: Container destroyed — $(docker.Actor.Attributes.name)</description>
+    <group>docker-events</group>
+  </rule>
+
+  <!-- Container died (crash) -->
+  <rule id="100182" level="10">
+    <if_group>docker</if_group>
+    <field name="docker.Action">die</field>
+    <description>Docker: Container died — $(docker.Actor.Attributes.name) (exit $(docker.Actor.Attributes.exitCode))</description>
+    <group>docker-events,swarm-critical</group>
+  </rule>
+
+  <!-- Container OOM killed -->
+  <rule id="100183" level="12">
+    <if_group>docker</if_group>
+    <field name="docker.Action">oom</field>
+    <description>Docker: Container OOM killed — $(docker.Actor.Attributes.name)</description>
+    <options>alert_by_email</options>
+    <group>docker-events,swarm-critical</group>
+  </rule>
+
+  <!-- Network created/removed -->
+  <rule id="100184" level="5">
+    <if_group>docker</if_group>
+    <field name="docker.Type">network</field>
+    <field name="docker.Action">create|destroy</field>
+    <description>Docker: Network $(docker.Action) — $(docker.Actor.Attributes.name)</description>
+    <group>docker-events,docker-network</group>
+  </rule>
+
+  <!-- Volume created/removed -->
+  <rule id="100185" level="5">
+    <if_group>docker</if_group>
+    <field name="docker.Type">volume</field>
+    <field name="docker.Action">create|destroy</field>
+    <description>Docker: Volume $(docker.Action)</description>
+    <group>docker-events,docker-volume</group>
+  </rule>
+
+  <!-- Secret/Config created (Swarm) -->
+  <rule id="100186" level="7">
+    <if_group>docker</if_group>
+    <field name="docker.Type">secret|config</field>
+    <description>Docker Swarm: $(docker.Type) $(docker.Action)</description>
+    <group>docker-events,swarm-config-change</group>
+  </rule>
+
+</group>

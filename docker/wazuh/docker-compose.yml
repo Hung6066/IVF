@@ -1,5 +1,14 @@
 # ═══════════════════════════════════════════════════════════
-#  Wazuh Manager Stack — chạy trên vps1 (manager node)
+#  Wazuh SIEM Stack — 2 VPS Docker Swarm
+#
+#  Topology:
+#    vps1 (vmi3129107, 194.163.181.19) — Swarm Leader, role: standby
+#    vps2 (vmi3129111, 45.134.226.56)  — Swarm Reachable, role: primary
+#
+#  Components:
+#    Manager + Indexer + Dashboard  → vps2 (vmi3129111)
+#    Agent vps1                     → vps1 (vmi3129107)
+#    Agent vps2                     → vps2 (vmi3129111)
 #
 #  Deploy:
 #    docker stack deploy -c docker/wazuh/docker-compose.yml wazuh
@@ -8,9 +17,9 @@
 #    1514/tcp  — Agent communication
 #    1515/tcp  — Agent enrollment
 #    55000/tcp — Wazuh API (internal only)
-#    5601/tcp  — Wazuh Dashboard (Kibana-based, internal + Caddy proxy)
+#    5601/tcp  — Wazuh Dashboard (via Caddy proxy)
 #
-#  Truy cập dashboard: https://natra.site/wazuh/ (qua Caddy reverse proxy)
+#  Truy cập dashboard: https://natra.site/wazuh/
 # ═══════════════════════════════════════════════════════════
 
 version: "3.8"
@@ -60,6 +69,8 @@ services:
       - ./config/wazuh_indexer_ssl_certs/wazuh-manager.pem:/etc/ssl/filebeat.pem
       - ./config/wazuh_indexer_ssl_certs/wazuh-manager-key.pem:/etc/ssl/filebeat.key
       - ./config/wazuh_cluster/wazuh_manager.conf:/wazuh-config-mount/etc/ossec.conf
+      - ./config/wazuh_cluster/custom_decoders:/var/ossec/etc/decoders
+      - ./config/wazuh_cluster/custom_rules:/var/ossec/etc/rules
     secrets:
       - wazuh_indexer_password
       - wazuh_api_password
@@ -119,6 +130,9 @@ services:
     image: wazuh/wazuh-dashboard:4.9.2
     hostname: wazuh-dashboard
     restart: unless-stopped
+    # Remove reportsDashboards plugin — crashes on basePath URLs without query params:
+    # checkURLParams() does location.href.split('?')[1].split('&') → TypeError
+    entrypoint: ["/bin/sh", "-c", "rm -rf /usr/share/wazuh-dashboard/plugins/reportsDashboards && /entrypoint.sh"]
     environment:
       INDEXER_USERNAME: admin
       INDEXER_PASSWORD_FILE: /run/secrets/wazuh_indexer_password
@@ -153,6 +167,74 @@ services:
         reservations:
           memory: 256M
 
+  # ─── Wazuh Agent — VPS2 (vmi3129111, primary) ───────────
+  wazuh-agent-vps2:
+    image: wazuh/wazuh-agent:4.9.2
+    hostname: vps2-vmi3129111
+    restart: unless-stopped
+    environment:
+      WAZUH_MANAGER: wazuh-manager
+      WAZUH_AGENT_GROUP: docker-swarm,vps-primary
+    volumes:
+      - ./config/wazuh_agent/ossec.conf:/var/ossec/etc/ossec.conf
+      # Host log access (read-only)
+      - /var/log:/host/var/log:ro
+      - /etc:/host/etc:ro
+      # Docker socket for docker-listener + commands
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Docker data dir (FIM)
+      - /var/lib/docker:/var/lib/docker:ro
+      # IVF app configs (FIM)
+      - /opt/ivf/docker:/host/opt/ivf/docker:ro
+      # Agent persistent data
+      - wazuh_agent_vps2_var:/var/ossec/var
+      - wazuh_agent_vps2_etc:/var/ossec/etc
+    networks:
+      - wazuh-net
+    deploy:
+      placement:
+        constraints:
+          - node.hostname == vmi3129111
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
+
+  # ─── Wazuh Agent — VPS1 (vmi3129107, standby/leader) ────
+  wazuh-agent-vps1:
+    image: wazuh/wazuh-agent:4.9.2
+    hostname: vps1-vmi3129107
+    restart: unless-stopped
+    environment:
+      WAZUH_MANAGER: wazuh-manager
+      WAZUH_AGENT_GROUP: docker-swarm,vps-standby
+    volumes:
+      - ./config/wazuh_agent/ossec.conf:/var/ossec/etc/ossec.conf
+      # Host log access (read-only)
+      - /var/log:/host/var/log:ro
+      - /etc:/host/etc:ro
+      # Docker socket for docker-listener + commands
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Docker data dir (FIM)
+      - /var/lib/docker:/var/lib/docker:ro
+      # IVF app configs (FIM)
+      - /opt/ivf/docker:/host/opt/ivf/docker:ro
+      # Agent persistent data
+      - wazuh_agent_vps1_var:/var/ossec/var
+      - wazuh_agent_vps1_etc:/var/ossec/etc
+    networks:
+      - wazuh-net
+    deploy:
+      placement:
+        constraints:
+          - node.hostname == vmi3129107
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
+
 volumes:
   wazuh_api_configuration:
   wazuh_etc:
@@ -168,6 +250,10 @@ volumes:
   wazuh_indexer_data:
   wazuh_dashboard_config:
   wazuh_dashboard_custom:
+  wazuh_agent_vps1_var:
+  wazuh_agent_vps1_etc:
+  wazuh_agent_vps2_var:
+  wazuh_agent_vps2_etc:
 
 networks:
   wazuh-net:

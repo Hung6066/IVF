@@ -1,0 +1,92 @@
+<!--
+  Custom decoders for Docker & Docker Swarm monitoring
+  Mount vào manager: /var/ossec/etc/decoders/docker_swarm_decoders.xml
+-->
+
+<!-- ─── Docker Swarm Services ─── -->
+<decoder name="docker-swarm-services">
+  <prematch>^ossec: output: 'docker-swarm-services'</prematch>
+</decoder>
+<decoder name="docker-swarm-services-json">
+  <parent>docker-swarm-services</parent>
+  <regex offset="after_parent">(\S+)</regex>
+  <order>extra_data</order>
+  <plugin_decoder>JSON_Decoder</plugin_decoder>
+</decoder>
+
+<!-- ─── Docker Swarm Nodes ─── -->
+<decoder name="docker-swarm-nodes">
+  <prematch>^ossec: output: 'docker-swarm-nodes'</prematch>
+</decoder>
+<decoder name="docker-swarm-nodes-json">
+  <parent>docker-swarm-nodes</parent>
+  <regex offset="after_parent">(\S+)</regex>
+  <order>extra_data</order>
+  <plugin_decoder>JSON_Decoder</plugin_decoder>
+</decoder>
+
+<!-- ─── Docker Info ─── -->
+<decoder name="docker-info">
+  <prematch>^ossec: output: 'docker-info'</prematch>
+</decoder>
+<decoder name="docker-info-json">
+  <parent>docker-info</parent>
+  <regex offset="after_parent">(\S+)</regex>
+  <order>extra_data</order>
+  <plugin_decoder>JSON_Decoder</plugin_decoder>
+</decoder>
+
+<!-- ─── Docker Containers ─── -->
+<decoder name="docker-containers">
+  <prematch>^ossec: output: 'docker-containers'</prematch>
+</decoder>
+<decoder name="docker-containers-json">
+  <parent>docker-containers</parent>
+  <regex offset="after_parent">(\S+)</regex>
+  <order>extra_data</order>
+  <plugin_decoder>JSON_Decoder</plugin_decoder>
+</decoder>
+
+<!-- ─── Docker Unhealthy ─── -->
+<decoder name="docker-unhealthy">
+  <prematch>^ossec: output: 'docker-unhealthy'</prematch>
+</decoder>
+<decoder name="docker-unhealthy-json">
+  <parent>docker-unhealthy</parent>
+  <regex offset="after_parent">(\S+)</regex>
+  <order>extra_data</order>
+  <plugin_decoder>JSON_Decoder</plugin_decoder>
+</decoder>
+
+<!-- ─── Docker Disk Usage ─── -->
+<decoder name="docker-disk-usage">
+  <prematch>^ossec: output: 'docker-disk-usage'</prematch>
+</decoder>
+<decoder name="docker-disk-usage-json">
+  <parent>docker-disk-usage</parent>
+  <regex offset="after_parent">(\S+)</regex>
+  <order>extra_data</order>
+  <plugin_decoder>JSON_Decoder</plugin_decoder>
+</decoder>
+
+<!-- ─── Docker Networks ─── -->
+<decoder name="docker-networks">
+  <prematch>^ossec: output: 'docker-networks'</prematch>
+</decoder>
+<decoder name="docker-networks-json">
+  <parent>docker-networks</parent>
+  <regex offset="after_parent">(\S+)</regex>
+  <order>extra_data</order>
+  <plugin_decoder>JSON_Decoder</plugin_decoder>
+</decoder>
+
+<!-- ─── Docker Swarm Failed Tasks ─── -->
+<decoder name="docker-swarm-failed-tasks">
+  <prematch>^ossec: output: 'docker-swarm-failed-tasks'</prematch>
+</decoder>
+<decoder name="docker-swarm-failed-tasks-json">
+  <parent>docker-swarm-failed-tasks</parent>
+  <regex offset="after_parent">(\S+)</regex>
+  <order>extra_data</order>
+  <plugin_decoder>JSON_Decoder</plugin_decoder>
+</decoder>
