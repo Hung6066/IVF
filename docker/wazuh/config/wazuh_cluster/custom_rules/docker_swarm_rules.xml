@@ -19,8 +19,8 @@
   <!-- Node status is Down -->
   <rule id="100101" level="12">
     <if_sid>100100</if_sid>
-    <field name="status">Down</field>
-    <description>Docker Swarm: Node $(hostname) is DOWN</description>
+    <status>Down</status>
+    <description>Docker Swarm: Node is DOWN</description>
     <options>alert_by_email</options>
     <group>docker-swarm-nodes,swarm-critical</group>
   </rule>
@@ -62,7 +62,7 @@
   <!-- Service has degraded replicas (not all running) -->
   <rule id="100112" level="8">
     <if_sid>100110</if_sid>
-    <field name="replicas" negate="yes">^(\d+)/\1$</field>
+    <field name="replicas">^\d+/</field>
     <description>Docker Swarm: Service $(name) has degraded replicas: $(replicas)</description>
     <group>docker-swarm-services,swarm-warning</group>
   </rule>

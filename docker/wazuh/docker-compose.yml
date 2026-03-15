@@ -7,8 +7,12 @@
 #
 #  Components:
 #    Manager + Indexer + Dashboard  → vps2 (vmi3129111)
-#    Agent vps1                     → vps1 (vmi3129107)
-#    Agent vps2                     → vps2 (vmi3129111)
+#    Agent vps1                     → vps1 (vmi3129107, native install)
+#    Agent vps2                     → vps2 (vmi3129111, native install)
+#
+#  Agents: installed natively via apt (wazuh-agent=4.9.2-1)
+#    No container agent image exists for 4.9.x
+#    Config: /var/ossec/etc/ossec.conf (copy from config/wazuh_agent/)
 #
 #  Deploy:
 #    docker stack deploy -c docker/wazuh/docker-compose.yml wazuh
@@ -167,73 +171,15 @@ services:
         reservations:
           memory: 256M
 
-  # ─── Wazuh Agent — VPS2 (vmi3129111, primary) ───────────
-  wazuh-agent-vps2:
-    image: wazuh/wazuh-agent:4.9.2
-    hostname: vps2-vmi3129111
-    restart: unless-stopped
-    environment:
-      WAZUH_MANAGER: wazuh-manager
-      WAZUH_AGENT_GROUP: docker-swarm,vps-primary
-    volumes:
-      - ./config/wazuh_agent/ossec.conf:/var/ossec/etc/ossec.conf
-      # Host log access (read-only)
-      - /var/log:/host/var/log:ro
-      - /etc:/host/etc:ro
-      # Docker socket for docker-listener + commands
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      # Docker data dir (FIM)
-      - /var/lib/docker:/var/lib/docker:ro
-      # IVF app configs (FIM)
-      - /opt/ivf/docker:/host/opt/ivf/docker:ro
-      # Agent persistent data
-      - wazuh_agent_vps2_var:/var/ossec/var
-      - wazuh_agent_vps2_etc:/var/ossec/etc
-    networks:
-      - wazuh-net
-    deploy:
-      placement:
-        constraints:
-          - node.hostname == vmi3129111
-      resources:
-        limits:
-          memory: 256M
-        reservations:
-          memory: 128M
-
-  # ─── Wazuh Agent — VPS1 (vmi3129107, standby/leader) ────
-  wazuh-agent-vps1:
-    image: wazuh/wazuh-agent:4.9.2
-    hostname: vps1-vmi3129107
-    restart: unless-stopped
-    environment:
-      WAZUH_MANAGER: wazuh-manager
-      WAZUH_AGENT_GROUP: docker-swarm,vps-standby
-    volumes:
-      - ./config/wazuh_agent/ossec.conf:/var/ossec/etc/ossec.conf
-      # Host log access (read-only)
-      - /var/log:/host/var/log:ro
-      - /etc:/host/etc:ro
-      # Docker socket for docker-listener + commands
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      # Docker data dir (FIM)
-      - /var/lib/docker:/var/lib/docker:ro
-      # IVF app configs (FIM)
-      - /opt/ivf/docker:/host/opt/ivf/docker:ro
-      # Agent persistent data
-      - wazuh_agent_vps1_var:/var/ossec/var
-      - wazuh_agent_vps1_etc:/var/ossec/etc
-    networks:
-      - wazuh-net
-    deploy:
-      placement:
-        constraints:
-          - node.hostname == vmi3129107
-      resources:
-        limits:
-          memory: 256M
-        reservations:
-          memory: 128M
+  # ─── Wazuh Agents ───────────────────────────────────────
+  # Agents are installed NATIVELY on each VPS host (not containers).
+  # No wazuh/wazuh-agent Docker image exists for version 4.9.x.
+  #
+  # Install: WAZUH_MANAGER='127.0.0.1' apt install wazuh-agent=4.9.2-1
+  # Config:  cp config/wazuh_agent/ossec.conf /var/ossec/etc/ossec.conf
+  # Key:     docker exec <manager> /var/ossec/bin/manage_agents -e <id>
+  #          /var/ossec/bin/manage_agents -i <key>
+  # Start:   systemctl enable --now wazuh-agent
 
 volumes:
   wazuh_api_configuration:
@@ -250,10 +196,6 @@ volumes:
   wazuh_indexer_data:
   wazuh_dashboard_config:
   wazuh_dashboard_custom:
-  wazuh_agent_vps1_var:
-  wazuh_agent_vps1_etc:
-  wazuh_agent_vps2_var:
-  wazuh_agent_vps2_etc:
 
 networks:
   wazuh-net:
