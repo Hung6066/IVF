@@ -6,13 +6,13 @@
 set -euo pipefail
 
 REPORT_DIR="/var/log/lynis/reports"
-HOSTNAME="{{ ansible_hostname }}"
+HOSTNAME="vmi3129111"
 TODAY="$(date +%Y-%m-%d)"
 DATFILE="${REPORT_DIR}/lynis-${TODAY}.dat"
 JSONFILE="${REPORT_DIR}/lynis-${TODAY}.json"
 
-MINIO_ACCESS="{{ lynis_minio_access_key }}"
-MINIO_SECRET="{{ lynis_minio_secret_key }}"
+MINIO_ACCESS="ivf-admin-6dcf47ed0cd5cc8a"
+MINIO_SECRET="ZvaBRL2rgSphAByqsm1jeMMAXNXiidFjc+yVO4PIfP0="
 BUCKET="ivf-documents"
 OBJECT_PREFIX="system/lynis/${HOSTNAME}"
 
@@ -101,14 +101,11 @@ parse_lynis_dat "${DATFILE}" > "${JSONFILE}"
 chmod 600 "${JSONFILE}"
 
 # ─── upload lên MinIO (via Docker ivf-monitoring overlay) ───
-# MinIO API port 9000 is not published on host — must reach via overlay network
 MC_HOST_URL="http://${MINIO_ACCESS}:${MINIO_SECRET}@minio-metrics:9000"
 docker run --rm --network ivf-monitoring \
   -e "MC_HOST_minio=${MC_HOST_URL}" \
   -v "${JSONFILE}:/tmp/r.json:ro" \
   minio/mc:latest cp /tmp/r.json "minio/${BUCKET}/${OBJECT_PREFIX}/lynis-${TODAY}.json" --quiet
-
-# Cập nhật latest.json (overwrite)
 docker run --rm --network ivf-monitoring \
   -e "MC_HOST_minio=${MC_HOST_URL}" \
   -v "${JSONFILE}:/tmp/r.json:ro" \

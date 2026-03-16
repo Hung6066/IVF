@@ -69,7 +69,7 @@
           track tab.id
         ) {
           <button
-            (click)="setTab(tab.id)"
+            (click)="setTab($any(tab.id))"
             [class.border-blue-500]="activeTab() === tab.id"
             [class.text-blue-400]="activeTab() === tab.id"
             [class.border-transparent]="activeTab() !== tab.id"
