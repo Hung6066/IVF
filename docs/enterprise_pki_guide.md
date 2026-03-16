@@ -22,6 +22,11 @@
 18. [Script Reference](#18-script-reference)
 19. [File Inventory](#19-file-inventory)
 20. [Live Deployment Status](#20-live-deployment-status)
+21. [Lộ trình nâng cấp PKI](#21-lộ-trình-nâng-cấp-pki-pki-upgrade-roadmap)
+    - [21.1 Giai đoạn 1: FIPS hardening (Hiện tại)](#211-giai-đoạn-1-chuẩn-bị--hardening-hiện-tại)
+    - [21.2 Giai đoạn 2: Hardware HSM](#212-giai-đoạn-2-hardware-hsm-khi-có-ngân-sách)
+    - [21.3 Giai đoạn 3: Kiểm định pháp lý](#213-giai-đoạn-3-kiểm-định-pháp-lý-tùy-chọn)
+    - [21.4 Timeline & Chi phí](#214-tóm-tắt-timeline-và-chi-phí)
 
 ---
 
@@ -31,13 +36,13 @@ The IVF Enterprise PKI system provides a complete public key infrastructure for 
 
 ### Components
 
-| Component         | Role                                                                              | Image                                                      |
-| ----------------- | --------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| **EJBCA CE**      | Certificate Authority -- issues, manages, and revokes X.509 certificates          | `keyfactor/ejbca-ce:latest`                                |
-| **SignServer CE** | Document signing service -- signs PDFs using keys and certificates from EJBCA     | `keyfactor/signserver-ce:latest` (or custom SoftHSM build) |
-| **SoftHSM2**      | Software-based PKCS#11 cryptographic token -- stores private keys non-extractably | Installed into SignServer container via custom Dockerfile  |
-| **WireGuard VPN** | Secure remote access to EJBCA/SignServer admin interfaces                         | Host-level (10.200.0.1)                                    |
-| **PostgreSQL 16** | Dedicated databases for EJBCA and SignServer                                      | `postgres:16-alpine`                                       |
+| Component         | Role                                                                              | Image / Location                                                                   |
+| ----------------- | --------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| **EJBCA CE**      | Certificate Authority -- issues, manages, and revokes X.509 certificates          | `keyfactor/ejbca-ce:latest`                                                        |
+| **SignServer CE** | Document signing service -- signs PDFs using keys and certificates from EJBCA     | `keyfactor/signserver-ce:latest` (standard image, no custom build)                 |
+| **SoftHSM2**      | Software-based PKCS#11 cryptographic token -- stores private keys non-extractably | AlmaLinux 9 native binary deployed to persistent volume (`libsofthsm2.so`, 960 KB) |
+| **WireGuard VPN** | Secure remote access to EJBCA/SignServer admin interfaces                         | Host-level (10.200.0.1)                                                            |
+| **PostgreSQL 16** | Dedicated databases for EJBCA and SignServer                                      | `postgres:16-alpine`                                                               |
 
 ### Security Goals
 
@@ -198,9 +203,19 @@ Profile XML files saved in `certs/ejbca/`:
 
 ## 5. SoftHSM2 PKCS#11 Architecture
 
-The IVF deployment uses the **standard `keyfactor/signserver-ce:7.3.2` image** (no custom build). SoftHSM2 is **pre-installed** in the SignServer CE 7.3.2 image as a system package (`/usr/lib64/pkcs11/libsofthsm2.so`) and is **pre-registered** in the image's `signserver_deploy.properties` at index 1. No custom binary deployment is required.
+The IVF deployment uses the **standard `keyfactor/signserver-ce:latest` image** (no custom build). The SignServer CE container runs on **AlmaLinux 9**. SoftHSM2 is **NOT pre-installed** in the container image — the AlmaLinux 9 native `libsofthsm2.so` must be deployed to the persistent volume.
 
-The persistent **`environment-hsm` hook** on the Docker volume handles: (1) writing `softhsm2.conf` to a location writable by uid=10001, (2) exporting `SOFTHSM2_CONF` so the JVM finds the correct token directory, and (3) conditionally initializing the token on first use.
+> **Why not copy from the Docker host?** Ubuntu 24.04's `libsofthsm2.so` requires `GLIBC_2.38`, but the AlmaLinux 9 container ships with only `GLIBC_2.34`. The library must be compiled for AlmaLinux 9 (or extracted from an `almalinux:9` container via `dnf install softhsm`).
+
+The persistent **`environment-hsm` hook** on the Docker volume handles on every container restart:
+
+1. Copy `signserver-truststore.jks` from persistent volume to WildFly config dir (legacy path)
+2. Fix TLS protocol list via `python3 fix-tls.py`
+3. Register the persistent-volume `libsofthsm2.so` in `signserver_deploy.properties` at index 90
+4. Write `softhsm2.conf` pointing to the persistent token directory; export `SOFTHSM2_CONF`
+5. Initialize SoftHSM token if `softhsm2-util` is available and token is missing
+6. _(Background)_ Re-apply WildFly mTLS config via `jboss-cli` if `standalone.xml` is missing `httpsTM`
+7. _(Background, 120 s delay)_ Auto-activate all 6 workers with PIN from Docker secret
 
 ```mermaid
 graph TD
@@ -216,7 +231,7 @@ graph TD
         STARTH["start.sh<br/>(container entrypoint)"]
         SOURCEHOOK["source /opt/keyfactor/persistent/environment-hsm"]
         WRITECONF["Hook writes persistent softhsm2.conf:<br/>/opt/keyfactor/persistent/softhsm/softhsm2.conf<br/>tokendir = /opt/keyfactor/persistent/softhsm-tokens\nHook exports: SOFTHSM2_CONF=..../softhsm/softhsm2.conf"]
-        WILDFLY["WildFly 35 starts<br/>deploy.properties already has SoftHSM (image default):<br/>cryptotoken.p11.lib.1.name = SoftHSM<br/>cryptotoken.p11.lib.1.file = /usr/lib64/pkcs11/libsofthsm2.so<br/>SOFTHSM2_CONF env var points JVM to persistent token directory"]
+        WILDFLY["WildFly 35 starts<br/>Hook wrote to deploy.properties (index 90):<br/>cryptotoken.p11.lib.90.name = SoftHSM<br/>cryptotoken.p11.lib.90.file = /opt/keyfactor/persistent/libsofthsm2.so<br/>SOFTHSM2_CONF env var points JVM to persistent token directory"]
 
         STARTH --> SOURCEHOOK --> WRITECONF --> WILDFLY
     end
@@ -233,41 +248,53 @@ graph TD
 
 ### Key Storage Details
 
-| Parameter                      | Value                                                                                                        |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------ |
-| Token label                    | `SignServerToken`                                                                                            |
-| User PIN                       | From Docker secret `softhsm_pin` (mounted at `/run/secrets/softhsm_pin`)                                     |
-| SO PIN                         | From Docker secret `softhsm_so_pin` (mounted at `/run/secrets/softhsm_so_pin`)                               |
-| Library path (system)          | `/usr/lib64/pkcs11/libsofthsm2.so` **(pre-installed in SignServer CE 7.3.2 image)**                          |
-| SoftHSM2 utility               | `softhsm2-util` **(system binary, pre-installed in image)**                                                  |
-| softhsm2.conf (persistent)     | `/opt/keyfactor/persistent/softhsm/softhsm2.conf` (written by hook on every restart)                         |
-| `SOFTHSM2_CONF` env var        | Exported by hook; JVM and softhsm2-util both use this to find the conf file                                  |
-| Token directory                | `/opt/keyfactor/persistent/softhsm-tokens` (Docker volume `ivf_signserver_persistent`)                       |
-| Startup hook                   | `/opt/keyfactor/persistent/environment-hsm` (sourced by `start.sh` on every restart)                         |
-| deploy.properties registration | Pre-configured in image: `cryptotoken.p11.lib.1.name = SoftHSM` / `.file = /usr/lib64/pkcs11/libsofthsm2.so` |
-| SoftHSM2 version               | v2.6.1 (AlmaLinux 9 system package — pre-installed in SignServer CE 7.3.2)                                   |
-| Key algorithm                  | RSA 4096                                                                                                     |
-| Key extractable                | **No** (`CKA_EXTRACTABLE = false`)                                                                           |
-| SignServer user UID            | `10001`                                                                                                      |
+| Parameter                     | Value                                                                                                                    |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Token label                   | `SignServerToken`                                                                                                        |
+| User PIN                      | From Docker secret `softhsm_pin` (mounted at `/run/secrets/softhsm_pin`)                                                 |
+| SO PIN                        | From Docker secret `softhsm_so_pin` (mounted at `/run/secrets/softhsm_so_pin`)                                           |
+| Library path (persistent)     | `/opt/keyfactor/persistent/libsofthsm2.so` — **AlmaLinux 9 native build (960 KB), deployed to persistent volume**        |
+| Library deploy.properties key | `cryptotoken.p11.lib.90.name = SoftHSM` / `.file = /opt/keyfactor/persistent/libsofthsm2.so` (written by hook, index 90) |
+| SoftHSM2 utility              | `softhsm2-util` — available only via PATH if installed in container (not guaranteed); hook handles init idempotently     |
+| softhsm2.conf (persistent)    | `/opt/keyfactor/persistent/softhsm/softhsm2.conf` (written by hook on every restart)                                     |
+| `SOFTHSM2_CONF` env var       | Exported by hook; JVM and softhsm2-util both use this to find the conf file                                              |
+| Token directory               | `/opt/keyfactor/persistent/softhsm-tokens/` (Docker volume `ivf_signserver_persistent`)                                  |
+| Startup hook                  | `/opt/keyfactor/persistent/environment-hsm` (sourced by `start.sh` on every restart)                                     |
+| SoftHSM2 binary origin        | Extracted from `almalinux:9` via `dnf install softhsm` into a temp container                                             |
+| Key algorithm                 | RSA 4096                                                                                                                 |
+| Key extractable               | **No** (`CKA_EXTRACTABLE = false`)                                                                                       |
+| SignServer user UID           | `10001`                                                                                                                  |
 
 ### environment-hsm Hook (Current Content)
 
-The hook at `/opt/keyfactor/persistent/environment-hsm` performs four tasks on every container restart:
+The hook at `/opt/keyfactor/persistent/environment-hsm` (source: `scripts/signserver-environment-hsm.sh`) performs the following tasks on every container restart:
 
 ```bash
 #!/bin/bash
-# 1. Copy truststore.jks to WildFly config dir (enables mTLS admin web)
-CONF_DIR=/opt/keyfactor/appserver/standalone/configuration
+# 1. Copy truststore.jks from persistent volume to WildFly config dir (legacy path)
 if [ -f /opt/keyfactor/persistent/truststore.jks ]; then
-    cp /opt/keyfactor/persistent/truststore.jks "${CONF_DIR}/truststore.jks"
+    cp /opt/keyfactor/persistent/truststore.jks \
+        /opt/keyfactor/appserver/standalone/configuration/truststore.jks
 fi
 
-# 2. Fix TLS protocols (remove TLSv1.3 — breaks Firefox SSL client cert auth)
+# 2. Fix TLS protocols (remove TLSv1.3 from functions-appserver)
 python3 /opt/keyfactor/persistent/fix-tls.py
 
-# 3. Write softhsm2.conf to writable subdir + export SOFTHSM2_CONF
-#    NOTE: /opt/keyfactor/persistent/ is owned by root — NOT writable by uid=10001
-#    BUT /opt/keyfactor/persistent/softhsm/ subdir IS owned by uid=10001
+# 3. Register SoftHSM library from persistent volume in deploy.properties
+#    Note: library lives at /opt/keyfactor/persistent/libsofthsm2.so (AlmaLinux 9 native)
+#    Registered at index 90 to avoid conflicting with any image-default entries.
+SOFTHSM_LIB=/opt/keyfactor/persistent/libsofthsm2.so
+DEPLOY_PROPS=/opt/keyfactor/signserver-custom/conf/signserver_deploy.properties
+if [ -f "${SOFTHSM_LIB}" ]; then
+    if ! grep -q "cryptotoken.p11.lib.90.name" "${DEPLOY_PROPS}"; then
+        echo "cryptotoken.p11.lib.90.name = SoftHSM" >> "${DEPLOY_PROPS}"
+        echo "cryptotoken.p11.lib.90.file = ${SOFTHSM_LIB}" >> "${DEPLOY_PROPS}"
+    else
+        sed -i "s|cryptotoken.p11.lib.90.file = .*|cryptotoken.p11.lib.90.file = ${SOFTHSM_LIB}|" "${DEPLOY_PROPS}"
+    fi
+fi
+
+# 5. Write softhsm2.conf to writable subdir + export SOFTHSM2_CONF
 SOFTHSM_CONF_FILE=/opt/keyfactor/persistent/softhsm/softhsm2.conf
 SOFTHSM_TOKEN_DIR=/opt/keyfactor/persistent/softhsm-tokens
 mkdir -p "${SOFTHSM_TOKEN_DIR}"
@@ -277,29 +304,63 @@ log.level = INFO
 EOF
 export SOFTHSM2_CONF="${SOFTHSM_CONF_FILE}"
 
-# 4. Initialize SoftHSM token if not already present
+# 6. Initialize SoftHSM token if softhsm2-util is available and token missing
 TOKEN_LABEL="${SOFTHSM_TOKEN_LABEL:-SignServerToken}"
-HSM_PIN="$(cat "${SOFTHSM_USER_PIN_FILE}" 2>/dev/null || echo '3ac33a807af6b22fe9f22e4ba2c56a3b')"
+HSM_PIN="$(cat "${SOFTHSM_USER_PIN_FILE}" 2>/dev/null || echo 'fallback-pin')"
 HSM_SO_PIN="$(cat "${SOFTHSM_SO_PIN_FILE}" 2>/dev/null || echo "${HSM_PIN}")"
-if softhsm2-util --show-slots 2>/dev/null | grep -q "Label.*${TOKEN_LABEL}"; then
-    echo "[hook] SoftHSM token '${TOKEN_LABEL}' already initialized"
-else
-    softhsm2-util --init-token --free --label "${TOKEN_LABEL}" \
-        --pin "${HSM_PIN}" --so-pin "${HSM_SO_PIN}"
+if command -v softhsm2-util &>/dev/null; then
+    if ! softhsm2-util --show-slots 2>/dev/null | grep -q "Label.*${TOKEN_LABEL}"; then
+        softhsm2-util --init-token --free \
+            --label "${TOKEN_LABEL}" --pin "${HSM_PIN}" --so-pin "${HSM_SO_PIN}"
+    fi
 fi
+
+# 8. (Background) Re-apply WildFly mTLS config if standalone.xml lost httpsTM
+#    WildFly can regenerate standalone.xml on startup, losing jboss-cli changes.
+(
+    JBOSS_CLI=/opt/keyfactor/wildfly-35.0.1.Final/bin/jboss-cli.sh
+    STANDALONE_XML=/opt/keyfactor/wildfly-35.0.1.Final/standalone/configuration/standalone.xml
+    for i in $(seq 1 30); do
+        if ${JBOSS_CLI} --connect --command="ls /subsystem=elytron" >/dev/null 2>&1; then break; fi
+        sleep 10
+    done
+    if ! grep -q "httpsTM" "${STANDALONE_XML}" 2>/dev/null; then
+        ${JBOSS_CLI} --connect --commands="
+/subsystem=elytron/key-store=httpsTS:add(path=signserver-truststore.jks,relative-to=jboss.server.config.dir,credential-reference={clear-text=changeit},type=JKS),
+/subsystem=elytron/key-store=httpsTS:load(),
+/subsystem=elytron/trust-manager=httpsTM:add(key-store=httpsTS),
+/subsystem=elytron/server-ssl-context=httpsSSC:write-attribute(name=trust-manager,value=httpsTM),
+/subsystem=elytron/server-ssl-context=httpsSSC:write-attribute(name=want-client-auth,value=true),
+reload"
+    fi
+) &
+
+# 7. (Background, 120s delay) Auto-activate crypto tokens after SignServer deploys
+(
+    sleep 120
+    SIGNCLI=/opt/keyfactor/signserver/bin/signserver
+    PIN="$(cat "${SOFTHSM_USER_PIN_FILE}" 2>/dev/null || echo 'fallback-pin')"
+    for WID in 1 100 272 444 597 907; do
+        ${SIGNCLI} activatecryptotoken ${WID} "${PIN}" >/dev/null 2>&1
+    done
+) &
 ```
 
 > **Key design decisions**:
 >
 > - The hook is **sourced** (not executed) by `start.sh`, so `export SOFTHSM2_CONF` propagates to the WildFly JVM process.
-> - Writing to `/opt/keyfactor/persistent/softhsm/softhsm2.conf` works because that subdirectory is owned by uid=10001. Writing to the persistent volume root fails (owned by root).
-> - `deploy.properties` does **not** need modification — `SoftHSM` is pre-registered in the image at index 1.
+> - The library is registered at **index 90** (not the image default index 1) to allow both registrations to coexist without conflict.
+> - Writing `softhsm2.conf` to `/opt/keyfactor/persistent/softhsm/softhsm2.conf` works because the `softhsm/` subdirectory is owned by uid=10001. The volume root is owned by root.
+> - **Section 8 (mTLS idempotency)**: WildFly rewrites `standalone.xml` on startup in some scenarios (e.g., multiple forced restarts). This background job detects the loss and re-applies via `jboss-cli`, ensuring `httpsTS` + `httpsTM` + `want-client-auth=true` always survive.
+> - **Section 7 (auto-activation)**: Tokens are automatically activated 120 seconds after container start, eliminating the need for manual `activatecryptotoken` after restarts.
 
 ### Why the Persistent Hook Approach
 
-`/etc/softhsm2.conf` is in the **ephemeral** container filesystem — it does not exist in the base image and is reset on container recreation. The `SOFTHSM2_CONF` environment variable overrides the default config file location, so the hook exports it to point to the persistent volume copy.
+`/etc/softhsm2.conf` and `/opt/keyfactor/signserver-custom/conf/signserver_deploy.properties` are in the **ephemeral** container filesystem — they are reset to image defaults on every container recreation. The persistent volume hook approach solves this:
 
-The `start.sh` entrypoint sources every file matching `/opt/keyfactor/*/environment-hsm` before starting WildFly. Placing the hook on the persistent volume (`/opt/keyfactor/persistent/environment-hsm`) means it runs on every container restart, writes the `softhsm2.conf` to the persistent volume, exports `SOFTHSM2_CONF`, and WildFly/the PKCS#11 library correctly finds the token directory on every restart.
+- `SOFTHSM2_CONF` env var (exported by hook) overrides the default config file lookup for both WildFly JVM and `softhsm2-util`.
+- `deploy.properties` is rewritten on every startup by the hook (not reliant on image defaults).
+- `standalone.xml` WildFly config (mTLS trust-manager) is re-applied via `jboss-cli` if the file is regenerated.
 
 ### Why PKCS#11 Over P12
 
@@ -649,20 +710,41 @@ In `appsettings.json`, tenant-specific signing can override the default CA:
 
 ## 10. Docker Compose Services
 
-| Service         | Container Name      | Image                            | Ports (host:container)                               | Networks                          | Volumes                                                                     | Profile |
-| --------------- | ------------------- | -------------------------------- | ---------------------------------------------------- | --------------------------------- | --------------------------------------------------------------------------- | ------- |
-| `ejbca`         | `ivf-ejbca`         | `keyfactor/ejbca-ce:latest`      | `8443:8443` (HTTPS Admin), `8442:8080` (HTTP Public) | ivf-public, ivf-signing, ivf-data | `ejbca_persistent:/opt/keyfactor/persistent`, `./certs/ca/ca.pem` (ro)      | default |
-| `ejbca-db`      | `ivf-ejbca-db`      | `postgres:16-alpine`             | --                                                   | ivf-data                          | `ejbca_db_data:/var/lib/postgresql/data`                                    | default |
-| `signserver`    | `ivf-signserver`    | `keyfactor/signserver-ce:latest` | `9443:8443` (HTTPS Admin)                            | ivf-public, ivf-signing, ivf-data | `signserver_persistent:/opt/keyfactor/persistent`, `./certs/ca/ca.pem` (ro) | default |
-| `signserver-db` | `ivf-signserver-db` | `postgres:16-alpine`             | --                                                   | ivf-data                          | `signserver_db_data:/var/lib/postgresql/data`                               | default |
+| Service         | Container Name      | Image                            | Ports (host:container)                               | Networks              | Volumes                                                                                                                                  | Profile |
+| --------------- | ------------------- | -------------------------------- | ---------------------------------------------------- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| `ejbca`         | `ivf-ejbca`         | `keyfactor/ejbca-ce:latest`      | `8443:8443` (HTTPS Admin), `8442:8080` (HTTP Public) | ivf-signing, ivf-data | `ejbca_persistent:/opt/keyfactor/persistent`, `ejbca_wildfly_cfg:/opt/keyfactor/appserver/standalone/configuration`                      | default |
+| `ejbca-db`      | `ivf-ejbca-db`      | `postgres:16-alpine`             | --                                                   | ivf-data              | `ejbca_db_data:/var/lib/postgresql/data`                                                                                                 | default |
+| `signserver`    | `ivf-signserver`    | `keyfactor/signserver-ce:latest` | `9443:8443` (HTTPS Admin)                            | ivf-signing, ivf-data | `signserver_persistent:/opt/keyfactor/persistent`, `signserver_wildfly_cfg:/opt/keyfactor/wildfly-35.0.1.Final/standalone/configuration` | default |
+| `signserver-db` | `ivf-signserver-db` | `postgres:16-alpine`             | --                                                   | ivf-data              | `signserver_db_data:/var/lib/postgresql/data`                                                                                            | default |
 
 ### SoftHSM2 Integration (Swarm Stack)
 
-The **standard `keyfactor/signserver-ce:latest` image** is used — no custom Dockerfile is needed. SoftHSM2 support is activated by running `setup-pkcs11-workers.sh` once after the stack is deployed. The script:
+The **standard `keyfactor/signserver-ce:latest` image** is used — no custom Dockerfile is needed. SoftHSM2 support is activated by deploying the AlmaLinux 9 native library to the persistent volume and installing the `environment-hsm` startup hook. One-time setup:
 
-1. Copies AlmaLinux 9 native SoftHSM2 binaries onto the `signserver_persistent` Docker volume
-2. Installs a persistent `environment-hsm` startup hook on the same volume
-3. Restarts the service — on every subsequent restart, the hook runs before WildFly, registers the library, and initializes the token using PINs from Docker secrets
+1. Extract AlmaLinux 9 native `libsofthsm2.so` from a temporary `almalinux:9` container (`dnf install softhsm`)
+2. Copy the library to `ivf_signserver_persistent` volume at the root: `libsofthsm2.so`
+3. Install the `environment-hsm` hook (from `scripts/signserver-environment-hsm.sh`) at the same volume root
+4. Restart the service — on every subsequent restart, the hook registers the library, configures SoftHSM, and re-applies WildFly mTLS config
+
+> **Note**: EJBCA and SignServer admin web UIs (`8443`, `9443`) are **NOT** on the `ivf-public` network in the Swarm stack. Access is exclusively via SSH tunnel:
+>
+> ```bash
+> ssh -L 8443:localhost:8443 -L 9443:localhost:9443 root@10.200.0.1
+> ```
+
+### EJBCA/SignServer Environment Variables
+
+```yaml
+# EJBCA (same for SignServer)
+TLS_SETUP_ENABLED: later # Use persistent WildFly config volume instead of auto-TLS
+INITIAL_ADMIN:
+  ";CertificateAuthenticationToken:WITH_ISSUER_SERIAL;\
+  CN=IVF Root Certificate Authority,OU=PKI,O=IVF Healthcare,C=VN;\
+  3AEE4ACB235D363E4179C8ABD1CD41BAA92F93D2;"
+  # ↑ serial of superadmin.p12 — locks admin access to this specific cert
+```
+
+> **Important**: `TLS_SETUP_ENABLED=later` means WildFly uses whatever TLS config exists in `*_wildfly_cfg` volumes rather than auto-generating a self-signed cert on every start.
 
 ### Docker Secrets Required
 
@@ -823,70 +905,95 @@ environment:
 ### Prerequisites
 
 1. WireGuard VPN connection established (VPN server at `10.200.0.1`)
-2. `superadmin.p12` client certificate generated from EJBCA's ManagementCA
+2. `superadmin.p12` client certificate — issued by **IVF-Root-CA** (not ManagementCA)
+
+> **Current superadmin cert**: Serial `3AEE4ACB235D363E4179C8ABD1CD41BAA92F93D2`, issuer `CN=IVF Root Certificate Authority,OU=PKI,O=IVF Healthcare,C=VN`, password: **`SuperAdmin1!`**  
+> File: `certs/ejbca/superadmin.p12` (local). Both EJBCA and SignServer `INITIAL_ADMIN` in `docker-compose.stack.yml` are configured with this serial.
 
 ### Step 1: Generate superadmin.p12
 
-On first EJBCA startup with `INITIAL_ADMIN=;PublicAccessAuthenticationToken:TRANSPORT_ANY;`, admin access is open. Use this to generate a proper admin certificate:
+The production superadmin cert is issued by EJBCA's **IVF-Root-CA** (not ManagementCA), using `CertificateAuthenticationToken:WITH_ISSUER_SERIAL` mode:
 
 ```bash
-# Access EJBCA admin web (no client cert needed initially)
-# Navigate to: RA Functions → Add End Entity
-# Create entity with ManagementCA, ENDUSER profile
-# Generate keystore (PKCS#12)
+EJBCA=$(docker ps --filter name=ivf_ejbca --format "{{.Names}}" | head -1)
 
-# Or via CLI:
-docker exec ivf-ejbca /opt/keyfactor/bin/ejbca.sh ra addendentity \
+# Add end entity under IVF-Root-CA
+docker exec "$EJBCA" /opt/keyfactor/bin/ejbca.sh ra addendentity \
     --username superadmin \
-    --dn "CN=SuperAdmin,O=IVF Healthcare,C=VN" \
-    --caname ManagementCA \
-    --type 1 \
-    --token P12 \
-    --password changeit \
-    --certprofile ENDUSER \
-    --eeprofile EMPTY
+    --dn "CN=SuperAdmin,OU=PKI,O=IVF Healthcare,C=VN" \
+    --caname "IVF-Root-CA" \
+    --type 1 --token P12 --password SuperAdmin1! \
+    --certprofile ENDUSER --eeprofile EMPTY
 
-docker exec ivf-ejbca /opt/keyfactor/bin/ejbca.sh ra setclearpwd superadmin changeit
-docker exec ivf-ejbca /opt/keyfactor/bin/ejbca.sh batch --username superadmin -dir /tmp
+docker exec "$EJBCA" /opt/keyfactor/bin/ejbca.sh ra setclearpwd superadmin "SuperAdmin1!"
+docker exec "$EJBCA" /opt/keyfactor/bin/ejbca.sh batch --username superadmin -dir /tmp
 
 # Copy to host
-docker cp ivf-ejbca:/tmp/superadmin.p12 ./certs/ejbca-admin.p12
+docker cp "${EJBCA}:/tmp/superadmin.p12" ./certs/ejbca/superadmin.p12
 ```
 
-### Step 2: Add Admin Role
+After enrollment, get the cert serial and update `docker-compose.stack.yml`:
 
 ```bash
-docker exec ivf-ejbca /opt/keyfactor/bin/ejbca.sh roles addrolemember \
-    --role "Super Administrator Role" \
-    --caname ManagementCA \
-    --with CertificateAuthenticationToken \
-    --value "CN=SuperAdmin,O=IVF Healthcare,C=VN"
+# Extract serial from P12
+keytool -list -v -keystore certs/ejbca/superadmin.p12 -storepass "SuperAdmin1!" \
+    | grep "Serial number"
+
+# Update in docker-compose.stack.yml:
+# EJBCA_ADMIN_CERT_SERIAL=<NEW_SERIAL>
+# SIGNSERVER_ADMIN_CERT_SERIAL=<NEW_SERIAL>
 ```
+
+### Step 2: Configure INITIAL_ADMIN in Stack
+
+`INITIAL_ADMIN` in `docker-compose.stack.yml` uses the cert serial to lock admin access:
+
+```yaml
+# EJBCA
+INITIAL_ADMIN: ";CertificateAuthenticationToken:WITH_ISSUER_SERIAL;CN=IVF Root Certificate Authority,OU=PKI,O=IVF Healthcare,C=VN;3AEE4ACB235D363E4179C8ABD1CD41BAA92F93D2;"
+# SignServer
+INITIAL_ADMIN: ";CertificateAuthenticationToken:WITH_ISSUER_SERIAL;CN=IVF Root Certificate Authority,OU=PKI,O=IVF Healthcare,C=VN;3AEE4ACB235D363E4179C8ABD1CD41BAA92F93D2;"
+```
+
+> **Old (insecure) pattern**: `PublicAccessAuthenticationToken:TRANSPORT_ANY` — allows any unauthenticated request. Do NOT use in production.
 
 ### Step 3: Import P12 into Browser
 
 1. Open your browser's certificate management:
    - **Chrome**: Settings > Privacy and Security > Security > Manage certificates
    - **Firefox**: Settings > Privacy & Security > Certificates > View Certificates
-2. Import `superadmin.p12` (password: `changeit`)
-3. The ManagementCA must also be in the browser's trusted certificate authorities for the connection to succeed
+2. Import `superadmin.p12` (password: **`SuperAdmin1!`**)
+3. Trust the **IVF Root Certificate Authority** cert (`certs/ca/root-ca.pem`) in your browser's trusted CAs
 
-### Step 4: Access Admin Web UIs
+### Step 4: Set Up SSH Tunnel
 
-| Application           | URL                                                               | Authentication                      |
-| --------------------- | ----------------------------------------------------------------- | ----------------------------------- |
-| **EJBCA Admin**       | `https://10.200.0.1:8443/ejbca/adminweb/`                         | Client certificate (superadmin.p12) |
-| **EJBCA Public**      | `https://10.200.0.1:8443/ejbca/publicweb/`                        | No auth required                    |
-| **EJBCA RA**          | `https://10.200.0.1:8443/ejbca/ra/`                               | Client certificate                  |
-| **SignServer Admin**  | `https://10.200.0.1:9443/signserver/adminweb/`                    | Client certificate (superadmin.p12) |
-| **SignServer Health** | `https://10.200.0.1:9443/signserver/healthcheck/signserverhealth` | No auth                             |
+EJBCA and SignServer admin ports are NOT exposed to the public internet — access via SSH tunnel only:
 
-### Step 5: Allow Any Admin in SignServer (Development)
+```bash
+ssh -L 8443:localhost:8443 -L 9443:localhost:9443 root@10.200.0.1
+```
+
+### Step 5: Access Admin Web UIs
+
+With the tunnel running, browse using the SSH-forwarded localhost ports:
+
+| Application           | URL                                                              | Authentication                      |
+| --------------------- | ---------------------------------------------------------------- | ----------------------------------- |
+| **EJBCA Admin**       | `https://localhost:8443/ejbca/adminweb/`                         | Client certificate (superadmin.p12) |
+| **EJBCA Public**      | `https://localhost:8443/ejbca/publicweb/`                        | No auth required                    |
+| **EJBCA RA**          | `https://localhost:8443/ejbca/ra/`                               | Client certificate                  |
+| **SignServer Admin**  | `https://localhost:9443/signserver/adminweb/`                    | Client certificate (superadmin.p12) |
+| **SignServer Health** | `https://localhost:9443/signserver/healthcheck/signserverhealth` | No auth                             |
+
+> **Note**: EJBCA and SignServer ports are NOT published publicly. Direct access to `https://10.200.0.1:8443/...` does not work without the SSH tunnel.
+
+### Step 6: Allow Any Admin in SignServer (Development)
 
 For development, SignServer can be configured to accept any client certificate:
 
 ```bash
-docker exec ivf-signserver /opt/signserver/bin/signserver wsadmins -allowany
+SSCONT=$(docker ps --filter name=ivf_signserver --format "{{.Names}}" | grep -v '\-db' | head -1)
+docker exec "$SSCONT" /opt/keyfactor/bin/signserver wsadmins -allowany
 ```
 
 For production, add specific admin certificates via the SignServer Admin Web or CLI.
@@ -1112,7 +1219,12 @@ ejbca.sh config protocols enable --name "OCSP"
 
 ### SignServer CLI
 
-All commands are run via: `docker exec ivf-signserver /opt/signserver/bin/signserver <command>`
+All commands are run via (replace `$SSCONT` with the actual container name):
+
+```bash
+SSCONT=$(docker ps --filter name=ivf_signserver --format "{{.Names}}" | grep -v '\-db' | head -1)
+docker exec "$SSCONT" /opt/keyfactor/bin/signserver <command>
+```
 
 #### Worker Properties
 
@@ -1216,28 +1328,40 @@ signserver wsarchiveauditors -add -cert /tmp/superadmin-cert.pem
 signserver wsarchiveauditors -list
 ```
 
-> **Current state**: The superadmin cert (serial `4cc00e72ec60ba41ae2a91a386abf9ebaac2d33f`, issuer `CN=IVF Root Certificate Authority`) has been added to both `wsauditors` and `wsarchiveauditors`. `wsadmins` is still in `allowany` mode (any certificate accepted) — lock down for production.
+> **Current state (March 2026)**: Three certificates are authorized in both `wsauditors` and `wsarchiveauditors`:
+>
+> - `4cc00e72ec60ba41ae2a91a386abf9ebaac2d33f` — IVF Root CA cert itself (issuer: self)
+> - `2eb6eb968de282d3d8e731f79081ca1405836e09` — CN=IVF Admin (issuer: IVF Internal Root CA)
+> - `3aee4acb235d363e4179c8abd1cd41baa92f93d2` — superadmin.p12 (issuer: IVF Root Certificate Authority)
+>
+> `wsadmins` is still in `allowany` mode — lock down before production.
+>
+> **Important**: `wsadmins -allowany` does NOT grant auditor or archive-auditor access. These are separate, independent roles. Users accessing audit log or archive pages must be explicitly added to `wsauditors` / `wsarchiveauditors`.
 
 ## 16. Troubleshooting
 
 ### "SHAREDLIBRARYNAME SoftHSM is not referring to a defined value. Available library names: (empty)"
 
-**Cause**: WildFly loaded `signserver_deploy.properties` before SoftHSM was registered. In SignServer CE 7.3.2, SoftHSM is **pre-registered** in the image's deploy.properties at index 1 (`cryptotoken.p11.lib.1.name = SoftHSM`). This error should not occur unless the deploy.properties was overwritten.
+**Cause**: The `environment-hsm` hook did not run (or failed silently) before WildFly loaded `signserver_deploy.properties`. SoftHSM is registered by the hook at runtime at index 90 (`cryptotoken.p11.lib.90.name = SoftHSM`). If the hook was not executed, no library entry exists.
 
-**Fix**: Verify the current state and trigger a restart if needed:
+**Fix**: Verify the hook ran and the library entry was written:
 
 ```bash
-CONT=$(docker ps --filter name=ivf_signserver --format "{{.Names}}" | grep -v '\-db' | head -1)
+SSCONT=$(docker ps --filter name=ivf_signserver --format "{{.Names}}" | grep -v '\-db' | head -1)
 
-# Check if SoftHSM is registered (should show index 1)
-docker exec "$CONT" grep -i softhsm \
+# Check if index 90 is present
+docker exec "$SSCONT" grep -i softhsm \
     /opt/keyfactor/signserver-custom/conf/signserver_deploy.properties
 
 # Expected output:
-# cryptotoken.p11.lib.1.name = SoftHSM
-# cryptotoken.p11.lib.1.file = /usr/lib64/pkcs11/libsofthsm2.so
+# cryptotoken.p11.lib.90.name = SoftHSM
+# cryptotoken.p11.lib.90.file = /opt/keyfactor/persistent/libsofthsm2.so
 
-# If not present, force restart (the image default will be restored):
+# Verify libsofthsm2.so exists in the persistent volume:
+docker exec "$SSCONT" ls -la /opt/keyfactor/persistent/libsofthsm2.so
+
+# If the library file is missing, redeploy it from AlmaLinux 9 (see "SoftHSM2 library not found" below).
+# If the file is present but the entry is missing, force restart to re-run the hook:
 docker service update --force ivf_signserver
 ```
 
@@ -1283,23 +1407,19 @@ EndEntityProfile eep = new EndEntityProfile(true);  // NOT new EndEntityProfile(
 
 **Cause**: `/opt/keyfactor/signserver-custom/conf/signserver_deploy.properties` is in the **ephemeral** container filesystem — it is reset to the image default every time the container restarts. Only the `/opt/keyfactor/persistent/` directory (Docker volume `ivf_signserver_persistent`) survives restarts.
 
-**Fix**: Never write PKCS#11 library registration directly to `signserver_deploy.properties` at runtime. Instead, use the persistent startup hook:
+**Fix**: Never write PKCS#11 library registration directly to `signserver_deploy.properties` at runtime. Instead, ensure the persistent startup hook is in place:
 
 ```
 /opt/keyfactor/persistent/environment-hsm
 ```
 
-This file is sourced by `start.sh` on every container startup and writes the library entries before WildFly loads. See Phase 3 of `setup-pkcs11-workers.sh` for the exact hook content.
+This file is sourced by `start.sh` on every container startup. It writes `cryptotoken.p11.lib.90.name = SoftHSM` and `.file = /opt/keyfactor/persistent/libsofthsm2.so` before WildFly loads. See `scripts/signserver-environment-hsm.sh` for the current hook content.
 
 ### "SoftHSM2 library not found in SignServer container"
 
-**Note**: In **SignServer CE 7.3.2**, SoftHSM2 is **pre-installed** as a system package (`/usr/lib64/pkcs11/libsofthsm2.so`). This error should not occur on 7.3.2+.
+**Cause**: SignServer CE 7.3.2 is based on **AlmaLinux 9 minimal** — `libsofthsm2.so` is **NOT pre-installed** in the image. The library must be placed manually in the persistent volume. If Alpine/Ubuntu/Debian-built binaries of `libsofthsm2.so` are used, SoftHSM will fail with GLIBC version errors (AlmaLinux 9 requires AlmaLinux 9 native binaries).
 
-If you are on an older custom image that does NOT include SoftHSM2, or if the library is missing:
-
-**Cause**: The SignServer CE image is based on **AlmaLinux 9** (minimal). Ubuntu-built `libsofthsm2.so` is incompatible (requires `GLIBC_2.38` which is not present on AlmaLinux 9).
-
-**Fix** (for older images without pre-installed SoftHSM2): Pull AlmaLinux 9 native SoftHSM2 binaries via a temporary container:
+**Fix**: Pull AlmaLinux 9 native SoftHSM2 binaries via a temporary container and copy to the persistent volume root:
 
 ```bash
 docker rm -f softhsm-src 2>/dev/null || true
@@ -1310,17 +1430,66 @@ docker cp softhsm-src:/usr/lib64/pkcs11/libsofthsm2.so /tmp/libsofthsm2.so
 docker cp softhsm-src:/usr/bin/softhsm2-util            /tmp/softhsm2-util
 docker rm -f softhsm-src
 
-# Copy to persistent volume in SignServer container
-CONT=$(docker ps --filter name=ivf_signserver --format "{{.Names}}" | grep -v '\-db' | head -1)
-docker exec --user root "$CONT" mkdir -p /opt/keyfactor/persistent/softhsm/lib \
-                                         /opt/keyfactor/persistent/softhsm/bin
-docker cp /tmp/libsofthsm2.so "$CONT:/opt/keyfactor/persistent/softhsm/lib/libsofthsm2.so"
-docker cp /tmp/softhsm2-util  "$CONT:/opt/keyfactor/persistent/softhsm/bin/softhsm2-util"
-docker exec --user root "$CONT" \
-    chmod 644 /opt/keyfactor/persistent/softhsm/lib/libsofthsm2.so
-docker exec --user root "$CONT" \
-    chmod 755 /opt/keyfactor/persistent/softhsm/bin/softhsm2-util
+# Copy to persistent volume root (the hook reads from here)
+SSCONT=$(docker ps --filter name=ivf_signserver --format "{{.Names}}" | grep -v '\-db' | head -1)
+docker cp /tmp/libsofthsm2.so "$SSCONT":/opt/keyfactor/persistent/libsofthsm2.so
+docker cp /tmp/softhsm2-util  "$SSCONT":/opt/keyfactor/persistent/softhsm2-util
+docker exec --user root "$SSCONT" chmod 755 /opt/keyfactor/persistent/libsofthsm2.so
+docker exec --user root "$SSCONT" chmod 755 /opt/keyfactor/persistent/softhsm2-util
+
+# Force restart to re-run the environment-hsm hook (which writes the deploy.properties entry)
+docker service update --force ivf_signserver
 ```
+
+> **Persistent**: Once copied to `ivf_signserver_persistent` volume, the library survives container restarts. The `environment-hsm` hook registers it at `cryptotoken.p11.lib.90` on every startup.
+
+### "Audit Log / Archive page shows 'Auditor not authorized to resource'"
+
+**Cause**: The certificate used in the browser is not in the `wsauditors` or `wsarchiveauditors` role list. This is independent of `wsadmins` — even if `wsadmins -allowany` is set, audit log access requires separate authorization.
+
+**Fix**: Add the certificate serial + issuer DN to both roles:
+
+```bash
+SSCONT=$(docker ps --filter name=ivf_signserver --format "{{.Names}}" | grep -v '\-db' | head -1)
+
+# Find the serial and issuer of the cert in the browser (from the error page or cert viewer)
+SERIAL="<hex-serial-from-browser-cert>"
+ISSUER="CN=...,O=...,C=VN"
+
+docker exec "$SSCONT" /opt/keyfactor/bin/signserver wsauditors -add \
+    -certserialno "$SERIAL" \
+    -issuerdn "$ISSUER"
+
+docker exec "$SSCONT" /opt/keyfactor/bin/signserver wsarchiveauditors -add \
+    -certserialno "$SERIAL" \
+    -issuerdn "$ISSUER"
+```
+
+> **Note**: These rules are stored in the SignServer database and survive container restarts. No service restart is required after adding certs.
+
+### WildFly mTLS config (trust-manager) lost after service restart
+
+**Cause**: WildFly regenerates `standalone.xml` during startup. On very rapid restarts or multiple `--force` updates, the jboss-cli changes applied at initialization can be lost.
+
+**Symptom**: Running `curl -v https://signserver:8443/...` no longer shows `Request CERT (13)` in the TLS handshake. Client certificate authentication stops working.
+
+**Prevention**: The `environment-hsm` hook (Section 8) re-applies the WildFly mTLS config idempotently via `jboss-cli.sh` on every container startup. If the hook ran successfully, this should not occur.
+
+**Fix** (if the hook did not restore it automatically):
+
+```bash
+SSCONT=$(docker ps --filter name=ivf_signserver --format "{{.Names}}" | grep -v '\-db' | head -1)
+docker exec "$SSCONT" /opt/keyfactor/wildfly-35.0.1.Final/bin/jboss-cli.sh \
+  --connect --commands="
+  /subsystem=elytron/key-store=httpsTS:add(path=signserver-truststore.jks,relative-to=jboss.server.config.dir,credential-reference={clear-text=changeit},type=JKS),
+  /subsystem=elytron/key-store=httpsTS:load(),
+  /subsystem=elytron/trust-manager=httpsTM:add(key-store=httpsTS),
+  /subsystem=elytron/server-ssl-context=httpsSSC:write-attribute(name=trust-manager,value=httpsTM),
+  /subsystem=elytron/server-ssl-context=httpsSSC:write-attribute(name=want-client-auth,value=true),
+  reload"
+```
+
+> The `signserver-truststore.jks` (password `changeit`) must be in the `ivf_signserver_wildfly_cfg` volume at the WildFly config directory. It contains the IVF Root CA and IVF Internal Root CA certificates.
 
 ### Container filter matches `ivf_signserver-db` instead of `ivf_signserver`
 
@@ -1380,8 +1549,8 @@ signserver setproperty 1 SHAREDLIBRARYNAME SoftHSM
 **Fix**: Reload and re-activate after generating the key:
 
 ```bash
-docker exec ivf-signserver /opt/signserver/bin/signserver reload 1
-docker exec ivf-signserver /opt/signserver/bin/signserver activatecryptotoken 1 changeit
+docker exec "$SSCONT" /opt/keyfactor/bin/signserver reload 1
+docker exec "$SSCONT" /opt/keyfactor/bin/signserver activatecryptotoken 1 changeit
 ```
 
 ### "Activation FAILED"
@@ -1391,10 +1560,10 @@ docker exec ivf-signserver /opt/signserver/bin/signserver activatecryptotoken 1 
 **Fix**: Generate a key first:
 
 ```bash
-docker exec ivf-signserver /opt/signserver/bin/signserver \
+docker exec "$SSCONT" /opt/keyfactor/bin/signserver \
     generatekey 1 -keyalg RSA -keyspec 4096 -alias signer
-docker exec ivf-signserver /opt/signserver/bin/signserver reload 1
-docker exec ivf-signserver /opt/signserver/bin/signserver activatecryptotoken 1 changeit
+docker exec "$SSCONT" /opt/keyfactor/bin/signserver reload 1
+docker exec "$SSCONT" /opt/keyfactor/bin/signserver activatecryptotoken 1 changeit
 ```
 
 ### "SET_PERMISSIONS unknown property"
@@ -1404,8 +1573,8 @@ docker exec ivf-signserver /opt/signserver/bin/signserver activatecryptotoken 1 
 **Fix**: Remove the property:
 
 ```bash
-docker exec ivf-signserver /opt/signserver/bin/signserver removeproperty 1 SET_PERMISSIONS
-docker exec ivf-signserver /opt/signserver/bin/signserver reload 1
+docker exec "$SSCONT" /opt/keyfactor/bin/signserver removeproperty 1 SET_PERMISSIONS
+docker exec "$SSCONT" /opt/keyfactor/bin/signserver reload 1
 ```
 
 ### "Enforce unique DN" / End entity already exists
@@ -1430,9 +1599,9 @@ docker exec ivf-ejbca /opt/keyfactor/bin/ejbca.sh ra setclearpwd ivf-signer-1 ch
 cat signer-cert.pem sub-ca.pem root-ca.pem > chain.pem
 
 docker cp chain.pem ivf-signserver:/tmp/chain.pem
-docker exec ivf-signserver /opt/signserver/bin/signserver \
+docker exec "$SSCONT" /opt/keyfactor/bin/signserver \
     uploadsignercertificatechain 1 GLOB /tmp/chain.pem
-docker exec ivf-signserver /opt/signserver/bin/signserver reload 1
+docker exec "$SSCONT" /opt/keyfactor/bin/signserver reload 1
 ```
 
 ### Ports not published / cannot access admin web
@@ -1447,8 +1616,8 @@ docker exec ivf-signserver /opt/signserver/bin/signserver reload 1
 
 **Fix**:
 
-1. Import `superadmin.p12` into your browser (password: `changeit`)
-2. Ensure the ManagementCA root certificate is in your browser's trusted authorities
+1. Import `superadmin.p12` into your browser (password: **`SuperAdmin1!`**)
+2. Ensure the **IVF Root Certificate Authority** root certificate is in your browser's trusted authorities (`certs/ca/root-ca.pem`)
 3. Clear SSL state and retry
 
 ### MSYS path conversion on Windows (Git Bash)
@@ -1482,7 +1651,7 @@ docker exec --user root ivf-ejbca microdnf install -y <package>
 **Fix**: Check individual worker status:
 
 ```bash
-docker exec ivf-signserver /opt/signserver/bin/signserver getstatus brief all
+docker exec "$SSCONT" /opt/keyfactor/bin/signserver getstatus brief all
 ```
 
 Look for workers with errors. Common causes: crypto token not activated, certificate not uploaded, key alias mismatch.
@@ -1516,7 +1685,7 @@ To manually check certificate expiry:
 
 ```bash
 # Check all worker certificates
-docker exec ivf-signserver /opt/signserver/bin/signserver getstatus brief all
+docker exec "$SSCONT" /opt/keyfactor/bin/signserver getstatus brief all
 
 # Check specific certificate details
 docker exec ivf-signserver keytool -list -v \
@@ -1566,7 +1735,10 @@ For P12 keystores:
 - [ ] Use `no-new-privileges` security option (already set in docker-compose.yml)
 - [ ] Monitor certificate expiry and set up alerting
 - [ ] **Disable `wsadmins -allowany`**: Run `signserver wsadmins -allowany false` and add specific admin certs with `signserver wsadmins -add -cert /path/superadmin.pem`
-- [ ] **wsauditors/wsarchiveauditors**: Add admin certificates to `wsauditors` and `wsarchiveauditors` for audit log access (done: superadmin cert `4cc00e72ec60ba41ae2a91a386abf9ebaac2d33f` added)
+- [x] **wsauditors/wsarchiveauditors**: Three certificates authorized (March 2026):
+  - `4cc00e72ec60ba41ae2a91a386abf9ebaac2d33f` — IVF Root CA itself
+  - `2eb6eb968de282d3d8e731f79081ca1405836e09` — CN=IVF Admin (issuer: IVF Internal Root CA)
+  - `3aee4acb235d363e4179c8abd1cd41baa92f93d2` — superadmin.p12 (issuer: IVF Root Certificate Authority)
 
 #### FIPS Phase 1 Checklist (Giai đoạn 1 — 1–2 tháng)
 
@@ -1683,20 +1855,21 @@ The script is designed to be re-run safely:
 
 ### Scripts
 
-| File                              | Purpose                                                                                                                                                                                                                                                                     |
-| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `scripts/setup-enterprise-pki.sh` | Main PKI setup script — Phases 1–8 (CAs, cert profiles, P12 enrollment, worker config)                                                                                                                                                                                      |
-| `scripts/setup-pkcs11-workers.sh` | **SoftHSM2 + PKCS#11 migration** — Phases 3–5 (persistent SoftHSM2 setup, `environment-hsm` hook, EJBCA EE creation, PKCS#11 worker config + RSA key gen + cert enrollment). Run on VPS.                                                                                    |
-| `scripts/init-ejbca-rest.sh`      | EJBCA REST API initialization (mounted into container)                                                                                                                                                                                                                      |
-| `scripts/init-mtls.sh`            | mTLS configuration script for SignServer                                                                                                                                                                                                                                    |
-| `scripts/init-tsa.sh`             | TSA (Timestamp Authority) initialization script                                                                                                                                                                                                                             |
-| `scripts/probe-rest-auth.sh`      | Probes SignServer REST authentication — tests mTLS and basic auth modes, reports which endpoints are reachable                                                                                                                                                              |
-| `scripts/test-importprofiles.sh`  | Tests EJBCA certificate and end entity profile XML import — validates XML format and import success for profiles in `certs/ejbca/`                                                                                                                                          |
-| `scripts/hsm-rekey-migration.sh`  | **HSM Re-Key Migration** — generates new keys on target HSM, re-issues all 6 worker certs from EJBCA. Use when upgrading SoftHSM2 → hardware HSM (FIPS Level 2). Run on VPS. Supports `--dry-run`, `--worker ID` (rolling), `--hsm-lib`, `--hsm-name`, `--new-token-label`. |
-| `scripts/fips-enable.sh`          | **FIPS Phase 1 (1/4)** — Bật FIPS mode trên AlmaLinux host: `fips-mode-setup --enable` + `update-crypto-policies --set FIPS`. Yêu cầu reboot. Chạy một lần. Hỗ trợ `--dry-run`, `--force`, `--no-reboot`.                                                                   |
-| `scripts/fips-verify.sh`          | **FIPS Phase 1 (2/4)** — Xác minh sau reboot: kiểm tra `fips_enabled=1`, crypto policy, algorithm enforcement (MD5/RC4 blocked), tất cả container health, SoftHSM2 workers ACTIVE, TLS quality.                                                                             |
-| `scripts/fips-ejbca-harden.sh`    | **FIPS Phase 1 (3/4)** — Hardening EJBCA cert profiles: restrict `availablesignaturealgorithms` (SHA256/384/512 only, loại SHA1/MD5), minimum RSA-2048+, ECDSA P-256+. Patch JVM `jdk.certpath.disabledAlgorithms`. Hỗ trợ `--dry-run`.                                     |
-| `scripts/fips-tls-harden.sh`      | **FIPS Phase 1 (4/4)** — Hardening TLS ciphers: Caddy (TLS 1.2+, AES-GCM only — Swarm config v16), EJBCA/SignServer JVM JAVA_OPTS, PostgreSQL `ssl_min_protocol_version=TLSv1.2`. Hỗ trợ `--dry-run`, `--skip-caddy`, `--skip-jvm`.                                         |
+| File                                    | Purpose                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `scripts/setup-enterprise-pki.sh`       | Main PKI setup script — Phases 1–8 (CAs, cert profiles, P12 enrollment, worker config)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `scripts/signserver-environment-hsm.sh` | **Source of truth for the `environment-hsm` hook** deployed to the `ivf_signserver_persistent` volume. Handles: (1) truststore copy to WildFly config dir, (2) TLS protocol fix via `fix-tls.py`, (3) `libsofthsm2.so` registration at index 90, (4) `softhsm2.conf` write, (5) SoftHSM2 token init, (6) WildFly mTLS idempotency via `jboss-cli`, (7) auto-activation of all 6 workers. Deploy: `scp scripts/signserver-environment-hsm.sh root@10.200.0.1:/var/lib/docker/volumes/ivf_signserver_persistent/_data/environment-hsm && ssh root@10.200.0.1 "chmod +x /var/lib/docker/volumes/ivf_signserver_persistent/_data/environment-hsm"` |
+| `scripts/setup-pkcs11-workers.sh`       | **SoftHSM2 + PKCS#11 migration** — Phases 3–5 (persistent SoftHSM2 setup, `environment-hsm` hook, EJBCA EE creation, PKCS#11 worker config + RSA key gen + cert enrollment). Run on VPS.                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `scripts/init-ejbca-rest.sh`            | EJBCA REST API initialization (mounted into container)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `scripts/init-mtls.sh`                  | mTLS configuration script for SignServer                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `scripts/init-tsa.sh`                   | TSA (Timestamp Authority) initialization script                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `scripts/probe-rest-auth.sh`            | Probes SignServer REST authentication — tests mTLS and basic auth modes, reports which endpoints are reachable                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `scripts/test-importprofiles.sh`        | Tests EJBCA certificate and end entity profile XML import — validates XML format and import success for profiles in `certs/ejbca/`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `scripts/hsm-rekey-migration.sh`        | **HSM Re-Key Migration** — generates new keys on target HSM, re-issues all 6 worker certs from EJBCA. Use when upgrading SoftHSM2 → hardware HSM (FIPS Level 2). Run on VPS. Supports `--dry-run`, `--worker ID` (rolling), `--hsm-lib`, `--hsm-name`, `--new-token-label`.                                                                                                                                                                                                                                                                                                                                                                    |
+| `scripts/fips-enable.sh`                | **FIPS Phase 1 (1/4)** — Bật FIPS mode trên AlmaLinux host: `fips-mode-setup --enable` + `update-crypto-policies --set FIPS`. Yêu cầu reboot. Chạy một lần. Hỗ trợ `--dry-run`, `--force`, `--no-reboot`.                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `scripts/fips-verify.sh`                | **FIPS Phase 1 (2/4)** — Xác minh sau reboot: kiểm tra `fips_enabled=1`, crypto policy, algorithm enforcement (MD5/RC4 blocked), tất cả container health, SoftHSM2 workers ACTIVE, TLS quality.                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `scripts/fips-ejbca-harden.sh`          | **FIPS Phase 1 (3/4)** — Hardening EJBCA cert profiles: restrict `availablesignaturealgorithms` (SHA256/384/512 only, loại SHA1/MD5), minimum RSA-2048+, ECDSA P-256+. Patch JVM `jdk.certpath.disabledAlgorithms`. Hỗ trợ `--dry-run`.                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `scripts/fips-tls-harden.sh`            | **FIPS Phase 1 (4/4)** — Hardening TLS ciphers: Caddy (TLS 1.2+, AES-GCM only — Swarm config v16), EJBCA/SignServer JVM JAVA_OPTS, PostgreSQL `ssl_min_protocol_version=TLSv1.2`. Hỗ trợ `--dry-run`, `--skip-caddy`, `--skip-jvm`.                                                                                                                                                                                                                                                                                                                                                                                                            |
 
 ### Docker
 
@@ -1758,33 +1931,36 @@ These XML files are imported into EJBCA to configure certificate and end entity 
 
 ### Container Paths
 
-| Path (inside container)                                              | Container      | Persistent?                                         | Purpose                                                                                                                                                   |
-| -------------------------------------------------------------------- | -------------- | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/opt/keyfactor/bin/ejbca.sh`                                        | ivf-ejbca      | —                                                   | EJBCA CLI                                                                                                                                                 |
-| `/opt/signserver/bin/signserver`                                     | ivf-signserver | —                                                   | SignServer CLI                                                                                                                                            |
-| `/opt/keyfactor/persistent/`                                         | ivf-signserver | **YES** (Docker volume `ivf_signserver_persistent`) | All persistent data                                                                                                                                       |
-| `/opt/keyfactor/persistent/environment-hsm`                          | ivf-signserver | **YES**                                             | Startup hook — sourced by `start.sh` on every restart. Writes `softhsm2.conf` and exports `SOFTHSM2_CONF`.                                                |
-| `/usr/lib64/pkcs11/libsofthsm2.so`                                   | ivf-signserver | **NO (ephemeral)**                                  | SoftHSM2 PKCS#11 library — **pre-installed in SignServer CE 7.3.2 image**, no custom build needed. Also pre-registered in `deploy.properties` at index 1. |
-| `/opt/keyfactor/persistent/softhsm/softhsm2.conf`                    | ivf-signserver | **YES**                                             | SoftHSM2 configuration — written by `environment-hsm` hook on every restart. Sets `tokendir = ../softhsm-tokens`.                                         |
-| `/opt/keyfactor/persistent/softhsm-tokens/`                          | ivf-signserver | **YES**                                             | **Active** SoftHSM2 token storage (private key material). Located directly under persistent volume root.                                                  |
-| `/opt/keyfactor/persistent/keys/`                                    | ivf-signserver | **YES**                                             | P12 keystore files                                                                                                                                        |
-| `/opt/keyfactor/persistent/keys/ca-chain.pem`                        | ivf-signserver | **YES**                                             | CA chain for trust validation                                                                                                                             |
-| `/opt/keyfactor/signserver-custom/conf/signserver_deploy.properties` | ivf-signserver | **NO (ephemeral)**                                  | WildFly PKCS#11 library config — **pre-configured in image** with `cryptotoken.p11.lib.1.name = SoftHSM` at index 1. Hook no longer rewrites this file.   |
-| `/run/secrets/softhsm_pin`                                           | ivf-signserver | —                                                   | Docker secret: SoftHSM2 user PIN                                                                                                                          |
-| `/run/secrets/softhsm_so_pin`                                        | ivf-signserver | —                                                   | Docker secret: SoftHSM2 SO (Security Officer) PIN                                                                                                         |
-| `/tmp/ejbca-certs/`                                                  | ivf-ejbca      | —                                                   | Temporary directory for batch-generated keystores                                                                                                         |
-| `/app/certs/`                                                        | ivf-api        | —                                                   | Mounted certificates for API                                                                                                                              |
-| `/run/secrets/api_cert_password`                                     | ivf-api        | —                                                   | API cert password (Docker Secret mount)                                                                                                                   |
+| Path (inside container)                                              | Container      | Persistent?                                          | Purpose                                                                                                                                                               |
+| -------------------------------------------------------------------- | -------------- | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/opt/keyfactor/bin/ejbca.sh`                                        | ivf-ejbca      | —                                                    | EJBCA CLI                                                                                                                                                             |
+| `/opt/keyfactor/bin/signserver`                                      | ivf-signserver | —                                                    | SignServer CLI (correct path in CE 7.3.2)                                                                                                                             |
+| `/opt/keyfactor/persistent/`                                         | ivf-signserver | **YES** (Docker volume `ivf_signserver_persistent`)  | All persistent data                                                                                                                                                   |
+| `/opt/keyfactor/persistent/environment-hsm`                          | ivf-signserver | **YES**                                              | Startup hook — sourced by `start.sh` on every restart. Writes `softhsm2.conf` and exports `SOFTHSM2_CONF`.                                                            |
+| `/opt/keyfactor/persistent/libsofthsm2.so`                           | ivf-signserver | **YES** (Docker volume `ivf_signserver_persistent`)  | SoftHSM2 PKCS#11 library — **AlmaLinux 9 native binary** (960 KB). NOT pre-installed in image. Manually deployed. Registered by hook at `deploy.properties` index 90. |
+| `/opt/keyfactor/persistent/softhsm2-util`                            | ivf-signserver | **YES**                                              | SoftHSM2 CLI utility — AlmaLinux 9 native. Used by hook and for manual token management.                                                                              |
+| `/opt/keyfactor/persistent/softhsm/softhsm2.conf`                    | ivf-signserver | **YES**                                              | SoftHSM2 configuration — written by `environment-hsm` hook on every restart. Sets `tokendir = ../softhsm-tokens`.                                                     |
+| `/opt/keyfactor/persistent/softhsm-tokens/`                          | ivf-signserver | **YES**                                              | **Active** SoftHSM2 token storage (private key material). Located directly under persistent volume root.                                                              |
+| `/opt/keyfactor/persistent/keys/`                                    | ivf-signserver | **YES**                                              | P12 keystore files                                                                                                                                                    |
+| `/opt/keyfactor/persistent/keys/ca-chain.pem`                        | ivf-signserver | **YES**                                              | CA chain for trust validation                                                                                                                                         |
+| `/opt/keyfactor/signserver-custom/conf/signserver_deploy.properties` | ivf-signserver | **NO (ephemeral)**                                   | WildFly PKCS#11 library config — **ephemeral, reset on restart**. The `environment-hsm` hook writes `cryptotoken.p11.lib.90.name = SoftHSM` on every startup.         |
+| `/opt/keyfactor/wildfly-35.0.1.Final/standalone/configuration/`      | ivf-signserver | **YES** (Docker volume `ivf_signserver_wildfly_cfg`) | WildFly configuration directory: `standalone.xml` (with `httpsTS`, `httpsTM`, `want-client-auth=true`), `signserver-truststore.jks` (password: `changeit`).           |
+| `/run/secrets/softhsm_pin`                                           | ivf-signserver | —                                                    | Docker secret: SoftHSM2 user PIN                                                                                                                                      |
+| `/run/secrets/softhsm_so_pin`                                        | ivf-signserver | —                                                    | Docker secret: SoftHSM2 SO (Security Officer) PIN                                                                                                                     |
+| `/tmp/ejbca-certs/`                                                  | ivf-ejbca      | —                                                    | Temporary directory for batch-generated keystores                                                                                                                     |
+| `/app/certs/`                                                        | ivf-api        | —                                                    | Mounted certificates for API                                                                                                                                          |
+| `/run/secrets/api_cert_password`                                     | ivf-api        | —                                                    | API cert password (Docker Secret mount)                                                                                                                               |
 
 ### Docker Volumes
 
-| Volume (Swarm stack name)   | Purpose                                                                                                                                                           |
-| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ivf_ejbca_persistent`      | EJBCA application data and crypto tokens                                                                                                                          |
-| `ivf_ejbca_db_data`         | EJBCA PostgreSQL data                                                                                                                                             |
-| `ivf_signserver_persistent` | SignServer persistent data: P12 keystores, `softhsm-tokens/`, `softhsm/softhsm2.conf`, `environment-hsm` hook                                                     |
-| `ivf_signserver_db_data`    | SignServer PostgreSQL data                                                                                                                                        |
-| `ivf_softhsm_tokens`        | **Legacy / unused.** Mounted at `/opt/keyfactor/persistent/softhsm/tokens` inside the container. Active tokens are in `ivf_signserver_persistent/softhsm-tokens`. |
+| Volume (Swarm stack name)    | Purpose                                                                                                                                                                                                                          |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ivf_ejbca_persistent`       | EJBCA application data and crypto tokens                                                                                                                                                                                         |
+| `ivf_ejbca_db_data`          | EJBCA PostgreSQL data                                                                                                                                                                                                            |
+| `ivf_signserver_persistent`  | SignServer persistent data: P12 keystores, `softhsm-tokens/`, `softhsm/softhsm2.conf`, `environment-hsm` hook, `libsofthsm2.so` (AlmaLinux 9 native), `softhsm2-util`                                                            |
+| `ivf_signserver_wildfly_cfg` | WildFly configuration: `standalone.xml` (with `httpsTS` key-store, `httpsTM` trust-manager, `want-client-auth=true`), `signserver-truststore.jks` (3430 bytes, password `changeit`, contains IVF Root CA + IVF Internal Root CA) |
+| `ivf_signserver_db_data`     | SignServer PostgreSQL data                                                                                                                                                                                                       |
+| `ivf_softhsm_tokens`         | **Legacy / unused.** Mounted at `/opt/keyfactor/persistent/softhsm/tokens` inside the container. Active tokens are in `ivf_signserver_persistent/softhsm-tokens`.                                                                |
 
 ## 20. Live Deployment Status
 
@@ -1805,11 +1981,11 @@ All 6 workers are ACTIVE with keys stored in SoftHSM2 inside the `ivf_signserver
 
 ### Web Service Roles
 
-| Role                | Mode / Status                               | Authorized Certificates                                        |
-| ------------------- | ------------------------------------------- | -------------------------------------------------------------- |
-| `wsadmins`          | ⚠️ **allowany** (all client certs accepted) | ANY — **should be restricted before production**               |
-| `wsauditors`        | ✅ Cert-based                               | Serial `4cc00e72ec60ba41ae2a91a386abf9ebaac2d33f` (superadmin) |
-| `wsarchiveauditors` | ✅ Cert-based                               | Serial `4cc00e72ec60ba41ae2a91a386abf9ebaac2d33f` (superadmin) |
+| Role                | Mode / Status                               | Authorized Certificates                                                                                                    |
+| ------------------- | ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `wsadmins`          | ⚠️ **allowany** (all client certs accepted) | ANY — **should be restricted before production**                                                                           |
+| `wsauditors`        | ✅ Cert-based (3 certs)                     | `4cc00e72...` (IVF Root CA), `2eb6eb96...` (CN=IVF Admin / IVF Internal Root CA), `3aee4acb...` (superadmin / IVF Root CA) |
+| `wsarchiveauditors` | ✅ Cert-based (3 certs)                     | Same 3 certs as `wsauditors`                                                                                               |
 
 > **Action required**: Disable allowany on `wsadmins` and add specific admin certificate(s) before going to production.  
 > See Section 15 for commands and Section 17 checklist for the security action item.
@@ -1843,20 +2019,473 @@ All 6 workers are ACTIVE with keys stored in SoftHSM2 inside the `ivf_signserver
 
 ### Superadmin Certificate
 
-| Attribute | Value                                                            |
-| --------- | ---------------------------------------------------------------- |
-| Serial    | `4cc00e72ec60ba41ae2a91a386abf9ebaac2d33f`                       |
-| Issuer CN | `CN=IVF Root Certificate Authority`                              |
-| Usage     | EJBCA admin, `wsauditors`, `wsarchiveauditors` web service roles |
-| Store     | `certs/ejbca/superadmin.p12`                                     |
+| Attribute     | Value                                                                                                                                                       |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Serial        | `3aee4acb235d363e4179c8abd1cd41baa92f93d2`                                                                                                                  |
+| Issuer CN     | `CN=IVF Root Certificate Authority, OU=PKI, O=IVF Healthcare, C=VN`                                                                                         |
+| Password      | `SuperAdmin1!`                                                                                                                                              |
+| Usage         | EJBCA admin, SignServer admin, `wsauditors`, `wsarchiveauditors` web service roles                                                                          |
+| Store         | `certs/ejbca/superadmin.p12`                                                                                                                                |
+| INITIAL_ADMIN | `CertificateAuthenticationToken:WITH_ISSUER_SERIAL;CN=IVF Root Certificate Authority,OU=PKI,O=IVF Healthcare,C=VN;3AEE4ACB235D363E4179C8ABD1CD41BAA92F93D2` |
 
 ### SoftHSM2 Status
 
-| Property                    | Value                                                               |
-| --------------------------- | ------------------------------------------------------------------- |
-| Library (image)             | `/usr/lib64/pkcs11/libsofthsm2.so` (pre-installed, ephemeral)       |
-| `deploy.properties` entry   | `cryptotoken.p11.lib.1.name = SoftHSM` (index 1, pre-configured)    |
-| Token directory             | `/opt/keyfactor/persistent/softhsm-tokens/` (persistent volume)     |
-| `softhsm2.conf`             | `/opt/keyfactor/persistent/softhsm/softhsm2.conf` (written by hook) |
-| `SOFTHSM2_CONF` env var     | Exported by `environment-hsm` hook on every restart                 |
-| `ivf_softhsm_tokens` volume | Legacy/unused — mounted at `softhsm/tokens`, not the active path    |
+| Property                    | Value                                                                            |
+| --------------------------- | -------------------------------------------------------------------------------- |
+| Library (persistent)        | `/opt/keyfactor/persistent/libsofthsm2.so` (AlmaLinux 9 native, 960 KB)          |
+| `deploy.properties` entry   | `cryptotoken.p11.lib.90.name = SoftHSM` (index 90, written by hook each restart) |
+| Token directory             | `/opt/keyfactor/persistent/softhsm-tokens/` (persistent volume)                  |
+| `softhsm2.conf`             | `/opt/keyfactor/persistent/softhsm/softhsm2.conf` (written by hook)              |
+| `SOFTHSM2_CONF` env var     | Exported by `environment-hsm` hook on every restart                              |
+| `ivf_softhsm_tokens` volume | Legacy/unused — mounted at `softhsm/tokens`, not the active path                 |
+
+### WildFly mTLS Configuration
+
+| Property                  | Value                                                                                                     |
+| ------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Key-store (`httpsTS`)     | `signserver-truststore.jks` (in `ivf_signserver_wildfly_cfg` volume, password `changeit`)                 |
+| Trust-manager (`httpsTM`) | Uses `httpsTS` key-store                                                                                  |
+| SSL context (`httpsSSC`)  | `trust-manager=httpsTM`, `want-client-auth=true`                                                          |
+| Truststore contents       | IVF Root Certificate Authority + IVF Internal Root CA (3430 bytes)                                        |
+| Auto-restoration          | `environment-hsm` hook Section 8 re-applies via `jboss-cli` if `httpsTM` is missing from `standalone.xml` |
+
+---
+
+## 21. Lộ trình nâng cấp PKI (PKI Upgrade Roadmap)
+
+> **Phạm vi triển khai**: Hệ thống IVF chỉ phục vụ nội bộ các phòng khám — không cung cấp dịch vụ CA ra bên ngoài. Do đó không bắt buộc đăng ký NEAC hay xin phép cơ quan nhà nước cho dịch vụ CA công cộng.
+
+### Tổng quan 3 giai đoạn
+
+```
+Giai đoạn 1 — HIỆN TẠI (đang thực hiện)
+├── SoftHSM2 PKCS#11 + persistent volume      ✅ Done
+├── FIPS 140-2 Level 1 preparation scripts    ✅ Scripts ready, chưa chạy
+├── WildFly mTLS + truststore                 ✅ Done
+├── Certificate hierarchy (Root + SubCA)      ✅ Done
+└── 6 workers ACTIVE với RSA 4096             ✅ Done
+
+Giai đoạn 2 — HARDWARE HSM (2–4 tháng kể từ khi mua)
+├── Mua/thuê Luna Network HSM hoặc Utimaco Security Server
+├── Viết lại environment-hsm hook → dùng HSM PKCS#11 library qua mạng
+├── Key ceremony: gen key mới trên HSM + re-enroll toàn bộ 6 certs
+│   (SoftHSM2 keys non-extractable → không di chuyển được, phải tạo mới)
+└── Cập nhật docker-compose.production.yml + Docker secrets
+
+Giai đoạn 3 — CHỨNG NHẬN PHÁP LÝ (tùy chọn, nội bộ IVF)
+├── Kiểm định theo Thông tư 03/2017/TT-BTTTT cấp độ 3 (tự đánh giá)
+└── Không bắt buộc NEAC vì không cung cấp CA dịch vụ ra bên ngoài
+```
+
+---
+
+## 21.1 Giai đoạn 1: Chuẩn bị & Hardening (Hiện tại)
+
+> Giai đoạn 1 đã được thiết kế và scripts đã sẵn sàng. Thực hiện theo thứ tự dưới đây.
+
+### Đánh giá hiện trạng
+
+| Hạng mục                  | Trạng thái   | Ghi chú                                         |
+| ------------------------- | ------------ | ----------------------------------------------- |
+| SoftHSM2 PKCS#11          | ✅ Hoạt động | 6 workers ACTIVE, RSA 4096, key non-extractable |
+| Root CA + SubCA           | ✅ Hoạt động | IVF-Root-CA (2046), IVF-Signing-SubCA (2036)    |
+| WildFly mTLS              | ✅ Hoạt động | `want-client-auth=true`, truststore có 2 CA     |
+| wsauditors / wsarchive    | ✅ 3 certs   | Root CA self + CN=IVF Admin + superadmin        |
+| FIPS mode (host OS)       | ❌ Chưa bật  | Scripts đã có, cần chạy theo thứ tự 4 bước      |
+| TLS cipher hardening      | ❌ Chưa bật  | fips-tls-harden.sh + caddyfile_v16              |
+| EJBCA cert profile harden | ❌ Chưa bật  | fips-ejbca-harden.sh                            |
+| wsadmins allowany         | ⚠️ Cần khoá  | Khoá trước khi production                       |
+| Log monitoring / alerting | ✅ Hoạt động | Grafana + Loki + Prometheus, Discord alerts     |
+
+### Checklist thực hiện Giai đoạn 1
+
+#### Bước 1.1 — Bật FIPS mode (cần reboot VPS)
+
+> ⚠️ VPS sẽ reboot. Kiểm tra tất cả services sau khi boot lại.
+
+```bash
+scp scripts/fips-enable.sh root@10.200.0.1:/tmp/
+ssh root@10.200.0.1 "bash /tmp/fips-enable.sh"
+# Script tự reboot khi hoàn chỉnh
+```
+
+#### Bước 1.2 — Xác minh sau reboot
+
+```bash
+scp scripts/fips-verify.sh root@10.200.0.1:/tmp/
+ssh root@10.200.0.1 "bash /tmp/fips-verify.sh"
+
+# Kiểm tra thủ công nhanh:
+ssh root@10.200.0.1 "cat /proc/sys/crypto/fips_enabled"  # → phải là 1
+ssh root@10.200.0.1 "docker service ls"                  # → tất cả Replicated 1/1
+```
+
+#### Bước 1.3 — Hardening EJBCA cert profiles
+
+```bash
+scp scripts/fips-ejbca-harden.sh root@10.200.0.1:/tmp/
+ssh root@10.200.0.1 "bash /tmp/fips-ejbca-harden.sh"
+# SHA1/MD5 bị disabled, min RSA 2048+ được enforce
+```
+
+#### Bước 1.4 — Hardening TLS ciphers
+
+```bash
+scp scripts/fips-tls-harden.sh root@10.200.0.1:/tmp/
+ssh root@10.200.0.1 "bash /tmp/fips-tls-harden.sh"
+# Script tạo Docker config caddyfile_v16
+# Sau đó cập nhật docker-compose.stack.yml: thay caddyfile_v15 → caddyfile_v16
+# docker stack deploy -c docker-compose.stack.yml ivf
+```
+
+#### Bước 1.5 — Khoá wsadmins allowany
+
+```bash
+SSCONT=$(docker ps --filter name=ivf_signserver --format "{{.Names}}" | grep -v '\-db' | head -1)
+
+# Tắt allowany
+docker exec "$SSCONT" /opt/keyfactor/bin/signserver wsadmins -allowany false
+
+# Export superadmin cert và thêm vào wsadmins
+docker cp certs/ejbca/superadmin.p12 "$SSCONT":/tmp/superadmin.p12
+docker exec "$SSCONT" sh -c \
+    "keytool -exportcert -alias 1 -keystore /tmp/superadmin.p12 \
+     -storepass 'SuperAdmin1!' -rfc -storetype PKCS12 > /tmp/superadmin-cert.pem"
+docker exec "$SSCONT" /opt/keyfactor/bin/signserver wsadmins -add -cert /tmp/superadmin-cert.pem
+
+# Xác minh
+docker exec "$SSCONT" /opt/keyfactor/bin/signserver wsadmins -list
+```
+
+#### Bước 1.6 — Kiểm tra tổng thể
+
+```bash
+ssh root@10.200.0.1 << 'EOF'
+echo "=== FIPS mode ==="
+cat /proc/sys/crypto/fips_enabled
+
+echo "=== All workers ACTIVE ==="
+SSCONT=$(docker ps --filter name=ivf_signserver --format "{{.Names}}" | grep -v '\-db' | head -1)
+docker exec "$SSCONT" /opt/keyfactor/bin/signserver getstatus brief all \
+    | grep -E 'ACTIVE|ERROR|OFFLINE'
+
+echo "=== wsadmins (should NOT show allowany) ==="
+docker exec "$SSCONT" /opt/keyfactor/bin/signserver wsadmins -list
+
+echo "=== TLS check ==="
+openssl s_client -connect localhost:9443 </dev/null 2>&1 \
+    | grep -E 'Protocol|Cipher|Verify'
+EOF
+```
+
+### Kết quả đạt được sau Giai đoạn 1
+
+| Tiêu chí                           | Trước           | Sau Giai đoạn 1        |
+| ---------------------------------- | --------------- | ---------------------- |
+| Thuật toán hash                    | SHA1 / SHA256   | SHA256/384/512 only    |
+| TLS version tối thiểu              | TLS 1.0+        | TLS 1.2+               |
+| FIPS mode (host kernel)            | Tắt             | Bật (FIPS 140-2 L1)    |
+| wsadmins                           | allowany        | Cert-based             |
+| SoftHSM key bảo vệ                 | Software (good) | Software + FIPS (best) |
+| Sẵn sàng nâng cấp lên HSM hardware | —               | ✅ Sẵn sàng            |
+
+---
+
+## 21.2 Giai đoạn 2: Hardware HSM (khi có ngân sách)
+
+### So sánh lựa chọn HSM
+
+| HSM                          | Hình thức        | FIPS Level    | Giá ước tính (USD) | Phù hợp IVF |
+| ---------------------------- | ---------------- | ------------- | ------------------ | ----------- |
+| **Thales Luna USB G5**       | USB HSM (single) | FIPS 140-2 L3 | ~$3.000            | ⚠️ Không HA |
+| **Thales Luna Network T7-2** | Network HSM (HA) | FIPS 140-2 L3 | ~$20.000–$25.000   | ✅ Tốt nhất |
+| **Utimaco SecurityServer**   | Network HSM (HA) | FIPS 140-2 L3 | ~$15.000–$20.000   | ✅ Tốt      |
+| **AWS CloudHSM**             | Cloud (managed)  | FIPS 140-2 L3 | ~$1.095/tháng/HSM  | ⚠️ Cloud    |
+| **SoftHSM2** (hiện tại)      | Software PKCS#11 | FIPS 140-2 L1 | $0                 | Phase 1 ✅  |
+
+> **Khuyến nghị cho IVF nội bộ**: Bắt đầu với **Thales Luna USB G5** (~$3.000) nếu ngân sách hạn chế — đủ cho 1 site. Nâng lên Luna Network khi mở rộng đa site.
+
+### Kiến trúc sau khi có Hardware HSM
+
+```
+┌──────────────────────────────────────────────────────────┐
+│  Docker Swarm Host (10.200.0.1)                          │
+│  ┌─────────────────────────────────────┐                  │
+│  │  SignServer Container               │                  │
+│  │  PKCS#11 Client Library             │                  │
+│  │  (libCryptoki2.so / Luna Client) ───┼──► TCP/NTLS     │
+│  └─────────────────────────────────────┘        ↓        │
+└──────────────────────────────────────────────────────────┘
+                                          HSM Network Interface
+                                               ↕ (1792/TCP, TLS)
+                              ┌──────────────────────────────────┐
+                              │  Thales Luna / Utimaco HSM       │
+                              │  ┌──────────────────────────┐    │
+                              │  │  Partition: IVF-PROD      │    │
+                              │  │  Keys (non-extractable):  │    │
+                              │  │  - signer                 │    │
+                              │  │  - tsa                    │    │
+                              │  │  - pdfsigner_technical    │    │
+                              │  │  - pdfsigner_head         │    │
+                              │  │  - pdfsigner_doctor1      │    │
+                              │  │  - pdfsigner_admin        │    │
+                              │  └──────────────────────────┘    │
+                              │  FIPS 140-2 Level 3              │
+                              │  Tamper-evident + tamper-resp.   │
+                              └──────────────────────────────────┘
+```
+
+### Viết lại environment-hsm hook cho Hardware HSM
+
+Thay nội dung `scripts/signserver-environment-hsm.sh` khi migrate:
+
+```bash
+#!/bin/bash
+# environment-hsm — SignServer startup hook cho Luna Network HSM / Utimaco
+# Sourced by start.sh on every container restart
+
+PERSISTENT=/opt/keyfactor/persistent
+
+# Luna: HSM_LIB="${PERSISTENT}/libCryptoki2.so"
+# Utimaco: HSM_LIB="${PERSISTENT}/libcs_pkcs11_R3.so"
+HSM_LIB="${PERSISTENT}/libCryptoki2.so"
+HSM_NAME="LUNA"
+
+# === 1: Copy truststore ===
+[ -f "${PERSISTENT}/signserver-truststore.jks" ] && \
+    cp -f "${PERSISTENT}/signserver-truststore.jks" \
+        /opt/keyfactor/wildfly-35.0.1.Final/standalone/configuration/signserver-truststore.jks
+
+# === 2: Fix TLS protocols ===
+python3 "${PERSISTENT}/fix-tls.py" 2>/dev/null || true
+
+# === 3: Đăng ký HSM PKCS#11 library vào deploy.properties ===
+DEPLOY_PROPS=/opt/keyfactor/signserver-custom/conf/signserver_deploy.properties
+sed -i '/cryptotoken\.p11\.lib\.90/d' "${DEPLOY_PROPS}" 2>/dev/null || true
+cat >> "${DEPLOY_PROPS}" << PROPS
+cryptotoken.p11.lib.90.name = ${HSM_NAME}
+cryptotoken.p11.lib.90.file = ${HSM_LIB}
+PROPS
+
+# === 4: Luna PKCS#11 client config (Chrystoki.conf) ===
+# File Chrystoki.conf phải tồn tại trong persistent volume
+# (copy từ host sau khi cài Luna Client: scp /etc/Chrystoki.conf root@vps:/var/lib/docker/volumes/ivf_signserver_persistent/_data/)
+[ -f "${PERSISTENT}/Chrystoki.conf" ] && export ChrystokiConfigurationPath="${PERSISTENT}"
+
+# === 5: WildFly mTLS (idempotent) ===
+WF_CFG=/opt/keyfactor/wildfly-35.0.1.Final/standalone/configuration/standalone.xml
+if ! grep -q 'httpsTS' "${WF_CFG}" 2>/dev/null; then
+    (sleep 30 && /opt/keyfactor/wildfly-35.0.1.Final/bin/jboss-cli.sh \
+      --connect --commands="
+      /subsystem=elytron/key-store=httpsTS:add(path=signserver-truststore.jks,relative-to=jboss.server.config.dir,credential-reference={clear-text=changeit},type=JKS),
+      /subsystem=elytron/key-store=httpsTS:load(),
+      /subsystem=elytron/trust-manager=httpsTM:add(key-store=httpsTS),
+      /subsystem=elytron/server-ssl-context=httpsSSC:write-attribute(name=trust-manager,value=httpsTM),
+      /subsystem=elytron/server-ssl-context=httpsSSC:write-attribute(name=want-client-auth,value=true),
+      reload" 2>&1 || true) &
+fi
+
+# === 6: Auto-activate workers với HSM PIN ===
+(sleep 120
+HSM_PIN=$(cat /run/secrets/hsm_pin 2>/dev/null || cat /run/secrets/softhsm_pin 2>/dev/null || echo "")
+for WID in 1 100 272 444 597 907; do
+    /opt/keyfactor/bin/signserver activatecryptotoken "${WID}" "${HSM_PIN}" 2>/dev/null || true
+done) &
+```
+
+> **Worker config thay đổi**: Khi dùng HSM, `SHAREDLIBRARYNAME` phải là `LUNA` (hoặc tên đã đăng ký) thay vì `SoftHSM`. Chạy `scripts/hsm-rekey-migration.sh --hsm-name LUNA` để tự động cập nhật toàn bộ worker properties.
+
+### Key Ceremony — quy trình chi tiết
+
+> Key ceremony là sự kiện có kiểm soát để tạo private key trên HSM. Cần ít nhất 2 người: **Key Custodian** (phụ trách kỹ thuật) + **Security Officer** (phụ trách giám sát/biên bản).
+
+```
+Trước buổi ceremony (chuẩn bị):
+  □ HSM đã rack, cấp nguồn, kết nối mạng nội bộ
+  □ Luna PKCS#11 client (libCryptoki2.so) đã cài trên Linux host
+  □ VPS có thể ping tới HSM network interface
+  □ EJBCA end entities đã reset về status 10 (NEW)
+  □ Giấy tờ biên bản ceremony đã in
+
+Trong buổi ceremony:
+  1. Security Officer: Đăng nhập vào HSM console (lunash)
+     lunash:> partition list
+     lunash:> partition create -label IVF-PROD
+     lunash:> partition changepw -label IVF-PROD (thiết lập Crypto Officer PIN)
+
+  2. Key Custodian: Chạy migration script
+     ssh root@10.200.0.1
+     bash /opt/scripts/hsm-rekey-migration.sh \
+         --hsm-lib /opt/keyfactor/persistent/libCryptoki2.so \
+         --hsm-name LUNA \
+         --new-token-label IVF-PROD
+
+  3. Kiểm tra: tất cả 6 workers ACTIVE với HSM backend
+     docker exec $SSCONT /opt/keyfactor/bin/signserver getstatus brief all
+
+  4. Test: ký thử 1 PDF thực tế qua API
+
+  5. Security Officer + Key Custodian ký biên bản ceremony
+
+Sau ceremony:
+  □ Backup HSM partition key (MofN scheme, 3-of-5 cards)
+  □ Cards chia cho 5 custodian khác nhau, lưu offline
+  □ Revoke chứng chỉ SoftHSM cũ trên EJBCA (tuỳ chọn)
+  □ Xoá token SoftHSM (softhsm2-util --delete-token --token SignServerToken)
+```
+
+### Cập nhật docker-compose.production.yml cho HSM
+
+```yaml
+services:
+  signserver:
+    environment:
+      TLS_SETUP_ENABLED: later
+      INITIAL_ADMIN: ";CertificateAuthenticationToken:WITH_ISSUER_SERIAL;CN=IVF Root Certificate Authority,OU=PKI,O=IVF Healthcare,C=VN;3AEE4ACB235D363E4179C8ABD1CD41BAA92F93D2;"
+      DATABASE_JDBC_URL: "jdbc:postgresql://signserver-db:5432/signserver"
+      DATABASE_USER: signserver
+      # Không còn SOFTHSM2_CONF
+    secrets:
+      - hsm_pin # đổi từ softhsm_pin → hsm_pin
+    configs:
+      - source: luna_chrystoki_v1
+        target: /opt/keyfactor/persistent/Chrystoki.conf
+        mode: 0444
+    networks:
+      - ivf-signing
+      - ivf-data
+      - hsm-network # thêm network tới HSM appliance
+
+networks:
+  hsm-network:
+    external: true # hoặc tạo overlay nội bộ
+    name: hsm_net
+
+secrets:
+  hsm_pin:
+    external: true # docker secret create hsm_pin
+
+configs:
+  luna_chrystoki_v1:
+    file: ./docker/luna/Chrystoki.conf
+```
+
+### Checklist hoàn thành Giai đoạn 2
+
+- [ ] HSM đã rack/cấp nguồn/kết nối mạng, ping từ Docker host thành công
+- [ ] Luna PKCS#11 client (`libCryptoki2.so`) đã copy vào `ivf_signserver_persistent` volume
+- [ ] `Chrystoki.conf` đã copy vào `ivf_signserver_persistent` volume
+- [ ] `environment-hsm` hook đã viết lại cho HSM (HSM_LIB, HSM_NAME)
+- [ ] Key ceremony đã thực hiện (biên bản có chữ ký 2 người)
+- [ ] 6 keys mới đã tạo trên HSM partition `IVF-PROD`
+- [ ] 6 certs mới đã enroll từ EJBCA Sub-CA
+- [ ] Tất cả 6 workers ACTIVE với HSM backend (kiểm tra bằng `getstatus brief all`)
+- [ ] Test signing PDF thực tế thành công
+- [ ] `docker-compose.production.yml` đã cập nhật (HSM network, Chrystoki config, `hsm_pin` secret)
+- [ ] Docker secret `hsm_pin` đã tạo: `echo "PIN" | docker secret create hsm_pin -`
+- [ ] Backup HSM partition (MofN 3-of-5) đã thực hiện, cards lưu offline
+- [ ] Revoke cert SoftHSM cũ trên EJBCA (tuỳ chọn)
+
+---
+
+## 21.3 Giai đoạn 3: Kiểm định pháp lý (tùy chọn)
+
+> **Phạm vi**: IVF không cung cấp dịch vụ CA ra bên ngoài → **không bắt buộc đăng ký NEAC** (Nghị định 130/2018/NĐ-CP áp dụng cho tổ chức cung cấp dịch vụ chứng thực chữ ký số cho bên thứ ba). PKI nội bộ chỉ ký tài liệu trong hệ thống quản lý của chính IVF.
+
+### Phân tích bắt buộc theo Thông tư 03/2017/TT-BTTTT
+
+| Yêu cầu                                | Bắt buộc IVF?     | Trạng thái                         |
+| -------------------------------------- | ----------------- | ---------------------------------- |
+| Hệ thống CNTT cấp độ 3 (dữ liệu y tế)  | ✅ Có             | Cần tự đánh giá và ghi nhận        |
+| Mã hoá đạt chuẩn (RSA 2048+, SHA-256+) | ✅ Có             | ✅ Đã đảm bảo sau Phase 1          |
+| Nhật ký kiểm toán                      | ✅ Có             | ✅ EJBCA + SignServer audit log    |
+| Quản lý khoá an toàn                   | ✅ Có             | Phase 1: L1 ✅ / Phase 2: L3 ✅    |
+| Phương án dự phòng & khôi phục         | ✅ Có             | ✅ Backup tự động + System Restore |
+| Đăng ký NEAC (CA dịch vụ ra ngoài)     | ❌ Không          | Không áp dụng — nội bộ IVF         |
+| Chứng nhận FIPS 140-2 L3 cho HSM       | ❌ Không bắt buộc | Khuyến nghị cho Phase 2            |
+
+### Self-assessment Thông tư 03/2017 (hệ thống cấp độ 3)
+
+#### Nhóm A — Xác thực và quản lý quyền truy cập
+
+- [x] **A.1** Xác thực mạnh (JWT 60 phút, bcrypt password, refresh token 7 ngày)
+- [x] **A.2** Phân quyền RBAC (Admin, Doctor, Nurse, LabTech, Embryologist, Cashier, Pharmacist)
+- [x] **A.3** Ghi nhật ký đăng nhập (`UserLoginHistory`, `UserSession`)
+- [x] **A.4** Khoá tài khoản sau nhiều lần thử sai (rate limiting + lockout)
+- [ ] **A.5** MFA cho tài khoản quản trị (module `advanced-security` — chưa bật)
+
+#### Nhóm B — Bảo mật kênh truyền
+
+- [x] **B.1** TLS 1.2+ toàn bộ traffic (Caddy reverse proxy)
+- [x] **B.2** mTLS giữa API ↔ SignServer
+- [ ] **B.3** TLS cipher hardening (sau Bước 1.4)
+- [x] **B.4** EJBCA/SignServer không expose ra internet (SSH tunnel nội bộ)
+
+#### Nhóm C — Audit trail và giám sát
+
+- [x] **C.1** Nhật ký ký số (SignServer wsauditors + EJBCA audit log)
+- [x] **C.2** Nhật ký không xoá được bởi người dùng thường
+- [x] **C.3** Monitoring realtime (Grafana + Loki + Prometheus + Discord)
+- [x] **C.4** Log tập trung với retention (Loki)
+- [ ] **C.5** Review audit log định kỳ (SOP vận hành — cần tài liệu)
+
+#### Nhóm D — Bảo vệ dữ liệu y tế
+
+- [x] **D.1** Mã hoá dữ liệu tại nghỉ (disk encryption tầng OS + MinIO)
+- [x] **D.2** Phân tách dữ liệu tenant (`TenantId` + MinIO prefix)
+- [x] **D.3** Backup tự động hàng ngày với SHA256 checksum
+- [x] **D.4** Khôi phục dữ liệu kiểm chứng được (System Restore + SignalR streaming)
+- [ ] **D.5** Data retention policy thực thi (module `compliance-audit`)
+
+#### Nhóm E — Cơ sở hạ tầng
+
+- [x] **E.1** Container isolation (`no-new-privileges`, Swarm)
+- [x] **E.2** Network segmentation (ivf-public, ivf-internal, ivf-signing, ivf-data)
+- [x] **E.3** Cập nhật bảo mật định kỳ (Ansible `site.yml`)
+- [ ] **E.4** Quét lỗ hổng images định kỳ (Trivy/Grype — chưa có pipeline)
+- [ ] **E.5** FIPS mode host OS (Bước 1.1–1.2 chưa chạy)
+
+### Tài liệu cần chuẩn bị nếu kiểm định chính thức
+
+| Tài liệu                       | Nguồn có sẵn                                        | Cần bổ sung              |
+| ------------------------------ | --------------------------------------------------- | ------------------------ |
+| Sơ đồ kiến trúc & data flow    | `docs/enterprise_pki_guide.md`                      | —                        |
+| Certificate Policy (CP)        | —                                                   | Cần soạn mới (~10tr)     |
+| Certificate Practice Statement | —                                                   | Cần soạn mới (~20tr)     |
+| Biên bản Key Ceremony          | —                                                   | Lập khi Phase 2          |
+| Business Continuity Plan (BCP) | `docs/infrastructure_operations_guide.md` (partial) | Cần hoàn thiện           |
+| Kết quả DR test                | `docs/backup_and_restore.md`                        | Cần lập log test thực tế |
+
+---
+
+## 21.4 Tóm tắt timeline và chi phí
+
+### Timeline
+
+```
+Tháng 1 (Giai đoạn 1 — Ngay bây giờ):
+  Tuần 1 : Bật FIPS → reboot → verify
+  Tuần 2 : fips-ejbca-harden + fips-tls-harden + Caddyfile v16 deploy
+  Tuần 3 : Khoá wsadmins allowany
+  Tuần 4 : Self-assessment Thông tư 03 (nhóm A–E), ghi kết quả
+
+Tháng 2–5 (Giai đoạn 2 — khi có ngân sách HSM):
+  Tháng 2 : Mua HSM, rack, cấp nguồn, cài Luna Client, test kết nối
+  Tháng 3 : Viết lại hook, test trên staging (dùng HSM ở chế độ sandbox)
+  Tháng 4 : Key ceremony, migration 6 workers, burn-in test 2 tuần
+  Tháng 5 : Backup HSM MofN, revoke SoftHSM certs cũ, update docker-compose
+
+Tháng 6+ (Giai đoạn 3 — khi có yêu cầu kiểm định):
+  Soạn CP/CPS, DR test có biên bản, mời auditor nếu cần
+```
+
+### Chi phí ước tính
+
+| Hạng mục                             | Chi phí (USD)        | Ghi chú                                         |
+| ------------------------------------ | -------------------- | ----------------------------------------------- |
+| Giai đoạn 1 (FIPS + hardening)       | **$0**               | Scripts đã có, chỉ cần thực hiện                |
+| **Thales Luna USB G5** (entry level) | **~$3.000**          | 1 thiết bị USB, FIPS L3, không HA               |
+| **Thales Luna Network T7-2**         | **~$20.000–$25.000** | HA-capable, 2U rack, khuyến nghị cho multi-site |
+| **Utimaco SecurityServer** (entry)   | **~$15.000–$20.000** | HA-capable, FIPS L3                             |
+| **AWS CloudHSM** (1 cluster)         | **~$1.095/tháng**    | Managed, không cần rack, phụ thuộc cloud        |
+| Soạn CP/CPS (tư vấn bên ngoài)       | **~$2.000–$5.000**   | Chỉ cần nếu kiểm định chính thức                |
