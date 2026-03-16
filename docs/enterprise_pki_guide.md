@@ -1568,6 +1568,39 @@ For P12 keystores:
 - [ ] **Disable `wsadmins -allowany`**: Run `signserver wsadmins -allowany false` and add specific admin certs with `signserver wsadmins -add -cert /path/superadmin.pem`
 - [ ] **wsauditors/wsarchiveauditors**: Add admin certificates to `wsauditors` and `wsarchiveauditors` for audit log access (done: superadmin cert `4cc00e72ec60ba41ae2a91a386abf9ebaac2d33f` added)
 
+#### FIPS Phase 1 Checklist (Giai đoạn 1 — 1–2 tháng)
+
+> Thứ tự chạy: bước 1 → reboot → bước 2 → bước 3 → bước 4
+
+```bash
+# Bước 1: Bật FIPS mode (cần reboot)
+scp scripts/fips-enable.sh root@10.200.0.1:/tmp/
+ssh root@10.200.0.1 "bash /tmp/fips-enable.sh"
+ssh root@10.200.0.1 "reboot"
+
+# Bước 2: Verify sau reboot
+scp scripts/fips-verify.sh root@10.200.0.1:/tmp/
+ssh root@10.200.0.1 "bash /tmp/fips-verify.sh"
+
+# Bước 3: Hardening EJBCA cert profiles
+scp scripts/fips-ejbca-harden.sh root@10.200.0.1:/tmp/
+ssh root@10.200.0.1 "bash /tmp/fips-ejbca-harden.sh"
+
+# Bước 4: Hardening TLS ciphers (Caddy + JVM + PostgreSQL)
+scp scripts/fips-tls-harden.sh root@10.200.0.1:/tmp/
+ssh root@10.200.0.1 "bash /tmp/fips-tls-harden.sh"
+
+# Sau bước 4: cập nhật docker-compose.stack.yml
+# Thay ivf_caddyfile_v15 → ivf_caddyfile_v16 (tên do fips-tls-harden.sh tạo)
+```
+
+- [ ] **FIPS 1/4**: `fips-enable.sh` — AlmaLinux `fips-mode-setup --enable` + `update-crypto-policies --set FIPS`
+- [ ] **FIPS 2/4**: `fips-verify.sh` — Post-reboot check: `fips_enabled=1`, containers healthy, SoftHSM2 ACTIVE
+- [ ] **FIPS 3/4**: `fips-ejbca-harden.sh` — EJBCA profiles: chỉ SHA-256/384/512, RSA-2048+, ECDSA P-256+
+- [ ] **FIPS 4/4**: `fips-tls-harden.sh` — Caddy TLS 1.2+, EJBCA/SignServer JVM disable TLS 1.0/1.1, PostgreSQL TLSv1.2
+- [ ] **Post-FIPS**: Cập nhật `docker-compose.stack.yml` config version sau khi `fips-tls-harden.sh` tạo `ivf_caddyfile_v16`
+- [ ] **Rollback** (nếu cần): `fips-mode-setup --disable && update-crypto-policies --set DEFAULT && reboot`
+
 ---
 
 ## 18. Script Reference
@@ -1650,15 +1683,20 @@ The script is designed to be re-run safely:
 
 ### Scripts
 
-| File                              | Purpose                                                                                                                                                                                  |
-| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `scripts/setup-enterprise-pki.sh` | Main PKI setup script — Phases 1–8 (CAs, cert profiles, P12 enrollment, worker config)                                                                                                   |
-| `scripts/setup-pkcs11-workers.sh` | **SoftHSM2 + PKCS#11 migration** — Phases 3–5 (persistent SoftHSM2 setup, `environment-hsm` hook, EJBCA EE creation, PKCS#11 worker config + RSA key gen + cert enrollment). Run on VPS. |
-| `scripts/init-ejbca-rest.sh`      | EJBCA REST API initialization (mounted into container)                                                                                                                                   |
-| `scripts/init-mtls.sh`            | mTLS configuration script for SignServer                                                                                                                                                 |
-| `scripts/init-tsa.sh`             | TSA (Timestamp Authority) initialization script                                                                                                                                          |
-| `scripts/probe-rest-auth.sh`      | Probes SignServer REST authentication — tests mTLS and basic auth modes, reports which endpoints are reachable                                                                           |
-| `scripts/test-importprofiles.sh`  | Tests EJBCA certificate and end entity profile XML import — validates XML format and import success for profiles in `certs/ejbca/`                                                       |
+| File                              | Purpose                                                                                                                                                                                                                                                                     |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `scripts/setup-enterprise-pki.sh` | Main PKI setup script — Phases 1–8 (CAs, cert profiles, P12 enrollment, worker config)                                                                                                                                                                                      |
+| `scripts/setup-pkcs11-workers.sh` | **SoftHSM2 + PKCS#11 migration** — Phases 3–5 (persistent SoftHSM2 setup, `environment-hsm` hook, EJBCA EE creation, PKCS#11 worker config + RSA key gen + cert enrollment). Run on VPS.                                                                                    |
+| `scripts/init-ejbca-rest.sh`      | EJBCA REST API initialization (mounted into container)                                                                                                                                                                                                                      |
+| `scripts/init-mtls.sh`            | mTLS configuration script for SignServer                                                                                                                                                                                                                                    |
+| `scripts/init-tsa.sh`             | TSA (Timestamp Authority) initialization script                                                                                                                                                                                                                             |
+| `scripts/probe-rest-auth.sh`      | Probes SignServer REST authentication — tests mTLS and basic auth modes, reports which endpoints are reachable                                                                                                                                                              |
+| `scripts/test-importprofiles.sh`  | Tests EJBCA certificate and end entity profile XML import — validates XML format and import success for profiles in `certs/ejbca/`                                                                                                                                          |
+| `scripts/hsm-rekey-migration.sh`  | **HSM Re-Key Migration** — generates new keys on target HSM, re-issues all 6 worker certs from EJBCA. Use when upgrading SoftHSM2 → hardware HSM (FIPS Level 2). Run on VPS. Supports `--dry-run`, `--worker ID` (rolling), `--hsm-lib`, `--hsm-name`, `--new-token-label`. |
+| `scripts/fips-enable.sh`          | **FIPS Phase 1 (1/4)** — Bật FIPS mode trên AlmaLinux host: `fips-mode-setup --enable` + `update-crypto-policies --set FIPS`. Yêu cầu reboot. Chạy một lần. Hỗ trợ `--dry-run`, `--force`, `--no-reboot`.                                                                   |
+| `scripts/fips-verify.sh`          | **FIPS Phase 1 (2/4)** — Xác minh sau reboot: kiểm tra `fips_enabled=1`, crypto policy, algorithm enforcement (MD5/RC4 blocked), tất cả container health, SoftHSM2 workers ACTIVE, TLS quality.                                                                             |
+| `scripts/fips-ejbca-harden.sh`    | **FIPS Phase 1 (3/4)** — Hardening EJBCA cert profiles: restrict `availablesignaturealgorithms` (SHA256/384/512 only, loại SHA1/MD5), minimum RSA-2048+, ECDSA P-256+. Patch JVM `jdk.certpath.disabledAlgorithms`. Hỗ trợ `--dry-run`.                                     |
+| `scripts/fips-tls-harden.sh`      | **FIPS Phase 1 (4/4)** — Hardening TLS ciphers: Caddy (TLS 1.2+, AES-GCM only — Swarm config v16), EJBCA/SignServer JVM JAVA_OPTS, PostgreSQL `ssl_min_protocol_version=TLSv1.2`. Hỗ trợ `--dry-run`, `--skip-caddy`, `--skip-jvm`.                                         |
 
 ### Docker
 
