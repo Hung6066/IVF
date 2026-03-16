@@ -136,13 +136,13 @@ graph TD
 
 EJBCA CE ships with a **ManagementCA** that is automatically created on first startup. This CA issues the `superadmin` client certificate used for admin web access. The IVF PKI hierarchy is separate from the ManagementCA:
 
-| CA                        | Purpose                                     | Created By                                   |
-| ------------------------- | ------------------------------------------- | -------------------------------------------- |
-| **ManagementCA**          | EJBCA admin authentication (superadmin.p12) | EJBCA auto-init                              |
-| **IVF Internal Root CA**  | Legacy CA from initial testing (DN: `CN=IVF Internal Root CA,OU=IT Department,O=IVF Clinic,ST=Ho Chi Minh,C=VN`, ID: 995596930, expires 2036) | Earlier manual setup |
-| **IVF-Root-CA**           | Root of the IVF PKI trust chain (ID: 1031502430, expires 2046) | `setup-enterprise-pki.sh` Phase 1a |
-| **IVF-Signing-SubCA**     | Issues end-entity signing certificates (ID: 1728368285, signed by IVF-Root-CA, expires 2036) | `setup-enterprise-pki.sh` Phase 1b |
-| **IVF-Tenant-{id}-SubCA** | Tenant-isolated signing certificates        | `setup-enterprise-pki.sh` Phase 7 (optional) |
+| CA                        | Purpose                                                                                                                                       | Created By                                   |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| **ManagementCA**          | EJBCA admin authentication (superadmin.p12)                                                                                                   | EJBCA auto-init                              |
+| **IVF Internal Root CA**  | Legacy CA from initial testing (DN: `CN=IVF Internal Root CA,OU=IT Department,O=IVF Clinic,ST=Ho Chi Minh,C=VN`, ID: 995596930, expires 2036) | Earlier manual setup                         |
+| **IVF-Root-CA**           | Root of the IVF PKI trust chain (ID: 1031502430, expires 2046)                                                                                | `setup-enterprise-pki.sh` Phase 1a           |
+| **IVF-Signing-SubCA**     | Issues end-entity signing certificates (ID: 1728368285, signed by IVF-Root-CA, expires 2036)                                                  | `setup-enterprise-pki.sh` Phase 1b           |
+| **IVF-Tenant-{id}-SubCA** | Tenant-isolated signing certificates                                                                                                          | `setup-enterprise-pki.sh` Phase 7 (optional) |
 
 ---
 
@@ -171,22 +171,23 @@ docker exec ivf-ejbca /opt/keyfactor/bin/ejbca.sh ca importprofile \
 
 > **Warning — XML profile import bugs in EJBCA CE**: Profiles MUST be generated from `CertificateProfile(1)` (ENDUSER) and `EndEntityProfile(true)` constructors to include all required internal fields. Partial XML profiles will throw NPE on import. See [Troubleshooting: EJBCA XML profile import bugs](#ejbca-xml-profile-import-bugs).
 
-| Profile Name               | Profile ID | Key Usage                        | Extended Key Usage                  | Validity | Purpose                        |
-| -------------------------- | ---------- | -------------------------------- | ----------------------------------- | -------- | ------------------------------ |
-| **IVF-PDFSigner-Profile**  | 5001       | digitalSignature, nonRepudiation | --                                  | 3 years  | PDF document signing workers   |
+| Profile Name               | Profile ID | Key Usage                        | Extended Key Usage                 | Validity | Purpose                        |
+| -------------------------- | ---------- | -------------------------------- | ---------------------------------- | -------- | ------------------------------ |
+| **IVF-PDFSigner-Profile**  | 5001       | digitalSignature, nonRepudiation | --                                 | 3 years  | PDF document signing workers   |
 | **IVF-TSA-Profile**        | 5002       | digitalSignature                 | timeStamping (1.3.6.1.5.5.7.3.8)   | 5 years  | Timestamp Authority worker     |
 | **IVF-TLS-Client-Profile** | 5003       | digitalSignature                 | clientAuth (1.3.6.1.5.5.7.3.2)     | 2 years  | mTLS client certificates (API) |
 | **IVF-OCSP-Profile**       | --         | digitalSignature                 | OCSPSigning (1.3.6.1.5.5.7.48.1.5) | 2 years  | Dedicated OCSP responder       |
 
 ### Deployed End Entity Profiles
 
-| Profile Name                     | Profile ID | Allowed CAs          | Allowed Cert Profiles    | Purpose                     |
-| -------------------------------- | ---------- | -------------------- | ------------------------ | --------------------------- |
-| **IVF-PDFSigner-EEProfile**      | 6001       | IVF-Signing-SubCA    | IVF-PDFSigner-Profile    | PDF signer end entities     |
-| **IVF-TSA-EEProfile**            | 6002       | IVF-Signing-SubCA    | IVF-TSA-Profile          | TSA end entities            |
-| **IVF-TLS-Client-EEProfile**     | 6003       | IVF-Signing-SubCA    | IVF-TLS-Client-Profile   | API mTLS client certs       |
+| Profile Name                 | Profile ID | Allowed CAs       | Allowed Cert Profiles  | Purpose                 |
+| ---------------------------- | ---------- | ----------------- | ---------------------- | ----------------------- |
+| **IVF-PDFSigner-EEProfile**  | 6001       | IVF-Signing-SubCA | IVF-PDFSigner-Profile  | PDF signer end entities |
+| **IVF-TSA-EEProfile**        | 6002       | IVF-Signing-SubCA | IVF-TSA-Profile        | TSA end entities        |
+| **IVF-TLS-Client-EEProfile** | 6003       | IVF-Signing-SubCA | IVF-TLS-Client-Profile | API mTLS client certs   |
 
 Profile XML files saved in `certs/ejbca/`:
+
 - `certprofile_IVF-PDFSigner-Profile-5001.xml`
 - `certprofile_IVF-TSA-Profile-5002.xml`
 - `entityprofile_IVF-PDFSigner-EEProfile-6001.xml`
@@ -232,22 +233,22 @@ graph TD
 
 ### Key Storage Details
 
-| Parameter                       | Value                                                                                |
-| ------------------------------- | ------------------------------------------------------------------------------------ |
-| Token label                     | `SignServerToken`                                                                    |
-| User PIN                        | From Docker secret `softhsm_pin` (mounted at `/run/secrets/softhsm_pin`)             |
-| SO PIN                          | From Docker secret `softhsm_so_pin` (mounted at `/run/secrets/softhsm_so_pin`)       |
-| Library path (system)           | `/usr/lib64/pkcs11/libsofthsm2.so` **(pre-installed in SignServer CE 7.3.2 image)**  |
-| SoftHSM2 utility                | `softhsm2-util` **(system binary, pre-installed in image)**                          |
-| softhsm2.conf (persistent)      | `/opt/keyfactor/persistent/softhsm/softhsm2.conf` (written by hook on every restart) |
-| `SOFTHSM2_CONF` env var         | Exported by hook; JVM and softhsm2-util both use this to find the conf file          |
-| Token directory                 | `/opt/keyfactor/persistent/softhsm-tokens` (Docker volume `ivf_signserver_persistent`)|
-| Startup hook                    | `/opt/keyfactor/persistent/environment-hsm` (sourced by `start.sh` on every restart) |
-| deploy.properties registration  | Pre-configured in image: `cryptotoken.p11.lib.1.name = SoftHSM` / `.file = /usr/lib64/pkcs11/libsofthsm2.so` |
-| SoftHSM2 version                | v2.6.1 (AlmaLinux 9 system package — pre-installed in SignServer CE 7.3.2)           |
-| Key algorithm                   | RSA 4096                                                                              |
-| Key extractable                 | **No** (`CKA_EXTRACTABLE = false`)                                                    |
-| SignServer user UID             | `10001`                                                                               |
+| Parameter                      | Value                                                                                                        |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------ |
+| Token label                    | `SignServerToken`                                                                                            |
+| User PIN                       | From Docker secret `softhsm_pin` (mounted at `/run/secrets/softhsm_pin`)                                     |
+| SO PIN                         | From Docker secret `softhsm_so_pin` (mounted at `/run/secrets/softhsm_so_pin`)                               |
+| Library path (system)          | `/usr/lib64/pkcs11/libsofthsm2.so` **(pre-installed in SignServer CE 7.3.2 image)**                          |
+| SoftHSM2 utility               | `softhsm2-util` **(system binary, pre-installed in image)**                                                  |
+| softhsm2.conf (persistent)     | `/opt/keyfactor/persistent/softhsm/softhsm2.conf` (written by hook on every restart)                         |
+| `SOFTHSM2_CONF` env var        | Exported by hook; JVM and softhsm2-util both use this to find the conf file                                  |
+| Token directory                | `/opt/keyfactor/persistent/softhsm-tokens` (Docker volume `ivf_signserver_persistent`)                       |
+| Startup hook                   | `/opt/keyfactor/persistent/environment-hsm` (sourced by `start.sh` on every restart)                         |
+| deploy.properties registration | Pre-configured in image: `cryptotoken.p11.lib.1.name = SoftHSM` / `.file = /usr/lib64/pkcs11/libsofthsm2.so` |
+| SoftHSM2 version               | v2.6.1 (AlmaLinux 9 system package — pre-installed in SignServer CE 7.3.2)                                   |
+| Key algorithm                  | RSA 4096                                                                                                     |
+| Key extractable                | **No** (`CKA_EXTRACTABLE = false`)                                                                           |
+| SignServer user UID            | `10001`                                                                                                      |
 
 ### environment-hsm Hook (Current Content)
 
@@ -289,6 +290,7 @@ fi
 ```
 
 > **Key design decisions**:
+>
 > - The hook is **sourced** (not executed) by `start.sh`, so `export SOFTHSM2_CONF` propagates to the WildFly JVM process.
 > - Writing to `/opt/keyfactor/persistent/softhsm/softhsm2.conf` works because that subdirectory is owned by uid=10001. Writing to the persistent volume root fails (owned by root).
 > - `deploy.properties` does **not** need modification — `SoftHSM` is pre-registered in the image at index 1.
@@ -1187,6 +1189,7 @@ signserver wsadmins -list
 #### Web Service Role Management (Auditors)
 
 SignServer CE 7.3.2 has three Web Service roles managed independently:
+
 - **wsadmins** — can configure workers and manage the system
 - **wsauditors** — can read audit logs via WS/REST
 - **wsarchiveauditors** — can access the archive (signed documents) via WS
@@ -1268,6 +1271,7 @@ Since the hook is **sourced** (not executed) by `start.sh`, the `export` propaga
 4. **PASSWORD data entry**: `paramNum=1`, `use_key=1000001` — requires `data.put(1000001, Boolean.TRUE)` in the DataContainer, which is only present when the PASSWORD field is explicitly configured.
 
 **Fix**: Generate profile XMLs using a Java helper compiled against the EJBCA JAR, using the correct constructors:
+
 ```java
 CertificateProfile cp = new CertificateProfile(CertificateProfileConstants.CERTPROFILE_FIXED_ENDUSER); // NOT new CertificateProfile()
 EndEntityProfile eep = new EndEntityProfile(true);  // NOT new EndEntityProfile()
@@ -1648,13 +1652,13 @@ The script is designed to be re-run safely:
 
 | File                              | Purpose                                                                                                                                                                                  |
 | --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `scripts/setup-enterprise-pki.sh`   | Main PKI setup script — Phases 1–8 (CAs, cert profiles, P12 enrollment, worker config)                                                                                                   |
-| `scripts/setup-pkcs11-workers.sh`   | **SoftHSM2 + PKCS#11 migration** — Phases 3–5 (persistent SoftHSM2 setup, `environment-hsm` hook, EJBCA EE creation, PKCS#11 worker config + RSA key gen + cert enrollment). Run on VPS. |
-| `scripts/init-ejbca-rest.sh`        | EJBCA REST API initialization (mounted into container)                                                                                                                                   |
-| `scripts/init-mtls.sh`              | mTLS configuration script for SignServer                                                                                                                                                 |
-| `scripts/init-tsa.sh`               | TSA (Timestamp Authority) initialization script                                                                                                                                          |
-| `scripts/probe-rest-auth.sh`        | Probes SignServer REST authentication — tests mTLS and basic auth modes, reports which endpoints are reachable                                                                            |
-| `scripts/test-importprofiles.sh`    | Tests EJBCA certificate and end entity profile XML import — validates XML format and import success for profiles in `certs/ejbca/`                                                        |
+| `scripts/setup-enterprise-pki.sh` | Main PKI setup script — Phases 1–8 (CAs, cert profiles, P12 enrollment, worker config)                                                                                                   |
+| `scripts/setup-pkcs11-workers.sh` | **SoftHSM2 + PKCS#11 migration** — Phases 3–5 (persistent SoftHSM2 setup, `environment-hsm` hook, EJBCA EE creation, PKCS#11 worker config + RSA key gen + cert enrollment). Run on VPS. |
+| `scripts/init-ejbca-rest.sh`      | EJBCA REST API initialization (mounted into container)                                                                                                                                   |
+| `scripts/init-mtls.sh`            | mTLS configuration script for SignServer                                                                                                                                                 |
+| `scripts/init-tsa.sh`             | TSA (Timestamp Authority) initialization script                                                                                                                                          |
+| `scripts/probe-rest-auth.sh`      | Probes SignServer REST authentication — tests mTLS and basic auth modes, reports which endpoints are reachable                                                                           |
+| `scripts/test-importprofiles.sh`  | Tests EJBCA certificate and end entity profile XML import — validates XML format and import success for profiles in `certs/ejbca/`                                                       |
 
 ### Docker
 
@@ -1687,14 +1691,14 @@ The script is designed to be re-run safely:
 
 These XML files are imported into EJBCA to configure certificate and end entity profiles.
 
-| File                                                        | Profile Type        | ID   | Purpose                            |
-| ----------------------------------------------------------- | ------------------- | ---- | ---------------------------------- |
-| `certs/ejbca/certprofile_IVF-PDFSigner-Profile-5001.xml`   | Certificate profile | 5001 | PDF signer key usage + constraints |
-| `certs/ejbca/certprofile_IVF-TSA-Profile-5002.xml`         | Certificate profile | 5002 | TSA (Timestamp Authority) profile  |
-| `certs/ejbca/certprofile_IVF-TLS-Client-Profile-5003.xml`  | Certificate profile | 5003 | TLS client certificate profile     |
-| `certs/ejbca/entityprofile_IVF-PDFSigner-EEProfile-6001.xml` | End entity profile | 6001 | End entity for PDF signers         |
-| `certs/ejbca/entityprofile_IVF-TSA-EEProfile-6002.xml`     | End entity profile  | 6002 | End entity for TSA                 |
-| `certs/ejbca/entityprofile_IVF-TLS-Client-EEProfile-6003.xml` | End entity profile | 6003 | End entity for TLS clients         |
+| File                                                          | Profile Type        | ID   | Purpose                            |
+| ------------------------------------------------------------- | ------------------- | ---- | ---------------------------------- |
+| `certs/ejbca/certprofile_IVF-PDFSigner-Profile-5001.xml`      | Certificate profile | 5001 | PDF signer key usage + constraints |
+| `certs/ejbca/certprofile_IVF-TSA-Profile-5002.xml`            | Certificate profile | 5002 | TSA (Timestamp Authority) profile  |
+| `certs/ejbca/certprofile_IVF-TLS-Client-Profile-5003.xml`     | Certificate profile | 5003 | TLS client certificate profile     |
+| `certs/ejbca/entityprofile_IVF-PDFSigner-EEProfile-6001.xml`  | End entity profile  | 6001 | End entity for PDF signers         |
+| `certs/ejbca/entityprofile_IVF-TSA-EEProfile-6002.xml`        | End entity profile  | 6002 | End entity for TSA                 |
+| `certs/ejbca/entityprofile_IVF-TLS-Client-EEProfile-6003.xml` | End entity profile  | 6003 | End entity for TLS clients         |
 
 > **Import command**: `docker exec ivf-ejbca ejbca.sh ca importcertificateprofile -cpf /tmp/certprofile_....xml` and `ejbca.sh ra importeeprofile -eepf /tmp/entityprofile_....xml`  
 > Copy files first: `docker cp certs/ejbca/certprofile_*.xml <container>:/tmp/`
@@ -1716,105 +1720,105 @@ These XML files are imported into EJBCA to configure certificate and end entity 
 
 ### Container Paths
 
-| Path (inside container)                                              | Container      | Persistent?                                         | Purpose                                                                            |
-| -------------------------------------------------------------------- | -------------- | --------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| `/opt/keyfactor/bin/ejbca.sh`                                        | ivf-ejbca      | —                                                   | EJBCA CLI                                                                          |
-| `/opt/signserver/bin/signserver`                                     | ivf-signserver | —                                                   | SignServer CLI                                                                     |
-| `/opt/keyfactor/persistent/`                                         | ivf-signserver | **YES** (Docker volume `ivf_signserver_persistent`) | All persistent data                                                                |
-| `/opt/keyfactor/persistent/environment-hsm`                          | ivf-signserver | **YES**                                             | Startup hook — sourced by `start.sh` on every restart. Writes `softhsm2.conf` and exports `SOFTHSM2_CONF`. |
+| Path (inside container)                                              | Container      | Persistent?                                         | Purpose                                                                                                                                                   |
+| -------------------------------------------------------------------- | -------------- | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/opt/keyfactor/bin/ejbca.sh`                                        | ivf-ejbca      | —                                                   | EJBCA CLI                                                                                                                                                 |
+| `/opt/signserver/bin/signserver`                                     | ivf-signserver | —                                                   | SignServer CLI                                                                                                                                            |
+| `/opt/keyfactor/persistent/`                                         | ivf-signserver | **YES** (Docker volume `ivf_signserver_persistent`) | All persistent data                                                                                                                                       |
+| `/opt/keyfactor/persistent/environment-hsm`                          | ivf-signserver | **YES**                                             | Startup hook — sourced by `start.sh` on every restart. Writes `softhsm2.conf` and exports `SOFTHSM2_CONF`.                                                |
 | `/usr/lib64/pkcs11/libsofthsm2.so`                                   | ivf-signserver | **NO (ephemeral)**                                  | SoftHSM2 PKCS#11 library — **pre-installed in SignServer CE 7.3.2 image**, no custom build needed. Also pre-registered in `deploy.properties` at index 1. |
-| `/opt/keyfactor/persistent/softhsm/softhsm2.conf`                    | ivf-signserver | **YES**                                             | SoftHSM2 configuration — written by `environment-hsm` hook on every restart. Sets `tokendir = ../softhsm-tokens`. |
-| `/opt/keyfactor/persistent/softhsm-tokens/`                          | ivf-signserver | **YES**                                             | **Active** SoftHSM2 token storage (private key material). Located directly under persistent volume root. |
-| `/opt/keyfactor/persistent/keys/`                                    | ivf-signserver | **YES**                                             | P12 keystore files                                                                 |
-| `/opt/keyfactor/persistent/keys/ca-chain.pem`                        | ivf-signserver | **YES**                                             | CA chain for trust validation                                                      |
-| `/opt/keyfactor/signserver-custom/conf/signserver_deploy.properties` | ivf-signserver | **NO (ephemeral)**                                  | WildFly PKCS#11 library config — **pre-configured in image** with `cryptotoken.p11.lib.1.name = SoftHSM` at index 1. Hook no longer rewrites this file. |
-| `/run/secrets/softhsm_pin`                                           | ivf-signserver | —                                                   | Docker secret: SoftHSM2 user PIN                                                   |
-| `/run/secrets/softhsm_so_pin`                                        | ivf-signserver | —                                                   | Docker secret: SoftHSM2 SO (Security Officer) PIN                                  |
-| `/tmp/ejbca-certs/`                                                  | ivf-ejbca      | —                                                   | Temporary directory for batch-generated keystores                                  |
-| `/app/certs/`                                                        | ivf-api        | —                                                   | Mounted certificates for API                                                       |
-| `/run/secrets/api_cert_password`                                     | ivf-api        | —                                                   | API cert password (Docker Secret mount)                                            |
+| `/opt/keyfactor/persistent/softhsm/softhsm2.conf`                    | ivf-signserver | **YES**                                             | SoftHSM2 configuration — written by `environment-hsm` hook on every restart. Sets `tokendir = ../softhsm-tokens`.                                         |
+| `/opt/keyfactor/persistent/softhsm-tokens/`                          | ivf-signserver | **YES**                                             | **Active** SoftHSM2 token storage (private key material). Located directly under persistent volume root.                                                  |
+| `/opt/keyfactor/persistent/keys/`                                    | ivf-signserver | **YES**                                             | P12 keystore files                                                                                                                                        |
+| `/opt/keyfactor/persistent/keys/ca-chain.pem`                        | ivf-signserver | **YES**                                             | CA chain for trust validation                                                                                                                             |
+| `/opt/keyfactor/signserver-custom/conf/signserver_deploy.properties` | ivf-signserver | **NO (ephemeral)**                                  | WildFly PKCS#11 library config — **pre-configured in image** with `cryptotoken.p11.lib.1.name = SoftHSM` at index 1. Hook no longer rewrites this file.   |
+| `/run/secrets/softhsm_pin`                                           | ivf-signserver | —                                                   | Docker secret: SoftHSM2 user PIN                                                                                                                          |
+| `/run/secrets/softhsm_so_pin`                                        | ivf-signserver | —                                                   | Docker secret: SoftHSM2 SO (Security Officer) PIN                                                                                                         |
+| `/tmp/ejbca-certs/`                                                  | ivf-ejbca      | —                                                   | Temporary directory for batch-generated keystores                                                                                                         |
+| `/app/certs/`                                                        | ivf-api        | —                                                   | Mounted certificates for API                                                                                                                              |
+| `/run/secrets/api_cert_password`                                     | ivf-api        | —                                                   | API cert password (Docker Secret mount)                                                                                                                   |
 
 ### Docker Volumes
 
-| Volume (Swarm stack name)   | Purpose                                                                                      |
-| --------------------------- | -------------------------------------------------------------------------------------------- |
-| `ivf_ejbca_persistent`      | EJBCA application data and crypto tokens                                                     |
-| `ivf_ejbca_db_data`         | EJBCA PostgreSQL data                                                                        |
-| `ivf_signserver_persistent` | SignServer persistent data: P12 keystores, `softhsm-tokens/`, `softhsm/softhsm2.conf`, `environment-hsm` hook |
-| `ivf_signserver_db_data`    | SignServer PostgreSQL data                                                                                      |
+| Volume (Swarm stack name)   | Purpose                                                                                                                                                           |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ivf_ejbca_persistent`      | EJBCA application data and crypto tokens                                                                                                                          |
+| `ivf_ejbca_db_data`         | EJBCA PostgreSQL data                                                                                                                                             |
+| `ivf_signserver_persistent` | SignServer persistent data: P12 keystores, `softhsm-tokens/`, `softhsm/softhsm2.conf`, `environment-hsm` hook                                                     |
+| `ivf_signserver_db_data`    | SignServer PostgreSQL data                                                                                                                                        |
 | `ivf_softhsm_tokens`        | **Legacy / unused.** Mounted at `/opt/keyfactor/persistent/softhsm/tokens` inside the container. Active tokens are in `ivf_signserver_persistent/softhsm-tokens`. |
 
 ## 20. Live Deployment Status
 
-*Last verified: March 16, 2026*
+_Last verified: March 16, 2026_
 
 ### SignServer Workers
 
-| Worker ID | Name                        | Status       | Key Alias                   | Crypto Token    |
-| --------- | --------------------------- | ------------ | --------------------------- | --------------- |
-| 1         | PDFSigner                   | ✅ ACTIVE    | `signer`                    | SoftHSM2 PKCS#11 |
-| 100       | TimeStampSigner             | ✅ ACTIVE    | `tsa`                       | SoftHSM2 PKCS#11 |
-| 272       | PDFSigner_technical         | ✅ ACTIVE    | `pdfsigner_technical`       | SoftHSM2 PKCS#11 |
-| 444       | PDFSigner_head_department   | ✅ ACTIVE    | `pdfsigner_head_department` | SoftHSM2 PKCS#11 |
-| 597       | PDFSigner_doctor1           | ✅ ACTIVE    | `pdfsigner_doctor1`         | SoftHSM2 PKCS#11 |
-| 907       | PDFSigner_admin             | ✅ ACTIVE    | `pdfsigner_admin`           | SoftHSM2 PKCS#11 |
+| Worker ID | Name                      | Status    | Key Alias                   | Crypto Token     |
+| --------- | ------------------------- | --------- | --------------------------- | ---------------- |
+| 1         | PDFSigner                 | ✅ ACTIVE | `signer`                    | SoftHSM2 PKCS#11 |
+| 100       | TimeStampSigner           | ✅ ACTIVE | `tsa`                       | SoftHSM2 PKCS#11 |
+| 272       | PDFSigner_technical       | ✅ ACTIVE | `pdfsigner_technical`       | SoftHSM2 PKCS#11 |
+| 444       | PDFSigner_head_department | ✅ ACTIVE | `pdfsigner_head_department` | SoftHSM2 PKCS#11 |
+| 597       | PDFSigner_doctor1         | ✅ ACTIVE | `pdfsigner_doctor1`         | SoftHSM2 PKCS#11 |
+| 907       | PDFSigner_admin           | ✅ ACTIVE | `pdfsigner_admin`           | SoftHSM2 PKCS#11 |
 
 All 6 workers are ACTIVE with keys stored in SoftHSM2 inside the `ivf_signserver_persistent` volume (`softhsm-tokens/`).
 
 ### Web Service Roles
 
-| Role                  | Mode / Status                                   | Authorized Certificates                                           |
-| --------------------- | ----------------------------------------------- | ----------------------------------------------------------------- |
-| `wsadmins`            | ⚠️ **allowany** (all client certs accepted)     | ANY — **should be restricted before production**                  |
-| `wsauditors`          | ✅ Cert-based                                   | Serial `4cc00e72ec60ba41ae2a91a386abf9ebaac2d33f` (superadmin)   |
-| `wsarchiveauditors`   | ✅ Cert-based                                   | Serial `4cc00e72ec60ba41ae2a91a386abf9ebaac2d33f` (superadmin)   |
+| Role                | Mode / Status                               | Authorized Certificates                                        |
+| ------------------- | ------------------------------------------- | -------------------------------------------------------------- |
+| `wsadmins`          | ⚠️ **allowany** (all client certs accepted) | ANY — **should be restricted before production**               |
+| `wsauditors`        | ✅ Cert-based                               | Serial `4cc00e72ec60ba41ae2a91a386abf9ebaac2d33f` (superadmin) |
+| `wsarchiveauditors` | ✅ Cert-based                               | Serial `4cc00e72ec60ba41ae2a91a386abf9ebaac2d33f` (superadmin) |
 
 > **Action required**: Disable allowany on `wsadmins` and add specific admin certificate(s) before going to production.  
 > See Section 15 for commands and Section 17 checklist for the security action item.
 
 ### EJBCA Certificate Authorities
 
-| CA Name               | CA ID       | Status             | Subject DN                                                                           | Expires |
-| --------------------- | ----------- | ------------------ | ------------------------------------------------------------------------------------ | ------- |
-| ManagementCA          | (auto)      | Active (internal)  | `CN=ManagementCA`                                                                    | ~2027   |
-| IVF Internal Root CA  | 995596930   | Active (legacy)    | `CN=IVF Internal Root CA,OU=IT Department,O=IVF Clinic,ST=Ho Chi Minh,C=VN`         | 2036    |
-| IVF-Root-CA           | 1031502430  | ✅ Active (primary) | `CN=IVF Root Certificate Authority,OU=PKI,O=IVF Healthcare,C=VN`                   | 2046    |
-| IVF-Signing-SubCA     | 1728368285  | ✅ Active           | `CN=IVF Document Signing CA,OU=Digital Signing,O=IVF Healthcare,C=VN`              | 2036    |
+| CA Name              | CA ID      | Status              | Subject DN                                                                  | Expires |
+| -------------------- | ---------- | ------------------- | --------------------------------------------------------------------------- | ------- |
+| ManagementCA         | (auto)     | Active (internal)   | `CN=ManagementCA`                                                           | ~2027   |
+| IVF Internal Root CA | 995596930  | Active (legacy)     | `CN=IVF Internal Root CA,OU=IT Department,O=IVF Clinic,ST=Ho Chi Minh,C=VN` | 2036    |
+| IVF-Root-CA          | 1031502430 | ✅ Active (primary) | `CN=IVF Root Certificate Authority,OU=PKI,O=IVF Healthcare,C=VN`            | 2046    |
+| IVF-Signing-SubCA    | 1728368285 | ✅ Active           | `CN=IVF Document Signing CA,OU=Digital Signing,O=IVF Healthcare,C=VN`       | 2036    |
 
 > **Note**: `IVF Internal Root CA` (ID 995596930) is a legacy CA created during initial testing. It uses a different DN from `IVF-Root-CA`. All production certificates should be issued under `IVF-Signing-SubCA` chaining to `IVF-Root-CA`.
 
 ### EJBCA Certificate Profiles
 
-| Profile Name               | ID   | Issuing CA          | Status        |
-| -------------------------- | ---- | ------------------- | ------------- |
-| IVF-PDFSigner-Profile      | 5001 | IVF-Signing-SubCA   | ✅ Imported   |
-| IVF-TSA-Profile            | 5002 | IVF-Signing-SubCA   | ✅ Imported   |
-| IVF-TLS-Client-Profile     | 5003 | IVF-Signing-SubCA   | ✅ Imported   |
+| Profile Name           | ID   | Issuing CA        | Status      |
+| ---------------------- | ---- | ----------------- | ----------- |
+| IVF-PDFSigner-Profile  | 5001 | IVF-Signing-SubCA | ✅ Imported |
+| IVF-TSA-Profile        | 5002 | IVF-Signing-SubCA | ✅ Imported |
+| IVF-TLS-Client-Profile | 5003 | IVF-Signing-SubCA | ✅ Imported |
 
 ### EJBCA End Entity Profiles
 
-| Profile Name                   | ID   | Certificate Profile       | Status        |
-| ------------------------------ | ---- | ------------------------- | ------------- |
-| IVF-PDFSigner-EEProfile        | 6001 | IVF-PDFSigner-Profile     | ✅ Imported   |
-| IVF-TSA-EEProfile              | 6002 | IVF-TSA-Profile           | ✅ Imported   |
-| IVF-TLS-Client-EEProfile       | 6003 | IVF-TLS-Client-Profile    | ✅ Imported   |
+| Profile Name             | ID   | Certificate Profile    | Status      |
+| ------------------------ | ---- | ---------------------- | ----------- |
+| IVF-PDFSigner-EEProfile  | 6001 | IVF-PDFSigner-Profile  | ✅ Imported |
+| IVF-TSA-EEProfile        | 6002 | IVF-TSA-Profile        | ✅ Imported |
+| IVF-TLS-Client-EEProfile | 6003 | IVF-TLS-Client-Profile | ✅ Imported |
 
 ### Superadmin Certificate
 
-| Attribute  | Value                                                         |
-| ---------- | ------------------------------------------------------------- |
-| Serial     | `4cc00e72ec60ba41ae2a91a386abf9ebaac2d33f`                    |
-| Issuer CN  | `CN=IVF Root Certificate Authority`                           |
-| Usage      | EJBCA admin, `wsauditors`, `wsarchiveauditors` web service roles |
-| Store      | `certs/ejbca/superadmin.p12`                                  |
+| Attribute | Value                                                            |
+| --------- | ---------------------------------------------------------------- |
+| Serial    | `4cc00e72ec60ba41ae2a91a386abf9ebaac2d33f`                       |
+| Issuer CN | `CN=IVF Root Certificate Authority`                              |
+| Usage     | EJBCA admin, `wsauditors`, `wsarchiveauditors` web service roles |
+| Store     | `certs/ejbca/superadmin.p12`                                     |
 
 ### SoftHSM2 Status
 
-| Property                       | Value                                                              |
-| ------------------------------ | ------------------------------------------------------------------ |
-| Library (image)                | `/usr/lib64/pkcs11/libsofthsm2.so` (pre-installed, ephemeral)     |
-| `deploy.properties` entry      | `cryptotoken.p11.lib.1.name = SoftHSM` (index 1, pre-configured)  |
-| Token directory                | `/opt/keyfactor/persistent/softhsm-tokens/` (persistent volume)   |
-| `softhsm2.conf`                | `/opt/keyfactor/persistent/softhsm/softhsm2.conf` (written by hook) |
-| `SOFTHSM2_CONF` env var        | Exported by `environment-hsm` hook on every restart               |
-| `ivf_softhsm_tokens` volume    | Legacy/unused — mounted at `softhsm/tokens`, not the active path  |
+| Property                    | Value                                                               |
+| --------------------------- | ------------------------------------------------------------------- |
+| Library (image)             | `/usr/lib64/pkcs11/libsofthsm2.so` (pre-installed, ephemeral)       |
+| `deploy.properties` entry   | `cryptotoken.p11.lib.1.name = SoftHSM` (index 1, pre-configured)    |
+| Token directory             | `/opt/keyfactor/persistent/softhsm-tokens/` (persistent volume)     |
+| `softhsm2.conf`             | `/opt/keyfactor/persistent/softhsm/softhsm2.conf` (written by hook) |
+| `SOFTHSM2_CONF` env var     | Exported by `environment-hsm` hook on every restart                 |
+| `ivf_softhsm_tokens` volume | Legacy/unused — mounted at `softhsm/tokens`, not the active path    |

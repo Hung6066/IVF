@@ -54,14 +54,14 @@
 
 ### Thành phần chính
 
-| Thành phần | Version | Node | Vai trò |
-|---|---|---|---|
-| **wazuh-manager** | 4.9.2 | VPS2 | Nhận/phân tích log từ agents, quản lý rules |
-| **wazuh-indexer** | 4.9.2 | VPS2 | Lưu trữ alerts/events (OpenSearch) |
-| **wazuh-dashboard** | 4.9.2 | VPS2 | Giao diện web phân tích bảo mật |
-| **wazuh-agent (VPS1)** | 4.9.2 | VPS1 | Thu thập log/events từ VPS1, gửi về manager |
-| **wazuh-agent (VPS2)** | 4.9.2 | VPS2 | Thu thập log/events từ VPS2, gửi về manager |
-| **Lynis** | latest | cả 2 VPS | Audit bảo mật hệ thống hàng tuần |
+| Thành phần             | Version | Node     | Vai trò                                     |
+| ---------------------- | ------- | -------- | ------------------------------------------- |
+| **wazuh-manager**      | 4.9.2   | VPS2     | Nhận/phân tích log từ agents, quản lý rules |
+| **wazuh-indexer**      | 4.9.2   | VPS2     | Lưu trữ alerts/events (OpenSearch)          |
+| **wazuh-dashboard**    | 4.9.2   | VPS2     | Giao diện web phân tích bảo mật             |
+| **wazuh-agent (VPS1)** | 4.9.2   | VPS1     | Thu thập log/events từ VPS1, gửi về manager |
+| **wazuh-agent (VPS2)** | 4.9.2   | VPS2     | Thu thập log/events từ VPS2, gửi về manager |
+| **Lynis**              | latest  | cả 2 VPS | Audit bảo mật hệ thống hàng tuần            |
 
 ---
 
@@ -74,7 +74,7 @@ graph TB
     subgraph VPS1["VPS1 — vmi3129107 (194.163.181.19)"]
         direction TB
         A1[wazuh-agent<br/>ID: 002<br/>systemd service]
-        
+
         subgraph MON_VPS1["Monitoring sources"]
             S1["/var/log/syslog<br/>/var/log/auth.log"]
             S2["Docker daemon<br/>journald"]
@@ -88,7 +88,7 @@ graph TB
     subgraph VPS2["VPS2 — vmi3129111 (45.134.226.56)"]
         direction TB
         A2[wazuh-agent<br/>ID: 001<br/>systemd service]
-        
+
         subgraph MON_VPS2["Monitoring sources"]
             S6["/var/log/syslog<br/>/var/log/auth.log"]
             S7["Docker daemon<br/>journald"]
@@ -97,14 +97,14 @@ graph TB
             S10["Lynis audit<br/>/var/log/lynis/"]
         end
         S6 & S7 & S8 & S9 & S10 --> A2
-        
+
         subgraph WAZUH_STACK["Wazuh Stack (Docker Swarm)"]
             WM["wazuh-manager<br/>TCP 1514 (events)<br/>TCP 1515 (enrollment)<br/>TCP 55000 (API)"]
             WI["wazuh-indexer<br/>(OpenSearch)<br/>TCP 9200"]
             WD["wazuh-dashboard<br/>TCP 5601"]
             FB["Filebeat<br/>(built-in)"]
         end
-        
+
         A2 -->|"TCP 1514<br/>AES encrypted"| WM
         WM --> FB
         FB -->|"HTTPS + mTLS"| WI
@@ -112,11 +112,11 @@ graph TB
     end
 
     A1 -->|"TCP 1514<br/>AES encrypted"| WM
-    
+
     subgraph CADDY["Caddy Reverse Proxy"]
         CP["https://natra.site/wazuh/<br/>Basic Auth: monitor/***"]
     end
-    
+
     WD --> CP
     CP -->|"Browser"| USER([👤 Security Analyst])
 
@@ -151,7 +151,7 @@ sequenceDiagram
     Note over M,I: Alert indexing
     M->>F: Write alerts.json
     F->>I: HTTPS PUT /wazuh-alerts-* (mTLS)
-    
+
     Note over I,D: Visualization
     D->>I: Query alerts/events
     I->>D: Aggregated results
@@ -306,25 +306,25 @@ sequenceDiagram
 
 ### Custom Rules — ID range & mức độ
 
-| Rule ID | Trigger | Level | Group |
-|---|---|---|---|
-| 100100 | Node status received | 0 (base) | docker-swarm-nodes |
-| **100101** | Node status = **Down** | **12** 🔴 | swarm-critical |
-| 100102 | Node availability = Drain | 7 🟡 | swarm-warning |
-| 100103 | Node availability = Pause | 7 🟡 | swarm-warning |
-| 100110 | Service list received | 0 (base) | docker-swarm-services |
-| **100111** | Service replicas = **0/N** | **12** 🔴 | swarm-critical |
-| 100112 | Service replicas degraded | 8 🟠 | swarm-warning |
-| 100120 | Docker info received | 0 (base) | docker-info |
-| 100121 | Swarm mode NOT active | 10 🔴 | swarm-critical |
-| 100122 | Stopped containers > 20 | 5 🟡 | docker-maintenance |
-| 100130 | Unhealthy check received | 0 (base) | docker-unhealthy |
-| **100131** | Container **UNHEALTHY** | **10** 🔴 | swarm-critical |
-| 100140 | Failed tasks received | 0 (base) | docker-swarm-failed-tasks |
-| **100141** | Task **failed/rejected** | **10** 🔴 | swarm-critical |
-| **100150** | SSH brute force (10+ in 2min) | **10** 🔴 | ssh-brute-force |
-| **100160** | `/etc/docker/` modified | **10** 🔴 | docker-config-change |
-| **100161** | Docker Swarm secret/config | **12** 🔴 | docker-config-change |
+| Rule ID    | Trigger                       | Level     | Group                     |
+| ---------- | ----------------------------- | --------- | ------------------------- |
+| 100100     | Node status received          | 0 (base)  | docker-swarm-nodes        |
+| **100101** | Node status = **Down**        | **12** 🔴 | swarm-critical            |
+| 100102     | Node availability = Drain     | 7 🟡      | swarm-warning             |
+| 100103     | Node availability = Pause     | 7 🟡      | swarm-warning             |
+| 100110     | Service list received         | 0 (base)  | docker-swarm-services     |
+| **100111** | Service replicas = **0/N**    | **12** 🔴 | swarm-critical            |
+| 100112     | Service replicas degraded     | 8 🟠      | swarm-warning             |
+| 100120     | Docker info received          | 0 (base)  | docker-info               |
+| 100121     | Swarm mode NOT active         | 10 🔴     | swarm-critical            |
+| 100122     | Stopped containers > 20       | 5 🟡      | docker-maintenance        |
+| 100130     | Unhealthy check received      | 0 (base)  | docker-unhealthy          |
+| **100131** | Container **UNHEALTHY**       | **10** 🔴 | swarm-critical            |
+| 100140     | Failed tasks received         | 0 (base)  | docker-swarm-failed-tasks |
+| **100141** | Task **failed/rejected**      | **10** 🔴 | swarm-critical            |
+| **100150** | SSH brute force (10+ in 2min) | **10** 🔴 | ssh-brute-force           |
+| **100160** | `/etc/docker/` modified       | **10** 🔴 | docker-config-change      |
+| **100161** | Docker Swarm secret/config    | **12** 🔴 | docker-config-change      |
 
 ---
 
@@ -384,19 +384,19 @@ flowchart TD
 stateDiagram-v2
     [*] --> BaselineScan: Agent khởi động\n(scan_on_start=yes)
     BaselineScan --> Monitoring: Baseline tạo xong\n(checksum, permissions, ownership)
-    
+
     Monitoring --> ChangeDetected: Realtime inotify event\nhoặc periodic scan (12h)
-    
+
     ChangeDetected --> Compare: So sánh với baseline
-    
+
     Compare --> AlertGenerated: Thuộc tính thay đổi
     Compare --> Monitoring: Không thay đổi
-    
+
     AlertGenerated --> RuleMatch: analysisd rule check
-    
+
     RuleMatch --> LowAlert: /etc/hosts.deny, mtab\n(ignored paths)
     RuleMatch --> HighAlert: /etc/docker/ → level 10\n/var/lib/docker/swarm → level 12
-    
+
     LowAlert --> Monitoring
     HighAlert --> IndexAlert: Gửi lên wazuh-indexer
     IndexAlert --> Dashboard: Hiển thị Integrity Monitoring tab
@@ -404,12 +404,14 @@ stateDiagram-v2
 ```
 
 **Thư mục được giám sát (realtime):**
+
 - `/etc/ssh` — SSH config changes
 - `/etc/docker` — Docker daemon config
 - `/opt/ivf/docker` — IVF app config
 - `/var/lib/docker/swarm` — Swarm secrets/configs
 
 **Thư mục bị loại trừ (high-churn):**
+
 - `/var/lib/docker/containers`, `/overlay2`, `/network`, `/volumes`
 
 ---
@@ -745,17 +747,9 @@ sequenceDiagram
   "malware_scanner": "",
   "compiler_installed": "no",
   "warning_count": 3,
-  "warnings": [
-    "SSH-7408",
-    "AUTH-9328",
-    "LOGG-2154"
-  ],
+  "warnings": ["SSH-7408", "AUTH-9328", "LOGG-2154"],
   "suggestion_count": 18,
-  "suggestions": [
-    "BOOT-5122",
-    "KRNL-6000",
-    "..."
-  ],
+  "suggestions": ["BOOT-5122", "KRNL-6000", "..."],
   "vulnerable_packages": [],
   "source_file": "/var/log/lynis/reports/lynis-2026-03-15.dat"
 }
@@ -800,7 +794,7 @@ graph TB
             V1D["Docker events\njournald + commands"]
             V1F["File changes\ninotify realtime"]
         end
-        
+
         subgraph VPS2H["VPS2 (vmi3129111)"]
             V2A["wazuh-agent\n(systemd, ID:001)"]
             V2L["Lynis\n(cron weekly)"]
@@ -856,15 +850,15 @@ graph TB
 
 ### Bảng tích hợp tổng hợp
 
-| Công cụ | Loại | Tần suất | Dữ liệu | Lưu trữ |
-|---|---|---|---|---|
-| **Wazuh Agent** | Real-time | Liên tục (1s events) | System logs, FIM, Docker | OpenSearch index |
-| **Wazuh SCA** | Periodic | 12h | Security configuration | OpenSearch index |
-| **Wazuh Rootcheck** | Periodic | 12h | Trojans, PIDs, ports | OpenSearch index |
-| **Wazuh Syscollector** | Periodic | 1h | HW/OS/Packages inventory | OpenSearch index |
-| **Wazuh Docker Monitor** | Periodic | 60–600s | Container/Service/Node status | OpenSearch index |
-| **Lynis** | Scheduled | Weekly (Sun 02:30) | Full security audit | MinIO + syslog |
-| **FIM (realtime)** | Event-driven | Immediate | File changes /etc /opt/ivf | OpenSearch index |
+| Công cụ                  | Loại         | Tần suất             | Dữ liệu                       | Lưu trữ          |
+| ------------------------ | ------------ | -------------------- | ----------------------------- | ---------------- |
+| **Wazuh Agent**          | Real-time    | Liên tục (1s events) | System logs, FIM, Docker      | OpenSearch index |
+| **Wazuh SCA**            | Periodic     | 12h                  | Security configuration        | OpenSearch index |
+| **Wazuh Rootcheck**      | Periodic     | 12h                  | Trojans, PIDs, ports          | OpenSearch index |
+| **Wazuh Syscollector**   | Periodic     | 1h                   | HW/OS/Packages inventory      | OpenSearch index |
+| **Wazuh Docker Monitor** | Periodic     | 60–600s              | Container/Service/Node status | OpenSearch index |
+| **Lynis**                | Scheduled    | Weekly (Sun 02:30)   | Full security audit           | MinIO + syslog   |
+| **FIM (realtime)**       | Event-driven | Immediate            | File changes /etc /opt/ivf    | OpenSearch index |
 
 ---
 
@@ -872,47 +866,47 @@ graph TB
 
 ### Ports Wazuh
 
-| Port | Protocol | Dịch vụ | Mô tả |
-|---|---|---|---|
-| **1514** | TCP | wazuh-manager | Agent event communication (encrypted AES) |
-| **1515** | TCP | wazuh-manager | Agent enrollment |
-| **1516** | TCP | wazuh-manager | Cluster communication (internal) |
-| **55000** | TCP | wazuh-manager | REST API (internal only, không expose ra ngoài) |
-| **9200** | TCP | wazuh-indexer | OpenSearch HTTP (internal) |
-| **9300** | TCP | wazuh-indexer | OpenSearch transport (internal) |
-| **5601** | TCP | wazuh-dashboard | Web UI (qua Caddy proxy) |
+| Port      | Protocol | Dịch vụ         | Mô tả                                           |
+| --------- | -------- | --------------- | ----------------------------------------------- |
+| **1514**  | TCP      | wazuh-manager   | Agent event communication (encrypted AES)       |
+| **1515**  | TCP      | wazuh-manager   | Agent enrollment                                |
+| **1516**  | TCP      | wazuh-manager   | Cluster communication (internal)                |
+| **55000** | TCP      | wazuh-manager   | REST API (internal only, không expose ra ngoài) |
+| **9200**  | TCP      | wazuh-indexer   | OpenSearch HTTP (internal)                      |
+| **9300**  | TCP      | wazuh-indexer   | OpenSearch transport (internal)                 |
+| **5601**  | TCP      | wazuh-dashboard | Web UI (qua Caddy proxy)                        |
 
 ### Credentials
 
-| Dịch vụ | User | Password | Ghi chú |
-|---|---|---|---|
-| Wazuh Dashboard | `admin` | `NXPPTSMdDcOAC9AzlhfNxN0ZYVrOpW1g` | OpenSearch admin |
-| Wazuh API | `wazuh-wui` | `0TLUTyAWNN5Xk0Gb9aeXdktR2Pp4Ww` | API user |
-| Caddy Basic Auth | `monitor` | `wDDaI8zzSTBPyzfGp3wRc6JkDGgIv6ZF` | HTTPS proxy auth |
-| MinIO (Lynis upload) | `minioadmin` | `minioadmin123` | S3 API (ghi đè trong hosts.yml) |
+| Dịch vụ              | User         | Password                           | Ghi chú                         |
+| -------------------- | ------------ | ---------------------------------- | ------------------------------- |
+| Wazuh Dashboard      | `admin`      | `NXPPTSMdDcOAC9AzlhfNxN0ZYVrOpW1g` | OpenSearch admin                |
+| Wazuh API            | `wazuh-wui`  | `0TLUTyAWNN5Xk0Gb9aeXdktR2Pp4Ww`   | API user                        |
+| Caddy Basic Auth     | `monitor`    | `wDDaI8zzSTBPyzfGp3wRc6JkDGgIv6ZF` | HTTPS proxy auth                |
+| MinIO (Lynis upload) | `minioadmin` | `minioadmin123`                    | S3 API (ghi đè trong hosts.yml) |
 
 > ⚠️ **Bảo mật**: Thay đổi tất cả credentials trong môi trường production. MinIO credentials nên được ghi đè trong `ansible/hosts.yml` hoặc `group_vars/all.yml`.
 
 ### Agent IDs
 
-| ID | Name | VPS | IP | Status |
-|---|---|---|---|---|
-| 000 | wazuh-manager | VPS2 | 127.0.0.1 | Active/Local (server) |
-| 001 | vps2-vmi3129111 | VPS2 | any | Active ✅ |
-| 002 | vps1-vmi3129107 | VPS1 | any | Active ✅ |
+| ID  | Name            | VPS  | IP        | Status                |
+| --- | --------------- | ---- | --------- | --------------------- |
+| 000 | wazuh-manager   | VPS2 | 127.0.0.1 | Active/Local (server) |
+| 001 | vps2-vmi3129111 | VPS2 | any       | Active ✅             |
+| 002 | vps1-vmi3129107 | VPS1 | any       | Active ✅             |
 
 ### Lynis paths
 
-| Path | Mô tả |
-|---|---|
-| `/usr/sbin/lynis` | Binary |
-| `/etc/lynis/custom.prf` | Custom profile |
-| `/var/log/lynis/lynis.log` | Audit log |
-| `/var/log/lynis/reports/lynis-YYYY-MM-DD.dat` | Raw report |
-| `/var/log/lynis/reports/lynis-YYYY-MM-DD.json` | Parsed JSON |
-| `/usr/local/bin/lynis-ship.sh` | MinIO upload script |
-| `/etc/cron.d/lynis-audit` | Cron definition |
-| `MinIO: ivf-documents/system/lynis/{hostname}/` | Remote storage |
+| Path                                            | Mô tả               |
+| ----------------------------------------------- | ------------------- |
+| `/usr/sbin/lynis`                               | Binary              |
+| `/etc/lynis/custom.prf`                         | Custom profile      |
+| `/var/log/lynis/lynis.log`                      | Audit log           |
+| `/var/log/lynis/reports/lynis-YYYY-MM-DD.dat`   | Raw report          |
+| `/var/log/lynis/reports/lynis-YYYY-MM-DD.json`  | Parsed JSON         |
+| `/usr/local/bin/lynis-ship.sh`                  | MinIO upload script |
+| `/etc/cron.d/lynis-audit`                       | Cron definition     |
+| `MinIO: ivf-documents/system/lynis/{hostname}/` | Remote storage      |
 
 ### Chạy Lynis thủ công
 
@@ -939,15 +933,15 @@ ansible-playbook ansible/site.yml --tags lynis -i ansible/hosts.yml
 
 ### Troubleshooting
 
-| Vấn đề | Kiểm tra | Giải pháp |
-|---|---|---|
-| Agent `Never connected` | `agent_control -l` trên manager | Kiểm tra port 1514 từ agent tới manager; xem `client.keys` |
-| Agent `Disconnected` | `systemctl status wazuh-agent` | `systemctl start wazuh-agent`; xem `/var/ossec/logs/ossec.log` |
-| Dashboard 429 Too Many Requests | `cat /var/ossec/api/configuration/api.yaml` | Tăng `max_request_per_minute: 1500` |
-| Lynis ship fail | `journalctl -t lynis-ship` | Kiểm tra MinIO access key; `mc ping minio` |
-| FIM false positives nhiều | `wazuh-dashboard → Integrity Monitoring` | Thêm `<ignore>` vào ossec.conf |
-| Custom rules không hoạt động | `agent_control -m 1 -f docker-swarm-services` (test) | Kiểm tra XML syntax; `ossec-logtest` trên manager |
+| Vấn đề                          | Kiểm tra                                             | Giải pháp                                                      |
+| ------------------------------- | ---------------------------------------------------- | -------------------------------------------------------------- |
+| Agent `Never connected`         | `agent_control -l` trên manager                      | Kiểm tra port 1514 từ agent tới manager; xem `client.keys`     |
+| Agent `Disconnected`            | `systemctl status wazuh-agent`                       | `systemctl start wazuh-agent`; xem `/var/ossec/logs/ossec.log` |
+| Dashboard 429 Too Many Requests | `cat /var/ossec/api/configuration/api.yaml`          | Tăng `max_request_per_minute: 1500`                            |
+| Lynis ship fail                 | `journalctl -t lynis-ship`                           | Kiểm tra MinIO access key; `mc ping minio`                     |
+| FIM false positives nhiều       | `wazuh-dashboard → Integrity Monitoring`             | Thêm `<ignore>` vào ossec.conf                                 |
+| Custom rules không hoạt động    | `agent_control -m 1 -f docker-swarm-services` (test) | Kiểm tra XML syntax; `ossec-logtest` trên manager              |
 
 ---
 
-*Tài liệu được tạo: 2026-03-15 | Version: 1.0 | IVF Platform Security Infrastructure*
+_Tài liệu được tạo: 2026-03-15 | Version: 1.0 | IVF Platform Security Infrastructure_
