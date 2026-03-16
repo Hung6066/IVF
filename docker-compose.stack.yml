@@ -246,7 +246,7 @@ services:
       - DATABASE_USER=ejbca
       - DATABASE_PASSWORD=ejbca
       - TLS_SETUP_ENABLED=later
-      - INITIAL_ADMIN=;CertificateAuthenticationToken:WITH_ISSUER_SERIAL;CN=ManagementCA,O=IVF Clinic;${EJBCA_ADMIN_CERT_SERIAL:-0};
+      - INITIAL_ADMIN=;CertificateAuthenticationToken:WITH_ISSUER_SERIAL;CN=IVF Root Certificate Authority,OU=PKI,O=IVF Healthcare,C=VN;${EJBCA_ADMIN_CERT_SERIAL:-3AEE4ACB235D363E4179C8ABD1CD41BAA92F93D2};
     ports:
       - target: 8443
         published: 8443
@@ -301,7 +301,7 @@ services:
       - DATABASE_USER=signserver
       - DATABASE_PASSWORD=signserver
       - TLS_SETUP_ENABLED=later
-      - INITIAL_ADMIN=;CertificateAuthenticationToken:WITH_ISSUER_SERIAL;CN=ManagementCA,O=IVF Clinic;${SIGNSERVER_ADMIN_CERT_SERIAL:-0};
+      - INITIAL_ADMIN=;CertificateAuthenticationToken:WITH_ISSUER_SERIAL;CN=IVF Root Certificate Authority,OU=PKI,O=IVF Healthcare,C=VN;${SIGNSERVER_ADMIN_CERT_SERIAL:-3AEE4ACB235D363E4179C8ABD1CD41BAA92F93D2};
       - SIGNSERVER_NODEID=node1
       - SOFTHSM_TOKEN_LABEL=SignServerToken
       - SOFTHSM_SO_PIN_FILE=/run/secrets/softhsm_so_pin
