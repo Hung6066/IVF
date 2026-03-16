@@ -52,6 +52,7 @@ bash scripts/deploy-wazuh.sh
 ```
 
 Deploy script thực hiện:
+
 1. Gen SSL certs cho wazuh.manager / wazuh.indexer / wazuh.dashboard
 2. Tạo Docker secrets: `wazuh_indexer_password`, `wazuh_api_password`, `wazuh_dashboard_password`
 3. `docker stack deploy wazuh`
@@ -59,8 +60,8 @@ Deploy script thực hiện:
 
 ### Truy cập Dashboard
 
-| URL | Auth |
-|-----|------|
+| URL                         | Auth                                            |
+| --------------------------- | ----------------------------------------------- |
 | `https://natra.site/wazuh/` | HTTP Basic: `monitor` / `<monitoring_password>` |
 
 > Sau khi qua basic auth, đăng nhập Wazuh bằng user `admin` / `<wazuh_indexer_password>` được lưu trong Docker secret.
@@ -81,11 +82,11 @@ systemctl start wazuh-agent
 
 ### Cấu hình quan trọng
 
-| File | Mục đích |
-|------|----------|
-| `docker/wazuh/config/wazuh_cluster/wazuh_manager.conf` | ossec.conf cho Manager |
-| `ansible/roles/wazuh-agent/templates/ossec.conf.j2` | ossec.conf cho agents |
-| `ansible/roles/wazuh-agent/defaults/main.yml` | IP manager, port, group |
+| File                                                   | Mục đích                |
+| ------------------------------------------------------ | ----------------------- |
+| `docker/wazuh/config/wazuh_cluster/wazuh_manager.conf` | ossec.conf cho Manager  |
+| `ansible/roles/wazuh-agent/templates/ossec.conf.j2`    | ossec.conf cho agents   |
+| `ansible/roles/wazuh-agent/defaults/main.yml`          | IP manager, port, group |
 
 #### Kích hoạt Vulnerability Detector
 
@@ -155,16 +156,17 @@ lynis audit system \
 
 ### Đọc báo cáo Lynis — giải thích chỉ số
 
-| Chỉ số | Mô tả | Mức tốt |
-|--------|-------|---------|
-| **Hardening Index** | Điểm bảo mật tổng thể (0-100) | ≥ 70 |
-| **Warnings** | Vấn đề cần xử lý ngay | = 0 |
-| **Suggestions** | Cải thiện bảo mật (không khẩn cấp) | < 30 |
-| **Vulnerable packages** | Package có CVE đã biết | = 0 |
+| Chỉ số                  | Mô tả                              | Mức tốt |
+| ----------------------- | ---------------------------------- | ------- |
+| **Hardening Index**     | Điểm bảo mật tổng thể (0-100)      | ≥ 70    |
+| **Warnings**            | Vấn đề cần xử lý ngay              | = 0     |
+| **Suggestions**         | Cải thiện bảo mật (không khẩn cấp) | < 30    |
+| **Vulnerable packages** | Package có CVE đã biết             | = 0     |
 
 ### Xem báo cáo qua UI
 
 Đăng nhập IVF Admin → **Lynis Audit** (`/admin/lynis`) → chọn host → xem 3 tab:
+
 - **Tổng quan**: score, warnings, suggestions, system info
 - **Lịch sử**: danh sách báo cáo theo thời gian
 - **Chi tiết**: toàn bộ warnings và suggestions
@@ -218,6 +220,7 @@ GET /api/admin/lynis/reports/vmi3129111/latest
    lynis show details LYNIS-xxxx
    ```
 3. Một số cải thiện nhanh:
+
    ```bash
    # SSH hardening
    echo "Protocol 2" >> /etc/ssh/sshd_config
@@ -242,10 +245,12 @@ GET /api/admin/lynis/reports/vmi3129111/latest
 ### FIM (File Integrity Monitoring) — Wazuh
 
 Wazuh agent theo dõi realtime các thư mục:
+
 - `/etc` — cấu hình hệ thống
 - `/opt/ivf` — code IVF platform
 
 **Khi có alert FIM:**
+
 1. Wazuh Dashboard → Modules → Integrity Monitoring
 2. Xem file thay đổi + diff
 3. Nếu unauthorized: `git diff` trên `/opt/ivf`, kiểm tra audit logs
@@ -253,11 +258,13 @@ Wazuh agent theo dõi realtime các thư mục:
 ### Rootkit Detection
 
 Wazuh rootcheck chạy mỗi 12 giờ. Alert level ≥ 7 khi phát hiện:
+
 - Hidden processes
 - Hidden files
 - Suspicious ports
 
 **Xử lý:**
+
 ```bash
 # Chạy rkhunter thủ công
 rkhunter --check --skip-keypress --report-warnings-only

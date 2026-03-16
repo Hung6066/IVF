@@ -136,7 +136,12 @@ services:
     restart: unless-stopped
     # Remove reportsDashboards plugin — crashes on basePath URLs without query params:
     # checkURLParams() does location.href.split('?')[1].split('&') → TypeError
-    entrypoint: ["/bin/sh", "-c", "rm -rf /usr/share/wazuh-dashboard/plugins/reportsDashboards && /entrypoint.sh"]
+    entrypoint:
+      [
+        "/bin/sh",
+        "-c",
+        "rm -rf /usr/share/wazuh-dashboard/plugins/reportsDashboards && /entrypoint.sh",
+      ]
     environment:
       INDEXER_USERNAME: admin
       INDEXER_PASSWORD_FILE: /run/secrets/wazuh_indexer_password

@@ -1,5 +1,4 @@
 <div class="p-6 space-y-6">
-
   <!-- Header -->
   <div class="flex items-center justify-between">
     <div>
@@ -34,7 +33,9 @@
 
   <!-- Error -->
   @if (error()) {
-    <div class="bg-red-900/30 border border-red-700 rounded-lg p-4 text-red-300 flex items-center gap-3">
+    <div
+      class="bg-red-900/30 border border-red-700 rounded-lg p-4 text-red-300 flex items-center gap-3"
+    >
       <i class="fas fa-exclamation-circle"></i>
       {{ error() }}
     </div>
@@ -59,11 +60,14 @@
     <!-- Tabs -->
     <div class="border-b border-gray-700">
       <nav class="flex gap-1">
-        @for (tab of [
-          { id: 'overview', label: 'Tổng quan', icon: 'fa-chart-pie' },
-          { id: 'reports',  label: 'Lịch sử báo cáo', icon: 'fa-history' },
-          { id: 'detail',   label: 'Chi tiết', icon: 'fa-list-check' }
-        ]; track tab.id) {
+        @for (
+          tab of [
+            { id: 'overview', label: 'Tổng quan', icon: 'fa-chart-pie' },
+            { id: 'reports', label: 'Lịch sử báo cáo', icon: 'fa-history' },
+            { id: 'detail', label: 'Chi tiết', icon: 'fa-list-check' },
+          ];
+          track tab.id
+        ) {
           <button
             (click)="setTab(tab.id)"
             [class.border-blue-500]="activeTab() === tab.id"
@@ -154,15 +158,36 @@
               </div>
               <div>
                 <span class="text-gray-500">Firewall</span>
-                <div class="mt-1" [ngClass]="selectedReport()!.firewall_active === 'yes' ? 'text-green-400' : 'text-red-400'">
-                  <i [class]="'fas ' + (selectedReport()!.firewall_active === 'yes' ? 'fa-check-circle' : 'fa-times-circle')"></i>
+                <div
+                  class="mt-1"
+                  [ngClass]="
+                    selectedReport()!.firewall_active === 'yes' ? 'text-green-400' : 'text-red-400'
+                  "
+                >
+                  <i
+                    [class]="
+                      'fas ' +
+                      (selectedReport()!.firewall_active === 'yes'
+                        ? 'fa-check-circle'
+                        : 'fa-times-circle')
+                    "
+                  ></i>
                   {{ selectedReport()!.firewall_active === 'yes' ? 'Bật' : 'Tắt' }}
                 </div>
               </div>
               <div>
                 <span class="text-gray-500">Compiler</span>
-                <div class="mt-1" [ngClass]="selectedReport()!.compiler_installed === 'yes' ? 'text-yellow-400' : 'text-green-400'">
-                  {{ selectedReport()!.compiler_installed === 'yes' ? 'Đã cài (rủi ro)' : 'Không cài' }}
+                <div
+                  class="mt-1"
+                  [ngClass]="
+                    selectedReport()!.compiler_installed === 'yes'
+                      ? 'text-yellow-400'
+                      : 'text-green-400'
+                  "
+                >
+                  {{
+                    selectedReport()!.compiler_installed === 'yes' ? 'Đã cài (rủi ro)' : 'Không cài'
+                  }}
                 </div>
               </div>
             </div>
@@ -177,7 +202,9 @@
               </h3>
               <div class="flex flex-wrap gap-2">
                 @for (pkg of selectedReport()!.vulnerable_packages; track pkg) {
-                  <span class="bg-red-900/40 border border-red-700 text-red-300 px-3 py-1 rounded-full text-xs font-mono">
+                  <span
+                    class="bg-red-900/40 border border-red-700 text-red-300 px-3 py-1 rounded-full text-xs font-mono"
+                  >
                     {{ pkg }}
                   </span>
                 }
@@ -210,15 +237,21 @@
           <tbody>
             @if (reports().length === 0) {
               <tr>
-                <td colspan="5" class="px-4 py-8 text-center text-gray-500">Không có báo cáo nào.</td>
+                <td colspan="5" class="px-4 py-8 text-center text-gray-500">
+                  Không có báo cáo nào.
+                </td>
               </tr>
             }
             @for (r of reports(); track trackByDate($index, r)) {
               <tr class="border-t border-gray-700 hover:bg-gray-750 transition">
                 <td class="px-4 py-3 font-mono text-blue-300">{{ r.hostname }}</td>
                 <td class="px-4 py-3 text-white">{{ r.date }}</td>
-                <td class="px-4 py-3 text-right text-gray-400">{{ (r.size / 1024).toFixed(1) }} KB</td>
-                <td class="px-4 py-3 text-gray-400">{{ r.lastModified | date:'dd/MM/yyyy HH:mm' }}</td>
+                <td class="px-4 py-3 text-right text-gray-400">
+                  {{ (r.size / 1024).toFixed(1) }} KB
+                </td>
+                <td class="px-4 py-3 text-gray-400">
+                  {{ r.lastModified | date: 'dd/MM/yyyy HH:mm' }}
+                </td>
                 <td class="px-4 py-3 text-center">
                   <button
                     (click)="openReport(r)"
@@ -254,7 +287,9 @@
             }
             <ul class="space-y-2">
               @for (w of selectedReport()!.warnings; track w) {
-                <li class="bg-yellow-900/20 border border-yellow-800 rounded-lg px-4 py-2 text-yellow-200 text-sm font-mono">
+                <li
+                  class="bg-yellow-900/20 border border-yellow-800 rounded-lg px-4 py-2 text-yellow-200 text-sm font-mono"
+                >
                   <i class="fas fa-triangle-exclamation text-yellow-500 mr-2"></i>{{ w }}
                 </li>
               }
@@ -272,7 +307,9 @@
             }
             <ul class="space-y-2">
               @for (s of selectedReport()!.suggestions; track s) {
-                <li class="bg-blue-900/20 border border-blue-800 rounded-lg px-4 py-2 text-blue-200 text-sm font-mono">
+                <li
+                  class="bg-blue-900/20 border border-blue-800 rounded-lg px-4 py-2 text-blue-200 text-sm font-mono"
+                >
                   <i class="fas fa-arrow-right text-blue-500 mr-2"></i>{{ s }}
                 </li>
               }
