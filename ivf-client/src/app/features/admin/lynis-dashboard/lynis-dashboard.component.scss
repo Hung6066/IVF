@@ -1,7 +1,426 @@
-:host {
-  display: block;
+// ═══════════════════════════════════════════════════════════
+// Lynis Security Audit Dashboard
+// ═══════════════════════════════════════════════════════════
+
+:host { display: block; }
+
+.lynis-page {
+  padding: 1.5rem;
+  max-width: 1400px;
+  margin: 0 auto;
 }
 
-.bg-gray-750 {
-  background-color: rgb(45 55 72 / 0.5);
+// ─── Header ─────────────────────────────────────────────
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+
+  h2 {
+    margin: 0;
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: #1e1e2f;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+
+    i { color: #2563eb; }
+  }
+
+  .subtitle {
+    color: #6b7280;
+    margin-top: 0.3rem;
+    font-size: 0.9rem;
+  }
+}
+
+.header-left { display: flex; flex-direction: column; }
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.host-select {
+  padding: 0.45rem 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  background: #fff;
+  color: #1e1e2f;
+  cursor: pointer;
+  transition: border-color 0.15s;
+
+  &:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+  }
+}
+
+// ─── Buttons ─────────────────────────────────────────────
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.9rem;
+  border-radius: 8px;
+  border: none;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-refresh {
+  background: #2563eb;
+  color: #fff;
+
+  &:hover { background: #1d4ed8; }
+}
+
+.btn-view {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem 0.75rem;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  background: #eff6ff;
+  color: #2563eb;
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+
+  &:hover {
+    background: #dbeafe;
+    border-color: #93c5fd;
+  }
+}
+
+// ─── Error / Loading / Empty ─────────────────────────────
+.error-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  color: #991b1b;
+  font-size: 0.875rem;
+}
+
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+  color: #9ca3af;
+  gap: 0.75rem;
+  font-size: 0.9rem;
+
+  i { font-size: 2rem; color: #d1d5db; }
+}
+
+.empty-state {
+  text-align: center;
+  padding: 4rem 2rem;
+  color: #9ca3af;
+
+  i { font-size: 3rem; margin-bottom: 1rem; display: block; }
+  h3 { color: #6b7280; font-size: 1.1rem; margin: 0 0 0.5rem; }
+  p  { margin: 0; font-size: 0.9rem; }
+}
+
+.empty-msg {
+  color: #9ca3af;
+  font-size: 0.875rem;
+  padding: 0.5rem 0;
+  margin: 0;
+}
+
+// ─── Tabs ─────────────────────────────────────────────────
+.tabs-nav {
+  display: flex;
+  gap: 0.25rem;
+  margin-bottom: 1.5rem;
+  padding: 0.35rem;
+  background: #f3f4f6;
+  border-radius: 10px;
+  flex-wrap: wrap;
+}
+
+.tab-btn {
+  padding: 0.5rem 1.1rem;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #6b7280;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+
+  &:hover {
+    background: #e5e7eb;
+    color: #1e1e2f;
+  }
+
+  &.active {
+    background: #fff;
+    color: #2563eb;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    font-weight: 600;
+  }
+}
+
+// ─── Stats Grid ───────────────────────────────────────────
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.stat-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 1.5rem;
+  text-align: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.stat-label {
+  font-size: 0.8rem;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+  margin-bottom: 0.6rem;
+}
+
+.stat-value {
+  font-size: 3.5rem;
+  font-weight: 900;
+  line-height: 1;
+  color: #1e1e2f;
+}
+
+.stat-badge {
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-top: 0.4rem;
+}
+
+.stat-unit {
+  font-size: 0.75rem;
+  color: #9ca3af;
+  margin-top: 0.3rem;
+}
+
+// Stat card color variants
+.stat-green  { background: #f0fdf4; border-color: #86efac; }
+.stat-yellow { background: #fefce8; border-color: #fde68a; }
+.stat-orange { background: #fff7ed; border-color: #fed7aa; }
+.stat-red    { background: #fef2f2; border-color: #fecaca; }
+.stat-blue   { background: #eff6ff; border-color: #bfdbfe; }
+
+// Score text colors
+.score-good    { color: #16a34a; }
+.score-medium  { color: #ca8a04; }
+.score-warning { color: #ea580c; }
+.score-danger  { color: #dc2626; }
+
+.text-yellow { color: #ca8a04; }
+.text-blue   { color: #2563eb; }
+.text-green  { color: #16a34a; }
+.text-red    { color: #dc2626; }
+.text-orange { color: #ea580c; }
+.text-secondary { color: #6b7280; }
+
+// ─── Cards ────────────────────────────────────────────────
+.card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  margin-bottom: 1rem;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.85rem 1.25rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1e1e2f;
+  border-bottom: 1px solid #f3f4f6;
+  background: #fafafa;
+
+  i { color: #2563eb; }
+}
+
+.card-header-warning {
+  background: #fffbeb;
+  border-color: #fde68a;
+  color: #92400e;
+  i { color: #d97706; }
+}
+
+.card-header-danger {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #991b1b;
+  i { color: #dc2626; }
+}
+
+.card-header-info {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #1e40af;
+  i { color: #2563eb; }
+}
+
+.card-warning { border-color: #fde68a; }
+.card-danger  { border-color: #fecaca; }
+.card-info    { border-color: #bfdbfe; }
+
+// ─── Info Grid ────────────────────────────────────────────
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  padding: 1.25rem;
+}
+
+.info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.info-label {
+  font-size: 0.75rem;
+  color: #9ca3af;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.info-value {
+  font-size: 0.9rem;
+  color: #1e1e2f;
+  font-weight: 500;
+}
+
+.mono { font-family: 'Consolas', 'Courier New', monospace; }
+
+// ─── Vulnerable Packages ──────────────────────────────────
+.pkg-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 1rem 1.25rem;
+}
+
+.pkg-badge {
+  display: inline-block;
+  padding: 0.25rem 0.7rem;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 999px;
+  color: #991b1b;
+  font-size: 0.78rem;
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-weight: 500;
+}
+
+// ─── Table ────────────────────────────────────────────────
+.table-wrapper { overflow-x: auto; }
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+
+  th, td {
+    padding: 0.65rem 1rem;
+    text-align: left;
+    border-bottom: 1px solid #f3f4f6;
+  }
+
+  th {
+    background: #fafafa;
+    color: #6b7280;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 600;
+  }
+
+  tbody tr:hover { background: #f9fafb; }
+  tbody tr:last-child td { border-bottom: none; }
+
+  .text-right  { text-align: right; }
+  .text-center { text-align: center; }
+}
+
+.empty-row {
+  text-align: center;
+  padding: 2rem !important;
+  color: #9ca3af;
+}
+
+// ─── Issue List (warnings / suggestions) ─────────────────
+.issue-list {
+  list-style: none;
+  margin: 0;
+  padding: 0.75rem 1.25rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.issue-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  border: 1px solid transparent;
+
+  .issue-icon { flex-shrink: 0; margin-top: 0.15rem; }
+  .mono { word-break: break-all; }
+}
+
+.issue-warning {
+  background: #fffbeb;
+  border-color: #fef3c7;
+  color: #78350f;
+  .issue-icon { color: #d97706; }
+}
+
+.issue-info {
+  background: #eff6ff;
+  border-color: #dbeafe;
+  color: #1e40af;
+  .issue-icon { color: #3b82f6; }
 }

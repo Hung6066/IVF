@@ -25,25 +25,21 @@ export class LynisDashboardComponent implements OnInit {
   loadingReport = signal(false);
   error = signal('');
 
-  // computed: score màu
+  // computed: score màu (SCSS class modifiers)
   scoreColor = computed(() => {
-    const report = this.selectedReport();
-    if (!report) return 'text-gray-400';
-    const idx = report.hardening_index;
-    if (idx >= 80) return 'text-green-400';
-    if (idx >= 60) return 'text-yellow-400';
-    if (idx >= 40) return 'text-orange-400';
-    return 'text-red-400';
+    const idx = this.selectedReport()?.hardening_index ?? 0;
+    if (idx >= 80) return 'score-good';
+    if (idx >= 60) return 'score-medium';
+    if (idx >= 40) return 'score-warning';
+    return 'score-danger';
   });
 
   scoreBg = computed(() => {
-    const report = this.selectedReport();
-    if (!report) return 'bg-gray-700';
-    const idx = report.hardening_index;
-    if (idx >= 80) return 'bg-green-900/30 border-green-700';
-    if (idx >= 60) return 'bg-yellow-900/30 border-yellow-700';
-    if (idx >= 40) return 'bg-orange-900/30 border-orange-700';
-    return 'bg-red-900/30 border-red-700';
+    const idx = this.selectedReport()?.hardening_index ?? 0;
+    if (idx >= 80) return 'stat-green';
+    if (idx >= 60) return 'stat-yellow';
+    if (idx >= 40) return 'stat-orange';
+    return 'stat-red';
   });
 
   ngOnInit(): void {
