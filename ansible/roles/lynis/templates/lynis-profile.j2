@@ -2,17 +2,46 @@
 # Lynis Custom Profile — IVF Platform
 # /etc/lynis/custom.prf
 #
+# Cập nhật: Sau khi áp dụng role hardening, chỉ skip các test
+# thực sự không áp dụng được cho môi trường VPS/Docker.
+#
+# CÁC TEST ĐÃ ĐƯỢC FIX bởi role hardening — KHÔNG skip:
+#   KRNL-6000, KRNL-5820, SSH-7408, SSH-7412, SSH-7440, SSH-7480
+#   AUTH-9286, AUTH-9230, AUTH-9262, FILE-6374, PKGS-7386
+#   ACCT-9628, ACCT-9626, MALW-3280, TIME-3104, HRDN-7222(kernel)
+#   FINT-4350, LOGG-2190, FILE-7524, PKGS-7370, BANN-7126
+#
 
-# Bỏ qua các warning không liên quan (container env)
-skip-test=HRDN-7222
+# ─── Skip tests không áp dụng cho VPS/Docker ───────────────
+
+# BOOT-5122: GRUB password protection — Cloud VPS không có console vật lý
+skip-test=BOOT-5122
+
+# CONT-8004: Docker content trust — Dùng GHCR với image signing riêng
+skip-test=CONT-8004
+
+# LOGG-2154: Remote syslog — Loki/Promtail đã xử lý log aggregation
+skip-test=LOGG-2154
+
+# NETW-3200: Disable IPv6 — Docker/overlay networking cần IPv6
 skip-test=NETW-3200
+
+# FIRE-4512: Checks for iptables (UFW đã cấu hình trong role common)
 skip-test=FIRE-4512
 
-# Màu sắc output (tắt để log sạch)
+# DEB-0880: Check apt-show-versions — không cần thiết khi dùng unattended-upgrades
+skip-test=DEB-0880
+
+# ─── Settings ──────────────────────────────────────────────
+
+# Tắt màu để log sạch (Promtail parse)
 colors=no
 
 # Không dừng khi có lỗi nhỏ
 quick=yes
 
-# Mức độ report
+# Luôn log kết quả test sai OS
 log_tests_incorrect_os=yes
+
+# Report level: high (chỉ hiển thị warning/suggestion quan trọng)
+report=default

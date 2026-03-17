@@ -15,7 +15,8 @@
 7. [Lynis — Kiến trúc & Luồng audit](#7-lynis--kiến-trúc--luồng-audit)
 8. [Lynis — Tích hợp Wazuh & MinIO](#8-lynis--tích-hợp-wazuh--minio)
 9. [Tích hợp tổng thể Wazuh + Lynis](#9-tích-hợp-tổng-thể-wazuh--lynis)
-10. [Tham chiếu: Ports, Credentials, Rule IDs](#10-tham-chiếu-ports-credentials-rule-ids)
+10. [Hardening Ansible Role — Nâng cao Lynis Score](#10-hardening-ansible-role--nâng-cao-lynis-score)
+11. [Tham chiếu: Ports, Credentials, Rule IDs](#11-tham-chiếu-ports-credentials-rule-ids)
 
 ---
 
@@ -656,20 +657,57 @@ flowchart TD
 
 ### Custom Profile (`/etc/lynis/custom.prf`)
 
+Template nguồn: `ansible/roles/lynis/templates/lynis-profile.j2`
+
 ```ini
-# Tests bỏ qua (không phù hợp với môi trường container/VPS)
-skip-test=HRDN-7222     # Kernel hardening — không applicable trên hosted VPS
-skip-test=NETW-3200     # Network: IPv6 — VPS không dùng IPv6
-skip-test=FIRE-4512     # Firewall: specific tool — dùng ufw/iptables thay thế
+#
+# Lynis Custom Profile — IVF Platform
+# /etc/lynis/custom.prf
+#
+# Cập nhật: Sau khi áp dụng role hardening (site.yml Phase 1.5),
+# chỉ skip các test thực sự KHÔNG áp dụng được cho môi trường VPS/Docker.
+# Các test đã được FIX bởi role hardening sẽ không bị skip nữa.
+#
+# CÁC TEST ĐÃ ĐƯỢC FIX bởi role `hardening` (KHÔNG skip):
+#   KRNL-6000, KRNL-5820, SSH-7408, SSH-7412, SSH-7440, SSH-7480
+#   AUTH-9286, AUTH-9230, AUTH-9262, FILE-6374, PKGS-7386
+#   ACCT-9628, ACCT-9626, MALW-3280, TIME-3104, HRDN-7222(kernel modules)
+#   FINT-4350, LOGG-2190, FILE-7524, PKGS-7370, BANN-7126, NETW-3032
+#
 
-# Output
-colors=no               # Tắt màu cho log sạch (cron logger)
-quick=yes               # Không dừng khi có minor issues
+# ─── Skip tests không áp dụng cho VPS/Docker ───────────────
 
-# Report
+# BOOT-5122: GRUB password protection — Cloud VPS không có console vật lý
+skip-test=BOOT-5122
+
+# CONT-8004: Docker content trust — Dùng GHCR với image signing riêng
+skip-test=CONT-8004
+
+# LOGG-2154: Remote syslog — Loki/Promtail đã xử lý log aggregation
+skip-test=LOGG-2154
+
+# NETW-3200: Disable IPv6 — Docker/overlay networking cần IPv6
+skip-test=NETW-3200
+
+# FIRE-4512: Checks for iptables (UFW đã cấu hình trong role common)
+skip-test=FIRE-4512
+
+# DEB-0880: Check apt-show-versions — unattended-upgrades đã xử lý
+skip-test=DEB-0880
+
+# ─── Settings ──────────────────────────────────────────────
+
+# Tắt màu để log sạch (Promtail parse)
+colors=no
+
+# Không dừng khi có lỗi nhỏ
+quick=yes
+
+# Luôn log kết quả test sai OS
 log_tests_incorrect_os=yes
-report_file_prefix=lynis-{hostname}-    # Thêm hostname vào tên file
 ```
+
+> **Lưu ý quan trọng**: `HRDN-7222` đã bị xóa khỏi danh sách `skip-test` — test này hiện được xử lý đúng bởi role `hardening` (vô hiệu hóa unused kernel modules). Nếu bạn thấy `HRDN-7222` trong skip list của version trước, đó là phiên bản cũ trước khi chạy Phase 1.5.
 
 ### Cron schedule
 
@@ -862,7 +900,240 @@ graph TB
 
 ---
 
-## 10. Tham chiếu: Ports, Credentials, Rule IDs
+## 10. Hardening Ansible Role — Nâng cao Lynis Score
+
+### Tổng quan
+
+Role `hardening` được tạo để **tự động hóa việc fix tất cả Lynis warnings/suggestions** có thể xử lý bằng cấu hình hệ thống. Role này chạy trong **Phase 1.5** của `site.yml`, sau `common` và trước `docker`.
+
+```mermaid
+graph LR
+    A["Phase 1\ncommon\n(base packages, UFW, WireGuard)"]
+    B["Phase 1.5\nhardening\n(22 Lynis fixes)"]
+    C["Phase 2\ndocker\n(Docker + Swarm)"]
+    D["Phase 3\napp\n(IVF stack deploy)"]
+    E["Phase 4\nlynis\n(audit + ship to MinIO)"]
+    F["Phase 5\nwazuh-agent\n(SIEM agent)"]
+
+    A --> B --> C --> D --> E --> F
+
+    style B fill:#fff3e0,stroke:#FF9800,stroke-width:2px
+```
+
+### Cấu trúc role
+
+```
+ansible/roles/hardening/
+├── defaults/
+│   └── main.yml          # Toggle variables (aide, rkhunter, auditd, usb)
+├── handlers/
+│   └── main.yml          # restart sshd/auditd/sysstat/timesyncd
+└── tasks/
+    └── main.yml          # 22 task groups, tagged by Lynis test ID
+```
+
+### Bảng các Lynis test được fix
+
+| Lynis Test ID     | Mô tả vấn đề                            | Giải pháp trong role                                                                   |
+| ----------------- | --------------------------------------- | -------------------------------------------------------------------------------------- |
+| **KRNL-6000**     | Kernel sysctl chưa hardened             | `/etc/sysctl.d/99-hardening.conf` — 20+ kernel params                                  |
+| **KRNL-5820**     | Core dumps không bị hạn chế             | `limits.d/99-no-coredump.conf` + `systemd coredump.conf.d`                             |
+| **SSH-7408**      | TCP forwarding enabled                  | `AllowTcpForwarding no` trong sshd_config                                              |
+| **SSH-7412**      | MaxAuthTries quá cao                    | `MaxAuthTries 3`                                                                       |
+| **SSH-7440**      | Agent forwarding enabled                | `AllowAgentForwarding no`                                                              |
+| **SSH-7480**      | LogLevel không phải VERBOSE             | `LogLevel VERBOSE`                                                                     |
+| **SSH-7490/7498** | Không có timeout SSH session            | `ClientAliveInterval 300`, `ClientAliveCountMax 2`                                     |
+| **AUTH-9286**     | umask tại login.defs quá rộng           | `UMASK 027` trong `/etc/login.defs`                                                    |
+| **FILE-6430**     | umask mặc định 022 (không bảo mật)      | `UMASK 027` (cùng task AUTH-9286)                                                      |
+| **AUTH-9230**     | Password expiry chưa cấu hình           | `PASS_MAX_DAYS 90`, `PASS_MIN_DAYS 1`, `PASS_WARN_AGE 14`                              |
+| **AUTH-9262**     | PAM password quality không được enforce | `libpam-pwquality` + `pwquality.conf` (minlen=12, minclass=3)                          |
+| **FILE-6374**     | `/tmp` mount thiếu nodev/nosuid         | `tmpfs /tmp nodev,nosuid,size=1G` ⚠️ _noexec bỏ chủ ý (Docker cần)_                    |
+| **PKGS-7386**     | Không có audit daemon                   | `auditd` + rules tại `/etc/audit/rules.d/99-ivf.rules`                                 |
+| **ACCT-9628**     | sysstat chưa cài                        | `sysstat` package + enable collection                                                  |
+| **ACCT-9626**     | Process accounting chưa bật             | `acct` package + `accton /var/log/account/pacct`                                       |
+| **MALW-3280**     | Không có malware scanner                | `rkhunter` + DB update + weekly cron                                                   |
+| **TIME-3104**     | NTP không được cấu hình rõ ràng         | `systemd-timesyncd` + `pool.ntp.org`                                                   |
+| **HRDN-7222**     | Unused kernel modules vẫn loadable      | `/etc/modprobe.d/disable-filesystems.conf` _(squashfs giữ lại!)_                       |
+| **NETW-3032**     | Unused network protocols enabled        | `/etc/modprobe.d/disable-protocols.conf` (dccp/sctp/rds/tipc)                          |
+| **FINT-4350**     | Không có file integrity tool (AIDE)     | `aide` + `/etc/aide/aide.conf` + daily cron + init DB                                  |
+| **LOGG-2190**     | Log rotation chưa tối ưu                | logrotate 13 tuần cho auth.log/syslog/kern.log                                         |
+| **FILE-7524**     | Quyền file hệ thống sai                 | Fix permissions: cron.d (0700), shadow (0640), passwd (0644)                           |
+| **PKGS-7370**     | Chưa có auto security updates           | `unattended-upgrades` + `20auto-upgrades` config                                       |
+| **BANN-7126**     | Không có login warning banner           | `/etc/issue.net` banner + SSH Banner directive + `/etc/motd`                           |
+| **USB-1000**      | USB storage module còn active (VPS)     | `/etc/modprobe.d/disable-usb-storage.conf` (khi `hardening_disable_usb_storage: true`) |
+
+### ⚠️ Lưu ý quan trọng khi hardening với Docker
+
+| Vấn đề                          | Chi tiết                                                                                                |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `/tmp` **không** có `noexec`    | Docker containers cần exec quyền trên `/tmp`. Role đặt `nodev,nosuid,size=1G` nhưng **không** `noexec`. |
+| `squashfs` **không** bị disable | Docker overlay2 driver yêu cầu `squashfs`. Chỉ disable các FS: cramfs, hfs, hfsplus, jffs2, udf.        |
+| `AIDE` khởi tạo tốn thời gian   | `aideinit --yes` chạy async với timeout 300s. Sau khoảng 5 phút mới xong lần đầu.                       |
+| `auditd` quy tắc `-e 2`         | Mode immutable — sau khi load rules, cần reboot để thay đổi rules. Phù hợp production.                  |
+
+### Chạy Hardening qua Ansible
+
+```bash
+# Chạy lần đầu trên tất cả VPS (bao gồm hardening)
+ansible-playbook -i ansible/hosts.yml ansible/site.yml --tags setup,hardening
+
+# Chạy hardening-only (cập nhật lại sau khi sửa role)
+ansible-playbook -i ansible/hosts.yml ansible/site.yml --tags hardening
+
+# Chỉ chạy trên VPS1
+ansible-playbook -i ansible/hosts.yml ansible/site.yml --tags hardening --limit vps1
+
+# Dry-run (check mode, không thay đổi hệ thống)
+ansible-playbook -i ansible/hosts.yml ansible/site.yml --tags hardening --check --diff
+```
+
+### Variables có thể override
+
+File `ansible/roles/hardening/defaults/main.yml`:
+
+```yaml
+# Bật/tắt cài đặt các tool nặng
+hardening_install_aide: true # AIDE file integrity (tốn ~200MB)
+hardening_install_rkhunter: true # rkhunter malware scanner
+hardening_install_auditd: true # auditd daemon
+hardening_tmp_nodev_nosuid: true # Mount /tmp với nodev,nosuid
+hardening_disable_usb_storage: true # Disable USB storage module (VPS = true)
+```
+
+Override trong `ansible/hosts.yml` hoặc `group_vars/`:
+
+```yaml
+# Ví dụ: tắt AIDE nếu có giới hạn storage
+hardening_install_aide: false
+```
+
+### Quy trình kiểm tra kết quả sau hardening
+
+```bash
+# Bước 1: Chạy Lynis manual sau khi hardening xong
+ssh root@VPS1 "lynis audit system --profile /etc/lynis/custom.prf --quiet 2>&1 | tail -30"
+
+# Bước 2: Xem hardening index mới
+ssh root@VPS1 "grep 'hardening_index' /var/log/lynis/reports/lynis-\$(date +%Y-%m-%d).dat"
+
+# Bước 3: Xem danh sách warnings còn lại (nên = 0 sau hardening)
+ssh root@VPS1 "grep '^warning\[\]=' /var/log/lynis/reports/lynis-\$(date +%Y-%m-%d).dat"
+
+# Bước 4: Xem suggestions còn lại (chỉ còn BOOT-5122 và các skip-test)
+ssh root@VPS1 "grep '^suggestion\[\]=' /var/log/lynis/reports/lynis-\$(date +%Y-%m-%d).dat"
+
+# Bước 5: Kiểm tra AIDE đã init chưa
+ssh root@VPS1 "stat /var/lib/aide/aide.db 2>/dev/null && echo 'AIDE DB OK' || echo 'AIDE DB MISSING'"
+
+# Bước 6: Kiểm tra auditd đang chạy
+ssh root@VPS1 "systemctl is-active auditd && auditctl -l | head -5"
+
+# Bước 7: Kiểm tra SSH config đúng
+ssh root@VPS1 "sshd -T | grep -E 'allowtcpforwarding|maxauthtries|loglevel|clientaliveinterval'"
+```
+
+### Điểm hardening_index kỳ vọng
+
+| Trạng thái                           | Điểm (ước tính) | Ghi chú                                   |
+| ------------------------------------ | --------------- | ----------------------------------------- |
+| Default Ubuntu 24.04 (chưa hardened) | 55–65           | Baseline trước khi apply role             |
+| Sau Phase 1 (common + UFW)           | 60–68           | UFW active, basic packages                |
+| **Sau Phase 1.5 (hardening)**        | **78–88**       | Target score sau khi apply role hardening |
+| Skip tests skip lý do hợp lệ         | ~83–90+         | Sau khi `skip-test` loại bỏ N/A tests     |
+
+> **Lưu ý**: Điểm chính xác phụ thuộc vào Lynis version và số lượng test áp dụng được. Tests bị skip (`BOOT-5122`, `CONT-8004`, v.v.) không tính vào điểm, nhưng giúp báo cáo sạch hơn.
+
+### Workflow tổng thể Lynis CI cycle
+
+```mermaid
+flowchart TD
+    DEPLOY["ansible-playbook site.yml\n(full deployment)"]
+
+    subgraph HARDENING["Phase 1.5: Hardening"]
+        H1["22 Lynis test fixes\nauto-applied"]
+        H2["SSH / kernel / audit\nFIM / logging / permissions"]
+        H1 --> H2
+    end
+
+    subgraph LYNIS_ROLE["Phase 4: Lynis"]
+        L1["Install lynis binary"]
+        L2["Deploy custom.prf\n(skip N/A tests only)"]
+        L3["Deploy cron\n(Sun 02:30)"]
+        L4["Deploy lynis-ship.sh\n(MinIO upload)"]
+        L1 --> L2 --> L3 --> L4
+    end
+
+    subgraph WEEKLY["Tuần tiếp theo (tự động)"]
+        W1["Cron trigger 02:30 Sun"]
+        W2["lynis audit system\n--profile custom.prf"]
+        W3["Parse .dat → .json"]
+        W4["mc cp → MinIO\nsystem/lynis/{hostname}/"]
+        W5["logger → syslog → Wazuh"]
+        W1 --> W2 --> W3 --> W4 & W5
+    end
+
+    DEPLOY --> HARDENING --> LYNIS_ROLE --> WEEKLY
+
+    subgraph DASHBOARD["IVF Dashboard"]
+        D1["Lynis Dashboard\n/admin/lynis"]
+        D2["Đọc JSON từ MinIO\nHiển thị hardening_index"]
+        D3["Warnings / Suggestions\ntheo host"]
+        D1 --> D2 --> D3
+    end
+
+    W4 -->|"MinIO REST API"| DASHBOARD
+
+    style HARDENING fill:#fff3e0,stroke:#FF9800,stroke-width:2px
+    style LYNIS_ROLE fill:#e8f5e9,stroke:#4CAF50
+    style WEEKLY fill:#e3f2fd,stroke:#2196F3
+    style DASHBOARD fill:#f3e5f5,stroke:#9C27B0
+```
+
+### Audit rules chi tiết (`/etc/audit/rules.d/99-ivf.rules`)
+
+```bash
+# Theo dõi thay đổi user/group
+-w /etc/passwd     -p wa  -k user-changes
+-w /etc/shadow     -p wa  -k user-changes
+-w /etc/group      -p wa  -k user-changes
+-w /etc/gshadow    -p wa  -k user-changes
+
+# Theo dõi privilege escalation
+-w /etc/sudoers    -p wa  -k privilege-escalation
+-w /etc/sudoers.d/ -p wa  -k privilege-escalation
+
+# Theo dõi SSH config
+-w /etc/ssh/sshd_config -p wa -k ssh-config
+
+# Theo dõi auth logs
+-w /var/log/auth.log    -p wa  -k auth-log
+-w /var/log/faillog     -p wa  -k auth-log
+
+# Theo dõi Docker config (tích hợp với Wazuh rule 100160)
+-w /etc/docker/ -p wa  -k docker-config
+-w /usr/bin/docker -p x -k docker-exec
+
+# Buffer size và immutable mode sau reboot
+-b 8192
+-e 2
+```
+
+> Các rule `docker-config` và `docker-exec` tích hợp trực tiếp với Wazuh rules **100160** và **100161** — mọi thay đổi `/etc/docker/` sẽ tạo alert level 10+.
+
+### Troubleshooting Hardening
+
+| Vấn đề                           | Lệnh kiểm tra                                         | Giải pháp                                                   |
+| -------------------------------- | ----------------------------------------------------- | ----------------------------------------------------------- |
+| `sysctl` task fail (permission)  | `dmesg \| grep sysctl`                                | VPS bị giới hạn namespace — `ignore_errors: true` đã set    |
+| AIDE init chạy lâu > 5 phút      | `ps aux \| grep aide`                                 | Bình thường — `async: 300 poll: 10`. Kiểm tra sau ~5 phút   |
+| auditd rules không load          | `auditctl -l` (nếu rỗng: `augenrules --load`)         | Restart: `systemctl restart auditd`                         |
+| SSH bị lock sau khi hardening    | Local console hoặc VPS panel                          | Kiểm tra `sshd_config` syntax: `sshd -t` trước khi apply    |
+| `/tmp` size=1G vẫn tràn          | `df -h /tmp`                                          | Tăng size trong role: `opts: defaults,nodev,nosuid,size=2G` |
+| rkhunter false positive cảnh báo | `rkhunter --check --nocolors 2>&1 \| grep -i warning` | Chạy `rkhunter --propupd` sau khi cập nhật packages         |
+
+---
+
+## 11. Tham chiếu: Ports, Credentials, Rule IDs
 
 ### Ports Wazuh
 
@@ -908,6 +1179,26 @@ graph TB
 | `/etc/cron.d/lynis-audit`                       | Cron definition     |
 | `MinIO: ivf-documents/system/lynis/{hostname}/` | Remote storage      |
 
+### Hardening paths
+
+| Path                                         | Mô tả                    |
+| -------------------------------------------- | ------------------------ |
+| `/etc/sysctl.d/99-hardening.conf`            | Kernel sysctl params     |
+| `/etc/security/limits.d/99-no-coredump.conf` | Core dump limits         |
+| `/etc/systemd/coredump.conf.d/disable.conf`  | Systemd coredump disable |
+| `/etc/ssh/sshd_config`                       | SSH hardening config     |
+| `/etc/audit/rules.d/99-ivf.rules`            | Audit rules              |
+| `/etc/security/pwquality.conf`               | Password complexity      |
+| `/etc/modprobe.d/disable-filesystems.conf`   | Disabled FS modules      |
+| `/etc/modprobe.d/disable-protocols.conf`     | Disabled network modules |
+| `/etc/modprobe.d/disable-usb-storage.conf`   | Disabled USB storage     |
+| `/etc/aide/aide.conf`                        | AIDE config              |
+| `/var/lib/aide/aide.db`                      | AIDE baseline database   |
+| `/etc/cron.d/aide-daily`                     | AIDE daily check cron    |
+| `/etc/cron.d/rkhunter-weekly`                | rkhunter weekly cron     |
+| `/etc/issue.net`                             | SSH login banner         |
+| `/etc/apt/apt.conf.d/50unattended-upgrades`  | Auto security updates    |
+
 ### Chạy Lynis thủ công
 
 ```bash
@@ -929,6 +1220,9 @@ grep "^warning\[\]=" /var/log/lynis/reports/lynis-$(date +%Y-%m-%d).dat
 
 # Deploy lại Lynis qua Ansible
 ansible-playbook ansible/site.yml --tags lynis -i ansible/hosts.yml
+
+# Deploy hardening + lynis cùng lúc
+ansible-playbook ansible/site.yml --tags hardening,lynis -i ansible/hosts.yml
 ```
 
 ### Troubleshooting
@@ -944,4 +1238,4 @@ ansible-playbook ansible/site.yml --tags lynis -i ansible/hosts.yml
 
 ---
 
-_Tài liệu được tạo: 2026-03-15 | Version: 1.0 | IVF Platform Security Infrastructure_
+_Tài liệu được tạo: 2026-03-15 | Cập nhật: 2026-03-16 | Version: 2.0 | IVF Platform Security Infrastructure_

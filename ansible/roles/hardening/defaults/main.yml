@@ -1,0 +1,19 @@
+---
+# ═══════════════════════════════════════════════════════════
+#  Hardening role defaults
+# ═══════════════════════════════════════════════════════════
+
+# Cài AIDE file integrity monitoring (chậm lần đầu ~5 phút)
+hardening_install_aide: true
+
+# Cài rkhunter malware scanner
+hardening_install_rkhunter: true
+
+# Cài auditd
+hardening_install_auditd: true
+
+# /tmp mount với nodev, nosuid (KHÔNG bật noexec — Docker cần /tmp)
+hardening_tmp_nodev_nosuid: true
+
+# Tắt USB storage module (VPS không cần)
+hardening_disable_usb_storage: true

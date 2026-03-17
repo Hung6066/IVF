@@ -34,6 +34,14 @@
   roles:
     - common
 
+# ──────────── Phase 1.5: Security Hardening (tất cả VPS) ─────
+- name: "Phase 1.5 — Linux Security Hardening (Lynis fixes)"
+  hosts: swarm
+  become: true
+  tags: [setup, hardening]
+  roles:
+    - hardening
+
 # ──────────── Phase 2: Docker + Swarm (tất cả VPS) ────────────
 - name: "Phase 2 — Docker & Swarm Cluster"
   hosts: swarm

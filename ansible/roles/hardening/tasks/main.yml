@@ -1,0 +1,663 @@
+# ═══════════════════════════════════════════════════════════
+#  Role: hardening — Linux security hardening (Lynis fixes)
+#  Chạy trên: tất cả VPS sau role common
+#
+#  Mỗi task được gán test ID Lynis tương ứng để dễ theo dõi.
+#  Tham khảo: https://cisofy.com/lynis/controls/
+# ═══════════════════════════════════════════════════════════
+
+# ─── [KRNL-6000 / HRDN-7222] Kernel sysctl hardening ───────
+
+- name: "KRNL-6000 — Tạo thư mục sysctl.d"
+  file:
+    path: /etc/sysctl.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: "KRNL-6000 / HRDN-7222 — Áp dụng kernel sysctl hardening"
+  sysctl:
+    name: "{{ item.name }}"
+    value: "{{ item.value }}"
+    sysctl_file: /etc/sysctl.d/99-hardening.conf
+    state: present
+    reload: yes
+  loop:
+    # ASLR — Address Space Layout Randomization
+    - { name: kernel.randomize_va_space, value: "2" }
+    # Tắt SysRq
+    - { name: kernel.sysrq, value: "0" }
+    # Core dump dùng PID trong tên file
+    - { name: kernel.core_uses_pid, value: "1" }
+    # Tắt core dump từ setuid process
+    - { name: fs.suid_dumpable, value: "0" }
+    # Ẩn kernel pointers khỏi unprivileged users
+    - { name: kernel.kptr_restrict, value: "2" }
+    # Giới hạn dmesg cho root
+    - { name: kernel.dmesg_restrict, value: "1" }
+    # TCP SYN cookies (chống SYN flood)
+    - { name: net.ipv4.tcp_syncookies, value: "1" }
+    # Reverse path filtering
+    - { name: net.ipv4.conf.all.rp_filter, value: "1" }
+    - { name: net.ipv4.conf.default.rp_filter, value: "1" }
+    # Không gửi ICMP redirects
+    - { name: net.ipv4.conf.all.send_redirects, value: "0" }
+    - { name: net.ipv4.conf.default.send_redirects, value: "0" }
+    # Không nhận source routing
+    - { name: net.ipv4.conf.all.accept_source_route, value: "0" }
+    - { name: net.ipv4.conf.default.accept_source_route, value: "0" }
+    # Không nhận ICMP redirects
+    - { name: net.ipv4.conf.all.accept_redirects, value: "0" }
+    - { name: net.ipv4.conf.default.accept_redirects, value: "0" }
+    # Chỉ nhận secure redirects từ default gateway
+    - { name: net.ipv4.conf.all.secure_redirects, value: "1" }
+    - { name: net.ipv4.conf.default.secure_redirects, value: "1" }
+    # Log gói tin martian (spoofed/invalid source IP)
+    - { name: net.ipv4.conf.all.log_martians, value: "1" }
+    - { name: net.ipv4.conf.default.log_martians, value: "1" }
+    # Bỏ qua ICMP broadcast echo
+    - { name: net.ipv4.icmp_echo_ignore_broadcasts, value: "1" }
+    # Bỏ error response giả mạo
+    - { name: net.ipv4.icmp_ignore_bogus_error_responses, value: "1" }
+    # Giới hạn perf_event_paranoid
+    - { name: kernel.perf_event_paranoid, value: "3" }
+    # Tắt core dumps toàn hệ thống
+    - { name: fs.core_pattern, value: "|/bin/false" }
+  ignore_errors: true  # một số VPS bị hạn chế sysctl namespace
+
+# ─── [KRNL-5820] Giới hạn core dumps ───────────────────────
+
+- name: "KRNL-5820 — Hạn chế core dumps qua limits.conf"
+  copy:
+    content: |
+      # Lynis KRNL-5820 — Tắt core dumps
+      * hard core 0
+      * soft core 0
+    dest: /etc/security/limits.d/99-no-coredump.conf
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: "KRNL-5820 — Hạn chế core dumps qua systemd-coredump"
+  file:
+    path: /etc/systemd/coredump.conf.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: "KRNL-5820 — Cấu hình systemd coredump disable"
+  copy:
+    content: |
+      [Coredump]
+      Storage=none
+      ProcessSizeMax=0
+    dest: /etc/systemd/coredump.conf.d/disable.conf
+    owner: root
+    group: root
+    mode: "0644"
+
+# ─── [SSH-7408/7412/7440/7480/7490/7498] SSH hardening ──────
+
+- name: "SSH-7408/7412/7440/7480 — SSH bổ sung hardening"
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+    state: present
+  loop:
+    # SSH-7408 — Tắt TCP forwarding
+    - { regexp: "^#?AllowTcpForwarding", line: "AllowTcpForwarding no" }
+    # SSH-7440 — Tắt agent forwarding
+    - { regexp: "^#?AllowAgentForwarding", line: "AllowAgentForwarding no" }
+    # SSH-7412 — Giới hạn số lần auth
+    - { regexp: "^#?MaxAuthTries", line: "MaxAuthTries 3" }
+    # SSH-7480 — Log level VERBOSE
+    - { regexp: "^#?LogLevel", line: "LogLevel VERBOSE" }
+    # SSH-7498 — Keep-alive & timeout
+    - { regexp: "^#?ClientAliveInterval", line: "ClientAliveInterval 300" }
+    - { regexp: "^#?ClientAliveCountMax", line: "ClientAliveCountMax 2" }
+    - { regexp: "^#?LoginGraceTime", line: "LoginGraceTime 30" }
+    # Hạn chế concurrent unauthenticated connections
+    - { regexp: "^#?MaxStartups", line: "MaxStartups 10:30:60" }
+    # Tắt X11 forwarding
+    - { regexp: "^#?X11Forwarding", line: "X11Forwarding no" }
+    # Tắt environment variables từ user
+    - { regexp: "^#?PermitUserEnvironment", line: "PermitUserEnvironment no" }
+    # Tắt TCPKeepAlive (dùng ClientAliveInterval thay thế)
+    - { regexp: "^#?TCPKeepAlive", line: "TCPKeepAlive no" }
+    # Tắt compression (tránh CVE liên quan zlib)
+    - { regexp: "^#?Compression", line: "Compression no" }
+    # Không resolve DNS (tăng tốc login)
+    - { regexp: "^#?UseDNS", line: "UseDNS no" }
+    # Giới hạn thuật toán mã hóa yếu
+    - { regexp: "^#?Ciphers", line: "Ciphers aes256-gcm@openssh.com,aes128-gcm@openssh.com,aes256-ctr,aes192-ctr,aes128-ctr" }
+    - { regexp: "^#?MACs", line: "MACs hmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com,umac-128-etm@openssh.com" }
+    - { regexp: "^#?KexAlgorithms", line: "KexAlgorithms curve25519-sha256@libssh.org,diffie-hellman-group16-sha512,diffie-hellman-group18-sha512" }
+  notify: restart sshd
+
+# ─── [AUTH-9286 / FILE-6430] Umask & Login defaults ─────────
+
+- name: "AUTH-9286 / FILE-6430 — Đặt umask mạnh trong /etc/login.defs"
+  lineinfile:
+    path: /etc/login.defs
+    regexp: "^\\s*UMASK"
+    line: "UMASK           027"
+    state: present
+
+- name: "AUTH-9230 — Cấu hình password aging"
+  lineinfile:
+    path: /etc/login.defs
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+    state: present
+  loop:
+    - { regexp: "^\\s*PASS_MAX_DAYS", line: "PASS_MAX_DAYS   90" }
+    - { regexp: "^\\s*PASS_MIN_DAYS", line: "PASS_MIN_DAYS   1" }
+    - { regexp: "^\\s*PASS_WARN_AGE", line: "PASS_WARN_AGE   14" }
+
+# ─── [AUTH-9262] PAM password quality ───────────────────────
+
+- name: "AUTH-9262 — Cài đặt libpam-pwquality"
+  apt:
+    name: libpam-pwquality
+    state: present
+    update_cache: no
+
+- name: "AUTH-9262 — Cấu hình độ phức tạp mật khẩu"
+  copy:
+    content: |
+      # Lynis AUTH-9262 — Password policy
+      minlen = 12
+      minclass = 3
+      maxrepeat = 3
+      reject_username = 1
+      dictcheck = 1
+    dest: /etc/security/pwquality.conf
+    owner: root
+    group: root
+    mode: "0644"
+
+# ─── [FILE-6374] /tmp mount hardening ───────────────────────
+# NOTE: noexec bị bỏ chủ ý — Docker dùng /tmp ở tmpfs, noexec làm vỡ container
+
+- name: "FILE-6374 — Kiểm tra /tmp hiện tại trong /etc/fstab"
+  command: grep -E "^\S+\s+/tmp\s" /etc/fstab
+  register: tmp_fstab
+  failed_when: false
+  changed_when: false
+
+- name: "FILE-6374 — Thêm /tmp với nodev, nosuid vào fstab (nếu chưa có)"
+  mount:
+    path: /tmp
+    src: tmpfs
+    fstype: tmpfs
+    opts: defaults,nodev,nosuid,size=1G
+    state: mounted
+  when: tmp_fstab.rc != 0
+
+# ─── [PKGS-7386] Audit daemon (auditd) ──────────────────────
+
+- name: "PKGS-7386 — Cài đặt auditd"
+  apt:
+    name:
+      - auditd
+      - audispd-plugins
+    state: present
+    update_cache: no
+
+- name: "PKGS-7386 — Bật và khởi động auditd"
+  service:
+    name: auditd
+    state: started
+    enabled: yes
+
+- name: "PKGS-7386 — Cấu hình audit rules cho IVF compliance"
+  copy:
+    content: |
+      # Lynis PKGS-7386 — Audit rules cho IVF Platform
+      # Theo dõi thay đổi user/group
+      -w /etc/passwd -p wa -k user-changes
+      -w /etc/shadow -p wa -k user-changes
+      -w /etc/group -p wa -k user-changes
+      -w /etc/gshadow -p wa -k user-changes
+      # Theo dõi escalation
+      -w /etc/sudoers -p wa -k privilege-escalation
+      -w /etc/sudoers.d/ -p wa -k privilege-escalation
+      # Theo dõi SSH config changes
+      -w /etc/ssh/sshd_config -p wa -k ssh-config
+      # Theo dõi log auth
+      -w /var/log/auth.log -p wa -k auth-log
+      -w /var/log/faillog -p wa -k auth-log
+      # Theo dõi Docker daemon config
+      -w /etc/docker/ -p wa -k docker-config
+      -w /usr/bin/docker -p x -k docker-exec
+      # Đặt audit log size
+      -b 8192
+      # Tắt write nếu disk đầy (audit daemon fails safely)
+      -e 2
+    dest: /etc/audit/rules.d/99-ivf.rules
+    owner: root
+    group: root
+    mode: "0640"
+  notify: restart auditd
+
+# ─── [ACCT-9628] sysstat — system accounting ────────────────
+
+- name: "ACCT-9628 — Cài đặt sysstat"
+  apt:
+    name: sysstat
+    state: present
+    update_cache: no
+
+- name: "ACCT-9628 — Bật sysstat data collection"
+  lineinfile:
+    path: /etc/default/sysstat
+    regexp: '^ENABLED'
+    line: 'ENABLED="true"'
+    create: yes
+  notify: restart sysstat
+
+# ─── [ACCT-9626] Process accounting ─────────────────────────
+
+- name: "ACCT-9626 — Cài đặt acct (process accounting)"
+  apt:
+    name: acct
+    state: present
+    update_cache: no
+
+- name: "ACCT-9626 — Tạo thư mục account log"
+  file:
+    path: /var/log/account
+    state: directory
+    owner: root
+    group: root
+    mode: "0750"
+
+- name: "ACCT-9626 — Bật process accounting"
+  command: accton /var/log/account/pacct
+  failed_when: false
+  changed_when: false
+
+# ─── [MALW-3280] Malware scanner (rkhunter) ─────────────────
+
+- name: "MALW-3280 — Cài đặt rkhunter"
+  apt:
+    name: rkhunter
+    state: present
+    update_cache: no
+
+- name: "MALW-3280 — Cập nhật rkhunter database"
+  command: rkhunter --update --nocolors
+  changed_when: false
+  failed_when: false
+
+- name: "MALW-3280 — Cấu hình rkhunter"
+  lineinfile:
+    path: /etc/rkhunter.conf
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+    state: present
+  loop:
+    - { regexp: "^#?UPDATE_MIRRORS", line: "UPDATE_MIRRORS=1" }
+    - { regexp: "^#?MIRRORS_MODE", line: "MIRRORS_MODE=0" }
+    - { regexp: "^#?WEB_CMD", line: 'WEB_CMD=""' }
+    - { regexp: "^#?MAIL-ON-WARNING", line: "MAIL-ON-WARNING=root" }
+  failed_when: false
+
+- name: "MALW-3280 — Tạo cron tuần cho rkhunter"
+  copy:
+    content: |
+      # Lynis MALW-3280 — rkhunter weekly scan
+      0 2 * * 0 root /usr/bin/rkhunter --check --nocolors --report-warnings-only 2>&1 | logger -t rkhunter
+    dest: /etc/cron.d/rkhunter-weekly
+    owner: root
+    group: root
+    mode: "0644"
+
+# ─── [TIME-3104] NTP configuration ──────────────────────────
+
+- name: "TIME-3104 — Đảm bảo systemd-timesyncd đang chạy"
+  service:
+    name: systemd-timesyncd
+    state: started
+    enabled: yes
+
+- name: "TIME-3104 — Cấu hình NTP servers"
+  copy:
+    content: |
+      [Time]
+      NTP=0.pool.ntp.org 1.pool.ntp.org 2.pool.ntp.org 3.pool.ntp.org
+      FallbackNTP=ntp.ubuntu.com
+    dest: /etc/systemd/timesyncd.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: restart timesyncd
+
+# ─── [HRDN-7222 / NETW-3032] Disable unused kernel modules ──
+
+- name: "HRDN-7222 — Vô hiệu hóa filesystem modules không dùng"
+  copy:
+    content: |
+      # Lynis HRDN-7222 — Disable uncommon/unused filesystems
+      install cramfs /bin/true
+      install freevxfs /bin/true
+      install hfs /bin/true
+      install hfsplus /bin/true
+      install jffs2 /bin/true
+      install udf /bin/true
+      # NOTE: squashfs KHÔNG disable — Docker overlay2 cần
+    dest: /etc/modprobe.d/disable-filesystems.conf
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: "NETW-3032 — Vô hiệu hóa protocol modules không dùng"
+  copy:
+    content: |
+      # Lynis NETW-3032 — Disable unused network protocols
+      install dccp /bin/true
+      install sctp /bin/true
+      install rds /bin/true
+      install tipc /bin/true
+    dest: /etc/modprobe.d/disable-protocols.conf
+    owner: root
+    group: root
+    mode: "0644"
+
+# ─── [FINT-4350] AIDE — File Integrity Monitoring ───────────
+
+- name: "FINT-4350 — Cài đặt AIDE"
+  apt:
+    name: aide
+    state: present
+    update_cache: no
+  when: hardening_install_aide | bool
+
+- name: "FINT-4350 — Tạo cấu hình AIDE cho IVF"
+  copy:
+    content: |
+      # Lynis FINT-4350 — AIDE config cho IVF Platform
+      @@define DBDIR /var/lib/aide
+      @@define LOGDIR /var/log/aide
+
+      Verbose = 6
+      database_in=file:@@{DBDIR}/aide.db
+      database_out=file:@@{DBDIR}/aide.db.new
+      database_new=file:@@{DBDIR}/aide.db.new
+      gzip_dbout=yes
+      report_url=file:@@{LOGDIR}/aide.log
+      report_url=stdout
+
+      # Ký hiệu: p=permissions, i=inode, n=num links, u=user, g=group
+      # s=size, m=mtime, c=ctime, S=SHA256, MD5=md5
+      PERMS = p+i+u+g
+      CONTENT = p+i+u+g+s+md5+sha256
+      CONTENT_EX = p+i+u+g+s+md5+sha256+acl+xattrs
+      LOG = p+i+u+g+s
+
+      # File quan trọng cần monitor
+      /boot CONTENT_EX
+      /etc/ssh CONTENT_EX
+      /etc/sudoers CONTENT_EX
+      /etc/sudoers.d CONTENT_EX
+      /etc/passwd CONTENT
+      /etc/shadow CONTENT
+      /etc/group CONTENT
+      /etc/gshadow CONTENT
+      /etc/crontab CONTENT
+      /etc/cron.d CONTENT
+      /bin CONTENT_EX
+      /sbin CONTENT_EX
+      /usr/bin CONTENT_EX
+      /usr/sbin CONTENT_EX
+
+      # Docker config
+      /etc/docker CONTENT_EX
+
+      # Bỏ qua các thư mục thay đổi thường xuyên
+      !/var/log
+      !/tmp
+      !/run
+      !/proc
+      !/sys
+    dest: /etc/aide/aide.conf
+    owner: root
+    group: root
+    mode: "0644"
+  when: hardening_install_aide | bool
+
+- name: "FINT-4350 — Kiểm tra database AIDE đã tồn tại chưa"
+  stat:
+    path: /var/lib/aide/aide.db
+  register: aide_db_stat
+  when: hardening_install_aide | bool
+
+- name: "FINT-4350 — Khởi tạo AIDE database (lần đầu)"
+  command: aideinit --yes
+  when:
+    - hardening_install_aide | bool
+    - not aide_db_stat.stat.exists
+  changed_when: true
+  async: 300
+  poll: 10
+
+- name: "FINT-4350 — Tạo cron hàng ngày cho AIDE check"
+  copy:
+    content: |
+      # Lynis FINT-4350 — AIDE daily integrity check
+      0 4 * * * root /usr/bin/aide --check 2>&1 | logger -t aide
+    dest: /etc/cron.d/aide-daily
+    owner: root
+    group: root
+    mode: "0644"
+  when: hardening_install_aide | bool
+
+# ─── [LOGG-2190] Log rotation ────────────────────────────────
+
+- name: "LOGG-2190 — Cấu hình logrotate cho auth log"
+  copy:
+    content: |
+      # Lynis LOGG-2190 — Tăng cường log rotation cho audit
+      /var/log/auth.log
+      /var/log/syslog
+      /var/log/kern.log {
+          weekly
+          missingok
+          rotate 13
+          compress
+          delaycompress
+          notifempty
+          create 0640 root adm
+          sharedscripts
+          postrotate
+              /usr/bin/systemctl kill -s HUP rsyslog.service 2>/dev/null || true
+          endscript
+      }
+    dest: /etc/logrotate.d/hardening
+    owner: root
+    group: root
+    mode: "0644"
+
+# ─── [FILE-7524] File permissions check ─────────────────────
+
+- name: "FILE-7524 — Fix quyền /etc/cron.d"
+  file:
+    path: /etc/cron.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: "FILE-7524 — Fix quyền /etc/crontab"
+  file:
+    path: /etc/crontab
+    state: file
+    owner: root
+    group: root
+    mode: "0600"
+  failed_when: false
+
+- name: "FILE-7524 — Fix quyền /etc/cron.*"
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+  loop:
+    - /etc/cron.hourly
+    - /etc/cron.daily
+    - /etc/cron.weekly
+    - /etc/cron.monthly
+  failed_when: false
+
+- name: "FILE-7524 — Fix quyền /etc/passwd"
+  file:
+    path: /etc/passwd
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: "FILE-7524 — Fix quyền /etc/shadow"
+  file:
+    path: /etc/shadow
+    owner: root
+    group: shadow
+    mode: "0640"
+  failed_when: false
+
+- name: "FILE-7524 — Fix quyền /etc/group"
+  file:
+    path: /etc/group
+    owner: root
+    group: root
+    mode: "0644"
+
+# ─── [PKGS-7370] Cập nhật package list & kiểm tra cập nhật ──
+
+- name: "PKGS-7370 — Cài đặt unattended-upgrades (tự động vá bảo mật)"
+  apt:
+    name:
+      - unattended-upgrades
+      - apt-listchanges
+    state: present
+    update_cache: yes
+
+- name: "PKGS-7370 — Cấu hình unattended-upgrades tự động vá security"
+  copy:
+    content: |
+      // Lynis PKGS-7370 — Tự động cập nhật bảo mật
+      Unattended-Upgrade::Allowed-Origins {
+          "${distro_id}:${distro_codename}";
+          "${distro_id}:${distro_codename}-security";
+          "${distro_id}ESMApps:${distro_codename}-apps-security";
+          "${distro_id}ESM:${distro_codename}-infra-security";
+      };
+      Unattended-Upgrade::AutoFixInterruptedDpkg "true";
+      Unattended-Upgrade::MinimalSteps "true";
+      Unattended-Upgrade::Remove-Unused-Dependencies "true";
+      Unattended-Upgrade::Automatic-Reboot "false";
+      Unattended-Upgrade::Mail "root";
+      Unattended-Upgrade::MailReport "on-change";
+    dest: /etc/apt/apt.conf.d/50unattended-upgrades
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: "PKGS-7370 — Bật unattended-upgrades"
+  copy:
+    content: |
+      APT::Periodic::Update-Package-Lists "1";
+      APT::Periodic::Download-Upgradeable-Packages "1";
+      APT::Periodic::AutocleanInterval "7";
+      APT::Periodic::Unattended-Upgrade "1";
+    dest: /etc/apt/apt.conf.d/20auto-upgrades
+    owner: root
+    group: root
+    mode: "0644"
+
+# ─── [BANN-7126] Login banner ────────────────────────────────
+
+- name: "BANN-7126 — Tạo login banner /etc/issue.net"
+  copy:
+    content: |
+      ╔════════════════════════════════════════════════════════╗
+      ║          IVF Platform — Authorized Access Only         ║
+      ║  Unauthorized access is strictly prohibited and will   ║
+      ║  be prosecuted to the full extent of the law.          ║
+      ║  All activity on this system is monitored and logged.  ║
+      ╚════════════════════════════════════════════════════════╝
+    dest: /etc/issue.net
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: "BANN-7126 — Bật SSH banner"
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "^#?Banner"
+    line: "Banner /etc/issue.net"
+    state: present
+  notify: restart sshd
+
+- name: "BANN-7126 — Tạo /etc/motd cảnh báo"
+  copy:
+    content: |
+      WARNING: This system is for authorized use only.
+      All connections are monitored and recorded.
+    dest: /etc/motd
+    owner: root
+    group: root
+    mode: "0644"
+
+# ─── [USB-1000] Tắt USB storage (tuỳ chọn, VPS không cần) ───
+
+- name: "USB-1000 — Vô hiệu hóa USB storage module"
+  copy:
+    content: |
+      # Lynis USB-1000 — Disable USB storage (không cần trên VPS)
+      install usb-storage /bin/true
+      install uas /bin/true
+    dest: /etc/modprobe.d/disable-usb-storage.conf
+    owner: root
+    group: root
+    mode: "0644"
+  when: hardening_disable_usb_storage | bool
+
+# ─── Tổng kết ─────────────────────────────────────────────────
+
+- name: "Hardening — Reload systemd daemon"
+  systemd:
+    daemon_reload: yes
+
+- name: "Hardening — Hiển thị tóm tắt"
+  debug:
+    msg: |
+      ✅ Hardening hoàn tất trên {{ inventory_hostname }}
+      Các vấn đề Lynis đã được xử lý:
+        KRNL-6000 ✓  Sysctl kernel hardening
+        KRNL-5820 ✓  Core dump restrictions
+        SSH-7408  ✓  SSH TCP/Agent forwarding disabled
+        SSH-7412  ✓  SSH MaxAuthTries=3
+        SSH-7440  ✓  SSH AllowAgentForwarding=no
+        SSH-7480  ✓  SSH LogLevel=VERBOSE
+        AUTH-9286 ✓  umask=027
+        AUTH-9230 ✓  Password aging policy
+        AUTH-9262 ✓  PAM pwquality installed
+        FILE-6374 ✓  /tmp nodev,nosuid
+        PKGS-7386 ✓  auditd installed + rules
+        ACCT-9628 ✓  sysstat enabled
+        ACCT-9626 ✓  process accounting (acct)
+        MALW-3280 ✓  rkhunter installed
+        TIME-3104 ✓  NTP (systemd-timesyncd)
+        HRDN-7222 ✓  Unused filesystem modules disabled
+        NETW-3032 ✓  Unused network protocols disabled
+        FINT-4350 ✓  AIDE file integrity monitoring
+        LOGG-2190 ✓  Log rotation configured
+        FILE-7524 ✓  File permissions hardened
+        PKGS-7370 ✓  Unattended security upgrades
+        BANN-7126 ✓  Login banner configured
+      Chạy lại Lynis để xác nhận: lynis audit system --profile /etc/lynis/custom.prf

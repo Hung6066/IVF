@@ -1,0 +1,22 @@
+---
+- name: restart sshd
+  service:
+    name: sshd
+    state: restarted
+
+- name: restart auditd
+  service:
+    name: auditd
+    state: restarted
+
+- name: restart sysstat
+  service:
+    name: sysstat
+    state: restarted
+  failed_when: false
+
+- name: restart timesyncd
+  systemd:
+    name: systemd-timesyncd
+    state: restarted
+    daemon_reload: yes

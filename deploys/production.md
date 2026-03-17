@@ -27,4 +27,4 @@ ssh root@45.134.226.56 "curl -sk https://natra.site/health/live && echo && docke
 docker build -t ghcr.io/hung6066/ivf:manual -f src/IVF.API/Dockerfile . && docker save ghcr.io/hung6066/ivf:manual | ssh root@10.200.0.1 "docker load" && ssh root@10.200.0.1 "docker service update --image ghcr.io/hung6066/ivf:manual --update-order start-first --force ivf_api"
 
 ### Frontend
-docker build -t ghcr.io/hung6066/ivf-client:manual -f ivf-client/Dockerfile . && docker save ghcr.io/hung6066/ivf-client:manual | ssh root@10.200.0.1 "docker load" && ssh root@10.200.0.1 "docker service update --image ghcr.io/hung6066/ivf-client:manual --update-order start-first --force ivf_frontend"
+docker build -t ghcr.io/hung6066/ivf-client:lynis-new -f ivf-client/Dockerfile . && docker save ghcr.io/hung6066/ivf-client:lynis-new | ssh root@10.200.0.1 "docker load" && ssh root@10.200.0.1 "docker service update --image ghcr.io/hung6066/ivf-client:lynis-new --update-order start-first --force ivf_frontend"
