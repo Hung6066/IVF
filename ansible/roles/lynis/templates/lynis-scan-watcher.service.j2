@@ -1,0 +1,9 @@
+[Unit]
+Description=Lynis scan watcher — kiểm tra trigger từ MinIO
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/lynis-scan-watcher.sh
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=lynis-watcher

@@ -2,7 +2,13 @@ import { inject, Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { LynisHostsResponse, LynisReport, LynisReportsResponse } from '../models/lynis.model';
+import {
+  LynisHostsResponse,
+  LynisReport,
+  LynisReportsResponse,
+  LynisScanResponse,
+  LynisScanStatus,
+} from '../models/lynis.model';
 
 @Injectable({ providedIn: 'root' })
 export class LynisService {
@@ -25,5 +31,13 @@ export class LynisService {
 
   getLatestReport(hostname: string): Observable<LynisReport> {
     return this.http.get<LynisReport>(`${this.baseUrl}/reports/${hostname}/latest`);
+  }
+
+  triggerScan(hostname: string): Observable<LynisScanResponse> {
+    return this.http.post<LynisScanResponse>(`${this.baseUrl}/scan`, { hostname });
+  }
+
+  getScanStatus(hostname: string): Observable<LynisScanStatus> {
+    return this.http.get<LynisScanStatus>(`${this.baseUrl}/scan/${hostname}/status`);
   }
 }

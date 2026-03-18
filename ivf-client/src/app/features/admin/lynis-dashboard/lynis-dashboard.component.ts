@@ -1,6 +1,8 @@
-import { Component, inject, OnInit, signal, computed } from '@angular/core';
+import { Component, inject, OnDestroy, OnInit, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { interval, Subscription } from 'rxjs';
+import { switchMap, takeWhile } from 'rxjs/operators';
 import { LynisService } from '../../../core/services/lynis.service';
 import { LynisReport, LynisReportSummary } from '../../../core/models/lynis.model';
 
@@ -11,8 +13,9 @@ import { LynisReport, LynisReportSummary } from '../../../core/models/lynis.mode
   templateUrl: './lynis-dashboard.component.html',
   styleUrls: ['./lynis-dashboard.component.scss'],
 })
-export class LynisDashboardComponent implements OnInit {
+export class LynisDashboardComponent implements OnInit, OnDestroy {
   private lynisService = inject(LynisService);
+  private scanPollSub: Subscription | null = null;
 
   activeTab = signal<'overview' | 'reports' | 'detail'>('overview');
 
@@ -24,6 +27,8 @@ export class LynisDashboardComponent implements OnInit {
   loading = signal(false);
   loadingReport = signal(false);
   error = signal('');
+  scanning = signal(false);
+  scanError = signal('');
 
   // computed: score màu (SCSS class modifiers)
   scoreColor = computed(() => {
@@ -46,6 +51,10 @@ export class LynisDashboardComponent implements OnInit {
     this.loadHosts();
   }
 
+  ngOnDestroy(): void {
+    this.scanPollSub?.unsubscribe();
+  }
+
   loadHosts(): void {
     this.loading.set(true);
     this.error.set('');
@@ -56,6 +65,7 @@ export class LynisDashboardComponent implements OnInit {
           this.selectedHost.set(res.hosts[0]);
           this.loadLatest(res.hosts[0]);
           this.loadReports(res.hosts[0]);
+          this.checkScanStatus(res.hosts[0]);
         }
         this.loading.set(false);
       },
@@ -89,8 +99,12 @@ export class LynisDashboardComponent implements OnInit {
 
   onHostChange(host: string): void {
     this.selectedHost.set(host);
+    this.scanPollSub?.unsubscribe();
+    this.scanning.set(false);
+    this.scanError.set('');
     this.loadLatest(host);
     this.loadReports(host);
+    this.checkScanStatus(host);
   }
 
   openReport(report: LynisReportSummary): void {
@@ -109,6 +123,57 @@ export class LynisDashboardComponent implements OnInit {
     this.activeTab.set(tab);
   }
 
+  triggerScan(): void {
+    const host = this.selectedHost();
+    if (!host || this.scanning()) return;
+
+    this.scanning.set(true);
+    this.scanError.set('');
+
+    this.lynisService.triggerScan(host).subscribe({
+      next: () => this.startScanPolling(host),
+      error: () => {
+        this.scanning.set(false);
+        this.scanError.set('Không thể gửi yêu cầu quét. Thử lại sau.');
+      },
+    });
+  }
+
+  private checkScanStatus(host: string): void {
+    this.lynisService.getScanStatus(host).subscribe({
+      next: (s) => {
+        if (s.status === 'scanning') {
+          this.scanning.set(true);
+          this.startScanPolling(host);
+        }
+      },
+      error: () => {},
+    });
+  }
+
+  private startScanPolling(host: string): void {
+    this.scanPollSub?.unsubscribe();
+    // Poll every 10 seconds; stop when status becomes idle
+    this.scanPollSub = interval(10_000)
+      .pipe(
+        switchMap(() => this.lynisService.getScanStatus(host)),
+        takeWhile((s) => s.status === 'scanning', true),
+      )
+      .subscribe({
+        next: (s) => {
+          if (s.status === 'idle') {
+            this.scanning.set(false);
+            this.loadLatest(host);
+            this.loadReports(host);
+          }
+        },
+        error: () => {
+          this.scanning.set(false);
+          this.scanError.set('Lỗi kiểm tra trạng thái quét.');
+        },
+      });
+  }
+
   getScoreLabel(idx: number): string {
     if (idx >= 80) return 'Tốt';
     if (idx >= 60) return 'Trung bình';
@@ -116,7 +181,8 @@ export class LynisDashboardComponent implements OnInit {
     return 'Nguy hiểm';
   }
 
-  trackByDate(_: number, r: LynisReportSummary): string {
-    return r.key;
+  trackByDate(_index: number, r: LynisReportSummary): string {
+    return r.date;
   }
 }
+

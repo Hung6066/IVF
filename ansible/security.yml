@@ -27,6 +27,7 @@
 - name: "Security Monitoring — Lynis + Wazuh Agent"
   hosts: swarm
   become: true
+  gather_facts: true
   tags: [security]
 
   vars:

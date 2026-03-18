@@ -1,6 +1,8 @@
 using IVF.Application.Common;
 using IVF.Application.Common.Interfaces;
+using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace IVF.API.Endpoints;
 
@@ -8,6 +10,7 @@ public static class LynisEndpoints
 {
     private const string LynisPrefix = "system/lynis/";
     private static readonly JsonSerializerOptions JsonOpts = new() { PropertyNameCaseInsensitive = true };
+    private static readonly Regex HostnamePattern = new(@"^[a-zA-Z0-9\-_]+$", RegexOptions.Compiled);
 
     public static void MapLynisEndpoints(this IEndpointRouteBuilder app)
     {
@@ -19,6 +22,8 @@ public static class LynisEndpoints
         group.MapGet("/reports/{hostname}/{date}", GetReport).WithName("GetLynisReport");
         group.MapGet("/reports/{hostname}/latest", GetLatestReport).WithName("GetLatestLynisReport");
         group.MapGet("/hosts", ListHosts).WithName("ListLynisHosts");
+        group.MapPost("/scan", TriggerScan).WithName("TriggerLynisScan");
+        group.MapGet("/scan/{hostname}/status", GetScanStatus).WithName("GetLynisScanStatus");
     }
 
     // GET /api/admin/lynis/hosts — list all hosts that have Lynis reports
@@ -136,4 +141,61 @@ public static class LynisEndpoints
             return Results.NotFound(new { error = ex.Message, key = objectKey });
         }
     }
+
+    // POST /api/admin/lynis/scan — write a trigger file that the VPS polling service detects
+    private static async Task<IResult> TriggerScan(
+        TriggerScanRequest request,
+        IObjectStorageService storage,
+        CancellationToken ct)
+    {
+        var hostname = request?.Hostname?.Trim() ?? string.Empty;
+        if (string.IsNullOrEmpty(hostname))
+            return Results.BadRequest(new { error = "Hostname là bắt buộc" });
+
+        if (!HostnamePattern.IsMatch(hostname))
+            return Results.BadRequest(new { error = "Hostname không hợp lệ" });
+
+        var triggerKey = $"{LynisPrefix}{hostname}/scan-trigger.json";
+        var payload = JsonSerializer.Serialize(new
+        {
+            requested_at = DateTime.UtcNow.ToString("O"),
+            hostname
+        });
+
+        var bytes = Encoding.UTF8.GetBytes(payload);
+        using var stream = new MemoryStream(bytes);
+        await storage.UploadAsync(
+            StorageBuckets.Documents, triggerKey, stream,
+            "application/json", bytes.Length, ct: ct);
+
+        return Results.Ok(new { message = "Đã gửi yêu cầu quét", hostname, status = "scanning" });
+    }
+
+    // GET /api/admin/lynis/scan/{hostname}/status — check whether a scan trigger is pending
+    private static async Task<IResult> GetScanStatus(
+        string hostname,
+        IObjectStorageService storage,
+        CancellationToken ct)
+    {
+        if (!HostnamePattern.IsMatch(hostname))
+            return Results.BadRequest(new { error = "Hostname không hợp lệ" });
+
+        var triggerKey = $"{LynisPrefix}{hostname}/scan-trigger.json";
+        try
+        {
+            var stream = await storage.DownloadAsync(StorageBuckets.Documents, triggerKey, ct);
+            if (stream is not null)
+            {
+                using var reader = new StreamReader(stream);
+                var json = await reader.ReadToEndAsync(ct);
+                var trigger = JsonSerializer.Deserialize<JsonElement>(json, JsonOpts);
+                return Results.Ok(new { status = "scanning", hostname, trigger });
+            }
+        }
+        catch { /* trigger file not found = idle */ }
+
+        return Results.Ok(new { status = "idle", hostname });
+    }
 }
+
+internal sealed record TriggerScanRequest(string Hostname);

@@ -127,7 +127,17 @@
     <skip_on_error>yes</skip_on_error>
   </wodle>
 
-  <!-- ─── Security Configuration Assessment ─── -->
+  <!-- ─── Lynis: chạy tự động mỗi 24h, output vào log để Wazuh thu thập ─── -->
+  <wodle name="command">
+    <disabled>no</disabled>
+    <tag>lynis</tag>
+    <command>mkdir -p /var/log/lynis && lynis audit system --quiet --report-file /var/log/lynis/lynis-report.dat >> /var/log/lynis/lynis.log 2>&1</command>
+    <interval>24h</interval>
+    <run_on_start>yes</run_on_start>
+    <timeout>1800</timeout>
+  </wodle>
+
+  <!-- ─── Security Configuration Assessment (CIS Benchmark) ─── -->
   <sca>
     <enabled>yes</enabled>
     <scan_on_start>yes</scan_on_start>

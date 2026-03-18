@@ -1,0 +1,45 @@
+#!/bin/bash
+# ═══════════════════════════════════════════════════════════════════
+# lynis-scan-watcher.sh — Kiểm tra MinIO trigger và chạy Lynis audit
+# Được gọi bởi systemd timer mỗi 5 phút
+# ═══════════════════════════════════════════════════════════════════
+set -euo pipefail
+
+HOSTNAME="{{ ansible_hostname }}"
+BUCKET="ivf-documents"
+TRIGGER_KEY="system/lynis/${HOSTNAME}/scan-trigger.json"
+LOCK_FILE="/var/run/lynis-scan.lock"
+
+MINIO_ACCESS="{{ lynis_minio_access_key }}"
+MINIO_SECRET="{{ lynis_minio_secret_key }}"
+MINIO_URL="http://minio-metrics:9000"
+
+MC_CMD="docker run --rm --network ivf-monitoring \
+  -e MC_HOST_minio=http://${MINIO_ACCESS}:${MINIO_SECRET}@minio-metrics:9000 \
+  minio/mc:latest"
+
+# Ngăn chạy đồng thời
+if [ -f "${LOCK_FILE}" ]; then
+    PID=$(cat "${LOCK_FILE}" 2>/dev/null || echo "")
+    if [ -n "${PID}" ] && kill -0 "${PID}" 2>/dev/null; then
+        echo "Scan đang chạy (PID ${PID}), bỏ qua." >&2
+        exit 0
+    fi
+fi
+
+# Kiểm tra trigger file
+if ! ${MC_CMD} stat "minio/${BUCKET}/${TRIGGER_KEY}" >/dev/null 2>&1; then
+    exit 0  # Không có trigger, không làm gì
+fi
+
+echo "Phát hiện trigger quét cho ${HOSTNAME} — bắt đầu Lynis audit..."
+echo $$ > "${LOCK_FILE}"
+trap 'rm -f "${LOCK_FILE}"' EXIT
+
+# Xóa trigger trước khi chạy (tránh re-trigger nếu scan lỗi)
+${MC_CMD} rm --force "minio/${BUCKET}/${TRIGGER_KEY}" 2>/dev/null || true
+
+# Chạy audit + ship
+bash /usr/local/bin/run-lynis.sh
+
+echo "Scan hoàn tất: ${HOSTNAME}"

@@ -16,6 +16,21 @@ export interface LynisHostsResponse {
   hosts: string[];
 }
 
+export interface LynisScanResponse {
+  message: string;
+  hostname: string;
+  status: string;
+}
+
+export interface LynisScanStatus {
+  status: 'idle' | 'scanning';
+  hostname: string;
+  trigger?: {
+    requested_at: string;
+    hostname: string;
+  };
+}
+
 export interface LynisReport {
   hostname: string;
   report_date: string;

@@ -4,23 +4,28 @@
 #  Lynis thực hiện audit bảo mật hệ thống và lưu report vào /var/log/lynis/
 # ═══════════════════════════════════════════════════════════
 
-- name: Thêm Lynis APT key
-  apt_key:
-    url: https://packages.cisofy.com/keys/cisofy-software-public.key
-    state: present
+- name: Xóa file repo Lynis cũ nếu có conflict
+  file:
+    path: /etc/apt/sources.list.d/cisofy-lynis.list
+    state: absent
+  ignore_errors: true
 
-- name: Thêm Lynis APT repository
-  apt_repository:
-    repo: "deb https://packages.cisofy.com/community/lynis/deb/ stable main"
-    filename: cisofy-lynis
-    state: present
-    update_cache: yes
+- name: Import Lynis GPG key (keyring)
+  shell: |
+    curl -fsSL https://packages.cisofy.com/keys/cisofy-software-public.key | \
+      gpg --dearmor -o /usr/share/keyrings/cisofy-lynis-keyring.gpg
+  changed_when: true
+
+- name: Thêm Lynis APT repository (signed-by)
+  copy:
+    dest: /etc/apt/sources.list.d/cisofy-lynis.list
+    content: "deb [signed-by=/usr/share/keyrings/cisofy-lynis-keyring.gpg] https://packages.cisofy.com/community/lynis/deb/ stable main\n"
+    mode: '0644'
 
 - name: Cài đặt Lynis
-  apt:
-    name: lynis
-    state: present
-    update_cache: yes
+  shell: apt-get update -y -o Acquire::AllowInsecureRepositories=false 2>/dev/null; apt-get install -y lynis
+  changed_when: false
+  failed_when: false
 
 - name: Tạo thư mục log cho Lynis
   file:
@@ -55,13 +60,14 @@
     mode: "0644"
 
 - name: Chạy Lynis audit lần đầu
-  command: >
-    lynis audit system
-    --profile /etc/lynis/custom.prf
-    --report-file /var/log/lynis/reports/lynis-{{ ansible_date_time.date }}.dat
-    --logfile /var/log/lynis/lynis.log
-    --no-colors
-    --quiet
+  shell: |
+    TODAY=$(date +%Y-%m-%d)
+    lynis audit system \
+      --profile /etc/lynis/custom.prf \
+      --report-file /var/log/lynis/reports/lynis-${TODAY}.dat \
+      --logfile /var/log/lynis/lynis.log \
+      --no-colors \
+      --quiet
   register: lynis_first_run
   changed_when: false
   failed_when: false
@@ -99,3 +105,45 @@
   command: /usr/local/bin/lynis-ship.sh
   changed_when: false
   failed_when: false
+
+# ─── Manual trigger / scan-on-demand ────────────────────────────────────
+- name: Deploy run-lynis.sh (audit + ship wrapper)
+  template:
+    src: run-lynis.j2
+    dest: /usr/local/bin/run-lynis.sh
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Deploy lynis-scan-watcher.sh (MinIO trigger poller)
+  template:
+    src: lynis-scan-watcher.j2
+    dest: /usr/local/bin/lynis-scan-watcher.sh
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Deploy systemd service cho scan watcher
+  template:
+    src: lynis-scan-watcher.service.j2
+    dest: /etc/systemd/system/lynis-scan-watcher.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: reload systemd
+
+- name: Deploy systemd timer cho scan watcher
+  template:
+    src: lynis-scan-watcher.timer.j2
+    dest: /etc/systemd/system/lynis-scan-watcher.timer
+    owner: root
+    group: root
+    mode: "0644"
+  notify: reload systemd
+
+- name: Kích hoạt và khởi động lynis-scan-watcher timer
+  systemd:
+    name: lynis-scan-watcher.timer
+    enabled: true
+    state: started
+    daemon_reload: true

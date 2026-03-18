@@ -18,6 +18,15 @@
           }
         </select>
       }
+      <button
+        (click)="triggerScan()"
+        [disabled]="scanning() || !selectedHost()"
+        class="btn btn-scan"
+        [title]="scanning() ? 'Đang quét...' : 'Kích hoạt quét Lynis ngay'"
+      >
+        <i class="fas fa-radar" [class.fa-spin]="scanning()"></i>
+        {{ scanning() ? 'Đang quét...' : 'Quét ngay' }}
+      </button>
       <button (click)="loadHosts()" class="btn btn-refresh">
         <i class="fas fa-sync-alt" [class.fa-spin]="loading()"></i>
         Làm mới
@@ -30,6 +39,21 @@
     <div class="error-banner">
       <i class="fas fa-exclamation-circle"></i>
       {{ error() }}
+    </div>
+  }
+
+  <!-- ═══ Scan status ═══ -->
+  @if (scanning()) {
+    <div class="scan-banner">
+      <i class="fas fa-circle-notch fa-spin"></i>
+      Đang thực hiện quét Lynis trên <strong>{{ selectedHost() }}</strong>...
+      Tự động làm mới khi hoàn tất (thường mất 2–5 phút).
+    </div>
+  }
+  @if (scanError()) {
+    <div class="error-banner">
+      <i class="fas fa-exclamation-circle"></i>
+      {{ scanError() }}
     </div>
   }
 
