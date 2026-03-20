@@ -180,4 +180,18 @@ public class SpermSample : BaseEntity
         ThawDate = DateTime.UtcNow;
         SetUpdated();
     }
+
+    // Destruction (P8.13)
+    public DateTime? DestroyedAt { get; private set; }
+    public string? DestroyedReason { get; private set; }
+    public string? DestroyedByUserId { get; private set; }
+
+    public void MarkDestroyed(string reason, string destroyedByUserId)
+    {
+        IsAvailable = false;
+        DestroyedAt = DateTime.UtcNow;
+        DestroyedReason = reason;
+        DestroyedByUserId = destroyedByUserId;
+        SetUpdated();
+    }
 }

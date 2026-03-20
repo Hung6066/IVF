@@ -149,6 +149,49 @@ public class RecordSampleQualityHandler : IRequestHandler<RecordSampleQualityCom
     }
 }
 
+// ==================== DESTROY SAMPLE (P8.13) ====================
+[RequiresFeature(FeatureCodes.SpermBank)]
+public record DestroySpermSampleCommand(
+    Guid SampleId,
+    string Reason,
+    string DestroyedByUserId
+) : IRequest<Result<SpermSampleDto>>;
+
+public class DestroySpermSampleValidator : AbstractValidator<DestroySpermSampleCommand>
+{
+    public DestroySpermSampleValidator()
+    {
+        RuleFor(x => x.Reason).NotEmpty().MaximumLength(500);
+        RuleFor(x => x.DestroyedByUserId).NotEmpty();
+    }
+}
+
+public class DestroySpermSampleHandler : IRequestHandler<DestroySpermSampleCommand, Result<SpermSampleDto>>
+{
+    private readonly ISpermSampleRepository _sampleRepo;
+    private readonly IUnitOfWork _unitOfWork;
+
+    public DestroySpermSampleHandler(ISpermSampleRepository sampleRepo, IUnitOfWork unitOfWork)
+    {
+        _sampleRepo = sampleRepo;
+        _unitOfWork = unitOfWork;
+    }
+
+    public async Task<Result<SpermSampleDto>> Handle(DestroySpermSampleCommand r, CancellationToken ct)
+    {
+        var sample = await _sampleRepo.GetByIdAsync(r.SampleId, ct);
+        if (sample == null) return Result<SpermSampleDto>.Failure("Sample not found");
+        if (!sample.IsAvailable && sample.DestroyedAt.HasValue)
+            return Result<SpermSampleDto>.Failure("Sample has already been destroyed");
+
+        sample.MarkDestroyed(r.Reason, r.DestroyedByUserId);
+        await _sampleRepo.UpdateAsync(sample, ct);
+        await _unitOfWork.SaveChangesAsync(ct);
+
+        return Result<SpermSampleDto>.Success(SpermSampleDto.FromEntity(sample));
+    }
+}
+
 // ==================== DTOs ====================
 public record SpermDonorDto(
     Guid Id,
@@ -179,11 +222,14 @@ public record SpermSampleDto(
     decimal? Motility,
     int? VialCount,
     bool IsAvailable,
-    DateTime CreatedAt
+    DateTime CreatedAt,
+    DateTime? DestroyedAt,
+    string? DestroyedReason
 )
 {
     public static SpermSampleDto FromEntity(SpermSample s) => new(
         s.Id, s.DonorId, s.SampleCode, s.CollectionDate, s.SpecimenType.ToString(),
-        s.Volume, s.Concentration, s.Motility, s.VialCount, s.IsAvailable, s.CreatedAt
+        s.Volume, s.Concentration, s.Motility, s.VialCount, s.IsAvailable, s.CreatedAt,
+        s.DestroyedAt, s.DestroyedReason
     );
 }

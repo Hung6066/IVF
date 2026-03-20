@@ -1,0 +1,127 @@
+<div class="p-6">
+  <div class="flex items-center justify-between mb-6">
+    <h1 class="text-2xl font-bold text-gray-800">Biểu đồ nang noãn</h1>
+    <span class="text-sm text-gray-500">Chu kỳ: {{ cycleId }}</span>
+  </div>
+
+  @if (loading()) {
+    <div class="flex justify-center py-12">
+      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+    </div>
+  } @else if (error()) {
+    <div class="p-4 bg-red-50 border border-red-200 rounded text-red-700">{{ error() }}</div>
+  } @else if (points().length === 0) {
+    <div class="text-center py-12 text-gray-500">
+      Chưa có dữ liệu theo dõi kích thích buồng trứng.
+    </div>
+  } @else {
+    <!-- Chart Table -->
+    <div class="bg-white rounded-lg shadow overflow-hidden mb-6">
+      <table class="min-w-full text-sm">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-4 py-3 text-left font-semibold text-gray-600">Ngày</th>
+            <th class="px-4 py-3 text-center font-semibold text-gray-600">Ngày CK</th>
+            <th class="px-4 py-3 text-center font-semibold text-blue-600">Nang ≥12mm</th>
+            <th class="px-4 py-3 text-center font-semibold text-indigo-600">Nang ≥14mm</th>
+            <th class="px-4 py-3 text-center font-semibold text-purple-600">Tổng nang</th>
+            <th class="px-4 py-3 text-center font-semibold text-pink-600">NMTC (mm)</th>
+            <th class="px-4 py-3 text-center font-semibold text-orange-600">E2 (pg/mL)</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (p of points(); track p.date) {
+            <tr class="border-t hover:bg-gray-50">
+              <td class="px-4 py-3 text-gray-900">{{ p.date | date: 'dd/MM/yyyy' }}</td>
+              <td class="px-4 py-3 text-center text-gray-600">CK {{ p.cycleDay }}</td>
+              <td class="px-4 py-3 text-center">
+                @if (p.size12 !== null && p.size12 !== undefined) {
+                  <span class="font-medium text-blue-700">{{ p.size12 }}</span>
+                } @else {
+                  <span class="text-gray-300">—</span>
+                }
+              </td>
+              <td class="px-4 py-3 text-center">
+                @if (p.size14 !== null && p.size14 !== undefined) {
+                  <span class="font-medium text-indigo-700">{{ p.size14 }}</span>
+                } @else {
+                  <span class="text-gray-300">—</span>
+                }
+              </td>
+              <td class="px-4 py-3 text-center">
+                @if (p.total !== null && p.total !== undefined) {
+                  <span class="font-bold text-purple-700">{{ p.total }}</span>
+                } @else {
+                  <span class="text-gray-300">—</span>
+                }
+              </td>
+              <td class="px-4 py-3 text-center">
+                @if (p.endometrium !== null && p.endometrium !== undefined) {
+                  <span class="font-medium text-pink-700">{{ p.endometrium }}</span>
+                } @else {
+                  <span class="text-gray-300">—</span>
+                }
+              </td>
+              <td class="px-4 py-3 text-center">
+                @if (p.e2 !== null && p.e2 !== undefined) {
+                  <span class="font-medium text-orange-700">{{ p.e2 | number: '1.0-0' }}</span>
+                } @else {
+                  <span class="text-gray-300">—</span>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Visual Bar Charts -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <!-- E2 Chart -->
+      <div class="bg-white rounded-lg shadow p-5">
+        <h3 class="font-semibold text-gray-700 mb-4">Estradiol (E2) theo ngày</h3>
+        <div class="space-y-2">
+          @for (p of points(); track p.date) {
+            @if (p.e2 !== null && p.e2 !== undefined) {
+              <div class="flex items-center gap-3">
+                <span class="text-xs text-gray-500 w-20 shrink-0">CK {{ p.cycleDay }}</span>
+                <div class="flex-1 bg-gray-100 rounded h-5 overflow-hidden">
+                  <div
+                    class="h-full bg-orange-400 rounded transition-all"
+                    [style.width]="barWidth(p.e2, maxE2)"
+                  ></div>
+                </div>
+                <span class="text-xs font-medium text-orange-700 w-16 text-right">{{
+                  p.e2 | number: '1.0-0'
+                }}</span>
+              </div>
+            }
+          }
+        </div>
+      </div>
+
+      <!-- Endometrium Chart -->
+      <div class="bg-white rounded-lg shadow p-5">
+        <h3 class="font-semibold text-gray-700 mb-4">Độ dày NMTC (mm)</h3>
+        <div class="space-y-2">
+          @for (p of points(); track p.date) {
+            @if (p.endometrium !== null && p.endometrium !== undefined) {
+              <div class="flex items-center gap-3">
+                <span class="text-xs text-gray-500 w-20 shrink-0">CK {{ p.cycleDay }}</span>
+                <div class="flex-1 bg-gray-100 rounded h-5 overflow-hidden">
+                  <div
+                    class="h-full bg-pink-400 rounded transition-all"
+                    [style.width]="barWidth(p.endometrium, maxEndometrium)"
+                  ></div>
+                </div>
+                <span class="text-xs font-medium text-pink-700 w-12 text-right"
+                  >{{ p.endometrium }} mm</span
+                >
+              </div>
+            }
+          }
+        </div>
+      </div>
+    </div>
+  }
+</div>

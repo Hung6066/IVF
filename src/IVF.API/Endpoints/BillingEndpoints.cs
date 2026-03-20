@@ -32,7 +32,7 @@ public static class BillingEndpoints
 
         group.MapPost("/invoices/{id:guid}/items", async (Guid id, AddItemRequest req, IMediator m) =>
         {
-            var r = await m.Send(new AddInvoiceItemCommand(id, req.ServiceCode, req.Description, req.Quantity, req.UnitPrice));
+            var r = await m.Send(new AddInvoiceItemCommand(id, req.ServiceCode, req.Description, req.Quantity, req.UnitPrice, req.FeeType));
             return r.IsSuccess ? Results.Ok(r.Value) : Results.NotFound(r.Error);
         });
 
@@ -48,5 +48,20 @@ public static class BillingEndpoints
             var r = await m.Send(new RecordPaymentCommand(id, req.Amount, req.PaymentMethod, req.TransactionReference, userId));
             return r.IsSuccess ? Results.Ok(r.Value) : Results.BadRequest(r.Error);
         });
+
+        group.MapPost("/invoices/{id:guid}/void", async (Guid id, IMediator m) =>
+        {
+            var r = await m.Send(new VoidInvoiceCommand(id));
+            return r.IsSuccess ? Results.Ok(r.Value) : Results.BadRequest(r.Error);
+        });
+
+        group.MapPost("/invoices/{id:guid}/refund", async (Guid id, ClaimsPrincipal principal, RefundPaymentRequest req, IMediator m) =>
+        {
+            var userId = Guid.Parse(principal.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+            var r = await m.Send(new RefundPaymentCommand(id, req.RefundAmount, req.Reason, userId));
+            return r.IsSuccess ? Results.Ok(r.Value) : Results.BadRequest(r.Error);
+        });
     }
 }
+
+file sealed record RefundPaymentRequest(decimal RefundAmount, string Reason);

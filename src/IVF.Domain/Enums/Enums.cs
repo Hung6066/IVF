@@ -46,7 +46,8 @@ public enum TreatmentMethod
     QHTN,   // Quan hệ tự nhiên
     IUI,    // Intrauterine Insemination
     ICSI,   // Intracytoplasmic Sperm Injection
-    IVM     // In Vitro Maturation
+    IVM,    // In Vitro Maturation
+    FET     // Frozen Embryo Transfer - Chuyển phôi đông lạnh
 }
 
 public enum CyclePhase

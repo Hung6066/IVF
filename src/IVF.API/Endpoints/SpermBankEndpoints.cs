@@ -50,5 +50,12 @@ public static class SpermBankEndpoints
             var r = await m.Send(new RecordSampleQualityCommand(id, req.Volume, req.Concentration, req.Motility, req.VialCount));
             return r.IsSuccess ? Results.Ok(r.Value) : Results.NotFound(r.Error);
         });
+
+        group.MapPost("/samples/{id:guid}/destroy", async (Guid id, DestroySpermSampleRequest req, HttpContext ctx, IMediator m) =>
+        {
+            var userId = ctx.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+            var r = await m.Send(new DestroySpermSampleCommand(id, req.Reason, userId));
+            return r.IsSuccess ? Results.Ok(r.Value) : Results.BadRequest(r.Error);
+        });
     }
 }

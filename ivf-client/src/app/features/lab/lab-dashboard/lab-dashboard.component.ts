@@ -3,7 +3,14 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { LabService } from './lab.service';
-import { QueueItem, EmbryoCard, ScheduleItem, CryoLocation, LabStats, EmbryoReport } from './lab-dashboard.models';
+import {
+  QueueItem,
+  EmbryoCard,
+  ScheduleItem,
+  CryoLocation,
+  LabStats,
+  EmbryoReport,
+} from './lab-dashboard.models';
 
 // Import Child Components
 import { LabQueueComponent } from './components/lab-queue/lab-queue.component';
@@ -11,6 +18,7 @@ import { LabEmbryosComponent } from './components/lab-embryos/lab-embryos.compon
 import { LabScheduleComponent } from './components/lab-schedule/lab-schedule.component';
 import { LabCryoComponent } from './components/lab-cryo/lab-cryo.component';
 import { QuickFormsWidgetComponent } from '../../forms/quick-forms-widget/quick-forms-widget.component';
+import { LabOrdersComponent } from '../lab-orders/lab-orders.component';
 
 @Component({
   selector: 'app-lab-dashboard',
@@ -23,10 +31,11 @@ import { QuickFormsWidgetComponent } from '../../forms/quick-forms-widget/quick-
     LabEmbryosComponent,
     LabScheduleComponent,
     LabCryoComponent,
-    QuickFormsWidgetComponent
+    QuickFormsWidgetComponent,
+    LabOrdersComponent,
   ],
   templateUrl: './lab-dashboard.component.html',
-  styleUrls: ['./lab-dashboard.component.scss']
+  styleUrls: ['./lab-dashboard.component.scss'],
 })
 export class LabDashboardComponent implements OnInit {
   private labService = inject(LabService);
@@ -48,7 +57,7 @@ export class LabDashboardComponent implements OnInit {
     freezeCount: 0,
     totalFrozenEmbryos: 0,
     totalFrozenEggs: 0,
-    totalFrozenSperm: 0
+    totalFrozenSperm: 0,
   });
   embryoReport = signal<EmbryoReport[]>([]);
 
@@ -56,7 +65,7 @@ export class LabDashboardComponent implements OnInit {
     this.refreshData();
 
     // Auto-refresh queue every 10 seconds
-    setInterval(() => this.labService.getQueue().subscribe(data => this.queue.set(data)), 10000);
+    setInterval(() => this.labService.getQueue().subscribe((data) => this.queue.set(data)), 10000);
   }
 
   setActiveTab(tab: string) {
@@ -64,26 +73,28 @@ export class LabDashboardComponent implements OnInit {
   }
 
   refreshData() {
-    this.labService.getQueue().subscribe(data => this.queue.set(data));
-    this.labService.getEmbryos().subscribe(data => this.embryos.set(data));
-    this.labService.getSchedule(this.currentDate).subscribe(data => this.schedule.set(data));
-    this.labService.getCryoLocations().subscribe(data => this.cryoLocations.set(data));
-    this.labService.getStats().subscribe(data => this.stats.set(data));
-    this.labService.getActiveCycles().subscribe(data => this.activeCycles.set(data));
-    this.labService.getDoctors().subscribe(data => this.doctors.set(data));
-    this.labService.getEmbryoReport(this.currentDate).subscribe(data => this.embryoReport.set(data));
+    this.labService.getQueue().subscribe((data) => this.queue.set(data));
+    this.labService.getEmbryos().subscribe((data) => this.embryos.set(data));
+    this.labService.getSchedule(this.currentDate).subscribe((data) => this.schedule.set(data));
+    this.labService.getCryoLocations().subscribe((data) => this.cryoLocations.set(data));
+    this.labService.getStats().subscribe((data) => this.stats.set(data));
+    this.labService.getActiveCycles().subscribe((data) => this.activeCycles.set(data));
+    this.labService.getDoctors().subscribe((data) => this.doctors.set(data));
+    this.labService
+      .getEmbryoReport(this.currentDate)
+      .subscribe((data) => this.embryoReport.set(data));
   }
 
   changeDay(days: number) {
     const newDate = new Date(this.currentDate);
     newDate.setDate(newDate.getDate() + days);
     this.currentDate = newDate;
-    this.labService.getSchedule(this.currentDate).subscribe(data => this.schedule.set(data));
+    this.labService.getSchedule(this.currentDate).subscribe((data) => this.schedule.set(data));
   }
 
   goToday() {
     this.currentDate = new Date();
-    this.labService.getSchedule(this.currentDate).subscribe(data => this.schedule.set(data));
+    this.labService.getSchedule(this.currentDate).subscribe((data) => this.schedule.set(data));
   }
 
   // --- Event Handlers ---
@@ -99,7 +110,10 @@ export class LabDashboardComponent implements OnInit {
         alert(isEdit ? 'Đã cập nhật phôi thành công' : 'Đã thêm phôi thành công');
         this.refreshData();
       },
-      error: (err) => alert(`Lỗi khi ${isEdit ? 'cập nhật' : 'thêm'} phôi: ` + (err.error?.detail || err.message))
+      error: (err) =>
+        alert(
+          `Lỗi khi ${isEdit ? 'cập nhật' : 'thêm'} phôi: ` + (err.error?.detail || err.message),
+        ),
     });
   }
 
@@ -109,7 +123,7 @@ export class LabDashboardComponent implements OnInit {
         alert('Đã xóa phôi thành công');
         this.refreshData();
       },
-      error: (err) => alert('Lỗi khi xóa phôi: ' + (err.error?.detail || err.message))
+      error: (err) => alert('Lỗi khi xóa phôi: ' + (err.error?.detail || err.message)),
     });
   }
 
@@ -119,7 +133,7 @@ export class LabDashboardComponent implements OnInit {
         alert('Đã lên lịch thủ thuật thành công');
         this.refreshData();
       },
-      error: (err) => alert('Lỗi khi lên lịch: ' + (err.error?.detail || err.message))
+      error: (err) => alert('Lỗi khi lên lịch: ' + (err.error?.detail || err.message)),
     });
   }
 
@@ -136,7 +150,7 @@ export class LabDashboardComponent implements OnInit {
         alert(`Bắt đầu thực hiện cho ${q.patientName}`);
         this.refreshData(); // Refresh queue to show updated status
       },
-      error: (err) => alert('Lỗi khi bắt đầu thực hiện: ' + (err.error?.detail || err.message))
+      error: (err) => alert('Lỗi khi bắt đầu thực hiện: ' + (err.error?.detail || err.message)),
     });
   }
 
@@ -144,7 +158,7 @@ export class LabDashboardComponent implements OnInit {
     if (confirm(`Bỏ qua bệnh nhân ${q.patientName}?`)) {
       this.labService.skipTicket(q.id).subscribe({
         next: () => this.refreshData(),
-        error: (err) => alert('Lỗi: ' + (err.error?.detail || err.message))
+        error: (err) => alert('Lỗi: ' + (err.error?.detail || err.message)),
       });
     }
   }
@@ -158,7 +172,7 @@ export class LabDashboardComponent implements OnInit {
     this.labService.toggleScheduleStatus(item).subscribe(() => {
       // Optimistic update or refresh
       item.status = item.status === 'done' ? 'pending' : 'done';
-      this.schedule.update(s => [...s]);
+      this.schedule.update((s) => [...s]);
     });
   }
 
@@ -169,10 +183,14 @@ export class LabDashboardComponent implements OnInit {
   }
 
   onUpdateCryoLocation(location: any) {
-    this.labService.updateCryoLocation(location.tank, { used: location.used, specimenType: location.specimenType })
+    this.labService
+      .updateCryoLocation(location.tank, {
+        used: location.used,
+        specimenType: location.specimenType,
+      })
       .subscribe({
         next: () => this.refreshData(),
-        error: (err) => alert('Lỗi cập nhật: ' + (err.error?.detail || err.message))
+        error: (err) => alert('Lỗi cập nhật: ' + (err.error?.detail || err.message)),
       });
   }
 
@@ -181,7 +199,7 @@ export class LabDashboardComponent implements OnInit {
       next: () => {
         this.refreshData();
       },
-      error: (err) => alert('Không thể xóa tủ: ' + (err.error?.detail || err.message))
+      error: (err) => alert('Không thể xóa tủ: ' + (err.error?.detail || err.message)),
     });
   }
 

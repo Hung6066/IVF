@@ -1,0 +1,117 @@
+<div class="modal-overlay" (click)="close()">
+  <div class="modal-content modal-lg" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>Chi tiet don thuoc</h3>
+      <button class="close-btn" (click)="close()">&times;</button>
+    </div>
+
+    <div class="modal-body">
+      <!-- Prescription Info -->
+      <div class="rx-info-grid">
+        <div class="info-item">
+          <strong>Benh nhan:</strong>
+          <span>{{ prescription.patientName }} ({{ prescription.patientCode }})</span>
+        </div>
+        <div class="info-item">
+          <strong>Bac si ke don:</strong>
+          <span>{{ prescription.doctorName }}</span>
+        </div>
+        <div class="info-item">
+          <strong>Ngay ke:</strong>
+          <span>{{ prescription.prescriptionDate | date:'dd/MM/yyyy' }}</span>
+        </div>
+        <div class="info-item">
+          <strong>Trang thai:</strong>
+          <span [class]="getStatusClass(prescription.status)">{{ getStatusLabel(prescription.status) }}</span>
+        </div>
+      </div>
+
+      <!-- Items Table -->
+      <h4 class="section-title">Danh sach thuoc ({{ prescription.items.length }})</h4>
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Thuoc</th>
+              <th>Lieu dung</th>
+              <th>Tan suat</th>
+              <th>Thoi gian</th>
+              <th>So luong</th>
+              <th>Ton kho</th>
+              <th>Thay the</th>
+              @if (prescription.status !== 'Dispensed') {
+              <th class="text-center">Da phat</th>
+              }
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of dispenseRows; track row.item.id) {
+            <tr [class.out-of-stock]="!row.inStock">
+              <td>
+                <div class="drug-name">{{ row.item.drugName }}</div>
+                @if (row.item.drugCode) {
+                <div class="drug-code">{{ row.item.drugCode }}</div>
+                }
+              </td>
+              <td>{{ row.item.dosage || '---' }}</td>
+              <td>{{ row.item.frequency || '---' }}</td>
+              <td>{{ row.item.duration || '---' }}</td>
+              <td class="qty-cell">{{ row.item.quantity }}</td>
+              <td>
+                @if (prescription.status !== 'Dispensed') {
+                <button type="button" class="stock-btn" [class.no-stock]="!row.inStock"
+                  (click)="toggleOutOfStock(row)">
+                  {{ row.inStock ? 'Co' : 'Het' }}
+                </button>
+                } @else {
+                <span>---</span>
+                }
+              </td>
+              <td>
+                @if (prescription.status !== 'Dispensed') {
+                <input type="text" class="form-control form-control-sm"
+                  [(ngModel)]="row.substituteNote" [name]="'sub_' + row.item.id"
+                  placeholder="Thuoc thay the..." [disabled]="row.inStock" />
+                } @else {
+                <span>---</span>
+                }
+              </td>
+              @if (prescription.status !== 'Dispensed') {
+              <td class="text-center">
+                <input type="checkbox" [checked]="row.dispensed" (change)="toggleDispensed(row)"
+                  [disabled]="!row.inStock" />
+              </td>
+              }
+            </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      @if (prescription.notes) {
+      <div class="rx-notes">
+        <strong>Ghi chu bac si:</strong>
+        <p>{{ prescription.notes }}</p>
+      </div>
+      }
+
+      <!-- Patient Instructions (only when not yet dispensed) -->
+      @if (prescription.status !== 'Dispensed') {
+      <div class="form-group">
+        <label class="form-label">Huong dan cho benh nhan</label>
+        <textarea class="form-control" [(ngModel)]="patientInstructions" name="instructions"
+          rows="2" placeholder="Huong dan su dung thuoc, luu y dac biet..."></textarea>
+      </div>
+      }
+    </div>
+
+    <div class="modal-footer">
+      @if (prescription.status !== 'Dispensed' && prescription.status !== 'Cancelled') {
+      <button class="btn btn-primary" (click)="onDispense()" [disabled]="saving()">
+        {{ saving() ? 'Dang xu ly...' : 'Xac nhan phat thuoc' }}
+      </button>
+      }
+      <button class="btn btn-secondary" (click)="close()">Dong</button>
+    </div>
+  </div>
+</div>

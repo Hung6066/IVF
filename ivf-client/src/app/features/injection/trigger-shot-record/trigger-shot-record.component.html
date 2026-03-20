@@ -1,0 +1,114 @@
+<div class="p-6 max-w-3xl mx-auto">
+  <div class="flex items-center gap-3 mb-6">
+    <button (click)="back()" class="text-gray-500 hover:text-gray-800">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+      </svg>
+    </button>
+    <h1 class="text-xl font-semibold text-gray-800">Ghi nhận Trigger Shot</h1>
+  </div>
+
+  @if (error()) {
+    <div class="bg-red-50 border border-red-200 text-red-700 rounded-lg p-4 mb-4">
+      {{ error() }}
+    </div>
+  }
+  @if (successMsg()) {
+    <div class="bg-green-50 border border-green-200 text-green-700 rounded-lg p-4 mb-4">
+      {{ successMsg() }}
+    </div>
+  }
+
+  <form (ngSubmit)="save()" class="space-y-4">
+    <div class="bg-white border rounded-lg p-5 space-y-4">
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Mã BN *</label>
+          <input
+            type="text"
+            [(ngModel)]="form.patientId"
+            name="patientId"
+            required
+            class="w-full border rounded-lg px-3 py-2"
+          />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Mã CK</label>
+          <app-cycle-search
+            [(ngModel)]="form.cycleId"
+            name="cycleId"
+            [patientId]="form.patientId || null"
+            placeholder="Tìm mã chu kỳ..."
+          ></app-cycle-search>
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Thuốc trigger *</label>
+          <input
+            type="text"
+            [(ngModel)]="form.medicationName"
+            name="med"
+            required
+            placeholder="VD: Ovitrelle, Decapeptyl"
+            class="w-full border rounded-lg px-3 py-2"
+          />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Liều</label>
+          <input
+            type="text"
+            [(ngModel)]="form.dosage"
+            name="dosage"
+            placeholder="VD: 250mcg"
+            class="w-full border rounded-lg px-3 py-2"
+          />
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Ngày tiêm</label>
+          <input
+            type="date"
+            [(ngModel)]="triggerDate"
+            name="tDate"
+            (ngModelChange)="calcOpuTime()"
+            class="w-full border rounded-lg px-3 py-2"
+          />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Giờ tiêm</label>
+          <input
+            type="time"
+            [(ngModel)]="triggerTime"
+            name="tTime"
+            (ngModelChange)="calcOpuTime()"
+            class="w-full border rounded-lg px-3 py-2"
+          />
+        </div>
+      </div>
+    </div>
+
+    @if (estimatedOpuDate) {
+      <div class="bg-orange-50 border border-orange-200 rounded-lg p-4">
+        <p class="text-orange-800 font-medium">Dự kiến OPU (36h sau trigger):</p>
+        <p class="text-orange-700 text-lg font-semibold">
+          {{ estimatedOpuDate }} lúc {{ estimatedOpuTime }}
+        </p>
+      </div>
+    }
+
+    <div class="flex gap-3">
+      <button
+        type="submit"
+        [disabled]="saving()"
+        class="px-6 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50"
+      >
+        {{ saving() ? 'Đang lưu...' : 'Ghi nhận Trigger' }}
+      </button>
+      <button type="button" (click)="back()" class="px-6 py-2 border rounded-lg hover:bg-gray-50">
+        Hủy
+      </button>
+    </div>
+  </form>
+</div>

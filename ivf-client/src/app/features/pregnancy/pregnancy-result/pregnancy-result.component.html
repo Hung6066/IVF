@@ -1,0 +1,114 @@
+<div class="p-6 max-w-3xl mx-auto">
+  <div class="flex items-center gap-3 mb-6">
+    <a [routerLink]="['/pregnancy', cycleId, 'beta-hcg']" class="text-gray-500 hover:text-gray-700">
+      <i class="fas fa-arrow-left"></i>
+    </a>
+    <h1 class="text-2xl font-bold text-gray-800">K&#7871;t qu&#7843; thai</h1>
+  </div>
+
+  @if (loading()) {
+    <div class="text-center py-16 text-gray-400"><i class="fas fa-spinner fa-spin text-2xl"></i></div>
+  } @else if (pregnancy()) {
+    <!-- Result Card -->
+    <div class="rounded-2xl border-2 p-8 text-center mb-6"
+      [ngClass]="pregnancy()!.isPregnant
+        ? 'border-green-300 bg-green-50'
+        : 'border-red-200 bg-red-50'">
+      <div class="text-5xl mb-3">
+        @if (pregnancy()!.isPregnant) {
+          <i class="fas fa-baby text-green-500"></i>
+        } @else {
+          <i class="fas fa-times-circle text-red-400"></i>
+        }
+      </div>
+      <div class="text-3xl font-bold mb-2"
+        [ngClass]="pregnancy()!.isPregnant ? 'text-green-700' : 'text-red-600'">
+        {{ pregnancy()!.isPregnant ? 'C\u00f3 thai' : 'Kh\u00f4ng c\u00f3 thai' }}
+      </div>
+      <div class="text-sm text-gray-500">{{ pregnancy()!.pregnancyStatus }}</div>
+    </div>
+
+    <!-- Details -->
+    <div class="bg-white rounded-xl border border-gray-200 p-6 mb-6">
+      <h3 class="font-semibold text-gray-700 mb-4">Th\u00f4ng tin chi ti\u1ebft</h3>
+      <div class="grid grid-cols-2 gap-4 text-sm">
+        <div>
+          <span class="text-gray-500">Beta HCG:</span>
+          <strong class="ml-2">{{ pregnancy()!.betaHcg ?? '\u2014' }} mIU/mL</strong>
+        </div>
+        <div>
+          <span class="text-gray-500">Ng\u00e0y x\u00e9t nghi\u1ec7m:</span>
+          <strong class="ml-2">{{ formatDate(pregnancy()!.betaHcgDate) }}</strong>
+        </div>
+        @if (pregnancy()!.isPregnant) {
+          <div>
+            <span class="text-gray-500">S\u1ed1 t\u00fai thai:</span>
+            <strong class="ml-2">{{ pregnancy()!.gestationalSacs ?? '\u2014' }}</strong>
+          </div>
+          <div>
+            <span class="text-gray-500">Tim thai:</span>
+            <strong class="ml-2">{{ pregnancy()!.fetalHeartbeats ?? '\u2014' }}</strong>
+          </div>
+          <div>
+            <span class="text-gray-500">D\u1ef1 ki\u1ebfn sinh:</span>
+            <strong class="ml-2">{{ formatDate(pregnancy()!.dueDate) }}</strong>
+          </div>
+        }
+        @if (pregnancy()!.notes) {
+          <div class="col-span-2">
+            <span class="text-gray-500">Ghi ch\u00fa:</span>
+            <span class="ml-2">{{ pregnancy()!.notes }}</span>
+          </div>
+        }
+      </div>
+    </div>
+
+    <!-- Follow-Up Schedule (positive only) -->
+    @if (pregnancy()!.isPregnant && followUp().length > 0) {
+      <div class="bg-white rounded-xl border border-gray-200 p-6 mb-6">
+        <h3 class="font-semibold text-gray-700 mb-4">L\u1ecbch theo d\u00f5i</h3>
+        <div class="space-y-3">
+          @for (item of followUp(); track item.scheduledDate) {
+            <div class="flex items-center gap-3 p-3 rounded-lg"
+              [ngClass]="item.isCompleted ? 'bg-green-50' : 'bg-gray-50'">
+              <i class="fas"
+                [ngClass]="item.isCompleted ? 'fa-check-circle text-green-500' : 'fa-clock text-gray-400'"></i>
+              <div class="flex-1">
+                <div class="font-medium text-sm">{{ item.visitType }}</div>
+                <div class="text-xs text-gray-500">{{ item.description }}</div>
+              </div>
+              <div class="text-sm text-gray-600">{{ formatDate(item.scheduledDate) }}</div>
+            </div>
+          }
+        </div>
+      </div>
+    }
+
+    <!-- Action Buttons -->
+    <div class="flex flex-wrap gap-3">
+      <a [routerLink]="['/pregnancy', cycleId, 'beta-hcg']"
+        class="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">
+        <i class="fas fa-vial"></i> Beta HCG
+      </a>
+      @if (pregnancy()!.isPregnant) {
+        <a [routerLink]="['/pregnancy', cycleId, 'prenatal']"
+          class="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700">
+          <i class="fas fa-baby"></i> Kh\u00e1m 7 tu\u1ea7n
+        </a>
+        <a [routerLink]="['/pregnancy', cycleId, 'discharge']"
+          class="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg text-sm hover:bg-gray-700">
+          <i class="fas fa-sign-out-alt"></i> Xu\u1ea5t vi\u1ec7n
+        </a>
+      }
+    </div>
+  } @else {
+    <div class="text-center py-16 text-gray-400">
+      <i class="fas fa-file-medical text-4xl mb-3"></i>
+      <p>Ch\u01b0a c\u00f3 k\u1ebft qu\u1ea3 thai cho chu k\u1ef3 n\u00e0y.</p>
+      <a [routerLink]="['/pregnancy', cycleId, 'beta-hcg']"
+        class="inline-block mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">
+        Ghi nh\u1eadn Beta HCG
+      </a>
+    </div>
+  }
+</div>

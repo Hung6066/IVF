@@ -1,0 +1,86 @@
+<div class="modal-overlay" (click)="close()">
+  <div class="modal-content modal-lg" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>Nhap ket qua xet nghiem</h3>
+      <button class="close-btn" (click)="close()">&times;</button>
+    </div>
+
+    <form (ngSubmit)="onSubmit()">
+      <div class="modal-body">
+        <!-- Order Info -->
+        <div class="order-info-grid">
+          <div class="info-item">
+            <strong>Benh nhan:</strong>
+            <span>{{ order.patientName }} ({{ order.patientCode }})</span>
+          </div>
+          <div class="info-item">
+            <strong>Loai XN:</strong>
+            <span>{{ order.orderType }}</span>
+          </div>
+          <div class="info-item">
+            <strong>BS chi dinh:</strong>
+            <span>{{ order.orderedByName }}</span>
+          </div>
+          <div class="info-item">
+            <strong>Ngay chi dinh:</strong>
+            <span>{{ order.orderedAt | date:'dd/MM/yyyy HH:mm' }}</span>
+          </div>
+        </div>
+
+        <!-- Result Entry Table -->
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Ma XN</th>
+                <th>Ten xet nghiem</th>
+                <th>Ket qua *</th>
+                <th>Don vi</th>
+                <th>Gia tri TK</th>
+                <th>Bat thuong</th>
+                <th>Ghi chu</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of resultRows; track row.testId) {
+              <tr [class.abnormal-row]="row.isAbnormal">
+                <td class="code-cell">{{ row.testCode }}</td>
+                <td>{{ row.testName }}</td>
+                <td>
+                  <input type="text" class="form-control form-control-sm"
+                    [(ngModel)]="row.resultValue" [name]="'val_' + row.testId"
+                    placeholder="Nhap ket qua" />
+                </td>
+                <td>
+                  <input type="text" class="form-control form-control-sm"
+                    [(ngModel)]="row.resultUnit" [name]="'unit_' + row.testId"
+                    placeholder="VD: mmol/L" />
+                </td>
+                <td class="ref-range">{{ row.referenceRange || '---' }}</td>
+                <td class="text-center">
+                  <button type="button" class="flag-btn" [class.flagged]="row.isAbnormal"
+                    (click)="toggleAbnormal(row)" [title]="row.isAbnormal ? 'Bo co bat thuong' : 'Danh dau bat thuong'">
+                    {{ row.isAbnormal ? '!!!' : '---' }}
+                  </button>
+                </td>
+                <td>
+                  <input type="text" class="form-control form-control-sm"
+                    [(ngModel)]="row.notes" [name]="'note_' + row.testId"
+                    placeholder="Ghi chu" />
+                </td>
+              </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" (click)="close()">Huy</button>
+        <button type="submit" class="btn btn-primary" [disabled]="saving()">
+          {{ saving() ? 'Dang luu...' : 'Luu ket qua' }}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>

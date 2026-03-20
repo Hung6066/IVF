@@ -1,0 +1,55 @@
+<div class="p-6">
+  <div class="flex justify-between items-center mb-6">
+    <h1 class="text-xl font-semibold text-gray-800">Quản lý Consent</h1>
+    <button (click)="create()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">+ Tạo mới</button>
+  </div>
+
+  <div class="flex gap-3 mb-4">
+    <input type="text" [(ngModel)]="searchQuery" (ngModelChange)="applyFilters()" placeholder="Tìm bệnh nhân, tiêu đề..."
+      class="flex-1 border rounded-lg px-3 py-2" />
+    <select [(ngModel)]="filterType" (ngModelChange)="applyFilters()" class="border rounded-lg px-3 py-2">
+      <option value="">Tất cả loại</option>
+      <option value="OPU">Chọc hút</option>
+      <option value="IUI">IUI</option>
+      <option value="Anesthesia">Tiền mê</option>
+      <option value="EggDonation">Cho trứng</option>
+      <option value="FET">FET</option>
+      <option value="General">Chung</option>
+    </select>
+    <select [(ngModel)]="filterStatus" (ngModelChange)="applyFilters()" class="border rounded-lg px-3 py-2">
+      <option value="">Tất cả TT</option>
+      <option value="signed">Đã ký</option>
+      <option value="unsigned">Chưa ký</option>
+      <option value="revoked">Đã thu hồi</option>
+    </select>
+  </div>
+
+  @if (loading()) {
+    <div class="flex justify-center py-12"><div class="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full"></div></div>
+  } @else {
+    <div class="bg-white border rounded-lg overflow-hidden">
+      <table class="w-full text-sm">
+        <thead><tr class="bg-gray-50 border-b">
+          <th class="text-left py-3 px-4 font-medium text-gray-700">Bệnh nhân</th>
+          <th class="text-left py-3 px-4 font-medium text-gray-700">Tiêu đề</th>
+          <th class="text-left py-3 px-4 font-medium text-gray-700">Loại</th>
+          <th class="text-left py-3 px-4 font-medium text-gray-700">Trạng thái</th>
+          <th class="text-left py-3 px-4 font-medium text-gray-700">Ngày tạo</th>
+        </tr></thead>
+        <tbody>
+          @for (c of filtered(); track c.id) {
+            <tr class="border-b hover:bg-gray-50 cursor-pointer" (click)="openDetail(c.id)">
+              <td class="py-3 px-4 font-medium">{{ c.patientName }}</td>
+              <td class="py-3 px-4">{{ c.title }}</td>
+              <td class="py-3 px-4">{{ typeLabel(c.consentType) }}</td>
+              <td class="py-3 px-4"><span class="px-2 py-1 rounded-full text-xs" [class]="statusClass(c)">{{ statusLabel(c) }}</span></td>
+              <td class="py-3 px-4 text-gray-500">{{ formatDate(c.createdAt) }}</td>
+            </tr>
+          } @empty {
+            <tr><td colspan="5" class="py-8 text-center text-gray-500">Không có consent form nào</td></tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</div>

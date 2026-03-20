@@ -82,6 +82,19 @@
 
   <!-- Summary Cards -->
   <div class="summary-grid">
+    <!-- Quick Links -->
+    <section class="summary-card card">
+      <h3>🔗 Liên kết nhanh</h3>
+      <div class="summary-list">
+        <a [routerLink]="['/stimulation', cycleId()]" class="quick-link">💉 KTBT chi tiết →</a>
+        <a [routerLink]="['/procedure']" class="quick-link">🔬 Thủ thuật →</a>
+        <a [routerLink]="['/cycle-fees', cycleId()]" class="quick-link">💰 Chi phí chu kỳ →</a>
+        <a [routerLink]="['/pregnancy', cycleId(), 'beta-hcg']" class="quick-link">🤰 Thai kỳ →</a>
+        <a routerLink="/fet" class="quick-link">❄️ FET →</a>
+        <a routerLink="/consent" class="quick-link">📋 Đồng thuận →</a>
+      </div>
+    </section>
+
     <!-- Ultrasounds -->
     <section class="summary-card card">
       <h3>🔬 Siêu âm ({{ ultrasounds().length }})</h3>

@@ -1,0 +1,223 @@
+<div class="min-h-screen bg-gray-50 p-6">
+  <div class="max-w-3xl mx-auto">
+    <div class="flex items-center gap-3 mb-6">
+      <button (click)="back()" class="text-gray-500 hover:text-gray-700">
+        <i class="fas fa-arrow-left"></i>
+      </button>
+      <h1 class="text-2xl font-bold text-gray-800">Phân Tích Tinh Dịch Đồ</h1>
+    </div>
+
+    @if (error()) {
+      <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4">
+        {{ error() }}
+      </div>
+    }
+    @if (success()) {
+      <div class="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg mb-4">
+        {{ success() }}
+      </div>
+    }
+
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-6">
+      <!-- Thông tin BN -->
+      <div>
+        <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
+          Thông tin bệnh nhân
+        </h2>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1"
+              >Bệnh nhân <span class="text-red-500">*</span></label
+            >
+            <app-patient-search
+              [(ngModel)]="form.patientId"
+              name="patientId"
+              [genderFilter]="'Male'"
+              placeholder="Tìm tên, mã BN, SĐT..."
+            ></app-patient-search>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Mã chu kỳ</label>
+            <app-cycle-search
+              [(ngModel)]="form.cycleId"
+              name="cycleId"
+              [patientId]="form.patientId || null"
+              placeholder="Tìm mã chu kỳ..."
+            ></app-cycle-search>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Ngày phân tích</label>
+            <input
+              type="date"
+              [(ngModel)]="form.analysisDate"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- Đặc điểm đại thể -->
+      <div>
+        <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
+          Đặc điểm đại thể
+        </h2>
+        <div class="grid grid-cols-3 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Thể tích (ml)</label>
+            <input
+              type="number"
+              [(ngModel)]="form.volume"
+              step="0.1"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              placeholder="1.5–5.0"
+            />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Màu sắc</label>
+            <select
+              [(ngModel)]="form.appearance"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            >
+              @for (opt of appearanceOptions; track opt) {
+                <option>{{ opt }}</option>
+              }
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Liquefied</label>
+            <select
+              [(ngModel)]="form.liquefaction"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            >
+              @for (opt of liquefactionOptions; track opt) {
+                <option>{{ opt }}</option>
+              }
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">pH</label>
+            <input
+              type="number"
+              [(ngModel)]="form.ph"
+              step="0.1"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              placeholder="7.2–8.0"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- Vi thể -->
+      <div>
+        <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
+          Vi thể (WHO 2021)
+        </h2>
+        <div class="grid grid-cols-3 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Mật độ (×10⁶/ml)</label>
+            <input
+              type="number"
+              [(ngModel)]="form.concentration"
+              step="0.1"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              placeholder="≥16"
+            />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1"
+              >Tổng số tinh trùng (×10⁶)</label
+            >
+            <input
+              type="number"
+              [(ngModel)]="form.totalCount"
+              step="0.1"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              placeholder="≥39"
+            />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1"
+              >Di động tiến tới (PR%)</label
+            >
+            <input
+              type="number"
+              [(ngModel)]="form.progressiveMotility"
+              step="0.1"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              placeholder="≥30"
+            />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1"
+              >Di động không tiến (NP%)</label
+            >
+            <input
+              type="number"
+              [(ngModel)]="form.nonProgressiveMotility"
+              step="0.1"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Không di động (IM%)</label>
+            <input
+              type="number"
+              [(ngModel)]="form.immotile"
+              step="0.1"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1"
+              >Hình dạng bình thường (%)</label
+            >
+            <input
+              type="number"
+              [(ngModel)]="form.normalMorphology"
+              step="0.1"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              placeholder="≥4"
+            />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Sống (%)</label>
+            <input
+              type="number"
+              [(ngModel)]="form.vitality"
+              step="0.1"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              placeholder="≥54"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- Ghi chú -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Ghi chú</label>
+        <textarea
+          [(ngModel)]="form.notes"
+          rows="3"
+          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+          placeholder="Nhận xét thêm..."
+        ></textarea>
+      </div>
+
+      <div class="flex justify-end gap-3 pt-2">
+        <button
+          (click)="back()"
+          class="px-4 py-2 text-sm border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+        >
+          Hủy
+        </button>
+        <button
+          (click)="save()"
+          [disabled]="saving()"
+          class="px-6 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+        >
+          {{ saving() ? 'Đang lưu...' : 'Lưu kết quả' }}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

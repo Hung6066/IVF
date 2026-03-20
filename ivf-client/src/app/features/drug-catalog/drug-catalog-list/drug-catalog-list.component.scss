@@ -1,0 +1,172 @@
+:host {
+  display: block;
+  min-height: 100%;
+  background: #f8fafc;
+}
+
+// Table container
+.bg-white {
+  &.rounded-xl {
+    transition: box-shadow 0.2s ease;
+
+    &:hover {
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+    }
+  }
+}
+
+// Table enhancements
+table {
+  thead th {
+    white-space: nowrap;
+    user-select: none;
+  }
+
+  tbody tr {
+    transition: background-color 0.15s ease;
+  }
+
+  .font-mono {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 0.8125rem;
+    letter-spacing: -0.02em;
+  }
+}
+
+// Overflow scroll for table
+.overflow-hidden {
+  overflow-x: auto;
+
+  &::-webkit-scrollbar {
+    height: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: #f1f5f9;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+
+    &:hover {
+      background: #94a3b8;
+    }
+  }
+}
+
+// Search bar inputs
+input,
+select {
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+
+  &:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+}
+
+// Pagination buttons
+button {
+  &[disabled] {
+    cursor: not-allowed;
+  }
+
+  &:not([disabled]) {
+    transition: all 0.15s ease;
+  }
+}
+
+// Modal overlay
+.fixed.inset-0 {
+  animation: fadeIn 0.2s ease;
+
+  .bg-white.rounded-xl {
+    animation: slideUp 0.25s ease;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+// Modal form inputs
+.space-y-3 {
+  label {
+    user-select: none;
+  }
+
+  textarea {
+    resize: vertical;
+    min-height: 60px;
+
+    &:focus {
+      outline: none;
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+  }
+}
+
+// Status badge animation
+span.rounded-full {
+  transition: all 0.2s ease;
+}
+
+// Responsive
+@media (max-width: 768px) {
+  :host {
+    .p-6 {
+      padding: 1rem;
+    }
+
+    .flex.gap-3.mb-5 {
+      flex-direction: column;
+
+      input,
+      select {
+        width: 100%;
+      }
+    }
+
+    table {
+      font-size: 0.75rem;
+
+      th,
+      td {
+        padding: 0.5rem;
+      }
+    }
+  }
+}
+
+@media print {
+  button,
+  .flex.gap-3.mb-5 {
+    display: none !important;
+  }
+
+  .bg-white.rounded-xl {
+    box-shadow: none;
+    border: 1px solid #e2e8f0;
+  }
+}

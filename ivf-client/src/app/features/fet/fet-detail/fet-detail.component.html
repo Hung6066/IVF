@@ -1,0 +1,376 @@
+<div class="p-6">
+  <!-- Header -->
+  <div class="flex items-center justify-between mb-6">
+    <div class="flex items-center gap-3">
+      <button routerLink="/fet" class="text-gray-500 hover:text-gray-700">
+        <i class="fas fa-arrow-left"></i>
+      </button>
+      <h1 class="text-2xl font-bold text-gray-800">Chi tiết FET Protocol</h1>
+      @if (protocol()) {
+        <span
+          class="px-3 py-1 rounded-full text-sm font-medium"
+          [ngClass]="{
+            'bg-blue-100 text-blue-700': protocol()!.status === 'Active',
+            'bg-green-100 text-green-700': protocol()!.status === 'Transferred',
+            'bg-gray-100 text-gray-600':
+              protocol()!.status === 'Cancelled' || protocol()!.status === 'Scheduled',
+          }"
+        >
+          {{ protocol()!.status }}
+        </span>
+      }
+    </div>
+    @if (protocol() && protocol()!.status === 'Active') {
+      <button
+        (click)="markTransferred()"
+        [disabled]="saving()"
+        class="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+      >
+        <i class="fas fa-check-circle"></i> Xác nhận chuyển phôi
+      </button>
+    }
+  </div>
+
+  @if (error()) {
+    <div class="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg">
+      {{ error() }}
+    </div>
+  }
+  @if (successMsg()) {
+    <div class="mb-4 p-3 bg-green-50 border border-green-200 text-green-700 rounded-lg">
+      {{ successMsg() }}
+    </div>
+  }
+
+  @if (loading()) {
+    <div class="text-center py-20 text-gray-500">
+      <i class="fas fa-spinner fa-spin text-2xl"></i>
+    </div>
+  } @else if (protocol()) {
+    <!-- Tabs -->
+    <div class="border-b border-gray-200 mb-6">
+      <nav class="flex gap-6">
+        @for (
+          tab of [
+            ['overview', 'Tổng quan'],
+            ['hormones', 'Hormone'],
+            ['endometrium', 'Nội mạc'],
+            ['embryo', 'Phôi & Chuyển phôi'],
+          ];
+          track tab[0]
+        ) {
+          <button
+            (click)="activeTab = tab[0]"
+            class="pb-3 text-sm font-medium border-b-2 transition-colors"
+            [ngClass]="
+              activeTab === tab[0]
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            "
+          >
+            {{ tab[1] }}
+          </button>
+        }
+      </nav>
+    </div>
+
+    <!-- Overview Tab -->
+    @if (activeTab === 'overview') {
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="bg-white rounded-xl border border-gray-200 p-5">
+          <h3 class="font-semibold text-gray-700 mb-4">Thông tin cơ bản</h3>
+          <dl class="space-y-3 text-sm">
+            <div class="flex justify-between">
+              <dt class="text-gray-500">ID Protocol</dt>
+              <dd class="font-medium">{{ protocol()!.id.slice(0, 8) }}...</dd>
+            </div>
+            <div class="flex justify-between">
+              <dt class="text-gray-500">Phác đồ chuẩn bị</dt>
+              <dd class="font-medium">{{ protocol()!.prepType }}</dd>
+            </div>
+            <div class="flex justify-between">
+              <dt class="text-gray-500">Ngày bắt đầu</dt>
+              <dd>{{ formatDate(protocol()!.startDate) }}</dd>
+            </div>
+            <div class="flex justify-between">
+              <dt class="text-gray-500">Ngày kinh (D{{ protocol()!.cycleDay }})</dt>
+              <dd>{{ protocol()!.cycleDay }}</dd>
+            </div>
+            <div class="flex justify-between">
+              <dt class="text-gray-500">Tạo lúc</dt>
+              <dd>{{ formatDate(protocol()!.createdAt) }}</dd>
+            </div>
+          </dl>
+        </div>
+        <div class="bg-white rounded-xl border border-gray-200 p-5">
+          <h3 class="font-semibold text-gray-700 mb-4">Ghi chú</h3>
+          <p class="text-sm text-gray-600">{{ protocol()!.notes || 'Không có ghi chú' }}</p>
+        </div>
+      </div>
+    }
+
+    <!-- Hormone Tab -->
+    @if (activeTab === 'hormones') {
+      <div class="bg-white rounded-xl border border-gray-200 p-5">
+        <h3 class="font-semibold text-gray-700 mb-4">Phác đồ hormone</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <h4 class="text-sm font-medium text-gray-500 mb-3">Estrogen</h4>
+            <dl class="space-y-2 text-sm">
+              <div class="flex justify-between">
+                <dt class="text-gray-500">Thuốc</dt>
+                <dd>{{ protocol()!.estrogenDrug || '—' }}</dd>
+              </div>
+              <div class="flex justify-between">
+                <dt class="text-gray-500">Liều</dt>
+                <dd>{{ protocol()!.estrogenDose || '—' }}</dd>
+              </div>
+              <div class="flex justify-between">
+                <dt class="text-gray-500">Ngày bắt đầu</dt>
+                <dd>{{ formatDate(protocol()!.estrogenStartDate) }}</dd>
+              </div>
+            </dl>
+          </div>
+          <div>
+            <h4 class="text-sm font-medium text-gray-500 mb-3">Progesterone</h4>
+            <dl class="space-y-2 text-sm">
+              <div class="flex justify-between">
+                <dt class="text-gray-500">Thuốc</dt>
+                <dd>{{ protocol()!.progesteroneDrug || '—' }}</dd>
+              </div>
+              <div class="flex justify-between">
+                <dt class="text-gray-500">Liều</dt>
+                <dd>{{ protocol()!.progesteroneDose || '—' }}</dd>
+              </div>
+              <div class="flex justify-between">
+                <dt class="text-gray-500">Ngày bắt đầu</dt>
+                <dd>{{ formatDate(protocol()!.progesteroneStartDate) }}</dd>
+              </div>
+            </dl>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- Endometrium Tab -->
+    @if (activeTab === 'endometrium') {
+      <div class="space-y-4">
+        <div class="bg-white rounded-xl border border-gray-200 p-5">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="font-semibold text-gray-700">Siêu âm nội mạc</h3>
+            <button
+              (click)="showEndoForm = !showEndoForm"
+              class="text-sm px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              <i class="fas fa-plus mr-1"></i> Ghi nhận
+            </button>
+          </div>
+          <dl class="grid grid-cols-3 gap-4 text-sm">
+            <div class="text-center p-3 bg-gray-50 rounded-lg">
+              <div class="text-2xl font-bold text-blue-600">
+                {{ protocol()!.endometriumThickness ?? '—' }}
+              </div>
+              <div class="text-gray-500 mt-1">Độ dày (mm)</div>
+            </div>
+            <div class="text-center p-3 bg-gray-50 rounded-lg">
+              <div class="text-lg font-semibold text-gray-700">
+                {{ protocol()!.endometriumPattern || '—' }}
+              </div>
+              <div class="text-gray-500 mt-1">Hình thái</div>
+            </div>
+            <div class="text-center p-3 bg-gray-50 rounded-lg">
+              <div class="text-lg font-semibold text-gray-700">
+                {{ formatDate(protocol()!.endometriumCheckDate) }}
+              </div>
+              <div class="text-gray-500 mt-1">Ngày SA</div>
+            </div>
+          </dl>
+        </div>
+
+        @if (showEndoForm) {
+          <div class="bg-blue-50 border border-blue-200 rounded-xl p-5">
+            <h4 class="font-medium text-blue-800 mb-4">Ghi nhận SA nội mạc</h4>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Độ dày (mm) *</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  [(ngModel)]="endoForm.thickness"
+                  class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Hình thái</label>
+                <select
+                  [(ngModel)]="endoForm.pattern"
+                  class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="">Chọn...</option>
+                  <option>Triple line (type A)</option>
+                  <option>Intermediate (type B)</option>
+                  <option>Homogeneous (type C)</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Ngày SA *</label>
+                <input
+                  type="date"
+                  [(ngModel)]="endoForm.checkDate"
+                  class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+            </div>
+            <div class="flex justify-end gap-3 mt-4">
+              <button
+                (click)="showEndoForm = false"
+                class="px-4 py-2 text-gray-600 hover:text-gray-800 text-sm"
+              >
+                Huỷ
+              </button>
+              <button
+                (click)="saveEndometrium()"
+                [disabled]="saving()"
+                class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50"
+              >
+                Lưu
+              </button>
+            </div>
+          </div>
+        }
+      </div>
+    }
+
+    <!-- Embryo Tab -->
+    @if (activeTab === 'embryo') {
+      <div class="space-y-4">
+        <div class="bg-white rounded-xl border border-gray-200 p-5">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="font-semibold text-gray-700">Rã đông phôi</h3>
+            <button
+              (click)="showThawForm = !showThawForm"
+              class="text-sm px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              <i class="fas fa-plus mr-1"></i> Cập nhật
+            </button>
+          </div>
+          <dl class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div class="text-center p-3 bg-gray-50 rounded-lg">
+              <div class="text-2xl font-bold text-blue-600">{{ protocol()!.embryosToThaw }}</div>
+              <div class="text-gray-500 mt-1">Phôi rã</div>
+            </div>
+            <div class="text-center p-3 bg-gray-50 rounded-lg">
+              <div class="text-2xl font-bold text-green-600">{{ protocol()!.embryosSurvived }}</div>
+              <div class="text-gray-500 mt-1">Sống sót</div>
+            </div>
+            <div class="text-center p-3 bg-gray-50 rounded-lg">
+              <div class="text-lg font-semibold text-gray-700">
+                {{ protocol()!.embryoGrade || '—' }}
+              </div>
+              <div class="text-gray-500 mt-1">Chất lượng</div>
+            </div>
+            <div class="text-center p-3 bg-gray-50 rounded-lg">
+              <div class="text-lg font-semibold text-gray-700">D{{ protocol()!.embryoAge }}</div>
+              <div class="text-gray-500 mt-1">Ngày phôi</div>
+            </div>
+          </dl>
+        </div>
+
+        <div class="bg-white rounded-xl border border-gray-200 p-5">
+          <h3 class="font-semibold text-gray-700 mb-4">Chuyển phôi</h3>
+          <dl class="grid grid-cols-2 gap-4 text-sm">
+            <div class="flex justify-between">
+              <dt class="text-gray-500">Ngày rã đông</dt>
+              <dd>{{ formatDate(protocol()!.thawDate) }}</dd>
+            </div>
+            <div class="flex justify-between">
+              <dt class="text-gray-500">Ngày chuyển dự kiến</dt>
+              <dd>{{ formatDate(protocol()!.plannedTransferDate) }}</dd>
+            </div>
+          </dl>
+          @if (protocol()!.status === 'Active') {
+            <div class="mt-4 pt-4 border-t border-gray-100">
+              <button
+                (click)="markTransferred()"
+                [disabled]="saving()"
+                class="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 text-sm"
+              >
+                <i class="fas fa-check-circle"></i> Xác nhận đã chuyển phôi
+              </button>
+            </div>
+          }
+        </div>
+
+        @if (showThawForm) {
+          <div class="bg-blue-50 border border-blue-200 rounded-xl p-5">
+            <h4 class="font-medium text-blue-800 mb-4">Cập nhật rã đông phôi</h4>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1"
+                  >Phôi đưa vào rã *</label
+                >
+                <input
+                  type="number"
+                  min="1"
+                  [(ngModel)]="thawForm.embryosToThaw"
+                  class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Phôi sống sót *</label>
+                <input
+                  type="number"
+                  min="0"
+                  [(ngModel)]="thawForm.embryosSurvived"
+                  class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Ngày rã đông *</label>
+                <input
+                  type="date"
+                  [(ngModel)]="thawForm.thawDate"
+                  class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Chất lượng phôi</label>
+                <input
+                  type="text"
+                  placeholder="vd: 4AA"
+                  [(ngModel)]="thawForm.embryoGrade"
+                  class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Ngày phôi</label>
+                <input
+                  type="number"
+                  min="3"
+                  max="6"
+                  [(ngModel)]="thawForm.embryoAge"
+                  class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                />
+              </div>
+            </div>
+            <div class="flex justify-end gap-3 mt-4">
+              <button
+                (click)="showThawForm = false"
+                class="px-4 py-2 text-gray-600 hover:text-gray-800 text-sm"
+              >
+                Huỷ
+              </button>
+              <button
+                (click)="saveThawing()"
+                [disabled]="saving()"
+                class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50"
+              >
+                Lưu
+              </button>
+            </div>
+          </div>
+        }
+      </div>
+    }
+  }
+</div>

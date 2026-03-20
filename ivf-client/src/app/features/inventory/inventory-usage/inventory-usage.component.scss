@@ -1,0 +1,153 @@
+:host {
+  display: block;
+  min-height: 100%;
+  background: #f8fafc;
+}
+
+.p-6.max-w-3xl {
+  width: 100%;
+}
+
+// Back button
+button.text-gray-500 {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  background: white;
+  border: 1.5px solid var(--border-color, #e2e8f0);
+  border-radius: 10px;
+  color: var(--text-secondary, #64748b);
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+
+  &:hover {
+    background: #f1f5f9;
+    color: var(--text-primary, #1e293b);
+    border-color: #94a3b8;
+  }
+}
+
+h1 {
+  font-size: 1.375rem;
+  font-weight: 700;
+  color: var(--text-primary, #1e293b);
+  margin: 0;
+}
+
+// Alert messages
+.bg-red-50,
+.bg-green-50 {
+  animation: slideDown 0.2s ease;
+  border-radius: 10px;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+// Form card
+form.bg-white.border.rounded-lg {
+  background: white;
+  border-radius: 16px !important;
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.06),
+    0 8px 24px rgba(0, 0, 0, 0.04);
+  border: 1px solid var(--border-color, #e2e8f0) !important;
+  padding: 1.75rem !important;
+
+  label {
+    display: block;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--text-secondary, #64748b);
+    margin-bottom: 0.375rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+
+  input {
+    width: 100%;
+    padding: 0.625rem 0.875rem;
+    border: 1.5px solid var(--border-color, #e2e8f0);
+    border-radius: 10px;
+    font-size: 0.875rem;
+    color: var(--text-primary, #1e293b);
+    background: white;
+    transition:
+      border-color 0.2s,
+      box-shadow 0.2s;
+    box-sizing: border-box;
+
+    &:focus {
+      outline: none;
+      border-color: var(--primary, #6366f1);
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+    }
+
+    &::placeholder {
+      color: #94a3b8;
+    }
+  }
+
+  // Submit
+  button[type='submit'] {
+    background: var(--primary, #6366f1);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    padding: 0.625rem 1.5rem;
+    font-weight: 700;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 2px 6px rgba(99, 102, 241, 0.3);
+
+    &:hover:not(:disabled) {
+      background: var(--primary-dark, #4f46e5);
+      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+      transform: translateY(-1px);
+    }
+
+    &:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+      transform: none;
+    }
+  }
+
+  // Cancel
+  button[type='button'] {
+    background: white;
+    color: var(--text-secondary, #64748b);
+    border: 1.5px solid var(--border-color, #e2e8f0);
+    border-radius: 10px;
+    padding: 0.625rem 1.5rem;
+    font-weight: 600;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.2s;
+
+    &:hover {
+      background: #f8fafc;
+      border-color: #94a3b8;
+      color: var(--text-primary, #1e293b);
+    }
+  }
+}
+
+// Responsive
+@media (max-width: 640px) {
+  .grid.grid-cols-2 {
+    grid-template-columns: 1fr;
+  }
+}

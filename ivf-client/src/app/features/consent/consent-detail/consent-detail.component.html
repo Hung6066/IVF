@@ -1,0 +1,87 @@
+<div class="p-6 max-w-3xl mx-auto">
+  <div class="flex items-center gap-3 mb-6">
+    <button (click)="back()" class="text-gray-500 hover:text-gray-800">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+    </button>
+    <h1 class="text-xl font-semibold text-gray-800">Chi tiết Consent</h1>
+  </div>
+
+  @if (error()) { <div class="bg-red-50 border border-red-200 text-red-700 rounded-lg p-4 mb-4">{{ error() }}</div> }
+  @if (successMsg()) { <div class="bg-green-50 border border-green-200 text-green-700 rounded-lg p-4 mb-4">{{ successMsg() }}</div> }
+  @if (loading()) { <div class="flex justify-center py-12"><div class="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full"></div></div> }
+
+  @if (consent(); as c) {
+    <div class="bg-white border rounded-lg p-5 mb-4">
+      <div class="grid grid-cols-2 gap-4 text-sm mb-4">
+        <div><span class="text-gray-500">Bệnh nhân:</span> <span class="font-medium">{{ c.patientName }}</span></div>
+        <div><span class="text-gray-500">Loại:</span> <span class="font-medium">{{ c.consentType }}</span></div>
+        <div><span class="text-gray-500">Ngày tạo:</span> {{ formatDate(c.createdAt) }}</div>
+        <div><span class="text-gray-500">Chu kỳ:</span> {{ c.cycleId || '—' }}</div>
+      </div>
+      <h2 class="text-lg font-medium mb-2">{{ c.title }}</h2>
+      <div class="bg-gray-50 rounded-lg p-4 text-sm whitespace-pre-wrap">{{ c.content }}</div>
+    </div>
+
+    <!-- Status -->
+    <div class="bg-white border rounded-lg p-5 mb-4">
+      <h3 class="font-medium mb-3">Trạng thái</h3>
+      @if (c.isRevoked) {
+        <div class="bg-red-50 border border-red-200 rounded-lg p-3 text-sm">
+          <p class="text-red-700 font-medium">Đã thu hồi ({{ formatDate(c.revokedAt) }})</p>
+          <p class="text-red-600">Lý do: {{ c.revocationReason }}</p>
+        </div>
+      } @else if (c.isSigned) {
+        <div class="bg-green-50 border border-green-200 rounded-lg p-3 text-sm">
+          <p class="text-green-700 font-medium">Đã ký ({{ formatDate(c.signedAt) }})</p>
+          <p class="text-green-600">Người ký: {{ c.signedByName }} | Nhân chứng: {{ c.witnessName || '—' }}</p>
+        </div>
+      } @else {
+        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-700">Chưa ký</div>
+      }
+    </div>
+
+    <!-- Actions -->
+    <div class="flex gap-3">
+      @if (!c.isSigned && !c.isRevoked) {
+        <button (click)="showSignForm = !showSignForm" class="px-5 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Ký consent</button>
+      }
+      @if (c.isSigned && !c.isRevoked) {
+        <button (click)="showRevokeForm = !showRevokeForm" class="px-5 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Thu hồi</button>
+      }
+    </div>
+
+    @if (showSignForm) {
+      <div class="bg-white border rounded-lg p-5 mt-4">
+        <h3 class="font-medium mb-3">Ký Consent</h3>
+        <div class="space-y-3">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Mã người ký</label>
+            <input type="text" [(ngModel)]="signForm.signedByUserId" class="w-full border rounded-lg px-3 py-2" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Nhân chứng</label>
+            <input type="text" [(ngModel)]="signForm.witnessName" class="w-full border rounded-lg px-3 py-2" />
+          </div>
+          <button (click)="sign()" [disabled]="saving()" class="px-5 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50">
+            {{ saving() ? 'Đang ký...' : 'Xác nhận ký' }}
+          </button>
+        </div>
+      </div>
+    }
+
+    @if (showRevokeForm) {
+      <div class="bg-white border rounded-lg p-5 mt-4">
+        <h3 class="font-medium mb-3">Thu hồi Consent</h3>
+        <div class="space-y-3">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Lý do thu hồi</label>
+            <textarea [(ngModel)]="revokeReason" rows="2" class="w-full border rounded-lg px-3 py-2"></textarea>
+          </div>
+          <button (click)="revoke()" [disabled]="saving()" class="px-5 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50">
+            {{ saving() ? 'Đang xử lý...' : 'Xác nhận thu hồi' }}
+          </button>
+        </div>
+      </div>
+    }
+  }
+</div>

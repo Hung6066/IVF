@@ -1,0 +1,167 @@
+<div class="min-h-screen bg-gray-50 p-6">
+  <div class="max-w-2xl mx-auto">
+    <div class="flex items-center gap-3 mb-6">
+      <button (click)="back()" class="text-gray-500 hover:text-gray-700">
+        <i class="fas fa-arrow-left"></i>
+      </button>
+      <h1 class="text-2xl font-bold text-gray-800">Lọc Rửa Tinh Trùng</h1>
+    </div>
+
+    @if (error()) {
+      <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4">
+        {{ error() }}
+      </div>
+    }
+    @if (success()) {
+      <div class="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg mb-4">
+        {{ success() }}
+      </div>
+    }
+
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-6">
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1"
+            >Mã chu kỳ <span class="text-red-500">*</span></label
+          >
+          <app-cycle-search
+            [(ngModel)]="form.cycleId"
+            name="cycleId"
+            placeholder="Tìm mã chu kỳ..."
+          ></app-cycle-search>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Chỉ định</label>
+          <select
+            [(ngModel)]="form.indication"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+          >
+            @for (opt of indications; track opt) {
+              <option>{{ opt }}</option>
+            }
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Phương pháp</label>
+          <select
+            [(ngModel)]="form.method"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+          >
+            @for (opt of methods; track opt) {
+              <option>{{ opt }}</option>
+            }
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Thời gian thực hiện</label>
+          <input
+            type="datetime-local"
+            [(ngModel)]="form.washDate"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+          />
+        </div>
+      </div>
+
+      <div>
+        <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
+          Trước lọc rửa
+        </h2>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1"
+              >Mật độ trước lọc (×10⁶/ml)</label
+            >
+            <input
+              type="number"
+              [(ngModel)]="form.preWashConcentration"
+              step="0.1"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1"
+              >Di động trước lọc (%)</label
+            >
+            <input
+              type="number"
+              [(ngModel)]="form.preWashMotility"
+              step="0.1"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
+          Sau lọc rửa
+        </h2>
+        <div class="grid grid-cols-3 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Mật độ (×10⁶/ml)</label>
+            <input
+              type="number"
+              [(ngModel)]="form.postWashConcentration"
+              step="0.1"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Di động (%)</label>
+            <input
+              type="number"
+              [(ngModel)]="form.postWashMotility"
+              step="0.1"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Thể tích (ml)</label>
+            <input
+              type="number"
+              [(ngModel)]="form.postWashVolume"
+              step="0.1"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1"
+              >Tổng số di động (×10⁶)</label
+            >
+            <input
+              type="number"
+              [(ngModel)]="form.totalMotileCount"
+              step="0.1"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Ghi chú</label>
+        <textarea
+          [(ngModel)]="form.notes"
+          rows="2"
+          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+        ></textarea>
+      </div>
+
+      <div class="flex justify-end gap-3">
+        <button
+          (click)="back()"
+          class="px-4 py-2 text-sm border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+        >
+          Hủy
+        </button>
+        <button
+          (click)="save()"
+          [disabled]="saving()"
+          class="px-6 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+        >
+          {{ saving() ? 'Đang lưu...' : 'Lưu kết quả' }}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

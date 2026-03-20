@@ -21,6 +21,7 @@ public class PrescriptionConfiguration : IEntityTypeConfiguration<Prescription>
         builder.HasIndex(p => p.PatientId);
         builder.HasIndex(p => p.DoctorId);
         builder.HasIndex(p => p.CycleId);
+        builder.HasIndex(p => p.TenantId);
         builder.HasIndex(p => p.PrescriptionDate);
         builder.HasQueryFilter(p => !p.IsDeleted);
     }

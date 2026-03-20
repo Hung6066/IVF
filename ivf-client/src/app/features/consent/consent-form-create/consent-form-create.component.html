@@ -1,0 +1,84 @@
+<div class="p-6 max-w-3xl mx-auto">
+  <div class="flex items-center gap-3 mb-6">
+    <button (click)="back()" class="text-gray-500 hover:text-gray-800">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+      </svg>
+    </button>
+    <h1 class="text-xl font-semibold text-gray-800">Tạo Consent Form</h1>
+  </div>
+
+  @if (error()) {
+    <div class="bg-red-50 border border-red-200 text-red-700 rounded-lg p-4 mb-4">
+      {{ error() }}
+    </div>
+  }
+
+  <form (ngSubmit)="save()" class="space-y-5">
+    <div class="bg-white border rounded-lg p-5 space-y-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Bệnh nhân *</label>
+        <app-patient-search
+          [(ngModel)]="form.patientId"
+          name="patientId"
+          required
+          placeholder="Tìm tên, mã BN, SĐT..."
+        ></app-patient-search>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Mã chu kỳ (tùy chọn)</label>
+        <app-cycle-search
+          [(ngModel)]="form.cycleId"
+          name="cycleId"
+          [patientId]="form.patientId || null"
+          placeholder="Tìm mã chu kỳ..."
+        ></app-cycle-search>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Loại consent *</label>
+        <select
+          [(ngModel)]="form.consentType"
+          name="consentType"
+          class="w-full border rounded-lg px-3 py-2"
+        >
+          @for (t of consentTypes; track t.value) {
+            <option [value]="t.value">{{ t.label }}</option>
+          }
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Tiêu đề *</label>
+        <input
+          type="text"
+          [(ngModel)]="form.title"
+          name="title"
+          required
+          class="w-full border rounded-lg px-3 py-2"
+          placeholder="VD: Đồng thuận thực hiện OPU"
+        />
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Nội dung</label>
+        <textarea
+          [(ngModel)]="form.content"
+          name="content"
+          rows="6"
+          class="w-full border rounded-lg px-3 py-2"
+          placeholder="Nội dung cam kết đồng thuận..."
+        ></textarea>
+      </div>
+    </div>
+    <div class="flex gap-3">
+      <button
+        type="submit"
+        [disabled]="saving()"
+        class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+      >
+        {{ saving() ? 'Đang lưu...' : 'Tạo Consent' }}
+      </button>
+      <button type="button" (click)="back()" class="px-6 py-2 border rounded-lg hover:bg-gray-50">
+        Hủy
+      </button>
+    </div>
+  </form>
+</div>

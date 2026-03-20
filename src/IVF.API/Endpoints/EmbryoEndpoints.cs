@@ -63,5 +63,23 @@ public static class EmbryoEndpoints
             var r = await m.Send(new DeleteEmbryoCommand(id));
             return r.IsSuccess ? Results.NoContent() : Results.NotFound(r.Error);
         });
+
+        // ==================== FREEZING CONTRACTS ====================
+        var contractGroup = app.MapGroup("/api/embryo-freezing-contracts").WithTags("Embryos").RequireAuthorization("EmbryologyAccess");
+
+        contractGroup.MapGet("/cycle/{cycleId:guid}", async (Guid cycleId, IMediator m) =>
+            Results.Ok(await m.Send(new GetEmbryoFreezingContractsByCycleQuery(cycleId))));
+
+        contractGroup.MapPost("/", async (CreateEmbryoFreezingContractCommand cmd, IMediator m) =>
+        {
+            var r = await m.Send(cmd);
+            return r.IsSuccess ? Results.Created($"/api/embryo-freezing-contracts/{r.Value!.Id}", r.Value) : Results.BadRequest(r.Error);
+        });
+
+        contractGroup.MapPost("/{id:guid}/payment", async (Guid id, RecordContractPaymentCommand cmd, IMediator m) =>
+        {
+            var r = await m.Send(cmd with { ContractId = id });
+            return r.IsSuccess ? Results.Ok(r.Value) : Results.NotFound(r.Error);
+        });
     }
 }

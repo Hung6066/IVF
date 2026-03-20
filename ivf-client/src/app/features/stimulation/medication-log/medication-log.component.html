@@ -1,0 +1,29 @@
+<div class="bg-white border rounded-lg p-5">
+  <h3 class="text-lg font-medium mb-4">Phác đồ thuốc KTBT</h3>
+  @if (medications.length === 0) {
+    <p class="text-gray-500 text-sm">Chưa có phác đồ thuốc</p>
+  } @else {
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b bg-gray-50">
+            <th class="text-left py-2 px-3 font-medium text-gray-700">#</th>
+            <th class="text-left py-2 px-3 font-medium text-gray-700">Thuốc</th>
+            <th class="text-left py-2 px-3 font-medium text-gray-700">Liều / Cách dùng</th>
+            <th class="text-left py-2 px-3 font-medium text-gray-700">Số ngày</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (med of medications; track med.sortOrder; let i = $index) {
+            <tr class="border-b hover:bg-gray-50">
+              <td class="py-2 px-3 text-gray-500">{{ i + 1 }}</td>
+              <td class="py-2 px-3 font-medium">{{ med.drugName }}</td>
+              <td class="py-2 px-3">{{ med.posology || '—' }}</td>
+              <td class="py-2 px-3">{{ med.duration }} ngày</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</div>

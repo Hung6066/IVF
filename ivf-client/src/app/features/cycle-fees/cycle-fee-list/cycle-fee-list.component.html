@@ -1,0 +1,266 @@
+<div class="p-6 space-y-6">
+  <!-- Header -->
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900">Phí Chu Kỳ Điều Trị</h1>
+      <p class="text-sm text-gray-500 mt-1">Mã chu kỳ: {{ cycleId() }}</p>
+    </div>
+    <button
+      (click)="openCreate()"
+      class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-medium"
+    >
+      + Thêm phí
+    </button>
+  </div>
+
+  <!-- Error -->
+  @if (error()) {
+    <div class="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 text-sm">
+      {{ error() }}
+    </div>
+  }
+
+  <!-- Summary cards -->
+  @if (!loading() && fees().length > 0) {
+    <div class="grid grid-cols-3 gap-4">
+      <div class="bg-white rounded-xl border border-gray-200 p-4">
+        <p class="text-xs text-gray-500">Tổng phí</p>
+        <p class="text-xl font-bold text-gray-900 mt-1">{{ formatCurrency(totalAmount) }}</p>
+      </div>
+      <div class="bg-white rounded-xl border border-gray-200 p-4">
+        <p class="text-xs text-gray-500">Đã thanh toán</p>
+        <p class="text-xl font-bold text-green-600 mt-1">{{ formatCurrency(totalPaid) }}</p>
+      </div>
+      <div class="bg-white rounded-xl border border-gray-200 p-4">
+        <p class="text-xs text-gray-500">Còn lại</p>
+        <p class="text-xl font-bold text-red-600 mt-1">{{ formatCurrency(totalBalance) }}</p>
+      </div>
+    </div>
+  }
+
+  <!-- Table -->
+  <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+    @if (loading()) {
+      <div class="flex justify-center items-center py-16 text-gray-400 text-sm">Đang tải...</div>
+    } @else if (fees().length === 0) {
+      <div class="flex flex-col items-center justify-center py-16 text-gray-400">
+        <i class="fa-regular fa-receipt text-4xl mb-3"></i>
+        <p class="text-sm">Chưa có phí nào cho chu kỳ này</p>
+      </div>
+    } @else {
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50 border-b border-gray-200">
+            <tr>
+              <th class="text-left px-4 py-3 font-medium text-gray-600">Loại phí</th>
+              <th class="text-left px-4 py-3 font-medium text-gray-600">Mô tả</th>
+              <th class="text-right px-4 py-3 font-medium text-gray-600">Số tiền</th>
+              <th class="text-right px-4 py-3 font-medium text-gray-600">Đã thanh toán</th>
+              <th class="text-right px-4 py-3 font-medium text-gray-600">Còn lại</th>
+              <th class="text-center px-4 py-3 font-medium text-gray-600">Trạng thái</th>
+              <th class="text-center px-4 py-3 font-medium text-gray-600">1 lần/chu kỳ</th>
+              <th class="px-4 py-3"></th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            @for (fee of fees(); track fee.id) {
+              <tr class="hover:bg-gray-50 transition">
+                <td class="px-4 py-3 font-medium text-gray-800">{{ fee.feeType }}</td>
+                <td class="px-4 py-3 text-gray-600">{{ fee.description }}</td>
+                <td class="px-4 py-3 text-right text-gray-800">{{ formatCurrency(fee.amount) }}</td>
+                <td class="px-4 py-3 text-right text-green-700">
+                  {{ formatCurrency(fee.paidAmount) }}
+                </td>
+                <td
+                  class="px-4 py-3 text-right font-semibold"
+                  [class.text-red-600]="fee.balanceDue > 0"
+                  [class.text-gray-500]="fee.balanceDue === 0"
+                >
+                  {{ formatCurrency(fee.balanceDue) }}
+                </td>
+                <td class="px-4 py-3 text-center">
+                  <span
+                    class="px-2 py-1 rounded-full text-xs font-semibold"
+                    [ngClass]="statusClass(fee.status)"
+                  >
+                    {{ statusLabel(fee.status) }}
+                  </span>
+                </td>
+                <td class="px-4 py-3 text-center text-gray-500">
+                  @if (fee.isOneTimePerCycle) {
+                    <span class="text-green-500"><i class="fa-solid fa-check"></i></span>
+                  } @else {
+                    <span class="text-gray-300">—</span>
+                  }
+                </td>
+                <td class="px-4 py-3">
+                  <div class="flex items-center gap-2 justify-end">
+                    @if (fee.status === 'Pending' || fee.status === 'PartiallyPaid') {
+                      <button
+                        (click)="openWaive(fee)"
+                        class="text-xs text-orange-600 hover:underline"
+                      >
+                        Miễn giảm
+                      </button>
+                    }
+                    @if (fee.status === 'Paid') {
+                      <button (click)="refund(fee)" class="text-xs text-purple-600 hover:underline">
+                        Hoàn tiền
+                      </button>
+                    }
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </div>
+</div>
+
+<!-- Create Modal -->
+@if (showCreate()) {
+  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+      <div class="flex items-center justify-between p-5 border-b border-gray-200">
+        <h2 class="text-lg font-semibold text-gray-900">Thêm phí mới</h2>
+        <button (click)="showCreate.set(false)" class="text-gray-400 hover:text-gray-600">
+          <i class="fa-solid fa-xmark text-xl"></i>
+        </button>
+      </div>
+      <div class="p-5 space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1"
+            >Loại phí <span class="text-red-500">*</span></label
+          >
+          <select
+            [(ngModel)]="createForm.feeType"
+            class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">-- Chọn loại phí --</option>
+            @for (t of feeTypes; track t) {
+              <option [value]="t">{{ t }}</option>
+            }
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1"
+            >Mô tả <span class="text-red-500">*</span></label
+          >
+          <input
+            type="text"
+            [(ngModel)]="createForm.description"
+            placeholder="Mô tả khoản phí..."
+            class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1"
+            >Số tiền (VNĐ) <span class="text-red-500">*</span></label
+          >
+          <input
+            type="number"
+            [(ngModel)]="createForm.amount"
+            min="0"
+            step="10000"
+            class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1"
+            >Mã bệnh nhân <span class="text-red-500">*</span></label
+          >
+          <input
+            type="text"
+            [(ngModel)]="createForm.patientId"
+            placeholder="Patient ID..."
+            class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        <label class="flex items-center gap-2 cursor-pointer select-none">
+          <input type="checkbox" [(ngModel)]="createForm.isOneTimePerCycle" class="rounded" />
+          <span class="text-sm text-gray-700">Chỉ tính 1 lần / chu kỳ</span>
+        </label>
+      </div>
+      <div class="flex justify-end gap-3 px-5 py-4 border-t border-gray-200">
+        <button
+          (click)="showCreate.set(false)"
+          class="px-4 py-2 text-sm text-gray-600 hover:text-gray-900 font-medium"
+        >
+          Huỷ
+        </button>
+        <button
+          (click)="create()"
+          [disabled]="
+            saving() || !createForm.feeType || !createForm.description || createForm.amount <= 0
+          "
+          class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+        >
+          @if (saving()) {
+            Đang lưu...
+          } @else {
+            Thêm phí
+          }
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Waive Modal -->
+@if (showWaive()) {
+  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+      <div class="flex items-center justify-between p-5 border-b border-gray-200">
+        <h2 class="text-lg font-semibold text-gray-900">Miễn giảm phí</h2>
+        <button (click)="showWaive.set(false)" class="text-gray-400 hover:text-gray-600">
+          <i class="fa-solid fa-xmark text-xl"></i>
+        </button>
+      </div>
+      <div class="p-5 space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1"
+            >Lý do miễn giảm <span class="text-red-500">*</span></label
+          >
+          <textarea
+            [(ngModel)]="waiveReason"
+            rows="3"
+            placeholder="Nhập lý do..."
+            class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none"
+          ></textarea>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1"
+            >ID người duyệt <span class="text-red-500">*</span></label
+          >
+          <input
+            type="text"
+            [(ngModel)]="waiveUserId"
+            placeholder="User ID..."
+            class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+          />
+        </div>
+      </div>
+      <div class="flex justify-end gap-3 px-5 py-4 border-t border-gray-200">
+        <button
+          (click)="showWaive.set(false)"
+          class="px-4 py-2 text-sm text-gray-600 hover:text-gray-900 font-medium"
+        >
+          Huỷ
+        </button>
+        <button
+          (click)="confirmWaive()"
+          [disabled]="waiving() || !waiveReason.trim() || !waiveUserId.trim()"
+          class="px-4 py-2 bg-orange-600 text-white rounded-lg text-sm font-medium hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+        >
+          @if (waiving()) {
+            Đang xử lý...
+          } @else {
+            Xác nhận miễn giảm
+          }
+        </button>
+      </div>
+    </div>
+  </div>
+}

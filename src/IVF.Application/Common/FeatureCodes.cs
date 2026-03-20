@@ -30,4 +30,5 @@ public static class FeatureCodes
     public const string Sla999 = "sla_999";
     public const string Support247 = "support_247";
     public const string CustomDomain = "custom_domain";
+    public const string EggBank = "egg_bank";
 }

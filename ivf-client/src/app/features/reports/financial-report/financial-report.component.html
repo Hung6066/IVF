@@ -1,0 +1,66 @@
+<div class="min-h-screen bg-gray-50 p-6">
+  <div class="max-w-5xl mx-auto">
+    <div class="flex items-center justify-between mb-6">
+      <h1 class="text-2xl font-bold text-gray-800">Báo Cáo Tài Chính</h1>
+      <a routerLink="/reports" class="text-sm text-blue-600 hover:underline"
+        ><i class="fas fa-arrow-left mr-1"></i> Quay lại</a
+      >
+    </div>
+
+    @if (loading()) {
+      <div class="text-center py-16 text-gray-400">
+        <i class="fas fa-spinner fa-spin fa-2x"></i>
+      </div>
+    } @else if (kpis(); as kpi) {
+      <div class="grid grid-cols-2 gap-4 mb-6">
+        <div class="bg-white rounded-xl border border-gray-200 p-5">
+          <div class="text-xs text-gray-500 uppercase font-semibold mb-1">Doanh thu tháng này</div>
+          <div class="text-2xl font-bold text-blue-600">
+            {{ kpi.totalRevenue / 1000000 | number: '1.0-0' }} triệu đ
+          </div>
+          <div
+            class="text-xs mt-1"
+            [class]="kpi.revenueTrend >= 0 ? 'text-green-600' : 'text-red-600'"
+          >
+            <i
+              [class]="kpi.revenueTrend >= 0 ? 'fas fa-arrow-up' : 'fas fa-arrow-down'"
+              class="mr-1"
+            ></i>
+            {{ kpi.revenueTrend }}% so với tháng trước
+          </div>
+        </div>
+        <div class="bg-white rounded-xl border border-gray-200 p-5">
+          <div class="text-xs text-gray-500 uppercase font-semibold mb-1">Bệnh nhân mới</div>
+          <div class="text-2xl font-bold text-green-600">{{ kpi.newPatients }}</div>
+          <div class="text-xs text-gray-500 mt-1">
+            Tổng: {{ kpi.totalPatients | number }} bệnh nhân
+          </div>
+        </div>
+        <div class="bg-white rounded-xl border border-gray-200 p-5">
+          <div class="text-xs text-gray-500 uppercase font-semibold mb-1">Chu kỳ IVF</div>
+          <div class="text-2xl font-bold text-purple-600">{{ kpi.ivfCycles }}</div>
+        </div>
+        <div class="bg-white rounded-xl border border-gray-200 p-5">
+          <div class="text-xs text-gray-500 uppercase font-semibold mb-1">Chu kỳ IUI</div>
+          <div class="text-2xl font-bold text-orange-500">{{ kpi.iuiCycles }}</div>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-xl border border-gray-200 p-6">
+        <h2 class="font-semibold text-gray-700 mb-4">Tổng Quan Doanh Thu</h2>
+        <div class="space-y-3 text-sm">
+          <div class="flex justify-between py-2 border-b border-gray-50">
+            <span class="text-gray-500">Doanh thu tháng này</span>
+            <span class="font-semibold text-blue-600"
+              >{{ kpi.totalRevenue | number: '1.0-0' }} đ</span
+            >
+          </div>
+        </div>
+        <div class="mt-4 p-3 bg-blue-50 rounded-lg text-sm text-blue-600">
+          <i class="fas fa-info-circle mr-1"></i>
+          Dữ liệu chi tiết được tổng hợp từ hóa đơn và thanh toán trong hệ thống.
+        </div>
+      </div>
+    }
+  </div>
+</div>

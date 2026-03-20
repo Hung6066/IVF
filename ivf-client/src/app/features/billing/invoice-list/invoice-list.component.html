@@ -1,236 +1,284 @@
 <div class="dashboard-layout">
-    <header class="page-header">
-        <div class="header-title">
-            <h1>💰 Hoá đơn & Thanh toán</h1>
-        </div>
-        <div class="tabs-container">
-            <button class="tab-btn" [class.active]="activeTab === 'invoices'" (click)="activeTab = 'invoices'">📋 Hoá
-                đơn</button>
-            <button class="tab-btn" [class.active]="activeTab === 'payments'" (click)="activeTab = 'payments'">💳 Thanh
-                toán</button>
-            <button class="tab-btn" [class.active]="activeTab === 'revenue'" (click)="activeTab = 'revenue'">📊 Doanh
-                thu</button>
-        </div>
-    </header>
-
-    <div class="stats-grid">
-        <div class="stat-card">
-            <div class="stat-icon info">📄</div>
-            <div class="stat-content">
-                <span class="value">{{ todayInvoices() }}</span>
-                <span class="label">Hoá đơn hôm nay</span>
-            </div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-icon success">💰</div>
-            <div class="stat-content">
-                <span class="value">{{ formatCurrency(todayRevenue()) }}</span>
-                <span class="label">Thu hôm nay</span>
-            </div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-icon warning">⏳</div>
-            <div class="stat-content">
-                <span class="value">{{ pendingPayments() }}</span>
-                <span class="label">Chờ thanh toán</span>
-            </div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-icon primary">🏦</div>
-            <div class="stat-content">
-                <span class="value">{{ formatCurrency(monthRevenue()) }}</span>
-                <span class="label">Thu tháng này</span>
-            </div>
-        </div>
+  <header class="page-header">
+    <div class="header-title">
+      <h1>💰 Hoá đơn & Thanh toán</h1>
     </div>
+    <div class="tabs-container">
+      <button
+        class="tab-btn"
+        [class.active]="activeTab === 'invoices'"
+        (click)="activeTab = 'invoices'"
+      >
+        📋 Hoá đơn
+      </button>
+      <button
+        class="tab-btn"
+        [class.active]="activeTab === 'payments'"
+        (click)="activeTab = 'payments'"
+      >
+        💳 Thanh toán
+      </button>
+      <button
+        class="tab-btn"
+        [class.active]="activeTab === 'revenue'"
+        (click)="activeTab = 'revenue'"
+      >
+        📊 Doanh thu
+      </button>
+      <a routerLink="/reports" class="tab-btn tab-link">📈 Báo cáo tài chính</a>
+    </div>
+  </header>
 
-    @if (activeTab === 'invoices') {
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-icon info">📄</div>
+      <div class="stat-content">
+        <span class="value">{{ todayInvoices() }}</span>
+        <span class="label">Hoá đơn hôm nay</span>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon success">💰</div>
+      <div class="stat-content">
+        <span class="value">{{ formatCurrency(todayRevenue()) }}</span>
+        <span class="label">Thu hôm nay</span>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon warning">⏳</div>
+      <div class="stat-content">
+        <span class="value">{{ pendingPayments() }}</span>
+        <span class="label">Chờ thanh toán</span>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon primary">🏦</div>
+      <div class="stat-content">
+        <span class="value">{{ formatCurrency(monthRevenue()) }}</span>
+        <span class="label">Thu tháng này</span>
+      </div>
+    </div>
+  </div>
+
+  @if (activeTab === 'invoices') {
     <section class="card">
-        <div class="section-header">
-            <h2>Danh sách hoá đơn</h2>
-            <button class="btn btn-primary" (click)="showCreateInvoice = true">➕ Tạo hoá đơn</button>
-        </div>
-        <div class="filter-row">
-            <input class="form-control" type="date" [(ngModel)]="filterDate" />
-            <select class="form-control" [(ngModel)]="filterStatus">
-                <option value="">Tất cả trạng thái</option>
-                <option value="Paid">Đã thanh toán</option>
-                <option value="Pending">Chờ thanh toán</option>
-                <option value="Partial">Thanh toán 1 phần</option>
-            </select>
-            <input class="form-control search-input" type="text" placeholder="Tìm mã hoá đơn..."
-                [(ngModel)]="searchTerm" />
-        </div>
-        <div class="table-container">
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>Mã HD</th>
-                        <th>Bệnh nhân</th>
-                        <th>Ngày</th>
-                        <th>Tổng tiền</th>
-                        <th>Đã thu</th>
-                        <th>Còn lại</th>
-                        <th>Trạng thái</th>
-                        <th class="text-right">Thao tác</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @for (inv of filteredInvoices(); track inv.id) {
-                    <tr>
-                        <td class="code-cell">{{ inv.code }}</td>
-                        <td>{{ inv.patient }}</td>
-                        <td>{{ inv.date }}</td>
-                        <td class="amount-cell">{{ formatCurrency(inv.total) }}</td>
-                        <td class="amount-cell">{{ formatCurrency(inv.paid) }}</td>
-                        <td class="amount-cell" [class.text-danger]="inv.remaining > 0">{{ formatCurrency(inv.remaining)
-                            }}</td>
-                        <td><span class="status-badge" [class]="inv.status.toLowerCase()">{{ getStatusName(inv.status)
-                                }}</span></td>
-                        <td class="actions-cell">
-                            <button class="btn-icon" title="Chi tiết" (click)="viewInvoice(inv)">📋</button>
-                            <button class="btn-icon" title="Thu tiền" (click)="payInvoice(inv)">💳</button>
-                            <button class="btn-icon" title="In" (click)="printInvoice(inv)">🖨️</button>
-                        </td>
-                    </tr>
-                    } @empty {
-                    <tr>
-                        <td colspan="8" class="empty-state">Không có hoá đơn</td>
-                    </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
+      <div class="section-header">
+        <h2>Danh sách hoá đơn</h2>
+        <button class="btn btn-primary" (click)="showCreateInvoice = true">➕ Tạo hoá đơn</button>
+      </div>
+      <div class="filter-row">
+        <input class="form-control" type="date" [(ngModel)]="filterDate" />
+        <select class="form-control" [(ngModel)]="filterStatus">
+          <option value="">Tất cả trạng thái</option>
+          <option value="Paid">Đã thanh toán</option>
+          <option value="Pending">Chờ thanh toán</option>
+          <option value="Partial">Thanh toán 1 phần</option>
+        </select>
+        <input
+          class="form-control search-input"
+          type="text"
+          placeholder="Tìm mã hoá đơn..."
+          [(ngModel)]="searchTerm"
+        />
+      </div>
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Mã HD</th>
+              <th>Bệnh nhân</th>
+              <th>Ngày</th>
+              <th>Tổng tiền</th>
+              <th>Đã thu</th>
+              <th>Còn lại</th>
+              <th>Trạng thái</th>
+              <th class="text-right">Thao tác</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (inv of filteredInvoices(); track inv.id) {
+              <tr>
+                <td class="code-cell">{{ inv.code }}</td>
+                <td>{{ inv.patient }}</td>
+                <td>{{ inv.date }}</td>
+                <td class="amount-cell">{{ formatCurrency(inv.total) }}</td>
+                <td class="amount-cell">{{ formatCurrency(inv.paid) }}</td>
+                <td class="amount-cell" [class.text-danger]="inv.remaining > 0">
+                  {{ formatCurrency(inv.remaining) }}
+                </td>
+                <td>
+                  <span class="status-badge" [class]="inv.status.toLowerCase()">{{
+                    getStatusName(inv.status)
+                  }}</span>
+                </td>
+                <td class="actions-cell">
+                  <button class="btn-icon" title="Chi tiết" (click)="viewInvoice(inv)">📋</button>
+                  <button class="btn-icon" title="Thu tiền" (click)="payInvoice(inv)">💳</button>
+                  <button class="btn-icon" title="In" (click)="printInvoice(inv)">🖨️</button>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="8" class="empty-state">Không có hoá đơn</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
     </section>
-    }
+  }
 
-    @if (activeTab === 'payments') {
+  @if (activeTab === 'payments') {
     <section class="card">
-        <div class="section-header">
-            <h2>Lịch sử thanh toán</h2>
-        </div>
-        <div class="table-container">
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>Mã</th>
-                        <th>Hoá đơn</th>
-                        <th>Bệnh nhân</th>
-                        <th>Số tiền</th>
-                        <th>Phương thức</th>
-                        <th>Thời gian</th>
-                        <th>Thu ngân</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @for (p of payments(); track p.id) {
-                    <tr>
-                        <td class="code-cell">{{ p.code }}</td>
-                        <td class="code-cell">{{ p.invoice }}</td>
-                        <td>{{ p.patient }}</td>
-                        <td class="amount-cell">{{ formatCurrency(p.amount) }}</td>
-                        <td>{{ p.method }}</td>
-                        <td>{{ p.datetime }}</td>
-                        <td>{{ p.cashier }}</td>
-                    </tr>
-                    } @empty {
-                    <tr>
-                        <td colspan="7" class="empty-state">Không có lịch sử</td>
-                    </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
+      <div class="section-header">
+        <h2>Lịch sử thanh toán</h2>
+      </div>
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Mã</th>
+              <th>Hoá đơn</th>
+              <th>Bệnh nhân</th>
+              <th>Số tiền</th>
+              <th>Phương thức</th>
+              <th>Thời gian</th>
+              <th>Thu ngân</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (p of payments(); track p.id) {
+              <tr>
+                <td class="code-cell">{{ p.code }}</td>
+                <td class="code-cell">{{ p.invoice }}</td>
+                <td>{{ p.patient }}</td>
+                <td class="amount-cell">{{ formatCurrency(p.amount) }}</td>
+                <td>{{ p.method }}</td>
+                <td>{{ p.datetime }}</td>
+                <td>{{ p.cashier }}</td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="7" class="empty-state">Không có lịch sử</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
     </section>
-    }
+  }
 
-    @if (activeTab === 'revenue') {
+  @if (activeTab === 'revenue') {
     <section class="card">
-        <div class="section-header">
-            <h2>Báo cáo doanh thu</h2>
+      <div class="section-header">
+        <h2>Báo cáo doanh thu</h2>
+      </div>
+      <div class="revenue-grid">
+        <div class="rev-card">
+          <h4>Tuần này</h4>
+          <span class="rev-value">{{ formatCurrency(weekRevenue()) }}</span>
+          <span class="rev-trend up">↑ 12%</span>
         </div>
-        <div class="revenue-grid">
-            <div class="rev-card">
-                <h4>Tuần này</h4>
-                <span class="rev-value">{{ formatCurrency(weekRevenue()) }}</span>
-                <span class="rev-trend up">↑ 12%</span>
-            </div>
-            <div class="rev-card">
-                <h4>Tháng này</h4>
-                <span class="rev-value">{{ formatCurrency(monthRevenue()) }}</span>
-                <span class="rev-trend up">↑ 8%</span>
-            </div>
-            <div class="rev-card">
-                <h4>Quý này</h4>
-                <span class="rev-value">{{ formatCurrency(quarterRevenue()) }}</span>
-                <span class="rev-trend down">↓ 3%</span>
-            </div>
+        <div class="rev-card">
+          <h4>Tháng này</h4>
+          <span class="rev-value">{{ formatCurrency(monthRevenue()) }}</span>
+          <span class="rev-trend up">↑ 8%</span>
         </div>
-        <div class="chart-placeholder">
-            <h4>Biểu đồ doanh thu theo ngày</h4>
-            <div class="bars">
-                @for (d of chartData(); track d.day) {
-                <div class="bar-col">
-                    <div class="bar" [style.height.%]="d.pct"></div>
-                    <span>{{ d.day }}</span>
-                </div>
-                }
-            </div>
+        <div class="rev-card">
+          <h4>Quý này</h4>
+          <span class="rev-value">{{ formatCurrency(quarterRevenue()) }}</span>
+          <span class="rev-trend down">↓ 3%</span>
         </div>
+      </div>
+      <div class="chart-placeholder">
+        <h4>Biểu đồ doanh thu theo ngày</h4>
+        <div class="bars">
+          @for (d of chartData(); track d.day) {
+            <div class="bar-col">
+              <div class="bar" [style.height.%]="d.pct"></div>
+              <span>{{ d.day }}</span>
+            </div>
+          }
+        </div>
+      </div>
     </section>
-    }
+  }
 
-    @if (showCreateInvoice) {
+  @if (showCreateInvoice) {
     <div class="modal-overlay" (click)="showCreateInvoice = false">
-        <div class="modal-content large-modal" (click)="$event.stopPropagation()">
-            <div class="modal-header">
-                <h3>➕ Tạo hoá đơn mới</h3>
-                <button class="close-btn" (click)="showCreateInvoice = false">×</button>
+      <div class="modal-content large-modal" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h3>➕ Tạo hoá đơn mới</h3>
+          <button class="close-btn" (click)="showCreateInvoice = false">×</button>
+        </div>
+
+        <form (ngSubmit)="submitInvoice()">
+          <div class="modal-body">
+            <div class="form-group">
+              <label class="form-label">Tìm bệnh nhân *</label>
+              <app-patient-search
+                [(ngModel)]="newInvoice.patientSearch"
+                name="search"
+                [required]="true"
+                (patientSelected)="onPatientSelect($event)"
+              ></app-patient-search>
             </div>
 
-            <form (ngSubmit)="submitInvoice()">
-                <div class="modal-body">
-                    <div class="form-group">
-                        <label class="form-label">Tìm bệnh nhân *</label>
-                        <app-patient-search [(ngModel)]="newInvoice.patientSearch" name="search" [required]="true"
-                            (patientSelected)="onPatientSelect($event)"></app-patient-search>
-                    </div>
-
-                    <div class="invoice-items-section">
-                        <h4>Dịch vụ</h4>
-                        @for (item of newInvoice.items; track $index) {
-                        <div class="item-row">
-                            <select class="form-control service-select" [ngModel]="item.serviceId"
-                                (ngModelChange)="onServiceSelect(item, $event)" [name]="'service'+$index">
-                                <option value="">-- Chọn dịch vụ --</option>
-                                @for (svc of services(); track svc.id) {
-                                <option [value]="svc.id">{{ svc.code }} - {{ svc.name }}</option>
-                                }
-                            </select>
-                            <input class="form-control qty-input" type="number" [(ngModel)]="item.qty"
-                                [name]="'qty'+$index" placeholder="SL" min="1" />
-                            <input class="form-control price-input" type="number" [(ngModel)]="item.price"
-                                [name]="'price'+$index" placeholder="Đơn giá" />
-                            <span class="unit-label">{{ item.unit || 'lần' }}</span>
-                            <button type="button" class="btn-icon danger" (click)="removeItem($index)">✖</button>
-                        </div>
-                        }
-                        <button type="button" class="btn btn-secondary full-width" (click)="addItem()">➕ Thêm dịch
-                            vụ</button>
-                    </div>
-
-                    <div class="total-row">
-                        <span>Tổng cộng:</span>
-                        <span class="total-value">{{ formatCurrency(calcTotal()) }}</span>
-                    </div>
+            <div class="invoice-items-section">
+              <h4>Dịch vụ</h4>
+              @for (item of newInvoice.items; track $index) {
+                <div class="item-row">
+                  <select
+                    class="form-control service-select"
+                    [ngModel]="item.serviceId"
+                    (ngModelChange)="onServiceSelect(item, $event)"
+                    [name]="'service' + $index"
+                  >
+                    <option value="">-- Chọn dịch vụ --</option>
+                    @for (svc of services(); track svc.id) {
+                      <option [value]="svc.id">{{ svc.code }} - {{ svc.name }}</option>
+                    }
+                  </select>
+                  <input
+                    class="form-control qty-input"
+                    type="number"
+                    [(ngModel)]="item.qty"
+                    [name]="'qty' + $index"
+                    placeholder="SL"
+                    min="1"
+                  />
+                  <input
+                    class="form-control price-input"
+                    type="number"
+                    [(ngModel)]="item.price"
+                    [name]="'price' + $index"
+                    placeholder="Đơn giá"
+                  />
+                  <span class="unit-label">{{ item.unit || 'lần' }}</span>
+                  <button type="button" class="btn-icon danger" (click)="removeItem($index)">
+                    ✖
+                  </button>
                 </div>
+              }
+              <button type="button" class="btn btn-secondary full-width" (click)="addItem()">
+                ➕ Thêm dịch vụ
+              </button>
+            </div>
 
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" (click)="showCreateInvoice = false">Huỷ</button>
-                    <button type="submit" class="btn btn-primary">Tạo hoá đơn</button>
-                </div>
-            </form>
-        </div>
+            <div class="total-row">
+              <span>Tổng cộng:</span>
+              <span class="total-value">{{ formatCurrency(calcTotal()) }}</span>
+            </div>
+          </div>
+
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" (click)="showCreateInvoice = false">
+              Huỷ
+            </button>
+            <button type="submit" class="btn btn-primary">Tạo hoá đơn</button>
+          </div>
+        </form>
+      </div>
     </div>
-    }
+  }
 </div>

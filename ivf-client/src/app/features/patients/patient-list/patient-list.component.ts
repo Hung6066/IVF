@@ -18,12 +18,14 @@ export class PatientListComponent implements OnInit {
   page = signal(1);
   loading = signal(false);
   searchQuery = '';
+  genderFilter = '';
   pageSize = 20;
   showAddModal = false;
   showEditModal = false;
   newPatient: any = { gender: 'Female', patientType: 'Infertility' };
   editingPatient: any = null;
 
+  protected readonly Math = Math;
   private searchTimeout?: ReturnType<typeof setTimeout>;
 
   constructor(
@@ -42,7 +44,12 @@ export class PatientListComponent implements OnInit {
   loadPatients(): void {
     this.loading.set(true);
     this.patientService
-      .searchPatients(this.searchQuery || undefined, this.page(), this.pageSize)
+      .searchPatients(
+        this.searchQuery || undefined,
+        this.page(),
+        this.pageSize,
+        this.genderFilter || undefined,
+      )
       .subscribe({
         next: (res) => {
           this.patients.set(res.items);
@@ -59,6 +66,11 @@ export class PatientListComponent implements OnInit {
       this.page.set(1);
       this.loadPatients();
     }, 300);
+  }
+
+  onFilterChange(): void {
+    this.page.set(1);
+    this.loadPatients();
   }
 
   changePage(newPage: number): void {

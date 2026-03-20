@@ -1,0 +1,202 @@
+<div class="min-h-screen bg-gray-50 p-6">
+  <div class="max-w-3xl mx-auto">
+    <div class="flex items-center gap-3 mb-6">
+      <button (click)="back()" class="text-gray-500 hover:text-gray-700">
+        <i class="fas fa-arrow-left"></i>
+      </button>
+      <h1 class="text-2xl font-bold text-gray-800">Sàng Lọc Người Hiến Tinh Trùng</h1>
+    </div>
+
+    @if (loading()) {
+      <div class="text-center py-16 text-gray-400">
+        <i class="fas fa-spinner fa-spin fa-2x"></i>
+      </div>
+    } @else {
+      @if (error()) {
+        <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4">
+          {{ error() }}
+        </div>
+      }
+      @if (success()) {
+        <div class="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg mb-4">
+          {{ success() }}
+        </div>
+      }
+
+      @if (donor(); as d) {
+        <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4 flex gap-4 text-sm">
+          <div>
+            <span class="text-gray-500">Mã NHTT:</span>
+            <span class="font-semibold">{{ d.code }}</span>
+          </div>
+          <div>
+            <span class="text-gray-500">Nhóm máu:</span>
+            <span class="font-medium">{{ d.bloodType }}</span>
+          </div>
+          <div>
+            <span class="text-gray-500">Tuổi:</span> <span class="font-medium">{{ d.age }}</span>
+          </div>
+        </div>
+      }
+
+      <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-6">
+        <div>
+          <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
+            Ngày sàng lọc
+          </h2>
+          <input
+            type="date"
+            [(ngModel)]="screening.screeningDate"
+            class="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+          />
+        </div>
+        <div>
+          <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
+            Xét nghiệm sàng lọc
+          </h2>
+
+          <!-- P8.04: HIV Rapid (15 phút) + Confirmatory (2 giờ) -->
+          <div class="border border-red-100 bg-red-50 rounded-lg p-4 mb-4">
+            <div class="text-xs font-semibold text-red-700 uppercase tracking-wide mb-3">
+              HIV — Phân loại kết quả
+            </div>
+            <div class="grid grid-cols-2 gap-4 mb-3">
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1"
+                  >HIV Nhanh <span class="text-red-500 font-semibold">(⏱ 15 phút)</span></label
+                >
+                <select
+                  [(ngModel)]="screening.hivRapidResult"
+                  class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                >
+                  @for (opt of labResults; track opt) {
+                    <option [value]="opt">{{ opt || '-- Chọn --' }}</option>
+                  }
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1"
+                  >HIV Khẳng định
+                  <span class="text-orange-500 font-semibold">(⏱ 2 giờ)</span></label
+                >
+                <select
+                  [(ngModel)]="screening.hivConfirmatoryResult"
+                  class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                >
+                  @for (opt of labResults; track opt) {
+                    <option [value]="opt">{{ opt || '-- Chọn --' }}</option>
+                  }
+                </select>
+              </div>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1"
+                >Thời điểm báo KQ nhanh</label
+              >
+              <input
+                type="datetime-local"
+                [(ngModel)]="screening.hivRapidReportedAt"
+                class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm"
+              />
+            </div>
+            <!-- P8.08: auto-compute 3-month retest date -->
+            <div
+              class="mt-3 p-3 bg-orange-50 border border-orange-200 rounded-lg text-xs text-orange-800"
+            >
+              <i class="fas fa-calendar-alt mr-1"></i>
+              Hẹn XN HIV lần 2 (3 tháng): <strong>{{ computedRetestDue || '—' }}</strong>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            @for (
+              field of [
+                { label: 'HBsAg', key: 'hbsAgResult' },
+                { label: 'HCV', key: 'hcvResult' },
+                { label: 'VDRL', key: 'vdrlResult' },
+                { label: 'CMV IgG', key: 'cmvResult' },
+              ];
+              track field.key
+            ) {
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">{{
+                  field.label
+                }}</label>
+                <select
+                  [(ngModel)]="$any(screening)[field.key]"
+                  class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                >
+                  @for (opt of labResults; track opt) {
+                    <option [value]="opt">{{ opt || '-- Chọn --' }}</option>
+                  }
+                </select>
+              </div>
+            }
+          </div>
+        </div>
+        <div>
+          <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
+            Khám thực thể
+          </h2>
+          <div class="grid grid-cols-3 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Chiều cao (cm)</label>
+              <input
+                type="number"
+                [(ngModel)]="screening.height"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Cân nặng (kg)</label>
+              <input
+                type="number"
+                [(ngModel)]="screening.weight"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Nhóm máu</label>
+              <input
+                type="text"
+                [(ngModel)]="screening.bloodType"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                placeholder="O, A, B, AB"
+              />
+            </div>
+          </div>
+          <div class="mt-4">
+            <label class="block text-sm font-medium text-gray-700 mb-1"
+              >Khám thực thể tổng quát</label
+            >
+            <textarea
+              [(ngModel)]="screening.physicalExam"
+              rows="2"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            ></textarea>
+          </div>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Ghi chú</label>
+          <textarea
+            [(ngModel)]="screening.notes"
+            rows="2"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+          ></textarea>
+        </div>
+        <div class="flex justify-end gap-3">
+          <button (click)="back()" class="px-4 py-2 text-sm border border-gray-300 rounded-lg">
+            Hủy
+          </button>
+          <button
+            (click)="save()"
+            [disabled]="saving()"
+            class="px-6 py-2 text-sm bg-blue-600 text-white rounded-lg disabled:opacity-50"
+          >
+            {{ saving() ? 'Đang lưu...' : 'Lưu kết quả sàng lọc' }}
+          </button>
+        </div>
+      </div>
+    }
+  </div>
+</div>

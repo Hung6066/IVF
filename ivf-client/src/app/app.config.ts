@@ -7,6 +7,8 @@ import { authInterceptor } from './core/interceptors/auth.interceptor';
 import { securityInterceptor } from './core/interceptors/security.interceptor';
 import { consentInterceptor } from './core/interceptors/consent.interceptor';
 import { tenantLimitInterceptor } from './core/interceptors/tenant-limit.interceptor';
+import { errorInterceptor } from './core/interceptors/error.interceptor';
+import { loadingInterceptor } from './core/interceptors/loading.interceptor';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -14,10 +16,12 @@ export const appConfig: ApplicationConfig = {
     provideRouter(routes),
     provideHttpClient(
       withInterceptors([
+        loadingInterceptor,
         securityInterceptor,
         authInterceptor,
         consentInterceptor,
         tenantLimitInterceptor,
+        errorInterceptor,
       ]),
     ),
     provideAnimations(),

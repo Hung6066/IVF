@@ -1,0 +1,92 @@
+<div class="queue-layout">
+  <!-- Pending Column -->
+  <div class="queue-column">
+    <div class="column-header pending-header">
+      <h3>Cho xu ly ({{ pendingList.length }})</h3>
+    </div>
+    <div class="queue-list">
+      @for (rx of pendingList; track rx.id) {
+      <div class="queue-card pending" (click)="onSelect(rx)">
+        <div class="card-top">
+          <span class="patient-name">{{ rx.patientName }}</span>
+          <span class="urgency-badge" [class]="getUrgencyClass(rx)">{{ getUrgencyLabel(rx) }}</span>
+        </div>
+        <div class="card-info">
+          <span class="code">{{ rx.patientCode }}</span>
+          <span class="separator">|</span>
+          <span>BS. {{ rx.doctorName }}</span>
+        </div>
+        <div class="card-meta">
+          <span>{{ rx.items.length }} thuoc</span>
+          <span>{{ formatDate(rx.prescriptionDate) }}</span>
+        </div>
+        <div class="card-actions">
+          <button class="btn btn-sm btn-warning" (click)="onProcess(rx, $event)">Tiep nhan</button>
+        </div>
+      </div>
+      } @empty {
+      <div class="empty-queue">Khong co don cho</div>
+      }
+    </div>
+  </div>
+
+  <!-- In Progress Column -->
+  <div class="queue-column">
+    <div class="column-header processing-header">
+      <h3>Dang xu ly ({{ enteredList.length }})</h3>
+    </div>
+    <div class="queue-list">
+      @for (rx of enteredList; track rx.id) {
+      <div class="queue-card processing" (click)="onSelect(rx)">
+        <div class="card-top">
+          <span class="patient-name">{{ rx.patientName }}</span>
+          <span class="status-pill processing">Dang pha</span>
+        </div>
+        <div class="card-info">
+          <span class="code">{{ rx.patientCode }}</span>
+          <span class="separator">|</span>
+          <span>BS. {{ rx.doctorName }}</span>
+        </div>
+        <div class="card-meta">
+          <span>{{ rx.items.length }} thuoc</span>
+        </div>
+        <div class="card-actions">
+          <button class="btn btn-sm btn-primary" (click)="onSelect(rx); $event.stopPropagation()">Phat thuoc</button>
+        </div>
+      </div>
+      } @empty {
+      <div class="empty-queue">Khong co don dang xu ly</div>
+      }
+    </div>
+  </div>
+
+  <!-- Completed Column -->
+  <div class="queue-column">
+    <div class="column-header completed-header">
+      <h3>Da phat ({{ dispensedList.length }})</h3>
+    </div>
+    <div class="queue-list">
+      @for (rx of dispensedList; track rx.id) {
+      <div class="queue-card completed" (click)="onSelect(rx)">
+        <div class="card-top">
+          <span class="patient-name">{{ rx.patientName }}</span>
+          <span class="status-pill completed">Hoan tat</span>
+        </div>
+        <div class="card-info">
+          <span class="code">{{ rx.patientCode }}</span>
+          <span class="separator">|</span>
+          <span>BS. {{ rx.doctorName }}</span>
+        </div>
+        <div class="card-meta">
+          <span>{{ rx.items.length }} thuoc</span>
+          @if (rx.dispensedAt) {
+          <span>Phat luc {{ formatDate(rx.dispensedAt) }}</span>
+          }
+        </div>
+      </div>
+      } @empty {
+      <div class="empty-queue">Chua co don da phat</div>
+      }
+    </div>
+  </div>
+</div>

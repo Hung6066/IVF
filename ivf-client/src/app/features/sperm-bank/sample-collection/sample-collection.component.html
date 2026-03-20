@@ -1,0 +1,151 @@
+<div class="min-h-screen bg-gray-50 p-6">
+  <div class="max-w-2xl mx-auto">
+    <div class="flex items-center gap-3 mb-6">
+      <button (click)="back()" class="text-gray-500 hover:text-gray-700">
+        <i class="fas fa-arrow-left"></i>
+      </button>
+      <h1 class="text-2xl font-bold text-gray-800">Lấy Mẫu Tinh Trùng</h1>
+    </div>
+
+    @if (error()) {
+      <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4">
+        {{ error() }}
+      </div>
+    }
+    @if (success()) {
+      <div class="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg mb-4">
+        {{ success() }}
+      </div>
+    }
+
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-4">
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Mã NHTT</label>
+          <input
+            type="text"
+            [value]="donorId"
+            readonly
+            class="w-full border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 text-sm text-gray-500"
+          />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Loại lấy mẫu</label>
+          <select
+            [(ngModel)]="form.collectionType"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+          >
+            @for (ct of collectionTypes; track ct.value) {
+              <option [value]="ct.value">{{ ct.label }}</option>
+            }
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Ngày lấy mẫu</label>
+          <input
+            type="datetime-local"
+            [(ngModel)]="form.collectionDate"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+          />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Số ngày cữ (ngày)</label>
+          <input
+            type="number"
+            [(ngModel)]="form.abstinenceDays"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            placeholder="2–7"
+          />
+        </div>
+      </div>
+
+      <div>
+        <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
+          Thông số tinh dịch
+        </h2>
+        <div class="grid grid-cols-3 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Thể tích (ml)</label>
+            <input
+              type="number"
+              [(ngModel)]="form.volume"
+              step="0.1"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Mật độ (×10⁶/ml)</label>
+            <input
+              type="number"
+              [(ngModel)]="form.concentration"
+              step="0.1"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Di động tiến tới (%)</label>
+            <input
+              type="number"
+              [(ngModel)]="form.progressiveMotility"
+              step="0.1"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1"
+              >Hình dạng bình thường (%)</label
+            >
+            <input
+              type="number"
+              [(ngModel)]="form.normalMorphology"
+              step="0.1"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Phương pháp xử lý</label>
+            <select
+              [(ngModel)]="form.processingMethod"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            >
+              @for (m of processingMethods; track m) {
+                <option>{{ m }}</option>
+              }
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Số vials lưu trữ</label>
+            <input
+              type="number"
+              [(ngModel)]="form.vials"
+              min="1"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Ghi chú</label>
+        <textarea
+          [(ngModel)]="form.notes"
+          rows="2"
+          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+        ></textarea>
+      </div>
+
+      <div class="flex justify-end gap-3">
+        <button (click)="back()" class="px-4 py-2 text-sm border border-gray-300 rounded-lg">
+          Hủy
+        </button>
+        <button
+          (click)="save()"
+          [disabled]="saving()"
+          class="px-6 py-2 text-sm bg-blue-600 text-white rounded-lg disabled:opacity-50"
+        >
+          {{ saving() ? 'Đang lưu...' : 'Lưu mẫu' }}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,145 +1,179 @@
 <div class="dashboard-layout">
-    <header class="page-header">
-        <div class="header-title">
-            <h1>💉 Phòng Tiêm</h1>
-        </div>
-    </header>
-
-    <div class="stats-grid">
-        <div class="stat-card">
-            <div class="stat-icon info">⏳</div>
-            <div class="stat-content">
-                <span class="value">{{ queueCount() }}</span>
-                <span class="label">Đang chờ</span>
-            </div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-icon success">✅</div>
-            <div class="stat-content">
-                <span class="value">{{ completedCount() }}</span>
-                <span class="label">Đã tiêm</span>
-            </div>
-        </div>
+  <header class="page-header">
+    <div class="header-title">
+      <h1>💉 Phòng Tiêm</h1>
     </div>
+  </header>
 
-    <div class="tabs-container">
-        <button class="tab-btn" [class.active]="activeTab === 'queue'" (click)="activeTab = 'queue'">Hàng đợi</button>
-        <button class="tab-btn" [class.active]="activeTab === 'history'" (click)="activeTab = 'history'">Lịch
-            sử</button>
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-icon info">⏳</div>
+      <div class="stat-content">
+        <span class="value">{{ queueCount() }}</span>
+        <span class="label">Đang chờ</span>
+      </div>
     </div>
+    <div class="stat-card">
+      <div class="stat-icon success">✅</div>
+      <div class="stat-content">
+        <span class="value">{{ completedCount() }}</span>
+        <span class="label">Đã tiêm</span>
+      </div>
+    </div>
+  </div>
 
-    @if (activeTab === 'queue') {
+  <div class="tabs-container">
+    <button class="tab-btn" [class.active]="activeTab === 'queue'" (click)="activeTab = 'queue'">
+      Hàng đợi
+    </button>
+    <button
+      class="tab-btn"
+      [class.active]="activeTab === 'history'"
+      (click)="activeTab = 'history'"
+    >
+      Lịch sử
+    </button>
+    <a routerLink="/admin/drug-catalog" class="tab-btn tab-link">📖 Danh mục thuốc</a>
+  </div>
+
+  @if (activeTab === 'queue') {
     <section class="card">
-        <div class="section-header">
-            <h2>Danh sách chờ ({{ queueCount() }})</h2>
-        </div>
-        <div class="table-container">
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>STT</th>
-                        <th>Họ tên</th>
-                        <th>Giờ lấy số</th>
-                        <th>Trạng thái</th>
-                        <th class="text-right">Thao tác</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @for (q of queue(); track q.id) {
-                    <tr>
-                        <td class="stt-cell">{{ q.ticketNumber }}</td>
-                        <td>{{ q.patientName }}</td>
-                        <td>{{ formatTime(q.issuedAt) }}</td>
-                        <td>
-                            @if (q.status === 'Waiting') { <span class="status-badge pending">Đang chờ</span> }
-                            @else if (q.status === 'Called') { <span class="status-badge called">Đang gọi</span> }
-                            @else if (q.status === 'InService') { <span class="status-badge processing">Đang tiêm</span>
-                            }
-                            @else { <span class="status-badge">{{ q.status }}</span> }
-                        </td>
-                        <td class="actions-cell">
-                            <button class="btn btn-sm btn-primary" (click)="callPatient(q)"
-                                [disabled]="q.status !== 'Waiting'">📢 Gọi</button>
-                            <button class="btn btn-sm btn-success" (click)="startInjection(q)"
-                                [disabled]="q.status === 'InService'">💉 Tiêm</button>
-                            <button class="btn btn-sm btn-warning" (click)="skipPatient(q)"
-                                [disabled]="q.status === 'InService'">⏭️ Bỏ qua</button>
-                        </td>
-                    </tr>
-                    } @empty {
-                    <tr>
-                        <td colspan="5" class="empty-state">Không có bệnh nhân chờ</td>
-                    </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
+      <div class="section-header">
+        <h2>Danh sách chờ ({{ queueCount() }})</h2>
+      </div>
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>STT</th>
+              <th>Họ tên</th>
+              <th>Giờ lấy số</th>
+              <th>Trạng thái</th>
+              <th class="text-right">Thao tác</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (q of queue(); track q.id) {
+              <tr>
+                <td class="stt-cell">{{ q.ticketNumber }}</td>
+                <td>{{ q.patientName }}</td>
+                <td>{{ formatTime(q.issuedAt) }}</td>
+                <td>
+                  @if (q.status === 'Waiting') {
+                    <span class="status-badge pending">Đang chờ</span>
+                  } @else if (q.status === 'Called') {
+                    <span class="status-badge called">Đang gọi</span>
+                  } @else if (q.status === 'InService') {
+                    <span class="status-badge processing">Đang tiêm</span>
+                  } @else {
+                    <span class="status-badge">{{ q.status }}</span>
+                  }
+                </td>
+                <td class="actions-cell">
+                  <button
+                    class="btn btn-sm btn-primary"
+                    (click)="callPatient(q)"
+                    [disabled]="q.status !== 'Waiting'"
+                  >
+                    📢 Gọi
+                  </button>
+                  <button
+                    class="btn btn-sm btn-success"
+                    (click)="startInjection(q)"
+                    [disabled]="q.status === 'InService'"
+                  >
+                    💉 Tiêm
+                  </button>
+                  <button
+                    class="btn btn-sm btn-warning"
+                    (click)="skipPatient(q)"
+                    [disabled]="q.status === 'InService'"
+                  >
+                    ⏭️ Bỏ qua
+                  </button>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="5" class="empty-state">Không có bệnh nhân chờ</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
     </section>
-    }
+  }
 
-    @if (activeTab === 'history') {
+  @if (activeTab === 'history') {
     <section class="card">
-        <div class="section-header">
-            <h2>Lịch sử tiêm hôm nay ({{ completedCount() }})</h2>
-        </div>
-        <div class="table-container">
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>STT</th>
-                        <th>Họ tên</th>
-                        <th>Giờ tiêm</th>
-                        <th>Ghi chú</th>
-                        <th>Trạng thái</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @for (h of history(); track h.id) {
-                    <tr>
-                        <td class="stt-cell">{{ h.ticketNumber }}</td>
-                        <td>{{ h.patientName }}</td>
-                        <td>{{ formatTime(h.completedAt || h.issuedAt) }}</td>
-                        <td>{{ h.notes || '-' }}</td>
-                        <td><span class="status-badge success">Đã tiêm</span></td>
-                    </tr>
-                    } @empty {
-                    <tr>
-                        <td colspan="5" class="empty-state">Chưa có lịch sử tiêm hôm nay</td>
-                    </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
+      <div class="section-header">
+        <h2>Lịch sử tiêm hôm nay ({{ completedCount() }})</h2>
+      </div>
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>STT</th>
+              <th>Họ tên</th>
+              <th>Giờ tiêm</th>
+              <th>Ghi chú</th>
+              <th>Trạng thái</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (h of history(); track h.id) {
+              <tr>
+                <td class="stt-cell">{{ h.ticketNumber }}</td>
+                <td>{{ h.patientName }}</td>
+                <td>{{ formatTime(h.completedAt || h.issuedAt) }}</td>
+                <td>{{ h.notes || '-' }}</td>
+                <td><span class="status-badge success">Đã tiêm</span></td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="5" class="empty-state">Chưa có lịch sử tiêm hôm nay</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
     </section>
-    }
+  }
 
-    @if (showForm) {
+  @if (showForm) {
     <div class="modal-overlay" (click)="showForm = false">
-        <div class="modal-content" (click)="$event.stopPropagation()">
-            <div class="modal-header">
-                <h3>💉 Xác nhận tiêm thuốc</h3>
-                <button class="close-btn" (click)="showForm = false">×</button>
-            </div>
-
-            <form (ngSubmit)="submitInjection()">
-                <div class="modal-body">
-                    <div class="patient-info-summary"
-                        style="margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px dashed #e2e8f0;">
-                        <strong>BN: </strong> {{ currentPatientName }}
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Loại thuốc / Ghi chú</label>
-                        <textarea class="form-control" [(ngModel)]="injectionNotes" name="notes" rows="3"
-                            placeholder="Ghi chú thuốc đã tiêm..."></textarea>
-                    </div>
-                </div>
-
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" (click)="showForm = false">Huỷ</button>
-                    <button type="submit" class="btn btn-primary">Xác nhận Tiêm xong</button>
-                </div>
-            </form>
+      <div class="modal-content" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h3>💉 Xác nhận tiêm thuốc</h3>
+          <button class="close-btn" (click)="showForm = false">×</button>
         </div>
+
+        <form (ngSubmit)="submitInjection()">
+          <div class="modal-body">
+            <div
+              class="patient-info-summary"
+              style="margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px dashed #e2e8f0"
+            >
+              <strong>BN: </strong> {{ currentPatientName }}
+            </div>
+            <div class="form-group">
+              <label class="form-label">Loại thuốc / Ghi chú</label>
+              <textarea
+                class="form-control"
+                [(ngModel)]="injectionNotes"
+                name="notes"
+                rows="3"
+                placeholder="Ghi chú thuốc đã tiêm..."
+              ></textarea>
+            </div>
+          </div>
+
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" (click)="showForm = false">Huỷ</button>
+            <button type="submit" class="btn btn-primary">Xác nhận Tiêm xong</button>
+          </div>
+        </form>
+      </div>
     </div>
-    }
+  }
 </div>

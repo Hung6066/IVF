@@ -51,7 +51,8 @@ public record AddInvoiceItemCommand(
     string ServiceCode,
     string Description,
     int Quantity,
-    decimal UnitPrice
+    decimal UnitPrice,
+    string FeeType = "IVFMD"   // P10.06: "IVFMD" | "Hospital"
 ) : IRequest<Result<InvoiceDto>>;
 
 public class AddInvoiceItemHandler : IRequestHandler<AddInvoiceItemCommand, Result<InvoiceDto>>
@@ -70,7 +71,7 @@ public class AddInvoiceItemHandler : IRequestHandler<AddInvoiceItemCommand, Resu
         var invoice = await _invoiceRepo.GetByIdWithItemsAsync(r.InvoiceId, ct);
         if (invoice == null) return Result<InvoiceDto>.Failure("Invoice not found");
 
-        invoice.AddItem(r.ServiceCode, r.Description, r.Quantity, r.UnitPrice);
+        invoice.AddItem(r.ServiceCode, r.Description, r.Quantity, r.UnitPrice, r.FeeType);
         await _invoiceRepo.UpdateAsync(invoice, ct);
         await _unitOfWork.SaveChangesAsync(ct);
 
@@ -186,4 +187,81 @@ public record PaymentDto(
         p.Id, p.PaymentNumber, p.InvoiceId, p.PaymentDate, p.Amount,
         p.PaymentMethod.ToString(), p.TransactionReference, p.CreatedAt
     );
+}
+
+// ==================== VOID INVOICE ====================
+[RequiresFeature(FeatureCodes.Billing)]
+public record VoidInvoiceCommand(Guid InvoiceId) : IRequest<Result<InvoiceDto>>;
+
+public class VoidInvoiceHandler : IRequestHandler<VoidInvoiceCommand, Result<InvoiceDto>>
+{
+    private readonly IInvoiceRepository _invoiceRepo;
+    private readonly IUnitOfWork _unitOfWork;
+
+    public VoidInvoiceHandler(IInvoiceRepository invoiceRepo, IUnitOfWork unitOfWork)
+    {
+        _invoiceRepo = invoiceRepo;
+        _unitOfWork = unitOfWork;
+    }
+
+    public async Task<Result<InvoiceDto>> Handle(VoidInvoiceCommand r, CancellationToken ct)
+    {
+        var invoice = await _invoiceRepo.GetByIdAsync(r.InvoiceId, ct);
+        if (invoice is null) return Result<InvoiceDto>.Failure("Không tìm thấy hóa đơn.");
+
+        invoice.Cancel();
+        await _invoiceRepo.UpdateAsync(invoice, ct);
+        await _unitOfWork.SaveChangesAsync(ct);
+        return Result<InvoiceDto>.Success(InvoiceDto.FromEntity(invoice, invoice.Patient?.FullName ?? ""));
+    }
+}
+
+// ==================== REFUND PAYMENT ====================
+[RequiresFeature(FeatureCodes.Billing)]
+public record RefundPaymentCommand(
+    Guid InvoiceId,
+    decimal RefundAmount,
+    string Reason,
+    Guid RefundedByUserId) : IRequest<Result<PaymentDto>>;
+
+public class RefundPaymentValidator : AbstractValidator<RefundPaymentCommand>
+{
+    public RefundPaymentValidator()
+    {
+        RuleFor(x => x.RefundAmount).GreaterThan(0);
+        RuleFor(x => x.Reason).NotEmpty().MaximumLength(500);
+    }
+}
+
+public class RefundPaymentHandler : IRequestHandler<RefundPaymentCommand, Result<PaymentDto>>
+{
+    private readonly IInvoiceRepository _invoiceRepo;
+    private readonly IPaymentRepository _paymentRepo;
+    private readonly IUnitOfWork _unitOfWork;
+
+    public RefundPaymentHandler(IInvoiceRepository invoiceRepo, IPaymentRepository paymentRepo, IUnitOfWork unitOfWork)
+    {
+        _invoiceRepo = invoiceRepo;
+        _paymentRepo = paymentRepo;
+        _unitOfWork = unitOfWork;
+    }
+
+    public async Task<Result<PaymentDto>> Handle(RefundPaymentCommand r, CancellationToken ct)
+    {
+        var invoice = await _invoiceRepo.GetByIdAsync(r.InvoiceId, ct);
+        if (invoice is null) return Result<PaymentDto>.Failure("Không tìm thấy hóa đơn.");
+        if (r.RefundAmount > invoice.PaidAmount)
+            return Result<PaymentDto>.Failure("Số tiền hoàn trả vượt quá số tiền đã thanh toán.");
+
+        var paymentNumber = await _paymentRepo.GeneratePaymentNumberAsync(ct);
+        var refund = Payment.Create(r.InvoiceId, paymentNumber, DateTime.UtcNow, -r.RefundAmount,
+            PaymentMethod.Cash, $"REFUND: {r.Reason}", r.RefundedByUserId);
+
+        invoice.RecordPayment(-r.RefundAmount);
+
+        await _paymentRepo.AddAsync(refund, ct);
+        await _invoiceRepo.UpdateAsync(invoice, ct);
+        await _unitOfWork.SaveChangesAsync(ct);
+        return Result<PaymentDto>.Success(PaymentDto.FromEntity(refund));
+    }
 }

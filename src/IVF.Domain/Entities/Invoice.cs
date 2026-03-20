@@ -59,9 +59,9 @@ public class Invoice : BaseEntity, ITenantEntity
         };
     }
 
-    public void AddItem(string serviceCode, string description, int quantity, decimal unitPrice)
+    public void AddItem(string serviceCode, string description, int quantity, decimal unitPrice, string feeType = "IVFMD")
     {
-        var item = InvoiceItem.Create(Id, serviceCode, description, quantity, unitPrice);
+        var item = InvoiceItem.Create(Id, serviceCode, description, quantity, unitPrice, feeType);
         Items.Add(item);
         RecalculateTotals();
     }
@@ -134,13 +134,14 @@ public class InvoiceItem : BaseEntity
     public int Quantity { get; private set; }
     public decimal UnitPrice { get; private set; }
     public decimal Amount => Quantity * UnitPrice;
+    public string FeeType { get; private set; } = "IVFMD"; // P10.06: "IVFMD" | "Hospital"
 
     // Navigation
     public Invoice Invoice { get; private set; } = null!;
 
     private InvoiceItem() { }
 
-    public static InvoiceItem Create(Guid invoiceId, string serviceCode, string description, int quantity, decimal unitPrice)
+    public static InvoiceItem Create(Guid invoiceId, string serviceCode, string description, int quantity, decimal unitPrice, string feeType = "IVFMD")
     {
         return new InvoiceItem
         {
@@ -150,6 +151,7 @@ public class InvoiceItem : BaseEntity
             Description = description,
             Quantity = quantity,
             UnitPrice = unitPrice,
+            FeeType = feeType,
             CreatedAt = DateTime.UtcNow
         };
     }

@@ -13,11 +13,25 @@
   <div class="search-bar">
     <input
       type="text"
-      class="form-control"
+      class="form-control search-input"
       [(ngModel)]="searchQuery"
       (input)="onSearch()"
       placeholder="🔍 Tìm kiếm theo tên, mã bệnh nhân, SĐT..."
     />
+    <select
+      class="form-control filter-select"
+      [(ngModel)]="genderFilter"
+      (change)="onFilterChange()"
+    >
+      <option value="">Tất cả giới tính</option>
+      <option value="Female">Nữ</option>
+      <option value="Male">Nam</option>
+    </select>
+    <select class="form-control filter-select" [(ngModel)]="pageSize" (change)="onFilterChange()">
+      <option [value]="10">10 / trang</option>
+      <option [value]="20">20 / trang</option>
+      <option [value]="50">50 / trang</option>
+    </select>
   </div>
 
   <div class="card table-container">
@@ -78,10 +92,10 @@
       >
         ← Trước
       </button>
-      <span class="page-info">Trang {{ page() }}</span>
+      <span class="page-info">Trang {{ page() }} / {{ Math.ceil(total() / pageSize) || 1 }}</span>
       <button
         class="btn btn-sm btn-secondary"
-        [disabled]="patients().length < pageSize"
+        [disabled]="page() * pageSize >= total()"
         (click)="changePage(page() + 1)"
       >
         Sau →

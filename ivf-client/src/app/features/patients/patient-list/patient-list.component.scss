@@ -52,13 +52,31 @@
 
 .search-bar {
   margin-bottom: 1.5rem;
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  align-items: center;
 
-  input {
-    width: 100%;
-    max-width: 400px;
+  .search-input {
+    flex: 1;
+    min-width: 220px;
     padding: 0.75rem 1rem;
     border: 1px solid var(--border-color);
     border-radius: 8px;
+
+    &:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+  }
+
+  .filter-select {
+    width: auto;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: white;
+    cursor: pointer;
 
     &:focus {
       outline: none;

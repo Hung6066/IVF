@@ -1,0 +1,345 @@
+<div class="p-6 space-y-6">
+  <!-- Header -->
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900">Theo dõi Kích thích Buồng trứng</h1>
+      <p class="text-sm text-gray-500 mt-1">Chu kỳ: {{ cycleId }}</p>
+    </div>
+    <div class="flex gap-2">
+      <button
+        (click)="showScanForm = !showScanForm"
+        class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
+      >
+        + SA nang noãn
+      </button>
+      <button
+        (click)="showTriggerForm = !showTriggerForm"
+        class="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 text-sm font-medium"
+      >
+        💉 Trigger shot
+      </button>
+      <button
+        (click)="showDecisionPanel = !showDecisionPanel"
+        class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium"
+      >
+        ✓ Đánh giá nang
+      </button>
+    </div>
+  </div>
+
+  <!-- Alerts -->
+  @if (successMsg()) {
+    <div class="bg-green-50 border border-green-200 rounded-lg p-3 text-green-800 text-sm">
+      ✓ {{ successMsg() }}
+    </div>
+  }
+  @if (error()) {
+    <div class="bg-red-50 border border-red-200 rounded-lg p-3 text-red-800 text-sm">
+      ⚠ {{ error() }}
+    </div>
+  }
+
+  <!-- Loading -->
+  @if (loading()) {
+    <div class="flex items-center justify-center h-32 text-gray-500">Đang tải dữ liệu...</div>
+  }
+
+  @if (!loading()) {
+    <!-- Tracker Summary -->
+    @if (tracker()) {
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="bg-white border rounded-xl p-4">
+          <p class="text-xs text-gray-500 uppercase tracking-wide">Nang ≥14mm</p>
+          <p class="text-3xl font-bold text-blue-700 mt-1">
+            {{ tracker()?.currentFolliclesReady ?? '—' }}
+          </p>
+        </div>
+        <div class="bg-white border rounded-xl p-4">
+          <p class="text-xs text-gray-500 uppercase tracking-wide">Niêm mạc (mm)</p>
+          <p class="text-3xl font-bold text-purple-700 mt-1">
+            {{ tracker()?.currentEndometriumThickness ?? '—' }}
+          </p>
+        </div>
+        <div class="bg-white border rounded-xl p-4">
+          <p class="text-xs text-gray-500 uppercase tracking-wide">E2 (pmol/L)</p>
+          <p class="text-3xl font-bold text-pink-700 mt-1">{{ tracker()?.e2Lab ?? '—' }}</p>
+        </div>
+        <div
+          class="bg-white border rounded-xl p-4"
+          [class.bg-green-50]="tracker()?.triggerGiven"
+          [class.border-green-300]="tracker()?.triggerGiven"
+        >
+          <p class="text-xs text-gray-500 uppercase tracking-wide">Trigger</p>
+          @if (tracker()?.triggerGiven) {
+            <p class="text-sm font-bold text-green-700 mt-1">✓ {{ tracker()?.triggerDrug }}</p>
+            <p class="text-xs text-gray-500">
+              {{ formatDate(tracker()?.triggerDate) }} {{ tracker()?.triggerTime }}
+            </p>
+          } @else {
+            <p class="text-3xl font-bold text-gray-400 mt-1">—</p>
+          }
+        </div>
+      </div>
+
+      <!-- Medication Schedule -->
+      @if (medications().length > 0) {
+        <div class="bg-white border rounded-xl p-4">
+          <h3 class="font-semibold text-gray-800 mb-3">Phác đồ thuốc KTBT</h3>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="text-left p-2 text-gray-600">STT</th>
+                  <th class="text-left p-2 text-gray-600">Thuốc</th>
+                  <th class="text-left p-2 text-gray-600">Cách dùng</th>
+                  <th class="text-left p-2 text-gray-600">Số ngày</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (med of medications(); track med.sortOrder) {
+                  <tr class="border-t hover:bg-gray-50">
+                    <td class="p-2">{{ med.sortOrder }}</td>
+                    <td class="p-2 font-medium">{{ med.drugName }}</td>
+                    <td class="p-2 text-gray-600">{{ med.posology || '—' }}</td>
+                    <td class="p-2">{{ med.duration }} ngày</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      }
+    } @else {
+      <div
+        class="bg-gray-50 border border-dashed border-gray-300 rounded-xl p-8 text-center text-gray-500"
+      >
+        Chưa có dữ liệu kích thích. Nhấn "SA nang noãn" để bắt đầu ghi nhận.
+      </div>
+    }
+
+    <!-- Follicle Scan Form -->
+    @if (showScanForm) {
+      <div class="bg-blue-50 border border-blue-200 rounded-xl p-5 space-y-4">
+        <h3 class="font-semibold text-blue-900">Ghi nhận SA nang noãn</h3>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div>
+            <label class="block text-xs text-gray-600 mb-1">Ngày SA</label>
+            <input
+              type="date"
+              [(ngModel)]="scanForm.scanDate"
+              class="w-full border rounded-lg px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label class="block text-xs text-gray-600 mb-1">Ngày chu kỳ</label>
+            <input
+              type="number"
+              [(ngModel)]="scanForm.cycleDay"
+              class="w-full border rounded-lg px-3 py-2 text-sm"
+              min="1"
+            />
+          </div>
+          <div>
+            <label class="block text-xs text-gray-600 mb-1">Nang ≥12mm</label>
+            <input
+              type="number"
+              [(ngModel)]="scanForm.size12Follicle"
+              class="w-full border rounded-lg px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label class="block text-xs text-gray-600 mb-1">Nang ≥14mm</label>
+            <input
+              type="number"
+              [(ngModel)]="scanForm.size14Follicle"
+              class="w-full border rounded-lg px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label class="block text-xs text-gray-600 mb-1">Tổng nang</label>
+            <input
+              type="number"
+              [(ngModel)]="scanForm.totalFollicles"
+              class="w-full border rounded-lg px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label class="block text-xs text-gray-600 mb-1">Niêm mạc (mm)</label>
+            <input
+              type="number"
+              step="0.1"
+              [(ngModel)]="scanForm.endometriumThickness"
+              class="w-full border rounded-lg px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label class="block text-xs text-gray-600 mb-1">E2 (pmol/L)</label>
+            <input
+              type="number"
+              [(ngModel)]="scanForm.e2"
+              class="w-full border rounded-lg px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label class="block text-xs text-gray-600 mb-1">LH (IU/L)</label>
+            <input
+              type="number"
+              [(ngModel)]="scanForm.lh"
+              class="w-full border rounded-lg px-3 py-2 text-sm"
+            />
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs text-gray-600 mb-1">Ghi chú</label>
+          <input
+            type="text"
+            [(ngModel)]="scanForm.notes"
+            class="w-full border rounded-lg px-3 py-2 text-sm"
+            placeholder="Nhận xét SA..."
+          />
+        </div>
+        <div class="flex gap-2">
+          <button
+            (click)="submitScan()"
+            [disabled]="saving()"
+            class="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium disabled:opacity-50"
+          >
+            {{ saving() ? 'Đang lưu...' : 'Lưu SA' }}
+          </button>
+          <button
+            (click)="showScanForm = false"
+            class="px-5 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50"
+          >
+            Hủy
+          </button>
+        </div>
+      </div>
+    }
+
+    <!-- Trigger Form -->
+    @if (showTriggerForm) {
+      <div class="bg-orange-50 border border-orange-200 rounded-xl p-5 space-y-4">
+        <h3 class="font-semibold text-orange-900">Ghi nhận Tiêm rụng trứng (Trigger Shot)</h3>
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+          <div>
+            <label class="block text-xs text-gray-600 mb-1">Thuốc trigger</label>
+            <input
+              type="text"
+              [(ngModel)]="triggerForm.triggerDrug"
+              class="w-full border rounded-lg px-3 py-2 text-sm"
+              placeholder="Ovitrelle, Pregnyl..."
+            />
+          </div>
+          <div>
+            <label class="block text-xs text-gray-600 mb-1">Ngày tiêm</label>
+            <input
+              type="date"
+              [(ngModel)]="triggerForm.triggerDate"
+              class="w-full border rounded-lg px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label class="block text-xs text-gray-600 mb-1">Giờ tiêm</label>
+            <input
+              type="time"
+              [(ngModel)]="triggerForm.triggerTime"
+              class="w-full border rounded-lg px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label class="block text-xs text-gray-600 mb-1">E2 (pmol/L)</label>
+            <input
+              type="number"
+              [(ngModel)]="triggerForm.e2Lab"
+              class="w-full border rounded-lg px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label class="block text-xs text-gray-600 mb-1">LH (IU/L)</label>
+            <input
+              type="number"
+              [(ngModel)]="triggerForm.lhLab"
+              class="w-full border rounded-lg px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label class="block text-xs text-gray-600 mb-1">P4 (nmol/L)</label>
+            <input
+              type="number"
+              [(ngModel)]="triggerForm.p4Lab"
+              class="w-full border rounded-lg px-3 py-2 text-sm"
+            />
+          </div>
+        </div>
+        <div class="flex gap-2">
+          <button
+            (click)="submitTrigger()"
+            [disabled]="saving()"
+            class="px-5 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 text-sm font-medium disabled:opacity-50"
+          >
+            {{ saving() ? 'Đang lưu...' : 'Ghi nhận' }}
+          </button>
+          <button
+            (click)="showTriggerForm = false"
+            class="px-5 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50"
+          >
+            Hủy
+          </button>
+        </div>
+      </div>
+    }
+
+    <!-- Decision Panel -->
+    @if (showDecisionPanel) {
+      <div class="bg-green-50 border border-green-200 rounded-xl p-5 space-y-4">
+        <h3 class="font-semibold text-green-900">Đánh giá nang noãn</h3>
+        <div class="flex gap-3 flex-wrap">
+          @for (opt of ['Proceed', 'Cancel', 'IVM', 'CoastDay']; track opt) {
+            <button
+              (click)="decision = opt"
+              [class]="
+                'px-4 py-2 rounded-lg border text-sm font-medium transition-colors ' +
+                (decision === opt
+                  ? 'bg-green-700 text-white border-green-700'
+                  : 'bg-white text-gray-700 hover:bg-green-100')
+              "
+            >
+              {{
+                opt === 'Proceed'
+                  ? '✓ Đạt — Tiến hành'
+                  : opt === 'Cancel'
+                    ? '✗ Ngưng'
+                    : opt === 'IVM'
+                      ? 'IVM'
+                      : 'Coast ngày'
+              }}
+            </button>
+          }
+        </div>
+        @if (decision === 'Cancel') {
+          <input
+            type="text"
+            [(ngModel)]="decisionReason"
+            class="w-full border rounded-lg px-3 py-2 text-sm"
+            placeholder="Lý do ngưng..."
+          />
+        }
+        <div class="flex gap-2">
+          <button
+            (click)="submitDecision()"
+            [disabled]="saving()"
+            class="px-5 py-2 bg-green-700 text-white rounded-lg hover:bg-green-800 text-sm font-medium disabled:opacity-50"
+          >
+            {{ saving() ? 'Đang lưu...' : 'Xác nhận' }}
+          </button>
+          <button
+            (click)="showDecisionPanel = false"
+            class="px-5 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50"
+          >
+            Hủy
+          </button>
+        </div>
+      </div>
+    }
+  }
+</div>

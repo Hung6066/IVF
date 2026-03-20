@@ -25,10 +25,17 @@ using Serilog.Events;
 using Serilog.Formatting.Compact;
 
 // ─── Serilog Bootstrap Logger (captures startup/shutdown errors) ───
+var _isDev = (Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Production")
+    .Equals("Development", StringComparison.OrdinalIgnoreCase);
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
     .Enrich.FromLogContext()
-    .WriteTo.Console(new RenderedCompactJsonFormatter())
+    .WriteTo.Console(
+        _isDev
+            ? new Serilog.Templates.ExpressionTemplate(
+                "[{@t:HH:mm:ss} {@l:u3}] {Substring(SourceContext, LastIndexOf(SourceContext, '.') + 1)}: {@m}\n{@x}",
+                theme: Serilog.Templates.Themes.TemplateTheme.Code)
+            : (Serilog.Formatting.ITextFormatter)new RenderedCompactJsonFormatter())
     .CreateBootstrapLogger();
 
 try
@@ -52,7 +59,12 @@ try
             .Enrich.WithThreadId()
             .Enrich.WithProperty("Application", "IVF.API")
             .Enrich.WithProperty("Version", typeof(Program).Assembly.GetName().Version?.ToString() ?? "1.0.0")
-            .WriteTo.Console(new RenderedCompactJsonFormatter());
+            .WriteTo.Console(
+                context.HostingEnvironment.IsDevelopment()
+                    ? new Serilog.Templates.ExpressionTemplate(
+                        "[{@t:HH:mm:ss} {@l:u3}] {Substring(SourceContext, LastIndexOf(SourceContext, '.') + 1)}: {@m}\n{@x}",
+                        theme: Serilog.Templates.Themes.TemplateTheme.Code)
+                    : (Serilog.Formatting.ITextFormatter)new RenderedCompactJsonFormatter());
     });
 
     // ─── Resolve Docker Secrets in configuration ───
@@ -64,6 +76,12 @@ try
     builder.Services.AddApplication();
     builder.Services.AddInfrastructure(builder.Configuration);
     builder.Services.AddMemoryCache();
+
+    // ─── Background service resilience ───
+    builder.Services.Configure<HostOptions>(options =>
+    {
+        options.BackgroundServiceExceptionBehavior = BackgroundServiceExceptionBehavior.Ignore;
+    });
 
     // ─── Health Checks ───
     builder.Services.AddHealthChecks()
@@ -742,7 +760,17 @@ try
     app.MapBillingEndpoints();
     app.MapReportEndpoints();
     app.MapAppointmentEndpoints();
+    app.MapPrescriptionEndpoints();
+    app.MapPrescriptionTemplateEndpoints();
+    app.MapDrugCatalogEndpoints();
+    app.MapConsultationEndpoints();
+    app.MapFetEndpoints();
+    app.MapProcedureEndpoints();
+    app.MapEggBankEndpoints();
+    app.MapInventoryEndpoints();
     app.MapNotificationEndpoints();
+    app.MapStimulationEndpoints();
+    app.MapPregnancyEndpoints();
     app.MapAuditEndpoints();
     app.MapDoctorEndpoints();
     app.MapUserEndpoints();
@@ -752,6 +780,12 @@ try
     app.MapPermissionDefinitionEndpoints();
     app.MapSeedEndpoints();
     app.MapLabEndpoints();
+    app.MapConsentEndpoints();
+    app.MapCycleFeeEndpoints();
+    app.MapFileTrackingEndpoints();
+    app.MapMedicationAdminEndpoints();
+    app.MapInventoryRequestEndpoints();
+    app.MapEggDonorRecipientEndpoints();
     app.MapFormEndpoints();
     app.MapConceptEndpoints();
     app.MapDigitalSigningEndpoints();

@@ -1,6 +1,7 @@
-using IVF.Application.Common.Interfaces;
-using IVF.Domain.Entities;
+using IVF.Application.Features.Appointments.Commands;
+using IVF.Application.Features.Appointments.Queries;
 using IVF.Domain.Enums;
+using MediatR;
 
 namespace IVF.API.Endpoints;
 
@@ -11,141 +12,91 @@ public static class AppointmentEndpoints
         var group = app.MapGroup("/api/appointments").WithTags("Appointments").RequireAuthorization();
 
         // Get today's appointments
-        group.MapGet("/today", async (IAppointmentRepository repo) =>
-            Results.Ok(await repo.GetTodayAppointmentsAsync()));
+        group.MapGet("/today", async (IMediator mediator) =>
+        {
+            var result = await mediator.Send(new GetTodayAppointmentsQuery());
+            return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
+        });
 
         // Get appointments by date range
-        group.MapGet("/", async (IAppointmentRepository repo, DateTime? start, DateTime? end) =>
+        group.MapGet("/", async (IMediator mediator, DateTime? start, DateTime? end) =>
         {
-            var startDate = start ?? DateTime.UtcNow.Date;
-            var endDate = end ?? startDate.AddDays(7);
-            return Results.Ok(await repo.GetByDateRangeAsync(startDate, endDate));
+            var result = await mediator.Send(new GetAppointmentsByDateRangeQuery(start, end));
+            return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
         });
 
         // Get upcoming appointments
-        group.MapGet("/upcoming", async (IAppointmentRepository repo, Guid? doctorId, int days = 7) =>
-            Results.Ok(await repo.GetUpcomingAsync(doctorId, days)));
+        group.MapGet("/upcoming", async (IMediator mediator, Guid? doctorId, int days = 7) =>
+        {
+            var result = await mediator.Send(new GetUpcomingAppointmentsQuery(doctorId, days));
+            return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
+        });
 
         // Get appointment by ID
-        group.MapGet("/{id:guid}", async (Guid id, IAppointmentRepository repo) =>
+        group.MapGet("/{id:guid}", async (Guid id, IMediator mediator) =>
         {
-            var apt = await repo.GetByIdAsync(id);
-            return apt is null ? Results.NotFound() : Results.Ok(apt);
+            var result = await mediator.Send(new GetAppointmentByIdQuery(id));
+            return result.IsSuccess ? Results.Ok(result.Value) : Results.NotFound(result.Error);
         });
 
         // Get appointments by patient
-        group.MapGet("/patient/{patientId:guid}", async (Guid patientId, IAppointmentRepository repo) =>
-            Results.Ok(await repo.GetByPatientAsync(patientId)));
-
-        // Get appointments by doctor for a date
-        group.MapGet("/doctor/{doctorId:guid}", async (Guid doctorId, DateTime? date, IAppointmentRepository repo) =>
-            Results.Ok(await repo.GetByDoctorAsync(doctorId, date ?? DateTime.UtcNow.Date)));
-
-        // Create appointment
-        group.MapPost("/", async (CreateAppointmentRequest req, IAppointmentRepository repo, IUnitOfWork uow, IDoctorRepository docRepo, INotificationService notifService) =>
+        group.MapGet("/patient/{patientId:guid}", async (Guid patientId, IMediator mediator) =>
         {
-            if (req.DoctorId.HasValue)
-            {
-                var hasConflict = await repo.HasConflictAsync(req.DoctorId.Value, req.ScheduledAt, req.DurationMinutes);
-                if (hasConflict)
-                    return Results.BadRequest("Doctor has a scheduling conflict at this time");
-            }
-
-            var apt = Appointment.Create(
-                req.PatientId,
-                req.ScheduledAt,
-                req.Type,
-                req.CycleId,
-                req.DoctorId,
-                req.DurationMinutes,
-                req.Notes,
-                req.RoomNumber);
-
-            await repo.AddAsync(apt);
-            await uow.SaveChangesAsync();
-
-            // Send Notification to Doctor
-            if (req.DoctorId.HasValue)
-            {
-                var doctor = await docRepo.GetByIdAsync(req.DoctorId.Value);
-                if (doctor != null)
-                {
-                    await notifService.SendAppointmentReminderAsync(doctor.UserId, apt.Id, req.ScheduledAt);
-                }
-            }
-
-            return Results.Created($"/api/appointments/{apt.Id}", apt);
+            var result = await mediator.Send(new GetAppointmentsByPatientQuery(patientId));
+            return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
         });
 
+        // Get appointments by doctor for a date
+        group.MapGet("/doctor/{doctorId:guid}", async (Guid doctorId, DateTime? date, IMediator mediator) =>
+        {
+            var result = await mediator.Send(new GetAppointmentsByDoctorQuery(doctorId, date));
+            return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
+        });
+
+        // Create appointment
+        group.MapPost("/", async (CreateAppointmentCommand cmd, IMediator mediator) =>
+        {
+            var result = await mediator.Send(cmd);
+            return result.IsSuccess
+                ? Results.Created($"/api/appointments/{result.Value!.Id}", result.Value)
+                : Results.BadRequest(result.Error);
+        });
 
         // Confirm appointment
-        group.MapPost("/{id:guid}/confirm", async (Guid id, IAppointmentRepository repo, IUnitOfWork uow) =>
+        group.MapPost("/{id:guid}/confirm", async (Guid id, IMediator mediator) =>
         {
-            var apt = await repo.GetByIdAsync(id);
-            if (apt is null) return Results.NotFound();
-            apt.Confirm();
-            await uow.SaveChangesAsync();
-            return Results.Ok(apt);
+            var result = await mediator.Send(new ConfirmAppointmentCommand(id));
+            return result.IsSuccess ? Results.Ok(result.Value) : Results.NotFound(result.Error);
         });
 
         // Check in
-        group.MapPost("/{id:guid}/checkin", async (Guid id, IAppointmentRepository repo, IUnitOfWork uow) =>
+        group.MapPost("/{id:guid}/checkin", async (Guid id, IMediator mediator) =>
         {
-            var apt = await repo.GetByIdAsync(id);
-            if (apt is null) return Results.NotFound();
-            apt.CheckIn();
-            await uow.SaveChangesAsync();
-            return Results.Ok(apt);
+            var result = await mediator.Send(new CheckInAppointmentCommand(id));
+            return result.IsSuccess ? Results.Ok(result.Value) : Results.NotFound(result.Error);
         });
 
         // Complete
-        group.MapPost("/{id:guid}/complete", async (Guid id, IAppointmentRepository repo, IUnitOfWork uow) =>
+        group.MapPost("/{id:guid}/complete", async (Guid id, IMediator mediator) =>
         {
-            var apt = await repo.GetByIdAsync(id);
-            if (apt is null) return Results.NotFound();
-            apt.Complete();
-            await uow.SaveChangesAsync();
-            return Results.Ok(apt);
+            var result = await mediator.Send(new CompleteAppointmentCommand(id));
+            return result.IsSuccess ? Results.Ok(result.Value) : Results.NotFound(result.Error);
         });
 
         // Cancel
-        group.MapPost("/{id:guid}/cancel", async (Guid id, CancelRequest? req, IAppointmentRepository repo, IUnitOfWork uow) =>
+        group.MapPost("/{id:guid}/cancel", async (Guid id, CancelRequest? req, IMediator mediator) =>
         {
-            var apt = await repo.GetByIdAsync(id);
-            if (apt is null) return Results.NotFound();
-            apt.Cancel(req?.Reason);
-            await uow.SaveChangesAsync();
-            return Results.NoContent();
+            var result = await mediator.Send(new CancelAppointmentCommand(id, req?.Reason));
+            return result.IsSuccess ? Results.NoContent() : Results.NotFound(result.Error);
         });
 
         // Reschedule
-        group.MapPost("/{id:guid}/reschedule", async (Guid id, RescheduleRequest req, IAppointmentRepository repo, IUnitOfWork uow) =>
+        group.MapPost("/{id:guid}/reschedule", async (Guid id, RescheduleRequest req, IMediator mediator) =>
         {
-            var apt = await repo.GetByIdAsync(id);
-            if (apt is null) return Results.NotFound();
-
-            if (apt.DoctorId.HasValue)
-            {
-                var hasConflict = await repo.HasConflictAsync(apt.DoctorId.Value, req.NewDateTime, apt.DurationMinutes, id);
-                if (hasConflict)
-                    return Results.BadRequest("Doctor has a scheduling conflict at this time");
-            }
-
-            apt.Reschedule(req.NewDateTime);
-            await uow.SaveChangesAsync();
-            return Results.Ok(apt);
+            var result = await mediator.Send(new RescheduleAppointmentCommand(id, req.NewDateTime));
+            return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
         });
     }
-
-    public record CreateAppointmentRequest(
-        Guid PatientId,
-        DateTime ScheduledAt,
-        AppointmentType Type,
-        Guid? CycleId = null,
-        Guid? DoctorId = null,
-        int DurationMinutes = 30,
-        string? Notes = null,
-        string? RoomNumber = null);
 
     public record CancelRequest(string? Reason);
     public record RescheduleRequest(DateTime NewDateTime);

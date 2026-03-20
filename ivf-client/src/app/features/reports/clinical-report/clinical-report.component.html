@@ -1,0 +1,100 @@
+<div class="min-h-screen bg-gray-50 p-6">
+  <div class="max-w-5xl mx-auto">
+    <div class="flex items-center justify-between mb-6">
+      <h1 class="text-2xl font-bold text-gray-800">Báo Cáo Lâm Sàng</h1>
+      <a routerLink="/reports" class="text-sm text-blue-600 hover:underline"
+        ><i class="fas fa-arrow-left mr-1"></i> Quay lại</a
+      >
+    </div>
+
+    @if (loading()) {
+      <div class="text-center py-16 text-gray-400">
+        <i class="fas fa-spinner fa-spin fa-2x"></i>
+      </div>
+    } @else {
+      <!-- KPI cards -->
+      <div class="grid grid-cols-3 gap-4 mb-6">
+        <div class="bg-white rounded-xl border border-gray-200 p-5 text-center">
+          <div class="text-3xl font-bold text-green-600">{{ successRate() }}%</div>
+          <div class="text-sm text-gray-500 mt-1">Tỉ lệ thành công</div>
+        </div>
+        <div class="bg-white rounded-xl border border-gray-200 p-5 text-center">
+          <div class="text-3xl font-bold text-blue-600">{{ totalCycles() }}</div>
+          <div class="text-sm text-gray-500 mt-1">Tổng chu kỳ</div>
+        </div>
+        <div class="bg-white rounded-xl border border-gray-200 p-5 text-center">
+          <div class="text-3xl font-bold text-purple-600">{{ topDoctors().length }}</div>
+          <div class="text-sm text-gray-500 mt-1">Bác sĩ hoạt động</div>
+        </div>
+      </div>
+
+      <!-- Monthly results -->
+      <div class="bg-white rounded-xl border border-gray-200 p-6 mb-4">
+        <h2 class="font-semibold text-gray-700 mb-4">Kết Quả Theo Tháng</h2>
+        <div class="space-y-3">
+          @for (r of monthlyResults(); track r.name) {
+            <div class="flex items-center gap-3">
+              <div class="w-8 text-sm text-gray-500 font-medium">{{ r.name }}</div>
+              <div class="flex-1 flex gap-1 h-6">
+                <div
+                  class="bg-green-400 rounded-sm flex items-center justify-center text-xs text-white font-medium"
+                  [style.width]="getBarWidth(r.success, maxMonthlyTotal)"
+                >
+                  {{ r.success }}
+                </div>
+                <div
+                  class="bg-red-300 rounded-sm flex items-center justify-center text-xs text-white font-medium"
+                  [style.width]="getBarWidth(r.failed, maxMonthlyTotal)"
+                >
+                  {{ r.failed }}
+                </div>
+              </div>
+            </div>
+          }
+        </div>
+        <div class="flex gap-4 mt-3 text-xs text-gray-500">
+          <span class="flex items-center gap-1"
+            ><span class="w-3 h-3 bg-green-400 rounded-sm inline-block"></span> Thành công</span
+          >
+          <span class="flex items-center gap-1"
+            ><span class="w-3 h-3 bg-red-300 rounded-sm inline-block"></span> Thất bại</span
+          >
+        </div>
+      </div>
+
+      <!-- Top doctors -->
+      <div class="bg-white rounded-xl border border-gray-200 p-6">
+        <h2 class="font-semibold text-gray-700 mb-4">Hiệu Suất Bác Sĩ</h2>
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-gray-100 text-left text-gray-500">
+              <th class="pb-2">Bác sĩ</th>
+              <th class="pb-2 text-center">Số chu kỳ</th>
+              <th class="pb-2 text-center">Tỉ lệ thành công</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (d of topDoctors(); track d.name; let i = $index) {
+              <tr class="border-b border-gray-50">
+                <td class="py-2 flex items-center gap-2">
+                  <span
+                    class="w-5 h-5 rounded-full bg-blue-100 text-blue-700 text-xs flex items-center justify-center font-bold"
+                    >{{ i + 1 }}</span
+                  >
+                  {{ d.name }}
+                </td>
+                <td class="py-2 text-center">{{ d.cycles }}</td>
+                <td
+                  class="py-2 text-center font-semibold"
+                  [class]="d.successRate >= 40 ? 'text-green-600' : 'text-yellow-600'"
+                >
+                  {{ d.successRate }}%
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </div>
+</div>

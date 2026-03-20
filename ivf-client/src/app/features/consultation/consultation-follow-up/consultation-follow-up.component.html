@@ -1,0 +1,54 @@
+<div class="modal-overlay" (click)="close()">
+  <div class="modal-content modal-lg" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>Tai kham - {{ consultation.patientName }}</h3>
+      <button class="close-btn" (click)="close()">&times;</button>
+    </div>
+
+    <form (ngSubmit)="onSubmit()">
+      <div class="modal-body">
+        <!-- Patient Info -->
+        <div class="patient-summary">
+          <span><strong>Ma BN:</strong> {{ consultation.patientCode }}</span>
+          <span><strong>Bac si:</strong> {{ consultation.doctorName }}</span>
+          <span><strong>Ngay kham:</strong> {{ consultation.consultationDate | date:'dd/MM/yyyy' }}</span>
+        </div>
+
+        <!-- Since Last Visit -->
+        <div class="form-group">
+          <label class="form-label">Dien bien tu lan kham truoc *</label>
+          <textarea class="form-control" [(ngModel)]="form.sinceLastVisit" name="sinceLastVisit"
+            rows="3" placeholder="Tinh trang benh nhan tu lan kham truoc den nay..."></textarea>
+        </div>
+
+        <!-- Current Symptoms -->
+        <div class="form-group">
+          <label class="form-label">Trieu chung hien tai</label>
+          <textarea class="form-control" [(ngModel)]="form.currentSymptoms" name="currentSymptoms"
+            rows="3" placeholder="Cac trieu chung hien tai cua benh nhan..."></textarea>
+        </div>
+
+        <!-- Examination Findings -->
+        <div class="form-group">
+          <label class="form-label">Kham lam sang</label>
+          <textarea class="form-control" [(ngModel)]="form.physicalExamination" name="physicalExamination"
+            rows="3" placeholder="Ket qua kham, sieu am, xet nghiem..."></textarea>
+        </div>
+
+        <!-- Chief Complaint Update -->
+        <div class="form-group">
+          <label class="form-label">Ly do kham (cap nhat)</label>
+          <textarea class="form-control" [(ngModel)]="form.chiefComplaint" name="chiefComplaint"
+            rows="2" placeholder="Cap nhat ly do kham neu co thay doi..."></textarea>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" (click)="close()">Huy</button>
+        <button type="submit" class="btn btn-primary" [disabled]="saving()">
+          {{ saving() ? 'Dang luu...' : 'Luu phieu tai kham' }}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>

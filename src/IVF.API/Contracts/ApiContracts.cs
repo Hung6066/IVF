@@ -37,9 +37,10 @@ public record RecordMicroscopicRequest(decimal? Concentration, decimal? TotalCou
 // SpermBank
 public record UpdateDonorProfileRequest(string? BloodType, decimal? Height, decimal? Weight, string? EyeColor, string? HairColor, string? Ethnicity, string? Education, string? Occupation);
 public record RecordQualityRequest(decimal? Volume, decimal? Concentration, decimal? Motility, int? VialCount);
+public record DestroySpermSampleRequest(string Reason);
 
 // Billing
-public record AddItemRequest(string ServiceCode, string Description, int Quantity, decimal UnitPrice);
+public record AddItemRequest(string ServiceCode, string Description, int Quantity, decimal UnitPrice, string FeeType = "IVFMD");
 public record RecordPaymentRequest(decimal Amount, PaymentMethod PaymentMethod, string? TransactionReference);
 
 // Queue

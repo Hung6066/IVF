@@ -1,0 +1,125 @@
+<div class="p-6">
+  <div class="flex items-center justify-between mb-6">
+    <div class="flex items-center gap-3">
+      <button routerLink="/egg-donor" class="text-gray-500 hover:text-gray-700">
+        <i class="fas fa-arrow-left"></i>
+      </button>
+      <h1 class="text-2xl font-bold text-gray-800">Ghép NCT - Người nhận</h1>
+    </div>
+  </div>
+
+  @if (error()) {
+    <div class="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+      {{ error() }}
+    </div>
+  }
+  @if (successMsg()) {
+    <div class="mb-4 p-3 bg-green-50 border border-green-200 text-green-700 rounded-lg text-sm">
+      {{ successMsg() }}
+    </div>
+  }
+
+  @if (showMatchForm) {
+    <div class="mb-6 bg-purple-50 border border-purple-200 rounded-xl p-5">
+      <h4 class="font-medium text-purple-800 mb-4">Ghép cặp mới</h4>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">ID NCT</label>
+          <input
+            type="text"
+            [ngModel]="matchForm.eggDonorId"
+            readonly
+            class="w-full border rounded-lg px-3 py-2 text-sm bg-gray-50"
+          />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">ID Cặp nhận *</label>
+          <input
+            type="text"
+            [(ngModel)]="matchForm.recipientCoupleId"
+            placeholder="UUID cặp vợ chồng nhận"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500"
+          />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">ID Người ghép *</label>
+          <input
+            type="text"
+            [(ngModel)]="matchForm.matchedByUserId"
+            placeholder="UUID BS/nhân viên"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500"
+          />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Ghi chú</label>
+          <input
+            type="text"
+            [(ngModel)]="matchForm.notes"
+            placeholder="Ghi chú..."
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500"
+          />
+        </div>
+      </div>
+      <div class="flex justify-end gap-3 mt-4">
+        <button (click)="showMatchForm = false" class="px-4 py-2 text-gray-600 text-sm">Huỷ</button>
+        <button
+          (click)="submitMatch()"
+          [disabled]="saving()"
+          class="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700 disabled:opacity-50"
+        >
+          Xác nhận ghép
+        </button>
+      </div>
+    </div>
+  }
+
+  <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+    @if (loading()) {
+      <div class="text-center py-10 text-gray-500">
+        <i class="fas fa-spinner fa-spin text-xl"></i>
+      </div>
+    } @else {
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="text-left px-4 py-3 text-gray-600 font-medium">Mã NCT</th>
+              <th class="text-left px-4 py-3 text-gray-600 font-medium">Họ tên</th>
+              <th class="text-left px-4 py-3 text-gray-600 font-medium">Nhóm máu</th>
+              <th class="text-left px-4 py-3 text-gray-600 font-medium">AMH</th>
+              <th class="text-left px-4 py-3 text-gray-600 font-medium">Số lần cho</th>
+              <th class="text-left px-4 py-3 text-gray-600 font-medium">Thành công</th>
+              <th class="text-left px-4 py-3 text-gray-600 font-medium"></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (d of donors(); track d.id) {
+              <tr class="border-t border-gray-50 hover:bg-gray-50">
+                <td class="px-4 py-3 font-mono text-xs">{{ d.donorCode }}</td>
+                <td class="px-4 py-3 font-medium">{{ d.patientName }}</td>
+                <td class="px-4 py-3">{{ d.bloodType || '—' }}</td>
+                <td class="px-4 py-3">{{ d.amhLevel ?? '—' }}</td>
+                <td class="px-4 py-3">{{ d.totalDonations }}</td>
+                <td class="px-4 py-3 text-green-600">{{ d.successfulPregnancies }}</td>
+                <td class="px-4 py-3">
+                  <button
+                    (click)="openMatch(d.id)"
+                    class="px-3 py-1.5 bg-purple-600 text-white rounded-lg text-xs hover:bg-purple-700"
+                  >
+                    <i class="fas fa-link mr-1"></i> Ghép
+                  </button>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="7" class="px-4 py-8 text-center text-gray-400">
+                  Không có NCT hoạt động
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </div>
+</div>

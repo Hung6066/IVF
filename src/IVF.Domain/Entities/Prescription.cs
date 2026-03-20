@@ -2,15 +2,23 @@ using IVF.Domain.Common;
 
 namespace IVF.Domain.Entities;
 
-public class Prescription : BaseEntity
+public class Prescription : BaseEntity, ITenantEntity
 {
     public Guid PatientId { get; private set; }
     public Guid? CycleId { get; private set; }
     public Guid DoctorId { get; private set; }
+    public Guid TenantId { get; private set; }
+    public void SetTenantId(Guid tenantId) { TenantId = tenantId; SetUpdated(); }
     public DateTime PrescriptionDate { get; private set; }
-    public string Status { get; private set; } = "Pending"; // Pending, Dispensed, Cancelled
+    public string Status { get; private set; } = "Pending"; // Pending, Entered, Printed, Dispensed, Cancelled
+    public DateTime? EnteredAt { get; private set; }
+    public Guid? EnteredByUserId { get; private set; }
+    public DateTime? PrintedAt { get; private set; }
     public DateTime? DispensedAt { get; private set; }
+    public Guid? DispensedByUserId { get; private set; }
     public string? Notes { get; private set; }
+    public Guid? TemplateId { get; private set; }
+    public bool WaiveConsultationFee { get; private set; }
 
     // Navigation properties
     public virtual Patient Patient { get; private set; } = null!;
@@ -25,7 +33,9 @@ public class Prescription : BaseEntity
         Guid doctorId,
         DateTime prescriptionDate,
         Guid? cycleId = null,
-        string? notes = null)
+        string? notes = null,
+        Guid? templateId = null,
+        bool waiveConsultationFee = false)
     {
         return new Prescription
         {
@@ -33,20 +43,50 @@ public class Prescription : BaseEntity
             DoctorId = doctorId,
             PrescriptionDate = prescriptionDate,
             CycleId = cycleId,
-            Notes = notes
+            Notes = notes,
+            TemplateId = templateId,
+            WaiveConsultationFee = waiveConsultationFee
         };
     }
 
-    public void Dispense()
+    public void Enter(Guid enteredByUserId)
+    {
+        Status = "Entered";
+        EnteredAt = DateTime.UtcNow;
+        EnteredByUserId = enteredByUserId;
+        SetUpdated();
+    }
+
+    public void MarkPrinted()
+    {
+        Status = "Printed";
+        PrintedAt = DateTime.UtcNow;
+        SetUpdated();
+    }
+
+    public void Dispense(Guid dispensedByUserId)
     {
         Status = "Dispensed";
         DispensedAt = DateTime.UtcNow;
+        DispensedByUserId = dispensedByUserId;
         SetUpdated();
     }
 
     public void Cancel()
     {
         Status = "Cancelled";
+        SetUpdated();
+    }
+
+    public void UpdateNotes(string? notes)
+    {
+        Notes = notes;
+        SetUpdated();
+    }
+
+    public void AddItem(PrescriptionItem item)
+    {
+        Items.Add(item);
         SetUpdated();
     }
 }

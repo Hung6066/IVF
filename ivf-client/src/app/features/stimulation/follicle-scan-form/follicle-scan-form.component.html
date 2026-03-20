@@ -1,0 +1,66 @@
+<div class="bg-white border rounded-lg p-5">
+  <h3 class="text-lg font-medium mb-4">Ghi nhận SA nang noãn</h3>
+  <form (ngSubmit)="onSubmit()" class="space-y-4">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Ngày SA</label>
+        <input type="date" [(ngModel)]="form.scanDate" name="scanDate" class="w-full border rounded-lg px-3 py-2" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Ngày CK</label>
+        <input type="number" [(ngModel)]="form.cycleDay" name="cycleDay" min="1" class="w-full border rounded-lg px-3 py-2" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Nang ≥12mm</label>
+        <input type="number" [(ngModel)]="form.size12Follicle" name="size12" min="0" class="w-full border rounded-lg px-3 py-2" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Nang ≥14mm</label>
+        <input type="number" [(ngModel)]="form.size14Follicle" name="size14" min="0" class="w-full border rounded-lg px-3 py-2" />
+      </div>
+    </div>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Tổng nang</label>
+        <input type="number" [(ngModel)]="form.totalFollicles" name="total" min="0" class="w-full border rounded-lg px-3 py-2" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">NMTC (mm)</label>
+        <input type="number" [(ngModel)]="form.endometriumThickness" name="endo" step="0.1" class="w-full border rounded-lg px-3 py-2" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Dạng NMTC</label>
+        <select [(ngModel)]="form.endometriumPattern" name="endoPattern" class="w-full border rounded-lg px-3 py-2">
+          <option value="">-- Chọn --</option>
+          <option value="Trilaminar">3 lá</option>
+          <option value="Homogeneous">Đồng nhất</option>
+          <option value="Other">Khác</option>
+        </select>
+      </div>
+    </div>
+    <div class="grid grid-cols-3 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">E2 (pg/mL)</label>
+        <input type="number" [(ngModel)]="form.e2" name="e2" step="0.1" class="w-full border rounded-lg px-3 py-2" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">LH (mIU/mL)</label>
+        <input type="number" [(ngModel)]="form.lh" name="lh" step="0.1" class="w-full border rounded-lg px-3 py-2" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">P4 (ng/mL)</label>
+        <input type="number" [(ngModel)]="form.p4" name="p4" step="0.01" class="w-full border rounded-lg px-3 py-2" />
+      </div>
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Ghi chú</label>
+      <textarea [(ngModel)]="form.notes" name="notes" rows="2" class="w-full border rounded-lg px-3 py-2"></textarea>
+    </div>
+    <div class="flex gap-3">
+      <button type="submit" [disabled]="saving" class="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
+        {{ saving ? 'Đang lưu...' : 'Lưu SA' }}
+      </button>
+      <button type="button" (click)="cancel.emit()" class="px-5 py-2 border rounded-lg hover:bg-gray-50">Hủy</button>
+    </div>
+  </form>
+</div>

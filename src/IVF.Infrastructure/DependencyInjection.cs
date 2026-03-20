@@ -66,9 +66,28 @@ public static class DependencyInjection
         services.AddScoped<IFormRepository, FormRepository>();
         services.AddScoped<IConceptRepository, ConceptRepository>();
         services.AddScoped<IPatientDocumentRepository, PatientDocumentRepository>();
+        services.AddScoped<IPrescriptionRepository, PrescriptionRepository>();
+        services.AddScoped<ILabOrderRepository, LabOrderRepository>();
+        services.AddScoped<IConsultationRepository, ConsultationRepository>();
+        services.AddScoped<IFetProtocolRepository, FetProtocolRepository>();
+        services.AddScoped<IProcedureRepository, ProcedureRepository>();
+        services.AddScoped<IEggDonorRepository, EggDonorRepository>();
+        services.AddScoped<IConsentFormRepository, ConsentFormRepository>();
+        services.AddScoped<IMedicationAdministrationRepository, MedicationAdministrationRepository>();
+        services.AddScoped<ICycleFeeRepository, CycleFeeRepository>();
+        services.AddScoped<IDrugCatalogRepository, DrugCatalogRepository>();
+        services.AddScoped<IPrescriptionTemplateRepository, PrescriptionTemplateRepository>();
+        services.AddScoped<IFileTrackingRepository, FileTrackingRepository>();
+        services.AddScoped<IEggDonorRecipientRepository, EggDonorRecipientRepository>();
+        services.AddScoped<IInventoryRequestRepository, InventoryRequestRepository>();
+        services.AddScoped<IOocyteSampleRepository, OocyteSampleRepository>();
+        services.AddScoped<IInventoryItemRepository, InventoryItemRepository>();
         services.AddScoped<ITenantRepository, TenantRepository>();
         services.AddScoped<IPricingRepository, PricingRepository>();
         services.AddScoped<IDnsRecordRepository, DnsRecordRepository>();
+        services.AddScoped<IEmbryoFreezingContractRepository, EmbryoFreezingContractRepository>();
+        services.AddScoped<IEndometriumScanRepository, EndometriumScanRepository>();
+        services.AddScoped<ISpermSampleUsageRepository, SpermSampleUsageRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 
         // Register Services

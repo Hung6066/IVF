@@ -149,6 +149,20 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'injection/log/new',
+        loadComponent: () =>
+          import('./features/injection/injection-log/injection-log.component').then(
+            (m) => m.InjectionLogComponent,
+          ),
+      },
+      {
+        path: 'injection/trigger-shot',
+        loadComponent: () =>
+          import('./features/injection/trigger-shot-record/trigger-shot-record.component').then(
+            (m) => m.TriggerShotRecordComponent,
+          ),
+      },
+      {
         path: 'reception',
         loadComponent: () =>
           import('./features/reception/reception-dashboard/reception-dashboard.component').then(
@@ -203,6 +217,109 @@ export const routes: Routes = [
             (m) => m.AppointmentsDashboardComponent,
           ),
       },
+
+      // ─── FET ───
+      {
+        path: 'fet',
+        loadComponent: () =>
+          import('./features/fet/fet-list/fet-list.component').then((m) => m.FetListComponent),
+      },
+      {
+        path: 'fet/create',
+        loadComponent: () =>
+          import('./features/fet/fet-create/fet-create.component').then(
+            (m) => m.FetCreateComponent,
+          ),
+      },
+      {
+        path: 'fet/:id',
+        loadComponent: () =>
+          import('./features/fet/fet-detail/fet-detail.component').then(
+            (m) => m.FetDetailComponent,
+          ),
+      },
+      {
+        path: 'fet/:id/hormone-therapy',
+        loadComponent: () =>
+          import('./features/fet/hormone-therapy/hormone-therapy.component').then(
+            (m) => m.HormoneTherapyComponent,
+          ),
+      },
+      {
+        path: 'fet/:id/transfer',
+        loadComponent: () =>
+          import('./features/fet/fet-transfer/fet-transfer.component').then(
+            (m) => m.FetTransferComponent,
+          ),
+      },
+
+      // ─── Procedure ───
+      {
+        path: 'procedure',
+        loadComponent: () =>
+          import('./features/procedure/procedure-list/procedure-list.component').then(
+            (m) => m.ProcedureListComponent,
+          ),
+      },
+      {
+        path: 'procedure/create',
+        loadComponent: () =>
+          import('./features/procedure/procedure-create/procedure-create.component').then(
+            (m) => m.ProcedureCreateComponent,
+          ),
+      },
+      {
+        path: 'procedure/:id',
+        loadComponent: () =>
+          import('./features/procedure/procedure-detail/procedure-detail.component').then(
+            (m) => m.ProcedureDetailComponent,
+          ),
+      },
+      {
+        path: 'procedure/opu/:cycleId',
+        loadComponent: () =>
+          import('./features/procedure/procedure-opu/procedure-opu.component').then(
+            (m) => m.ProcedureOpuComponent,
+          ),
+      },
+      {
+        path: 'procedure/iui/:cycleId',
+        loadComponent: () =>
+          import('./features/procedure/procedure-iui/procedure-iui.component').then(
+            (m) => m.ProcedureIuiComponent,
+          ),
+      },
+
+      // ─── Pregnancy ───
+      {
+        path: 'pregnancy/:cycleId/beta-hcg',
+        loadComponent: () =>
+          import('./features/pregnancy/pregnancy-beta-hcg/pregnancy-beta-hcg.component').then(
+            (m) => m.PregnancyBetaHcgComponent,
+          ),
+      },
+      {
+        path: 'pregnancy/:cycleId/result',
+        loadComponent: () =>
+          import('./features/pregnancy/pregnancy-result/pregnancy-result.component').then(
+            (m) => m.PregnancyResultComponent,
+          ),
+      },
+      {
+        path: 'pregnancy/:cycleId/prenatal',
+        loadComponent: () =>
+          import('./features/pregnancy/pregnancy-prenatal/pregnancy-prenatal.component').then(
+            (m) => m.PregnancyPrenatalComponent,
+          ),
+      },
+      {
+        path: 'pregnancy/:cycleId/discharge',
+        loadComponent: () =>
+          import('./features/pregnancy/pregnancy-discharge/pregnancy-discharge.component').then(
+            (m) => m.PregnancyDischargeComponent,
+          ),
+      },
+
       {
         path: 'admin/audit-logs',
         loadComponent: () =>
@@ -435,6 +552,318 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/compliance/compliance-audit/compliance-audit.component').then(
             (m) => m.ComplianceAuditComponent,
+          ),
+      },
+
+      // ─── Stimulation ───────────────────────────────────────────────────────
+      {
+        path: 'stimulation/:cycleId',
+        loadComponent: () =>
+          import('./features/stimulation/stimulation-tracking/stimulation-tracking.component').then(
+            (m) => m.StimulationTrackingComponent,
+          ),
+      },
+
+      // ─── Egg Donor ─────────────────────────────────────────────────────────
+      {
+        path: 'egg-donor',
+        loadComponent: () =>
+          import('./features/egg-donor/egg-donor-list/egg-donor-list.component').then(
+            (m) => m.EggDonorListComponent,
+          ),
+      },
+      {
+        path: 'egg-donor/register',
+        loadComponent: () =>
+          import('./features/egg-donor/egg-donor-register/egg-donor-register.component').then(
+            (m) => m.EggDonorRegisterComponent,
+          ),
+      },
+      {
+        path: 'egg-donor/matching',
+        loadComponent: () =>
+          import('./features/egg-donor/egg-donor-matching/egg-donor-matching.component').then(
+            (m) => m.EggDonorMatchingComponent,
+          ),
+      },
+      {
+        path: 'egg-donor/:id',
+        loadComponent: () =>
+          import('./features/egg-donor/egg-donor-detail/egg-donor-detail.component').then(
+            (m) => m.EggDonorDetailComponent,
+          ),
+      },
+      {
+        path: 'egg-donor/:id/samples',
+        loadComponent: () =>
+          import('./features/egg-donor/egg-donor-samples/egg-donor-samples.component').then(
+            (m) => m.EggDonorSamplesComponent,
+          ),
+      },
+
+      // ─── Inventory ─────────────────────────────────────────────────────────
+      {
+        path: 'inventory',
+        loadComponent: () =>
+          import('./features/inventory/inventory-stock/inventory-stock.component').then(
+            (m) => m.InventoryStockComponent,
+          ),
+      },
+      {
+        path: 'inventory/import',
+        loadComponent: () =>
+          import('./features/inventory/inventory-import/inventory-import.component').then(
+            (m) => m.InventoryImportComponent,
+          ),
+      },
+      {
+        path: 'inventory/usage',
+        loadComponent: () =>
+          import('./features/inventory/inventory-usage/inventory-usage.component').then(
+            (m) => m.InventoryUsageComponent,
+          ),
+      },
+      {
+        path: 'inventory/alerts',
+        loadComponent: () =>
+          import('./features/inventory/inventory-alerts/inventory-alerts.component').then(
+            (m) => m.InventoryAlertsComponent,
+          ),
+      },
+      {
+        path: 'inventory/requests',
+        loadComponent: () =>
+          import('./features/inventory/inventory-request-list/inventory-request-list.component').then(
+            (m) => m.InventoryRequestListComponent,
+          ),
+      },
+
+      // ─── Consent ───────────────────────────────────────────────────────────
+      {
+        path: 'consent',
+        loadComponent: () =>
+          import('./features/consent/consent-list/consent-list.component').then(
+            (m) => m.ConsentListComponent,
+          ),
+      },
+      {
+        path: 'consent/create',
+        loadComponent: () =>
+          import('./features/consent/consent-form-create/consent-form-create.component').then(
+            (m) => m.ConsentFormCreateComponent,
+          ),
+      },
+      {
+        path: 'consent/:id',
+        loadComponent: () =>
+          import('./features/consent/consent-detail/consent-detail.component').then(
+            (m) => m.ConsentDetailComponent,
+          ),
+      },
+
+      // ─── Andrology (sub-pages) ─────────────────────────────────────────────
+      {
+        path: 'andrology/analysis/new',
+        loadComponent: () =>
+          import('./features/andrology/semen-analysis-form/semen-analysis-form.component').then(
+            (m) => m.SemenAnalysisFormComponent,
+          ),
+      },
+      {
+        path: 'andrology/wash/new',
+        loadComponent: () =>
+          import('./features/andrology/sperm-wash-form/sperm-wash-form.component').then(
+            (m) => m.SpermWashFormComponent,
+          ),
+      },
+      {
+        path: 'andrology/analysis/:id',
+        loadComponent: () =>
+          import('./features/andrology/andrology-result-detail/andrology-result-detail.component').then(
+            (m) => m.AndrologyResultDetailComponent,
+          ),
+      },
+
+      // ─── Billing (sub-pages) ───────────────────────────────────────────────
+      {
+        path: 'billing/create',
+        loadComponent: () =>
+          import('./features/billing/invoice-create/invoice-create.component').then(
+            (m) => m.InvoiceCreateComponent,
+          ),
+      },
+      {
+        path: 'billing/history',
+        loadComponent: () =>
+          import('./features/billing/billing-history/billing-history.component').then(
+            (m) => m.BillingHistoryComponent,
+          ),
+      },
+      {
+        path: 'billing/payment/:id',
+        loadComponent: () =>
+          import('./features/billing/payment-form/payment-form.component').then(
+            (m) => m.PaymentFormComponent,
+          ),
+      },
+      {
+        path: 'billing/:id',
+        loadComponent: () =>
+          import('./features/billing/invoice-detail/invoice-detail.component').then(
+            (m) => m.InvoiceDetailComponent,
+          ),
+      },
+
+      // ─── Sperm Bank (sub-pages) ────────────────────────────────────────────
+      {
+        path: 'sperm-bank/screening/:id',
+        loadComponent: () =>
+          import('./features/sperm-bank/donor-screening/donor-screening.component').then(
+            (m) => m.DonorScreeningComponent,
+          ),
+      },
+      {
+        path: 'sperm-bank/approve/:id',
+        loadComponent: () =>
+          import('./features/sperm-bank/donor-approval/donor-approval.component').then(
+            (m) => m.DonorApprovalComponent,
+          ),
+      },
+      {
+        path: 'sperm-bank/sample/:donorId/collect',
+        loadComponent: () =>
+          import('./features/sperm-bank/sample-collection/sample-collection.component').then(
+            (m) => m.SampleCollectionComponent,
+          ),
+      },
+      {
+        path: 'sperm-bank/samples',
+        loadComponent: () =>
+          import('./features/sperm-bank/sample-inventory/sample-inventory.component').then(
+            (m) => m.SampleInventoryComponent,
+          ),
+      },
+      {
+        path: 'sperm-bank/sample-usage/:cycleId',
+        loadComponent: () =>
+          import('./features/sperm-bank/sperm-sample-usage/sperm-sample-usage.component').then(
+            (m) => m.SpermSampleUsageComponent,
+          ),
+      },
+      {
+        path: 'sperm-bank/hiv-retest/:donorId',
+        loadComponent: () =>
+          import('./features/sperm-bank/hiv-retest/hiv-retest.component').then(
+            (m) => m.HivRetestComponent,
+          ),
+      },
+
+      // ─── Lab (sub-pages) ──────────────────────────────────────────────────
+      {
+        path: 'lab/sample-handover',
+        loadComponent: () =>
+          import('./features/lab/sample-handover/sample-handover.component').then(
+            (m) => m.SampleHandoverComponent,
+          ),
+      },
+
+      // ─── Embryology ───────────────────────────────────────────────────────
+      {
+        path: 'embryology/ivm/:cycleId',
+        loadComponent: () =>
+          import('./features/embryology/ivm-maturation/ivm-maturation.component').then(
+            (m) => m.IvmMaturationComponent,
+          ),
+      },
+
+      // ─── Reports (sub-pages) ───────────────────────────────────────────────
+      {
+        path: 'reports/clinical',
+        loadComponent: () =>
+          import('./features/reports/clinical-report/clinical-report.component').then(
+            (m) => m.ClinicalReportComponent,
+          ),
+      },
+      {
+        path: 'reports/financial',
+        loadComponent: () =>
+          import('./features/reports/financial-report/financial-report.component').then(
+            (m) => m.FinancialReportComponent,
+          ),
+      },
+      {
+        path: 'reports/inventory',
+        loadComponent: () =>
+          import('./features/reports/inventory-report/inventory-report.component').then(
+            (m) => m.InventoryReportComponent,
+          ),
+      },
+
+      // ─── Appointments (sub-pages) ──────────────────────────────────────────
+      {
+        path: 'appointments/calendar',
+        loadComponent: () =>
+          import('./features/appointments/appointment-calendar/appointment-calendar.component').then(
+            (m) => m.AppointmentCalendarComponent,
+          ),
+      },
+      {
+        path: 'appointments/new',
+        loadComponent: () =>
+          import('./features/appointments/appointment-form/appointment-form.component').then(
+            (m) => m.AppointmentFormComponent,
+          ),
+      },
+
+      // ─── Ultrasounds (sub-pages) ───────────────────────────────────────────
+      {
+        path: 'follicle-chart/:cycleId',
+        loadComponent: () =>
+          import('./features/ultrasounds/follicle-chart/follicle-chart.component').then(
+            (m) => m.FollicleChartComponent,
+          ),
+      },
+      {
+        path: 'endometrium-scan/:cycleId',
+        loadComponent: () =>
+          import('./features/ultrasounds/endometrium-scan-form/endometrium-scan-form.component').then(
+            (m) => m.EndometriumScanFormComponent,
+          ),
+      },
+
+      // ─── Drug Catalog ──────────────────────────────────────────────────────
+      {
+        path: 'admin/drug-catalog',
+        loadComponent: () =>
+          import('./features/drug-catalog/drug-catalog-list/drug-catalog-list.component').then(
+            (m) => m.DrugCatalogListComponent,
+          ),
+      },
+
+      // ─── Prescription Templates ────────────────────────────────────────────
+      {
+        path: 'admin/prescription-templates',
+        loadComponent: () =>
+          import('./features/prescription-templates/template-list/template-list.component').then(
+            (m) => m.TemplateListComponent,
+          ),
+      },
+
+      // ─── File Tracking ─────────────────────────────────────────────────────
+      {
+        path: 'file-tracking',
+        loadComponent: () =>
+          import('./features/file-tracking/file-tracking-list/file-tracking-list.component').then(
+            (m) => m.FileTrackingListComponent,
+          ),
+      },
+
+      // ─── Cycle Fees ────────────────────────────────────────────────────────
+      {
+        path: 'cycle-fees/:cycleId',
+        loadComponent: () =>
+          import('./features/cycle-fees/cycle-fee-list/cycle-fee-list.component').then(
+            (m) => m.CycleFeeListComponent,
           ),
       },
     ],

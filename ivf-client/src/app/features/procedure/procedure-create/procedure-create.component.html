@@ -1,0 +1,141 @@
+<div class="p-6 max-w-3xl mx-auto">
+  <div class="flex items-center gap-3 mb-6">
+    <button routerLink="/procedure" class="text-gray-500 hover:text-gray-700">
+      <i class="fas fa-arrow-left"></i>
+    </button>
+    <h1 class="text-2xl font-bold text-gray-800">Tạo thủ thuật mới</h1>
+  </div>
+
+  @if (error()) {
+    <div class="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+      {{ error() }}
+    </div>
+  }
+
+  <div class="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Bệnh nhân *</label>
+        <app-patient-search
+          [(ngModel)]="form.patientId"
+          name="patientId"
+          placeholder="Tìm tên, mã BN, SĐT..."
+        ></app-patient-search>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">ID Chu kỳ</label>
+        <app-cycle-search
+          [(ngModel)]="form.cycleId"
+          name="cycleId"
+          [patientId]="form.patientId || null"
+          placeholder="Tìm mã chu kỳ..."
+        ></app-cycle-search>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">BS thực hiện *</label>
+        <input
+          type="text"
+          [(ngModel)]="form.performedByDoctorId"
+          placeholder="UUID bác sĩ"
+          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"
+        />
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">BS phụ</label>
+        <input
+          type="text"
+          [(ngModel)]="form.assistantDoctorId"
+          placeholder="UUID (tuỳ chọn)"
+          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"
+        />
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Loại thủ thuật *</label>
+        <select
+          [(ngModel)]="form.procedureType"
+          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"
+        >
+          @for (t of procedureTypes; track t) {
+            <option [value]="t">{{ t }}</option>
+          }
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Tên thủ thuật</label>
+        <input
+          type="text"
+          [(ngModel)]="form.procedureName"
+          placeholder="vd: OPU ngày D14"
+          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"
+        />
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Mã TT</label>
+        <input
+          type="text"
+          [(ngModel)]="form.procedureCode"
+          placeholder="vd: OPU-2026-001"
+          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"
+        />
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Ngày giờ hẹn *</label>
+        <input
+          type="datetime-local"
+          [(ngModel)]="form.scheduledAt"
+          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"
+        />
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Phòng</label>
+        <input
+          type="text"
+          [(ngModel)]="form.roomNumber"
+          placeholder="vd: P201"
+          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"
+        />
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Gây mê</label>
+        <select
+          [(ngModel)]="form.anesthesiaType"
+          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"
+        >
+          @for (a of anesthesiaTypes; track a) {
+            <option [value]="a">{{ a || 'Không' }}</option>
+          }
+        </select>
+      </div>
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Ghi chú trước TT</label>
+      <textarea
+        [(ngModel)]="form.preOpNotes"
+        rows="2"
+        placeholder="Ghi chú trước thủ thuật..."
+        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 resize-none"
+      ></textarea>
+    </div>
+
+    <div class="flex justify-end gap-3 pt-2 border-t border-gray-100">
+      <button routerLink="/procedure" class="px-4 py-2 text-gray-600 text-sm">Huỷ</button>
+      <button
+        (click)="submit()"
+        [disabled]="saving()"
+        class="flex items-center gap-2 px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-medium"
+      >
+        <i class="fas fa-save"></i> {{ saving() ? 'Đang lưu...' : 'Tạo thủ thuật' }}
+      </button>
+    </div>
+  </div>
+</div>

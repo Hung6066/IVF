@@ -13,5 +13,9 @@ public enum UserRole
     LabTech,        // Kỹ thuật viên xét nghiệm - Lab results
     Receptionist,   // Lễ tân - Patient intake, queue
     Cashier,        // Thu ngân - Billing, payments
-    Pharmacist      // Dược sĩ - Prescriptions
+    Pharmacist,     // Dược sĩ - Prescriptions
+    Manager,        // Quản lý - Reports, staff management
+    DataEntry,      // Nhập liệu - Data entry only
+    Coordinator,    // Điều phối viên - Appointment & cycle coordination
+    Supervisor      // Giám sát - Supervisor access, audits
 }

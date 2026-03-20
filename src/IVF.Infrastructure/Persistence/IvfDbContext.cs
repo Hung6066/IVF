@@ -42,6 +42,27 @@ public class IvfDbContext : DbContext
     public DbSet<InvoiceItem> InvoiceItems => Set<InvoiceItem>();
     public DbSet<Payment> Payments => Set<Payment>();
     public DbSet<Prescription> Prescriptions => Set<Prescription>();
+    public DbSet<LabOrder> LabOrders => Set<LabOrder>();
+    public DbSet<LabTest> LabTests => Set<LabTest>();
+    public DbSet<Consultation> Consultations => Set<Consultation>();
+    public DbSet<FetProtocol> FetProtocols => Set<FetProtocol>();
+    public DbSet<Procedure> Procedures => Set<Procedure>();
+    public DbSet<EggDonor> EggDonors => Set<EggDonor>();
+    public DbSet<OocyteSample> OocyteSamples => Set<OocyteSample>();
+    public DbSet<InventoryItem> InventoryItems => Set<InventoryItem>();
+    public DbSet<StockTransaction> StockTransactions => Set<StockTransaction>();
+
+    // New entities (Phase 2-9 gap implementations)
+    public DbSet<ConsentForm> ConsentForms => Set<ConsentForm>();
+    public DbSet<MedicationAdministration> MedicationAdministrations => Set<MedicationAdministration>();
+    public DbSet<CycleFee> CycleFees => Set<CycleFee>();
+    public DbSet<DrugCatalog> DrugCatalog => Set<DrugCatalog>();
+    public DbSet<PrescriptionTemplate> PrescriptionTemplates => Set<PrescriptionTemplate>();
+    public DbSet<PrescriptionTemplateItem> PrescriptionTemplateItems => Set<PrescriptionTemplateItem>();
+    public DbSet<FileTracking> FileTrackings => Set<FileTracking>();
+    public DbSet<FileTransfer> FileTransfers => Set<FileTransfer>();
+    public DbSet<EggDonorRecipient> EggDonorRecipients => Set<EggDonorRecipient>();
+    public DbSet<InventoryRequest> InventoryRequests => Set<InventoryRequest>();
     public DbSet<Doctor> Doctors => Set<Doctor>();
     public DbSet<UserPermission> UserPermissions => Set<UserPermission>();
     public DbSet<Appointment> Appointments => Set<Appointment>();
@@ -183,6 +204,11 @@ public class IvfDbContext : DbContext
     public DbSet<EncryptionConfig> EncryptionConfigs => Set<EncryptionConfig>();
     public DbSet<FieldAccessPolicy> FieldAccessPolicies => Set<FieldAccessPolicy>();
     public DbSet<SecretRotationSchedule> SecretRotationSchedules => Set<SecretRotationSchedule>();
+
+    // FET & Embryo additional tracking
+    public DbSet<EmbryoFreezingContract> EmbryoFreezingContracts => Set<EmbryoFreezingContract>();
+    public DbSet<EndometriumScan> EndometriumScans => Set<EndometriumScan>();
+    public DbSet<SpermSampleUsage> SpermSampleUsages => Set<SpermSampleUsage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -1,221 +1,273 @@
 <div class="dashboard-layout">
-    <header class="page-header">
-        <div class="header-title">
-            <h1>💊 Nhà thuốc</h1>
-        </div>
-        <div class="tabs-container">
-            <button class="tab-btn" [class.active]="activeTab === 'prescriptions'"
-                (click)="activeTab = 'prescriptions'">📋 Đơn thuốc</button>
-            <button class="tab-btn" [class.active]="activeTab === 'inventory'" (click)="activeTab = 'inventory'">📦 Tồn
-                kho</button>
-            <button class="tab-btn" [class.active]="activeTab === 'import'" (click)="activeTab = 'import'">📥 Nhập
-                kho</button>
-        </div>
-    </header>
-
-    <div class="stats-grid">
-        <div class="stat-card">
-            <div class="stat-icon info">📋</div>
-            <div class="stat-content">
-                <span class="value">{{ pendingRx() }}</span>
-                <span class="label">Chờ phát</span>
-            </div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-icon success">✅</div>
-            <div class="stat-content">
-                <span class="value">{{ completedRx() }}</span>
-                <span class="label">Đã phát</span>
-            </div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-icon warning">⚠️</div>
-            <div class="stat-content">
-                <span class="value">{{ lowStockCount() }}</span>
-                <span class="label">Sắp hết</span>
-            </div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-icon primary">📦</div>
-            <div class="stat-content">
-                <span class="value">{{ totalItems() }}</span>
-                <span class="label">Tổng mặt hàng</span>
-            </div>
-        </div>
+  <header class="page-header">
+    <div class="header-title">
+      <h1>💊 Nhà thuốc</h1>
     </div>
+    <div class="tabs-container">
+      <button
+        class="tab-btn"
+        [class.active]="activeTab === 'prescriptions'"
+        (click)="activeTab = 'prescriptions'"
+      >
+        📋 Đơn thuốc
+      </button>
+      <button
+        class="tab-btn"
+        [class.active]="activeTab === 'inventory'"
+        (click)="activeTab = 'inventory'"
+      >
+        📦 Tồn kho
+      </button>
+      <button
+        class="tab-btn"
+        [class.active]="activeTab === 'import'"
+        (click)="activeTab = 'import'"
+      >
+        📥 Nhập kho
+      </button>
+      <a routerLink="/admin/drug-catalog" class="tab-btn tab-link">📖 Danh mục thuốc</a>
+      <a routerLink="/admin/prescription-templates" class="tab-btn tab-link">📝 Mẫu toa thuốc</a>
+      <a routerLink="/inventory" class="tab-btn tab-link">🏭 Kho tổng</a>
+    </div>
+  </header>
 
-    @if (activeTab === 'prescriptions') {
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-icon info">📋</div>
+      <div class="stat-content">
+        <span class="value">{{ pendingRx() }}</span>
+        <span class="label">Chờ phát</span>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon success">✅</div>
+      <div class="stat-content">
+        <span class="value">{{ completedRx() }}</span>
+        <span class="label">Đã phát</span>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon warning">⚠️</div>
+      <div class="stat-content">
+        <span class="value">{{ lowStockCount() }}</span>
+        <span class="label">Sắp hết</span>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon primary">📦</div>
+      <div class="stat-content">
+        <span class="value">{{ totalItems() }}</span>
+        <span class="label">Tổng mặt hàng</span>
+      </div>
+    </div>
+  </div>
+
+  @if (activeTab === 'prescriptions') {
     <section class="card">
-        <div class="section-header">
-            <h2>Hàng đợi đơn thuốc</h2>
-        </div>
-        <div class="rx-queue-grid">
-            @for (rx of prescriptions(); track rx.id) {
-            <div class="rx-card" [class]="rx.status.toLowerCase()">
-                <div class="rx-header">
-                    <span class="rx-patient">{{ rx.patient }}</span>
-                    <span class="rx-time">{{ rx.time }}</span>
-                </div>
-                <div class="rx-info">
-                    👨‍⚕️ {{ rx.doctor }} • 💊 {{ rx.items }} thuốc
-                </div>
-                <div class="rx-actions">
-                    @if (rx.status === 'Pending') {
-                    <button class="btn btn-sm btn-warning" (click)="processRx(rx)">Bắt đầu</button>
-                    } @else if (rx.status === 'Processing') {
-                    <button class="btn btn-sm btn-primary" (click)="completeRx(rx)">Hoàn thành</button>
-                    } @else {
-                    <span class="status-badge success">✓ Đã phát</span>
-                    }
-                </div>
+      <div class="section-header">
+        <h2>Hàng đợi đơn thuốc</h2>
+      </div>
+      <div class="rx-queue-grid">
+        @for (rx of prescriptions(); track rx.id) {
+          <div class="rx-card" [class]="rx.status.toLowerCase()">
+            <div class="rx-header">
+              <span class="rx-patient">{{ rx.patientName }}</span>
+              <span class="rx-time">{{ rx.prescriptionDate | date: 'dd/MM HH:mm' }}</span>
             </div>
+            <div class="rx-info">👨‍⚕️ {{ rx.doctorName }} • 💊 {{ rx.items?.length }} thuốc</div>
+            <div class="rx-actions">
+              @if (rx.status === 'Pending') {
+                <button class="btn btn-sm btn-warning" (click)="processRx(rx)">Bắt đầu</button>
+              } @else if (rx.status === 'Processing') {
+                <button class="btn btn-sm btn-primary" (click)="completeRx(rx)">Hoàn thành</button>
+              } @else {
+                <span class="status-badge success">✓ Đã phát</span>
+              }
+            </div>
+          </div>
+        } @empty {
+          <div class="empty-state">Không có đơn thuốc</div>
+        }
+      </div>
+    </section>
+  }
+
+  @if (activeTab === 'inventory') {
+    <section class="card">
+      <div class="section-header">
+        <h2>Tồn kho thuốc</h2>
+        <input
+          type="text"
+          class="search-input"
+          placeholder="Tìm thuốc..."
+          [(ngModel)]="drugSearch"
+        />
+      </div>
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Mã</th>
+              <th>Tên thuốc</th>
+              <th>ĐVT</th>
+              <th>Tồn</th>
+              <th>Tối thiểu</th>
+              <th>Hạn sử dụng</th>
+              <th>Trạng thái</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (d of filteredDrugs(); track d.id) {
+              <tr [class.low-stock-row]="d.stock < d.minStock">
+                <td class="code-cell">{{ d.code }}</td>
+                <td>{{ d.name }}</td>
+                <td>{{ d.unit }}</td>
+                <td class="font-bold">{{ d.stock }}</td>
+                <td>{{ d.minStock }}</td>
+                <td>{{ d.expiry }}</td>
+                <td>
+                  <span
+                    class="status-badge"
+                    [class.warning]="d.stock < d.minStock"
+                    [class.success]="d.stock >= d.minStock"
+                  >
+                    {{ d.stock < d.minStock ? 'Sắp hết' : 'Đủ' }}
+                  </span>
+                </td>
+              </tr>
             } @empty {
-            <div class="empty-state">Không có đơn thuốc</div>
+              <tr>
+                <td colspan="7" class="empty-state">Không có dữ liệu</td>
+              </tr>
             }
-        </div>
+          </tbody>
+        </table>
+      </div>
     </section>
-    }
+  }
 
-    @if (activeTab === 'inventory') {
+  @if (activeTab === 'import') {
     <section class="card">
-        <div class="section-header">
-            <h2>Tồn kho thuốc</h2>
-            <input type="text" class="search-input" placeholder="Tìm thuốc..." [(ngModel)]="drugSearch" />
-        </div>
-        <div class="table-container">
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>Mã</th>
-                        <th>Tên thuốc</th>
-                        <th>ĐVT</th>
-                        <th>Tồn</th>
-                        <th>Tối thiểu</th>
-                        <th>Hạn sử dụng</th>
-                        <th>Trạng thái</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @for (d of filteredDrugs(); track d.id) {
-                    <tr [class.low-stock-row]="d.stock < d.minStock">
-                        <td class="code-cell">{{ d.code }}</td>
-                        <td>{{ d.name }}</td>
-                        <td>{{ d.unit }}</td>
-                        <td class="font-bold">{{ d.stock }}</td>
-                        <td>{{ d.minStock }}</td>
-                        <td>{{ d.expiry }}</td>
-                        <td>
-                            <span class="status-badge" [class.warning]="d.stock < d.minStock"
-                                [class.success]="d.stock >= d.minStock">
-                                {{ d.stock < d.minStock ? 'Sắp hết' : 'Đủ' }} </span>
-                        </td>
-                    </tr>
-                    } @empty {
-                    <tr>
-                        <td colspan="7" class="empty-state">Không có dữ liệu</td>
-                    </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
+      <div class="section-header">
+        <h2>Lịch sử nhập kho</h2>
+        <button class="btn btn-primary" (click)="showNewImport = true">➕ Nhập kho mới</button>
+      </div>
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Mã phiếu</th>
+              <th>Ngày</th>
+              <th>NCC</th>
+              <th>Số mặt hàng</th>
+              <th>Tổng tiền</th>
+              <th>Trạng thái</th>
+              <th class="text-right">Thao tác</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (i of imports(); track i.id) {
+              <tr>
+                <td class="code-cell">{{ i.code }}</td>
+                <td>{{ i.date }}</td>
+                <td>{{ i.supplier }}</td>
+                <td>{{ i.items }}</td>
+                <td>{{ formatCurrency(i.total) }}</td>
+                <td>
+                  <span class="status-badge success">{{ i.status }}</span>
+                </td>
+                <td class="actions-cell">
+                  <button class="btn-icon" (click)="viewImport(i)">👁️</button>
+                  <button class="btn-icon" (click)="editImport(i)">✏️</button>
+                  <button class="btn-icon" (click)="deleteImport(i)">🗑️</button>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="7" class="empty-state">Không có lịch sử</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
     </section>
-    }
+  }
 
-    @if (activeTab === 'import') {
-    <section class="card">
-        <div class="section-header">
-            <h2>Lịch sử nhập kho</h2>
-            <button class="btn btn-primary" (click)="showNewImport = true">➕ Nhập kho mới</button>
-        </div>
-        <div class="table-container">
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>Mã phiếu</th>
-                        <th>Ngày</th>
-                        <th>NCC</th>
-                        <th>Số mặt hàng</th>
-                        <th>Tổng tiền</th>
-                        <th>Trạng thái</th>
-                        <th class="text-right">Thao tác</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @for (i of imports(); track i.id) {
-                    <tr>
-                        <td class="code-cell">{{ i.code }}</td>
-                        <td>{{ i.date }}</td>
-                        <td>{{ i.supplier }}</td>
-                        <td>{{ i.items }}</td>
-                        <td>{{ formatCurrency(i.total) }}</td>
-                        <td><span class="status-badge success">{{ i.status }}</span></td>
-                        <td class="actions-cell">
-                            <button class="btn-icon" (click)="viewImport(i)">👁️</button>
-                            <button class="btn-icon" (click)="editImport(i)">✏️</button>
-                            <button class="btn-icon" (click)="deleteImport(i)">🗑️</button>
-                        </td>
-                    </tr>
-                    } @empty {
-                    <tr>
-                        <td colspan="7" class="empty-state">Không có lịch sử</td>
-                    </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
-    </section>
-    }
-
-    @if (showNewImport) {
+  @if (showNewImport) {
     <div class="modal-overlay" (click)="showNewImport = false">
-        <div class="modal-content large-modal" (click)="$event.stopPropagation()">
-            <div class="modal-header">
-                <h2>➕ Nhập kho mới</h2>
-                <button class="close-btn" (click)="showNewImport = false">×</button>
-            </div>
-            <form (ngSubmit)="submitImport()">
-                <div class="modal-body">
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label class="form-label">Nhà cung cấp *</label>
-                            <input class="form-control" type="text" [(ngModel)]="newImport.supplier" name="supplier"
-                                required />
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Ngày nhập</label>
-                            <input class="form-control" type="date" [(ngModel)]="newImport.date" name="date" />
-                        </div>
-                    </div>
-
-                    <div class="inventory-list">
-                        <h4>Danh sách thuốc</h4>
-                        @for (item of newImport.items; track $index) {
-                        <div class="item-row">
-                            <input class="form-control" type="text" [(ngModel)]="item.name" [name]="'name'+$index"
-                                placeholder="Tên thuốc" />
-                            <input class="form-control qty-input" type="number" [(ngModel)]="item.qty"
-                                [name]="'qty'+$index" placeholder="SL" />
-                            <input class="form-control" type="number" [(ngModel)]="item.price" [name]="'price'+$index"
-                                placeholder="Đơn giá" />
-                            <button type="button" class="btn-icon danger" (click)="removeImportItem($index)">✖</button>
-                        </div>
-                        }
-                        <button type="button" class="btn btn-secondary full-width" (click)="addImportItem()">➕ Thêm
-                            thuốc</button>
-                    </div>
-
-                    <div class="total-row">
-                        <span>Tổng tiền:</span>
-                        <span class="total-value">{{ formatCurrency(calcImportTotal()) }}</span>
-                    </div>
-                </div>
-
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" (click)="showNewImport = false">Huỷ</button>
-                    <button type="submit" class="btn btn-primary">Lưu phiếu nhập</button>
-                </div>
-            </form>
+      <div class="modal-content large-modal" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h2>➕ Nhập kho mới</h2>
+          <button class="close-btn" (click)="showNewImport = false">×</button>
         </div>
+        <form (ngSubmit)="submitImport()">
+          <div class="modal-body">
+            <div class="form-grid">
+              <div class="form-group">
+                <label class="form-label">Nhà cung cấp *</label>
+                <input
+                  class="form-control"
+                  type="text"
+                  [(ngModel)]="newImport.supplier"
+                  name="supplier"
+                  required
+                />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Ngày nhập</label>
+                <input class="form-control" type="date" [(ngModel)]="newImport.date" name="date" />
+              </div>
+            </div>
+
+            <div class="inventory-list">
+              <h4>Danh sách thuốc</h4>
+              @for (item of newImport.items; track $index) {
+                <div class="item-row">
+                  <input
+                    class="form-control"
+                    type="text"
+                    [(ngModel)]="item.name"
+                    [name]="'name' + $index"
+                    placeholder="Tên thuốc"
+                  />
+                  <input
+                    class="form-control qty-input"
+                    type="number"
+                    [(ngModel)]="item.qty"
+                    [name]="'qty' + $index"
+                    placeholder="SL"
+                  />
+                  <input
+                    class="form-control"
+                    type="number"
+                    [(ngModel)]="item.price"
+                    [name]="'price' + $index"
+                    placeholder="Đơn giá"
+                  />
+                  <button type="button" class="btn-icon danger" (click)="removeImportItem($index)">
+                    ✖
+                  </button>
+                </div>
+              }
+              <button type="button" class="btn btn-secondary full-width" (click)="addImportItem()">
+                ➕ Thêm thuốc
+              </button>
+            </div>
+
+            <div class="total-row">
+              <span>Tổng tiền:</span>
+              <span class="total-value">{{ formatCurrency(calcImportTotal()) }}</span>
+            </div>
+          </div>
+
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" (click)="showNewImport = false">
+              Huỷ
+            </button>
+            <button type="submit" class="btn btn-primary">Lưu phiếu nhập</button>
+          </div>
+        </form>
+      </div>
     </div>
-    }
+  }
 </div>

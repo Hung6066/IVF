@@ -1,0 +1,243 @@
+:host {
+  display: block;
+  background: #f8fafc;
+}
+
+// Page wrapper
+.p-6 {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+// Section heading
+h2 {
+  font-size: 1.375rem;
+  font-weight: 700;
+  color: var(--text-primary, #1e293b);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+
+  i {
+    color: #3b82f6;
+  }
+}
+
+// Stats cards grid
+.grid.grid-cols-4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+
+  // Each stat card
+  > div {
+    border-radius: 14px;
+    padding: 1.25rem;
+    text-align: center;
+    transition:
+      box-shadow 0.2s,
+      transform 0.2s;
+
+    &:hover {
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      transform: translateY(-2px);
+    }
+
+    // Number
+    .text-2xl {
+      font-size: 2rem;
+      font-weight: 700;
+      line-height: 1;
+      margin-bottom: 0.375rem;
+      font-feature-settings: 'tnum';
+    }
+
+    // Label
+    .text-sm {
+      font-size: 0.8125rem;
+      color: var(--text-secondary, #64748b);
+      font-weight: 500;
+    }
+  }
+}
+
+// Filter bar
+.flex.gap-4.mb-4 {
+  input,
+  select {
+    padding: 0.5rem 0.875rem;
+    border: 1.5px solid var(--border-color, #e2e8f0);
+    border-radius: 10px;
+    font-size: 0.875rem;
+    background: white;
+    transition:
+      border-color 0.2s,
+      box-shadow 0.2s;
+
+    &:focus {
+      outline: none;
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+    }
+  }
+
+  button.bg-blue-600 {
+    background: #3b82f6;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition:
+      background 0.2s,
+      box-shadow 0.2s;
+    white-space: nowrap;
+
+    &:hover {
+      background: #2563eb;
+      box-shadow: 0 2px 8px rgba(59, 130, 246, 0.35);
+    }
+  }
+}
+
+// Orders table container
+.bg-white.rounded-xl.shadow {
+  background: white;
+  border-radius: 16px;
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.06),
+    0 4px 16px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+
+    thead {
+      background: #f8fafc;
+
+      th {
+        padding: 0.875rem 1rem;
+        font-weight: 600;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-secondary, #64748b);
+        text-align: left;
+        border-bottom: 1.5px solid #e2e8f0;
+        white-space: nowrap;
+
+        &:last-child {
+          text-align: right;
+        }
+      }
+    }
+
+    tbody {
+      tr {
+        transition: background-color 0.15s ease;
+        border-bottom: 1px solid #f1f5f9;
+
+        &:last-child {
+          border-bottom: none;
+        }
+
+        &:hover {
+          background-color: #f0f9ff;
+          cursor: pointer;
+        }
+
+        td {
+          padding: 0.875rem 1rem;
+          vertical-align: middle;
+
+          .font-medium {
+            color: var(--text-primary, #1e293b);
+            font-weight: 600;
+          }
+          .text-xs.text-gray-500 {
+            color: #94a3b8;
+            font-size: 0.75rem;
+            margin-top: 0.125rem;
+          }
+        }
+      }
+    }
+  }
+}
+
+// Action buttons in table
+button.bg-blue-500,
+button.bg-green-500 {
+  padding: 0.25rem 0.75rem;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+button.bg-blue-500 {
+  background: #3b82f6;
+  color: white;
+
+  &:hover {
+    background: #2563eb;
+  }
+}
+
+button.bg-green-500 {
+  background: #22c55e;
+  color: white;
+
+  &:hover {
+    background: #16a34a;
+  }
+}
+
+// Status badges
+span.rounded-full {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.625rem;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+// Loading state
+.text-center.py-8 {
+  color: var(--text-secondary, #94a3b8);
+  font-size: 0.875rem;
+}
+
+// Responsive
+@media (max-width: 1024px) {
+  .grid.grid-cols-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .grid.grid-cols-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .flex.gap-4.mb-4 {
+    flex-wrap: wrap;
+
+    input {
+      flex: 1 1 100%;
+    }
+    select {
+      flex: 1 1 calc(50% - 0.5rem);
+    }
+  }
+}

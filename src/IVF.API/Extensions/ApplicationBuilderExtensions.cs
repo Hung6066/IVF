@@ -250,6 +250,23 @@ public static class ApplicationBuilderExtensions
         app.MapInfrastructureEndpoints();
         app.MapAdvancedSecurityEndpoints();
         app.MapEnterpriseSecurityEndpoints();
+        app.MapConsentEndpoints();
+        app.MapMedicationAdminEndpoints();
+        app.MapCycleFeeEndpoints();
+        app.MapDrugCatalogEndpoints();
+        app.MapPrescriptionTemplateEndpoints();
+        app.MapFileTrackingEndpoints();
+        app.MapEggDonorRecipientEndpoints();
+        app.MapInventoryRequestEndpoints();
+        app.MapPregnancyEndpoints();
+        app.MapProcedureEndpoints();
+        app.MapPrescriptionEndpoints();
+        app.MapStimulationEndpoints();
+        app.MapFetEndpoints();
+        app.MapConsultationEndpoints();
+        app.MapEggBankEndpoints();
+        app.MapLabEndpoints();
+        app.MapInventoryEndpoints();
 
         // SignalR Hubs
         app.MapHub<IVF.API.Hubs.QueueHub>("/hubs/queue");

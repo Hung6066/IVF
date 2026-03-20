@@ -1,150 +1,422 @@
 <div class="dashboard-layout">
-    <header class="page-header">
-        <div class="header-title">
-            <h1>🗣️ Phòng Tư vấn</h1>
-        </div>
-        <div class="header-actions">
-            <!-- Actions if needed -->
-        </div>
-    </header>
-
-    <div class="stats-grid">
-        <div class="stat-card">
-            <div class="stat-icon info">⏳</div>
-            <div class="stat-content">
-                <span class="value">{{ queueCount() }}</span>
-                <span class="label">Đang chờ</span>
-            </div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-icon success">✅</div>
-            <div class="stat-content">
-                <span class="value">{{ completedCount() }}</span>
-                <span class="label">Đã tư vấn</span>
-            </div>
-        </div>
+  <header class="page-header">
+    <div class="header-title">
+      <h1>🗣️ Phòng Tư vấn</h1>
     </div>
-
-    <div class="tabs-container">
-        <button class="tab-btn" [class.active]="activeTab === 'queue'" (click)="activeTab = 'queue'">Hàng đợi</button>
-        <button class="tab-btn" [class.active]="activeTab === 'history'" (click)="activeTab = 'history'">Lịch
-            sử</button>
+    <div class="header-actions">
+      <!-- Actions if needed -->
     </div>
+  </header>
 
-    @if (activeTab === 'queue') {
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-icon info">⏳</div>
+      <div class="stat-content">
+        <span class="value">{{ queueCount() }}</span>
+        <span class="label">Đang chờ</span>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon success">✅</div>
+      <div class="stat-content">
+        <span class="value">{{ completedCount() }}</span>
+        <span class="label">Đã tư vấn</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="tabs-container">
+    <button class="tab-btn" [class.active]="activeTab === 'queue'" (click)="activeTab = 'queue'">
+      Hàng đợi
+    </button>
+    <button
+      class="tab-btn"
+      [class.active]="activeTab === 'records'"
+      (click)="activeTab = 'records'"
+    >
+      Hồ sơ khám
+    </button>
+    <button
+      class="tab-btn"
+      [class.active]="activeTab === 'history'"
+      (click)="activeTab = 'history'"
+    >
+      Lịch sử
+    </button>
+    <a routerLink="/consent" class="tab-btn tab-link">📋 Đồng thuận</a>
+    <a routerLink="/file-tracking" class="tab-btn tab-link">📁 Hồ sơ giấy</a>
+  </div>
+
+  @if (activeTab === 'queue') {
     <section class="card">
-        <div class="section-header">
-            <h2>Danh sách chờ ({{ queueCount() }})</h2>
-        </div>
-        <div class="table-container">
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>STT</th>
-                        <th>Họ tên</th>
-                        <th>Mã BN</th>
-                        <th>Giờ lấy số</th>
-                        <th>Trạng thái</th>
-                        <th class="text-right">Thao tác</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @for (q of queue(); track q.id) {
-                    <tr>
-                        <td class="stt-cell">{{ q.ticketNumber }}</td>
-                        <td>{{ q.patientName }}</td>
-                        <td><span class="code-cell">{{ q.patientCode }}</span></td>
-                        <td>{{ formatTime(q.issuedAt) }}</td>
-                        <td>
-                            @if (q.status === 'Waiting') { <span class="status-badge pending">Đang chờ</span> }
-                            @else if (q.status === 'Called') { <span class="status-badge called">Đang gọi</span> }
-                            @else if (q.status === 'InService') { <span class="status-badge processing">Đang tư
-                                vấn</span> }
-                            @else { <span class="status-badge">{{ q.status }}</span> }
-                        </td>
-                        <td class="actions-cell">
-                            <button class="btn btn-sm btn-primary" (click)="callPatient(q)"
-                                [disabled]="q.status !== 'Waiting'">📢 Gọi</button>
-                            <button class="btn btn-sm btn-success" (click)="startConsult(q)"
-                                [disabled]="q.status === 'InService'">👨‍⚕️ Tư vấn</button>
-                            <button class="btn btn-sm btn-warning" (click)="skipPatient(q)"
-                                [disabled]="q.status === 'InService'">⏭️ Bỏ qua</button>
-                        </td>
-                    </tr>
-                    } @empty {
-                    <tr>
-                        <td colspan="6" class="empty-state">Không có bệnh nhân chờ</td>
-                    </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
+      <div class="section-header">
+        <h2>Danh sách chờ ({{ queueCount() }})</h2>
+      </div>
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>STT</th>
+              <th>Họ tên</th>
+              <th>Mã BN</th>
+              <th>Giờ lấy số</th>
+              <th>Trạng thái</th>
+              <th class="text-right">Thao tác</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (q of queue(); track q.id) {
+              <tr>
+                <td class="stt-cell">{{ q.ticketNumber }}</td>
+                <td>{{ q.patientName }}</td>
+                <td>
+                  <span class="code-cell">{{ q.patientCode }}</span>
+                </td>
+                <td>{{ formatTime(q.issuedAt) }}</td>
+                <td>
+                  @if (q.status === 'Waiting') {
+                    <span class="status-badge pending">Đang chờ</span>
+                  } @else if (q.status === 'Called') {
+                    <span class="status-badge called">Đang gọi</span>
+                  } @else if (q.status === 'InService') {
+                    <span class="status-badge processing">Đang tư vấn</span>
+                  } @else {
+                    <span class="status-badge">{{ q.status }}</span>
+                  }
+                </td>
+                <td class="actions-cell">
+                  <button
+                    class="btn btn-sm btn-primary"
+                    (click)="callPatient(q)"
+                    [disabled]="q.status !== 'Waiting'"
+                  >
+                    📢 Gọi
+                  </button>
+                  <button
+                    class="btn btn-sm btn-success"
+                    (click)="startConsult(q)"
+                    [disabled]="q.status === 'InService'"
+                  >
+                    👨‍⚕️ Tư vấn
+                  </button>
+                  <button
+                    class="btn btn-sm btn-warning"
+                    (click)="skipPatient(q)"
+                    [disabled]="q.status === 'InService'"
+                  >
+                    ⏭️ Bỏ qua
+                  </button>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="6" class="empty-state">Không có bệnh nhân chờ</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
     </section>
-    }
+  }
 
-    @if (activeTab === 'history') {
+  @if (activeTab === 'records') {
     <section class="card">
-        <div class="section-header">
-            <h2>Lịch sử tư vấn</h2>
+      <div class="section-header">
+        <h2>Hồ sơ khám bệnh</h2>
+        <div class="search-box">
+          <input
+            type="text"
+            [(ngModel)]="consultationsSearch"
+            (keyup.enter)="onConsultationsSearch()"
+            placeholder="Tìm theo tên/mã BN..."
+            class="form-control"
+          />
+          <button class="btn btn-primary btn-sm" (click)="onConsultationsSearch()">Tìm</button>
         </div>
-        <div class="table-container">
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>STT</th>
-                        <th>Họ tên</th>
-                        <th>Mã BN</th>
-                        <th>Giờ hoàn thành</th>
-                        <th>Ghi chú</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @for (h of history(); track h.id) {
-                    <tr>
-                        <td>{{ h.ticketNumber }}</td>
-                        <td>{{ h.patientName }}</td>
-                        <td><span class="code-cell">{{ h.patientCode }}</span></td>
-                        <td>{{ formatTime(h.completedAt) }}</td>
-                        <td>{{ h.notes || '-' }}</td>
-                    </tr>
-                    } @empty {
-                    <tr>
-                        <td colspan="5" class="empty-state">Chưa có lịch sử tư vấn</td>
-                    </tr>
+      </div>
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Bệnh nhân</th>
+              <th>Loại khám</th>
+              <th>Bác sĩ</th>
+              <th>Ngày khám</th>
+              <th>Chẩn đoán</th>
+              <th>PP điều trị</th>
+              <th>Trạng thái</th>
+              <th class="text-right">Chi tiết</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (c of consultations(); track c.id) {
+              <tr class="clickable-row" (click)="viewConsultation(c)">
+                <td>
+                  <div>{{ c.patientName }}</div>
+                  <small class="text-muted">{{ c.patientCode }}</small>
+                </td>
+                <td>{{ getTypeLabel(c.consultationType) }}</td>
+                <td>{{ c.doctorName }}</td>
+                <td>{{ c.consultationDate | date: 'dd/MM/yyyy HH:mm' }}</td>
+                <td>{{ c.diagnosis || '—' }}</td>
+                <td>{{ getMethodLabel(c.recommendedMethod ?? '') }}</td>
+                <td>
+                  <span [class]="getStatusClass(c.status)">{{ getStatusLabel(c.status) }}</span>
+                </td>
+                <td class="text-right actions-cell">
+                  <button
+                    class="btn btn-sm btn-outline"
+                    (click)="viewConsultation(c); $event.stopPropagation()"
+                    title="Xem chi tiet"
+                  >
+                    Xem
+                  </button>
+                  <button
+                    class="btn btn-sm btn-outline"
+                    (click)="printInfertilityExamForm(c); $event.stopPropagation()"
+                    title="In phiếu khám hiếm muộn"
+                  >
+                    🖨️ Phiếu
+                  </button>
+                  @if (c.status === 'InProgress' || c.status === 'Scheduled') {
+                    @if (c.consultationType === 'FirstVisit') {
+                      <button
+                        class="btn btn-sm btn-primary"
+                        (click)="openFirstVisitForm(c); $event.stopPropagation()"
+                      >
+                        Kham
+                      </button>
+                    } @else if (c.consultationType === 'FollowUp') {
+                      <button
+                        class="btn btn-sm btn-primary"
+                        (click)="openFollowUpForm(c); $event.stopPropagation()"
+                      >
+                        Tai kham
+                      </button>
                     }
-                </tbody>
-            </table>
-        </div>
+                    @if (!c.diagnosis) {
+                      <button
+                        class="btn btn-sm btn-success"
+                        (click)="openTreatmentDecision(c); $event.stopPropagation()"
+                      >
+                        QD dieu tri
+                      </button>
+                    }
+                  }
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="8" class="empty-state">Chưa có hồ sơ khám</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
     </section>
-    }
+  }
 
-    @if (showForm) {
+  @if (activeTab === 'history') {
+    <section class="card">
+      <div class="section-header">
+        <h2>Lịch sử tư vấn</h2>
+      </div>
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>STT</th>
+              <th>Họ tên</th>
+              <th>Mã BN</th>
+              <th>Giờ hoàn thành</th>
+              <th>Ghi chú</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (h of history(); track h.id) {
+              <tr>
+                <td>{{ h.ticketNumber }}</td>
+                <td>{{ h.patientName }}</td>
+                <td>
+                  <span class="code-cell">{{ h.patientCode }}</span>
+                </td>
+                <td>{{ formatTime(h.completedAt) }}</td>
+                <td>{{ h.notes || '-' }}</td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="5" class="empty-state">Chưa có lịch sử tư vấn</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+  }
+
+  @if (showForm) {
     <div class="modal-overlay" (click)="showForm = false">
-        <div class="modal-content" (click)="$event.stopPropagation()">
-            <div class="modal-header">
-                <h3>📝 Ghi nhận tư vấn</h3>
-                <button class="close-btn" (click)="showForm = false">&times;</button>
-            </div>
-
-            <form (ngSubmit)="submitConsult()">
-                <div class="modal-body">
-                    <div class="patient-info-summary">
-                        <strong>BN: </strong> {{ currentPatientName }}
-                    </div>
-
-                    <div class="form-group">
-                        <label class="form-label">Ghi chú tư vấn</label>
-                        <textarea class="form-control" [(ngModel)]="consultNotes" name="notes" rows="5"
-                            placeholder="Nội dung tư vấn..."></textarea>
-                    </div>
-                </div>
-
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" (click)="showForm = false">Huỷ</button>
-                    <button type="submit" class="btn btn-primary">Hoàn thành & Lưu</button>
-                </div>
-            </form>
+      <div class="modal-content" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h3>📝 Ghi nhận tư vấn</h3>
+          <button class="close-btn" (click)="showForm = false">&times;</button>
         </div>
+
+        <form (ngSubmit)="submitConsult()">
+          <div class="modal-body">
+            <div class="patient-info-summary"><strong>BN: </strong> {{ currentPatientName }}</div>
+
+            <div class="form-group">
+              <label class="form-label">Ghi chú tư vấn</label>
+              <textarea
+                class="form-control"
+                [(ngModel)]="consultNotes"
+                name="notes"
+                rows="5"
+                placeholder="Nội dung tư vấn..."
+              ></textarea>
+            </div>
+          </div>
+
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" (click)="showForm = false">Huỷ</button>
+            <button type="submit" class="btn btn-primary">Hoàn thành & Lưu</button>
+          </div>
+        </form>
+      </div>
     </div>
-    }
+  }
+
+  @if (showDetailModal && selectedConsultation()) {
+    <div class="modal-overlay" (click)="closeDetailModal()">
+      <div class="modal-content modal-lg" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h3>📋 Chi tiết khám bệnh</h3>
+          <button class="close-btn" (click)="closeDetailModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="detail-grid">
+            <div class="detail-row">
+              <strong>Bệnh nhân:</strong>
+              <span
+                >{{ selectedConsultation()!.patientName }} ({{
+                  selectedConsultation()!.patientCode
+                }})</span
+              >
+            </div>
+            <div class="detail-row">
+              <strong>Bác sĩ:</strong>
+              <span>{{ selectedConsultation()!.doctorName }}</span>
+            </div>
+            <div class="detail-row">
+              <strong>Loại khám:</strong>
+              <span>{{ getTypeLabel(selectedConsultation()!.consultationType) }}</span>
+            </div>
+            <div class="detail-row">
+              <strong>Trạng thái:</strong>
+              <span [class]="getStatusClass(selectedConsultation()!.status)">
+                {{ getStatusLabel(selectedConsultation()!.status) }}
+              </span>
+            </div>
+          </div>
+
+          @if (selectedConsultation()!.chiefComplaint) {
+            <div class="clinical-section">
+              <h4>Lý do khám</h4>
+              <p>{{ selectedConsultation()!.chiefComplaint }}</p>
+            </div>
+          }
+          @if (selectedConsultation()!.medicalHistory) {
+            <div class="clinical-section">
+              <h4>Tiền sử bệnh</h4>
+              <p>{{ selectedConsultation()!.medicalHistory }}</p>
+            </div>
+          }
+          @if (selectedConsultation()!.physicalExamination) {
+            <div class="clinical-section">
+              <h4>Khám lâm sàng</h4>
+              <p>{{ selectedConsultation()!.physicalExamination }}</p>
+            </div>
+          }
+          @if (selectedConsultation()!.diagnosis) {
+            <div class="clinical-section">
+              <h4>Chẩn đoán</h4>
+              <p>{{ selectedConsultation()!.diagnosis }}</p>
+            </div>
+          }
+          @if (selectedConsultation()!.treatmentPlan) {
+            <div class="clinical-section">
+              <h4>Kế hoạch điều trị</h4>
+              <p>{{ selectedConsultation()!.treatmentPlan }}</p>
+            </div>
+          }
+          @if (selectedConsultation()!.recommendedMethod) {
+            <div class="clinical-section">
+              <h4>Phương pháp đề xuất</h4>
+              <p>{{ getMethodLabel(selectedConsultation()!.recommendedMethod ?? '') }}</p>
+            </div>
+          }
+        </div>
+        <div class="modal-footer">
+          @if (
+            selectedConsultation()!.status === 'InProgress' ||
+            selectedConsultation()!.status === 'Scheduled'
+          ) {
+            @if (selectedConsultation()!.consultationType === 'FirstVisit') {
+              <button
+                class="btn btn-primary"
+                (click)="closeDetailModal(); openFirstVisitForm(selectedConsultation()!)"
+              >
+                Kham lan dau
+              </button>
+            } @else if (selectedConsultation()!.consultationType === 'FollowUp') {
+              <button
+                class="btn btn-primary"
+                (click)="closeDetailModal(); openFollowUpForm(selectedConsultation()!)"
+              >
+                Tai kham
+              </button>
+            }
+            @if (!selectedConsultation()!.diagnosis) {
+              <button
+                class="btn btn-success"
+                (click)="closeDetailModal(); openTreatmentDecision(selectedConsultation()!)"
+              >
+                Quyet dinh dieu tri
+              </button>
+            }
+          }
+          <button class="btn btn-secondary" (click)="closeDetailModal()">Dong</button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- Clinical Form Modals -->
+  @if (showFirstVisitForm && selectedConsultation()) {
+    <app-first-visit-form
+      [consultation]="selectedConsultation()!"
+      (closed)="closeClinicalForm()"
+      (saved)="onClinicalFormSaved()"
+    >
+    </app-first-visit-form>
+  }
+
+  @if (showFollowUpForm && selectedConsultation()) {
+    <app-consultation-follow-up
+      [consultation]="selectedConsultation()!"
+      (closed)="closeClinicalForm()"
+      (saved)="onClinicalFormSaved()"
+    >
+    </app-consultation-follow-up>
+  }
+
+  @if (showTreatmentDecision && selectedConsultation()) {
+    <app-treatment-decision
+      [consultation]="selectedConsultation()!"
+      (closed)="closeClinicalForm()"
+      (saved)="onClinicalFormSaved()"
+    >
+    </app-treatment-decision>
+  }
 </div>

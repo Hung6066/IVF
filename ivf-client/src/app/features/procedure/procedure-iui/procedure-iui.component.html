@@ -1,0 +1,153 @@
+<div class="p-6 max-w-3xl mx-auto">
+  <div class="flex items-center gap-3 mb-6">
+    <button routerLink="/procedure" class="text-gray-500 hover:text-gray-700">
+      <i class="fas fa-arrow-left"></i>
+    </button>
+    <h1 class="text-2xl font-bold text-gray-800">IUI — Bơm tinh trùng</h1>
+  </div>
+
+  @if (error()) {
+    <div class="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+      {{ error() }}
+    </div>
+  }
+  @if (successMsg()) {
+    <div class="mb-4 p-3 bg-green-50 border border-green-200 text-green-700 rounded-lg text-sm">
+      {{ successMsg() }}
+    </div>
+  }
+
+  @if (loading()) {
+    <div class="text-center py-20 text-gray-500">
+      <i class="fas fa-spinner fa-spin text-2xl"></i>
+    </div>
+  } @else if (procedure()) {
+    <div class="bg-white rounded-xl border border-gray-200 p-5 mb-6">
+      <div class="grid grid-cols-3 gap-4 text-sm">
+        <div>
+          <span class="text-gray-500">BN:</span> <strong>{{ procedure()!.patientName }}</strong>
+        </div>
+        <div><span class="text-gray-500">Mã:</span> {{ procedure()!.patientCode }}</div>
+        <div><span class="text-gray-500">BS:</span> {{ procedure()!.performedByDoctorName }}</div>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
+      <h3 class="font-semibold text-gray-700">Thông số tinh dịch sau lọc rửa</h3>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Thể tích (ml)</label>
+          <input
+            type="number"
+            step="0.1"
+            min="0"
+            [(ngModel)]="iuiForm.spermVolume"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+          />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Mật độ (M/ml)</label>
+          <input
+            type="number"
+            step="0.1"
+            min="0"
+            [(ngModel)]="iuiForm.spermConcentration"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+          />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Độ di động (%)</label>
+          <input
+            type="number"
+            min="0"
+            max="100"
+            [(ngModel)]="iuiForm.motility"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+          />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Hình thái (%)</label>
+          <input
+            type="number"
+            min="0"
+            max="100"
+            [(ngModel)]="iuiForm.morphology"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+          />
+        </div>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">TMC (triệu)</label>
+        <input
+          type="number"
+          step="0.1"
+          min="0"
+          [(ngModel)]="iuiForm.totalMotileCount"
+          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+        />
+      </div>
+
+      <h3 class="font-semibold text-gray-700 pt-2">Chi tiết bơm</h3>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Loại catheter</label>
+          <input
+            type="text"
+            [(ngModel)]="iuiForm.catheterType"
+            placeholder="vd: Soft tip"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+          />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Mức độ</label>
+          <select
+            [(ngModel)]="iuiForm.difficulty"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+          >
+            @for (d of difficultyOptions; track d) {
+              <option [value]="d">{{ d }}</option>
+            }
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Thời lượng (phút)</label>
+          <input
+            type="number"
+            min="1"
+            [(ngModel)]="iuiForm.durationMinutes"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+          />
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Ghi chú</label>
+        <textarea
+          [(ngModel)]="iuiForm.findings"
+          rows="2"
+          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm resize-none"
+        ></textarea>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Biến chứng</label>
+        <input
+          type="text"
+          [(ngModel)]="iuiForm.complications"
+          placeholder="Không"
+          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+        />
+      </div>
+
+      <div class="flex justify-end gap-3 pt-2 border-t border-gray-100">
+        <button routerLink="/procedure" class="px-4 py-2 text-gray-600 text-sm">Huỷ</button>
+        <button
+          (click)="completeIui()"
+          [disabled]="saving() || procedure()!.status === 'Completed'"
+          class="flex items-center gap-2 px-5 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 text-sm font-medium"
+        >
+          <i class="fas fa-check-circle"></i> {{ saving() ? 'Đang lưu...' : 'Hoàn thành IUI' }}
+        </button>
+      </div>
+    </div>
+  }
+</div>

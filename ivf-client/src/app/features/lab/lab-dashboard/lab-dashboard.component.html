@@ -1,152 +1,204 @@
 <div class="lab-dashboard page-container">
-    <header class="page-header">
-        <h1>🧫 Phòng Lab - LABO</h1>
-        <div class="tabs-container">
-            <button class="tab-btn" [class.active]="activeTab === 'queue'" (click)="setActiveTab('queue')">
-                🎫 Hàng đợi
-            </button>
-            <button class="tab-btn" [class.active]="activeTab === 'embryos'" (click)="setActiveTab('embryos')">
-                🔬 Phôi đang nuôi
-            </button>
-            <button class="tab-btn" [class.active]="activeTab === 'schedule'" (click)="setActiveTab('schedule')">
-                📅 Lịch thủ thuật
-            </button>
-            <button class="tab-btn" [class.active]="activeTab === 'cryo'" (click)="setActiveTab('cryo')">
-                ❄️ Kho đông lạnh
-            </button>
-            <button class="tab-btn" [class.active]="activeTab === 'report'" (click)="setActiveTab('report')">
-                📊 Báo cáo phôi
-            </button>
-            <button class="tab-btn" [class.active]="activeTab === 'forms'" (click)="setActiveTab('forms')">
-                📋 Biểu mẫu
-            </button>
-        </div>
-    </header>
-
-    <div class="date-nav">
-        <button (click)="changeDay(-1)">◀</button>
-        <span class="current-date">{{ currentDate | date:'EEEE, dd/MM/yyyy' }}</span>
-        <button (click)="changeDay(1)">▶</button>
-        <button class="btn-today" (click)="goToday()">Hôm nay</button>
+  <header class="page-header">
+    <h1>🧫 Phòng Lab - LABO</h1>
+    <div class="tabs-container">
+      <button
+        class="tab-btn"
+        [class.active]="activeTab === 'queue'"
+        (click)="setActiveTab('queue')"
+      >
+        🎫 Hàng đợi
+      </button>
+      <button
+        class="tab-btn"
+        [class.active]="activeTab === 'embryos'"
+        (click)="setActiveTab('embryos')"
+      >
+        🔬 Phôi đang nuôi
+      </button>
+      <button
+        class="tab-btn"
+        [class.active]="activeTab === 'schedule'"
+        (click)="setActiveTab('schedule')"
+      >
+        📅 Lịch thủ thuật
+      </button>
+      <button class="tab-btn" [class.active]="activeTab === 'cryo'" (click)="setActiveTab('cryo')">
+        ❄️ Kho đông lạnh
+      </button>
+      <button
+        class="tab-btn"
+        [class.active]="activeTab === 'orders'"
+        (click)="setActiveTab('orders')"
+      >
+        🧪 Xét nghiệm
+      </button>
+      <button
+        class="tab-btn"
+        [class.active]="activeTab === 'report'"
+        (click)="setActiveTab('report')"
+      >
+        📊 Báo cáo phôi
+      </button>
+      <button
+        class="tab-btn"
+        [class.active]="activeTab === 'forms'"
+        (click)="setActiveTab('forms')"
+      >
+        📋 Biểu mẫu
+      </button>
     </div>
+  </header>
 
-    <div class="stats-row">
-        <div class="stat-card">
-            <span class="icon">🥚</span>
-            <div>
-                <span class="value">{{ stats().eggRetrievalCount }}</span>
-                <span class="label">Chọc hút</span>
-            </div>
-        </div>
-        <div class="stat-card">
-            <span class="icon">🔬</span>
-            <div>
-                <span class="value">{{ stats().cultureCount }}</span>
-                <span class="label">Đang nuôi</span>
-            </div>
-        </div>
-        <div class="stat-card">
-            <span class="icon">💉</span>
-            <div>
-                <span class="value">{{ stats().transferCount }}</span>
-                <span class="label">Chuyển phôi</span>
-            </div>
-        </div>
-        <div class="stat-card">
-            <span class="icon">❄️</span>
-            <div>
-                <span class="value">{{ stats().freezeCount }}</span>
-                <span class="label">Trữ phôi</span>
-            </div>
-        </div>
+  <div class="date-nav">
+    <button (click)="changeDay(-1)">◀</button>
+    <span class="current-date">{{ currentDate | date: 'EEEE, dd/MM/yyyy' }}</span>
+    <button (click)="changeDay(1)">▶</button>
+    <button class="btn-today" (click)="goToday()">Hôm nay</button>
+  </div>
+
+  <div class="stats-row">
+    <div class="stat-card">
+      <span class="icon">🥚</span>
+      <div>
+        <span class="value">{{ stats().eggRetrievalCount }}</span>
+        <span class="label">Chọc hút</span>
+      </div>
     </div>
+    <div class="stat-card">
+      <span class="icon">🔬</span>
+      <div>
+        <span class="value">{{ stats().cultureCount }}</span>
+        <span class="label">Đang nuôi</span>
+      </div>
+    </div>
+    <div class="stat-card">
+      <span class="icon">💉</span>
+      <div>
+        <span class="value">{{ stats().transferCount }}</span>
+        <span class="label">Chuyển phôi</span>
+      </div>
+    </div>
+    <div class="stat-card">
+      <span class="icon">❄️</span>
+      <div>
+        <span class="value">{{ stats().freezeCount }}</span>
+        <span class="label">Trữ phôi</span>
+      </div>
+    </div>
+  </div>
 
-    @if (activeTab === 'queue') {
-    <app-lab-queue [queue]="queue()" (callPatient)="onCallPatient($event)" (startProcedure)="onStartProcedure($event)"
-        (skipPatient)="onSkipPatient($event)">
+  @if (activeTab === 'queue') {
+    <app-lab-queue
+      [queue]="queue()"
+      (callPatient)="onCallPatient($event)"
+      (startProcedure)="onStartProcedure($event)"
+      (skipPatient)="onSkipPatient($event)"
+    >
     </app-lab-queue>
-    }
+  }
 
-    @if (activeTab === 'embryos') {
-    <app-lab-embryos [embryos]="embryos()" [activeCycles]="activeCycles()" [cryoLocations]="cryoLocations()"
-        [currentDate]="currentDate" (selectEmbryo)="onSelectEmbryo($event)" (saveEmbryo)="onSaveEmbryo($event)"
-        (deleteEmbryo)="onDeleteEmbryo($event)">
+  @if (activeTab === 'embryos') {
+    <app-lab-embryos
+      [embryos]="embryos()"
+      [activeCycles]="activeCycles()"
+      [cryoLocations]="cryoLocations()"
+      [currentDate]="currentDate"
+      (selectEmbryo)="onSelectEmbryo($event)"
+      (saveEmbryo)="onSaveEmbryo($event)"
+      (deleteEmbryo)="onDeleteEmbryo($event)"
+    >
     </app-lab-embryos>
-    }
+  }
 
-    @if (activeTab === 'schedule') {
-    <app-lab-schedule [schedule]="schedule()" [activeCycles]="activeCycles()" [doctors]="doctors()"
-        [currentDate]="currentDate" (toggleStatus)="onToggleSchedule($event)" (addSchedule)="onAddSchedule($event)">
+  @if (activeTab === 'schedule') {
+    <app-lab-schedule
+      [schedule]="schedule()"
+      [activeCycles]="activeCycles()"
+      [doctors]="doctors()"
+      [currentDate]="currentDate"
+      (toggleStatus)="onToggleSchedule($event)"
+      (addSchedule)="onAddSchedule($event)"
+    >
     </app-lab-schedule>
-    }
+  }
 
-    @if (activeTab === 'cryo') {
-    <app-lab-cryo [locations]="cryoLocations()" [stats]="stats()" (addLocation)="onAddCryoLocation($event)"
-        (updateLocation)="onUpdateCryoLocation($event)" (deleteLocation)="onDeleteCryoLocation($event)">
+  @if (activeTab === 'cryo') {
+    <app-lab-cryo
+      [locations]="cryoLocations()"
+      [stats]="stats()"
+      (addLocation)="onAddCryoLocation($event)"
+      (updateLocation)="onUpdateCryoLocation($event)"
+      (deleteLocation)="onDeleteCryoLocation($event)"
+    >
     </app-lab-cryo>
-    }
+  }
 
-    @if (activeTab === 'report') {
+  @if (activeTab === 'orders') {
+    <app-lab-orders></app-lab-orders>
+  }
+
+  @if (activeTab === 'report') {
     <section class="content-section card">
-        <div class="section-header">
-            <h2>Báo cáo phôi theo ngày</h2>
-            <div class="report-actions">
-                <button class="btn btn-secondary" (click)="exportExcel()">📄 Xuất Excel</button>
-                <button class="btn btn-secondary" (click)="printReport()">🖨️ In báo cáo</button>
-            </div>
+      <div class="section-header">
+        <h2>Báo cáo phôi theo ngày</h2>
+        <div class="report-actions">
+          <button class="btn btn-secondary" (click)="exportExcel()">📄 Xuất Excel</button>
+          <button class="btn btn-secondary" (click)="printReport()">🖨️ In báo cáo</button>
         </div>
-        <div class="table-container">
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>Mã CK</th>
-                        <th>Bệnh nhân</th>
-                        <th>Ngày chọc</th>
-                        <th>Số trứng</th>
-                        <th>MII</th>
-                        <th>2PN</th>
-                        <th>D3</th>
-                        <th>D5/D6</th>
-                        <th>Chuyển</th>
-                        <th>Trữ</th>
-                        <th>Kết quả</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @for (row of embryoReport(); track row.cycleCode) {
-                    <tr>
-                        <td class="code">{{ row.cycleCode }}</td>
-                        <td>{{ row.patientName }}</td>
-                        <td>{{ row.aspirationDate }}</td>
-                        <td>{{ row.totalEggs }}</td>
-                        <td>{{ row.mII }}</td>
-                        <td>{{ row.twoPN }}</td>
-                        <td>{{ row.d3 }}</td>
-                        <td>{{ row.d5D6 }}</td>
-                        <td>{{ row.transferred > 0 ? row.transferred : '—' }}</td>
-                        <td>{{ row.frozen > 0 ? row.frozen : '—' }}</td>
-                        <td>
-                            <span class="badge" [class.badge-success]="row.status === 'Hoàn thành'"
-                                [class.badge-info]="row.status !== 'Hoàn thành'">
-                                {{ row.status }}
-                            </span>
-                        </td>
-                    </tr>
-                    } @empty {
-                    <tr>
-                        <td colspan="11" class="text-center text-muted">Không có dữ liệu</td>
-                    </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
+      </div>
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Mã CK</th>
+              <th>Bệnh nhân</th>
+              <th>Ngày chọc</th>
+              <th>Số trứng</th>
+              <th>MII</th>
+              <th>2PN</th>
+              <th>D3</th>
+              <th>D5/D6</th>
+              <th>Chuyển</th>
+              <th>Trữ</th>
+              <th>Kết quả</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of embryoReport(); track row.cycleCode) {
+              <tr>
+                <td class="code">{{ row.cycleCode }}</td>
+                <td>{{ row.patientName }}</td>
+                <td>{{ row.aspirationDate }}</td>
+                <td>{{ row.totalEggs }}</td>
+                <td>{{ row.mII }}</td>
+                <td>{{ row.twoPN }}</td>
+                <td>{{ row.d3 }}</td>
+                <td>{{ row.d5D6 }}</td>
+                <td>{{ row.transferred > 0 ? row.transferred : '—' }}</td>
+                <td>{{ row.frozen > 0 ? row.frozen : '—' }}</td>
+                <td>
+                  <span
+                    class="badge"
+                    [class.badge-success]="row.status === 'Hoàn thành'"
+                    [class.badge-info]="row.status !== 'Hoàn thành'"
+                  >
+                    {{ row.status }}
+                  </span>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="11" class="text-center text-muted">Không có dữ liệu</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
     </section>
-    }
+  }
 
-    @if (activeTab === 'forms') {
-    <app-quick-forms-widget
-    title="Biểu mẫu Lab"
-    [maxForms]="12">
-    </app-quick-forms-widget>
-    }
+  @if (activeTab === 'forms') {
+    <app-quick-forms-widget title="Biểu mẫu Lab" [maxForms]="12"> </app-quick-forms-widget>
+  }
 </div>

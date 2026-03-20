@@ -82,9 +82,9 @@ public record InvoiceDetailDto(
     );
 }
 
-public record InvoiceItemDto(Guid Id, string ServiceCode, string Description, int Quantity, decimal UnitPrice, decimal Amount)
+public record InvoiceItemDto(Guid Id, string ServiceCode, string Description, int Quantity, decimal UnitPrice, decimal Amount, string FeeType)
 {
     public static InvoiceItemDto FromEntity(Domain.Entities.InvoiceItem i) => new(
-        i.Id, i.ServiceCode, i.Description, i.Quantity, i.UnitPrice, i.Amount
+        i.Id, i.ServiceCode, i.Description, i.Quantity, i.UnitPrice, i.Amount, i.FeeType
     );
 }

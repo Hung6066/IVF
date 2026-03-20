@@ -1,0 +1,252 @@
+<div class="p-6">
+  <div class="flex items-center justify-between mb-6">
+    <h1 class="text-2xl font-bold text-gray-800">Mẫu toa thuốc</h1>
+    <button
+      (click)="openCreate()"
+      class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700"
+    >
+      <i class="fas fa-plus mr-1"></i> Tạo mẫu mới
+    </button>
+  </div>
+
+  <div class="flex gap-3 mb-5">
+    <input
+      [(ngModel)]="searchQuery"
+      (keydown.enter)="search()"
+      placeholder="Tìm mẫu toa thuốc..."
+      class="flex-1 border rounded-lg px-3 py-2 text-sm"
+    />
+    <select
+      [(ngModel)]="filterCycleType"
+      (change)="search()"
+      class="border rounded-lg px-3 py-2 text-sm"
+    >
+      <option value="">Tất cả loại</option>
+      @for (t of cycleTypes; track t) {
+        <option [value]="t">{{ cycleTypeLabels[t] }}</option>
+      }
+    </select>
+    <button (click)="search()" class="px-4 py-2 bg-gray-100 rounded-lg text-sm hover:bg-gray-200">
+      <i class="fas fa-search"></i>
+    </button>
+  </div>
+
+  <div class="space-y-3">
+    @if (loading()) {
+      <div class="bg-white rounded-xl p-8 text-center text-gray-400">
+        <i class="fas fa-spinner fa-spin mr-2"></i>Đang tải...
+      </div>
+    } @else if (items().length === 0) {
+      <div class="bg-white rounded-xl p-8 text-center text-gray-400">
+        Chưa có mẫu toa thuốc nào.
+      </div>
+    } @else {
+      @for (tpl of items(); track tpl.id) {
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200">
+          <div
+            class="px-4 py-3 flex items-center justify-between cursor-pointer"
+            (click)="toggleExpand(tpl.id)"
+          >
+            <div class="flex items-center gap-3">
+              <span class="font-medium text-gray-900">{{ tpl.name }}</span>
+              <span class="px-2 py-0.5 text-xs rounded bg-purple-50 text-purple-700">{{
+                cycleTypeLabels[tpl.cycleType]
+              }}</span>
+              @if (!tpl.isActive) {
+                <span class="px-2 py-0.5 text-xs rounded bg-gray-100 text-gray-500">Ngừng</span>
+              }
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-xs text-gray-400"
+                >{{ tpl.items.length }} thuốc · BS {{ tpl.doctorName }}</span
+              >
+              <button
+                (click)="openEdit(tpl); $event.stopPropagation()"
+                class="text-blue-600 hover:text-blue-800 text-xs px-2"
+              >
+                Sửa
+              </button>
+              <button
+                (click)="toggleActive(tpl); $event.stopPropagation()"
+                class="text-xs px-2"
+                [class.text-red-500]="tpl.isActive"
+                [class.text-green-600]="!tpl.isActive"
+              >
+                {{ tpl.isActive ? 'Vô hiệu' : 'Kích hoạt' }}
+              </button>
+              <i
+                class="fas text-gray-400 text-xs"
+                [class.fa-chevron-down]="expandedId() !== tpl.id"
+                [class.fa-chevron-up]="expandedId() === tpl.id"
+              ></i>
+            </div>
+          </div>
+          @if (expandedId() === tpl.id) {
+            <div class="border-t px-4 py-3">
+              @if (tpl.description) {
+                <p class="text-sm text-gray-500 mb-3">{{ tpl.description }}</p>
+              }
+              <table class="min-w-full text-xs">
+                <thead class="text-gray-500">
+                  <tr>
+                    <th class="text-left py-1 pr-4">Tên thuốc</th>
+                    <th class="text-left py-1 pr-4">Liều dùng</th>
+                    <th class="text-left py-1 pr-4">Tần suất</th>
+                    <th class="text-left py-1">Thời gian</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (item of tpl.items; track item.id) {
+                    <tr class="border-t border-gray-50">
+                      <td class="py-1 pr-4 font-medium text-gray-800">{{ item.drugName }}</td>
+                      <td class="py-1 pr-4 text-gray-600">{{ item.dosage }}</td>
+                      <td class="py-1 pr-4 text-gray-600">{{ item.frequency }}</td>
+                      <td class="py-1 text-gray-600">{{ item.duration }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        </div>
+      }
+      <div class="flex items-center justify-between text-sm text-gray-500 pt-2">
+        <span>Tổng: {{ total() }} mẫu</span>
+        <div class="flex gap-2">
+          <button
+            (click)="prevPage()"
+            [disabled]="page() === 1"
+            class="px-3 py-1 border rounded disabled:opacity-40"
+          >
+            Trước
+          </button>
+          <span class="px-3 py-1">{{ page() }} / {{ totalPages }}</span>
+          <button
+            (click)="nextPage()"
+            [disabled]="page() >= totalPages"
+            class="px-3 py-1 border rounded disabled:opacity-40"
+          >
+            Sau
+          </button>
+        </div>
+      </div>
+    }
+  </div>
+</div>
+
+<!-- Modal -->
+@if (showForm()) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 overflow-y-auto py-8">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-2xl mx-4 p-6">
+      <h2 class="text-lg font-bold text-gray-800 mb-4">
+        {{ editingItem() ? 'Sửa mẫu toa' : 'Tạo mẫu toa mới' }}
+      </h2>
+
+      @if (error()) {
+        <div class="mb-3 p-2 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
+          {{ error() }}
+        </div>
+      }
+
+      <div class="space-y-3 mb-4">
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1"
+              >Tên mẫu <span class="text-red-500">*</span></label
+            >
+            <input [(ngModel)]="form.name" class="w-full border rounded px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Loại chu kỳ</label>
+            <select [(ngModel)]="form.cycleType" class="w-full border rounded px-3 py-2 text-sm">
+              @for (t of cycleTypes; track t) {
+                <option [value]="t">{{ cycleTypeLabels[t] }}</option>
+              }
+            </select>
+          </div>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Mã bác sĩ tạo</label>
+          <input
+            [(ngModel)]="form.createdByDoctorId"
+            class="w-full border rounded px-3 py-2 text-sm"
+            placeholder="Doctor ID"
+          />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Mô tả</label>
+          <textarea
+            [(ngModel)]="form.description"
+            rows="2"
+            class="w-full border rounded px-3 py-2 text-sm"
+          ></textarea>
+        </div>
+      </div>
+
+      <!-- Items -->
+      <div class="border-t pt-4">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-sm font-semibold text-gray-700">Danh sách thuốc</h3>
+          <button (click)="addItem()" class="text-xs text-blue-600 hover:text-blue-800">
+            + Thêm thuốc
+          </button>
+        </div>
+        <div class="space-y-2">
+          @for (item of form.items; track $index; let i = $index) {
+            <div class="grid grid-cols-12 gap-2 items-center">
+              <div class="col-span-3">
+                <input
+                  [(ngModel)]="item.drugName"
+                  placeholder="Tên thuốc"
+                  class="w-full border rounded px-2 py-1.5 text-xs"
+                />
+              </div>
+              <div class="col-span-3">
+                <input
+                  [(ngModel)]="item.dosage"
+                  placeholder="Liều dùng"
+                  class="w-full border rounded px-2 py-1.5 text-xs"
+                />
+              </div>
+              <div class="col-span-3">
+                <input
+                  [(ngModel)]="item.frequency"
+                  placeholder="Tần suất (VD: 1 lần/ngày)"
+                  class="w-full border rounded px-2 py-1.5 text-xs"
+                />
+              </div>
+              <div class="col-span-2">
+                <input
+                  [(ngModel)]="item.duration"
+                  placeholder="Thời gian"
+                  class="w-full border rounded px-2 py-1.5 text-xs"
+                />
+              </div>
+              <div class="col-span-1 flex justify-center">
+                <button (click)="removeItem(i)" class="text-red-400 hover:text-red-600 text-xs">
+                  ✕
+                </button>
+              </div>
+            </div>
+          }
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-3 mt-5">
+        <button
+          (click)="showForm.set(false)"
+          class="px-4 py-2 border rounded text-sm text-gray-700 hover:bg-gray-50"
+        >
+          Hủy
+        </button>
+        <button
+          (click)="save()"
+          [disabled]="saving()"
+          class="px-6 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:opacity-50"
+        >
+          {{ saving() ? 'Đang lưu...' : 'Lưu mẫu toa' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

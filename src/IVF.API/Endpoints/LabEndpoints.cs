@@ -71,5 +71,55 @@ public static class LabEndpoints
             var result = await sender.Send(query);
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
         });
+
+        // ==================== Lab Orders ====================
+        group.MapGet("/orders/{id:guid}", async (Guid id, ISender sender) =>
+        {
+            var result = await sender.Send(new GetLabOrderByIdQuery(id));
+            return result != null ? Results.Ok(result) : Results.NotFound();
+        });
+
+        group.MapGet("/orders/patient/{patientId:guid}", async (Guid patientId, ISender sender) =>
+            Results.Ok(await sender.Send(new GetLabOrdersByPatientQuery(patientId))));
+
+        group.MapGet("/orders/cycle/{cycleId:guid}", async (Guid cycleId, ISender sender) =>
+            Results.Ok(await sender.Send(new GetLabOrdersByCycleQuery(cycleId))));
+
+        group.MapGet("/orders", async (ISender sender, string? q, string? status, string? orderType, DateTime? from, DateTime? to, int page = 1, int pageSize = 20) =>
+        {
+            var r = await sender.Send(new SearchLabOrdersQuery(q, status, orderType, from, to, page, pageSize));
+            return Results.Ok(new { Items = r.Items, Total = r.Total });
+        });
+
+        group.MapGet("/orders/statistics", async (ISender sender) =>
+            Results.Ok(await sender.Send(new GetLabOrderStatisticsQuery())));
+
+        group.MapPost("/orders", async ([FromBody] CreateLabOrderCommand cmd, ISender sender) =>
+        {
+            var r = await sender.Send(cmd);
+            return r.IsSuccess ? Results.Created($"/api/lab/orders/{r.Value!.Id}", r.Value) : Results.BadRequest(r.Error);
+        });
+
+        group.MapPut("/orders/{id:guid}/collect-sample", async (Guid id, ISender sender) =>
+        {
+            var r = await sender.Send(new CollectLabSampleCommand(id));
+            return r.IsSuccess ? Results.Ok(r.Value) : Results.BadRequest(r.Error);
+        });
+
+        group.MapPut("/orders/{id:guid}/results", async (Guid id, [FromBody] EnterLabResultRequest req, ISender sender) =>
+        {
+            var r = await sender.Send(new EnterLabResultCommand(id, req.PerformedByUserId, req.Results));
+            return r.IsSuccess ? Results.Ok(r.Value) : Results.BadRequest(r.Error);
+        });
+
+        group.MapPut("/orders/{id:guid}/deliver", async (Guid id, [FromBody] DeliverLabResultRequest req, ISender sender) =>
+        {
+            var r = await sender.Send(new DeliverLabResultCommand(id, req.DeliveredByUserId, req.DeliveredTo));
+            return r.IsSuccess ? Results.Ok(r.Value) : Results.BadRequest(r.Error);
+        });
     }
 }
+
+// Request DTOs
+public record EnterLabResultRequest(Guid PerformedByUserId, List<LabTestResultInput> Results);
+public record DeliverLabResultRequest(Guid DeliveredByUserId, string DeliveredTo);

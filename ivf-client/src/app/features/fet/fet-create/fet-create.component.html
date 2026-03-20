@@ -1,0 +1,83 @@
+<div class="p-6 max-w-2xl mx-auto">
+  <div class="flex items-center gap-3 mb-6">
+    <button routerLink="/fet" class="text-gray-500 hover:text-gray-700">
+      <i class="fas fa-arrow-left"></i>
+    </button>
+    <h1 class="text-2xl font-bold text-gray-800">Tạo FET Protocol mới</h1>
+  </div>
+
+  @if (error()) {
+    <div class="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg">
+      {{ error() }}
+    </div>
+  }
+
+  <div class="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">ID Chu kỳ điều trị *</label>
+      <app-cycle-search
+        [(ngModel)]="form.cycleId"
+        name="cycleId"
+        placeholder="Tìm mã chu kỳ..."
+      ></app-cycle-search>
+      <p class="mt-1 text-xs text-gray-500">Chọn chu kỳ điều trị cần tạo FET protocol</p>
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Phác đồ chuẩn bị *</label>
+      <select
+        [(ngModel)]="form.prepType"
+        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+      >
+        @for (type of prepTypes; track type) {
+          <option [value]="type">{{ type }}</option>
+        }
+      </select>
+    </div>
+
+    <div class="grid grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Ngày bắt đầu</label>
+        <input
+          type="date"
+          [(ngModel)]="form.startDate"
+          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        />
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Ngày kinh (D)</label>
+        <input
+          type="number"
+          min="1"
+          max="5"
+          [(ngModel)]="form.cycleDay"
+          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        />
+      </div>
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Ghi chú</label>
+      <textarea
+        [(ngModel)]="form.notes"
+        rows="3"
+        placeholder="Ghi chú thêm..."
+        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+      ></textarea>
+    </div>
+
+    <div class="flex justify-end gap-3 pt-2">
+      <button routerLink="/fet" class="px-4 py-2 text-gray-600 hover:text-gray-800 text-sm">
+        Huỷ
+      </button>
+      <button
+        (click)="submit()"
+        [disabled]="saving()"
+        class="flex items-center gap-2 px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-medium"
+      >
+        <i class="fas fa-save"></i>
+        {{ saving() ? 'Đang lưu...' : 'Tạo FET Protocol' }}
+      </button>
+    </div>
+  </div>
+</div>

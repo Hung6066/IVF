@@ -1,7 +1,8 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject, effect } from '@angular/core';
 import * as signalR from '@microsoft/signalr';
-import { BehaviorSubject, Observable } from 'rxjs';
+import { BehaviorSubject } from 'rxjs';
 import { environment } from '../../../environments/environment';
+import { AuthService } from './auth.service';
 
 export interface SignalRNotification {
   id: string;
@@ -29,10 +30,31 @@ export class SignalRService {
   public queueUpdate$ = this.queueUpdateSubject.asObservable();
 
   private readonly baseUrl = environment.production ? '' : 'http://localhost:5000';
+  private readonly authService = inject(AuthService);
 
-  constructor() {}
+  constructor() {
+    // Auto-connect on login, auto-disconnect on logout
+    effect(() => {
+      if (this.authService.isAuthenticated()) {
+        this.startAllConnections();
+      } else {
+        this.stopConnections();
+      }
+    });
+  }
+
+  async startAllConnections(): Promise<void> {
+    await Promise.all([this.startNotificationConnection(), this.startQueueConnection()]);
+  }
 
   async startNotificationConnection(): Promise<void> {
+    // Skip if already connected or connecting
+    if (
+      this.notificationHubConnection?.state === signalR.HubConnectionState.Connected ||
+      this.notificationHubConnection?.state === signalR.HubConnectionState.Connecting
+    ) {
+      return;
+    }
     this.notificationHubConnection = new signalR.HubConnectionBuilder()
       .withUrl(`${this.baseUrl}/hubs/notifications`, {
         accessTokenFactory: () => localStorage.getItem('ivf_access_token') || '',
@@ -68,11 +90,21 @@ export class SignalRService {
       console.log('✅ Connected to NotificationHub');
     } catch (err) {
       console.error('❌ NotificationHub connection error:', err);
-      setTimeout(() => this.startNotificationConnection(), 5000);
+      // Retry only if still authenticated
+      setTimeout(() => {
+        if (this.authService.isAuthenticated()) this.startNotificationConnection();
+      }, 5000);
     }
   }
 
   async startQueueConnection(): Promise<void> {
+    // Skip if already connected or connecting
+    if (
+      this.queueHubConnection?.state === signalR.HubConnectionState.Connected ||
+      this.queueHubConnection?.state === signalR.HubConnectionState.Connecting
+    ) {
+      return;
+    }
     this.queueHubConnection = new signalR.HubConnectionBuilder()
       .withUrl(`${this.baseUrl}/hubs/queue`, {
         accessTokenFactory: () => localStorage.getItem('ivf_access_token') || '',
@@ -110,16 +142,21 @@ export class SignalRService {
       console.log('✅ Connected to QueueHub');
     } catch (err) {
       console.error('❌ QueueHub connection error:', err);
-      setTimeout(() => this.startQueueConnection(), 5000);
+      // Retry only if still authenticated
+      setTimeout(() => {
+        if (this.authService.isAuthenticated()) this.startQueueConnection();
+      }, 5000);
     }
   }
 
   async stopConnections(): Promise<void> {
     if (this.notificationHubConnection) {
       await this.notificationHubConnection.stop();
+      this.notificationHubConnection = undefined;
     }
     if (this.queueHubConnection) {
       await this.queueHubConnection.stop();
+      this.queueHubConnection = undefined;
     }
   }
 

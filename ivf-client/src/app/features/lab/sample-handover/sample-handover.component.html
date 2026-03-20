@@ -1,0 +1,308 @@
+<div class="min-h-screen bg-gray-50 p-6">
+  <div class="max-w-4xl mx-auto">
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-6">
+      <div class="flex items-center gap-3">
+        <button (click)="back()" class="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+          <svg class="w-5 h-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M15 19l-7-7 7-7"
+            />
+          </svg>
+        </button>
+        <div>
+          <h1 class="text-2xl font-bold text-gray-900">Bàn giao mẫu</h1>
+          <p class="text-sm text-gray-500">Biên bản bàn giao mẫu giữa NHS và LABO</p>
+        </div>
+      </div>
+      <button
+        (click)="printHandover()"
+        class="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
+      >
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
+          />
+        </svg>
+        In biên bản
+      </button>
+    </div>
+
+    <!-- Alerts -->
+    @if (success()) {
+      <div class="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg text-green-800 text-sm">
+        ✅ {{ success() }}
+      </div>
+    }
+    @if (error()) {
+      <div class="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-800 text-sm">
+        ⚠️ {{ error() }}
+      </div>
+    }
+
+    <!-- Main Form -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+      <h2 class="text-lg font-semibold text-gray-900 mb-4">Thông tin bàn giao</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- Handover Type -->
+        <div class="md:col-span-2">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Loại bàn giao</label>
+          <div class="flex gap-4">
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                [(ngModel)]="handoverForm.handoverType"
+                value="NHS_TO_LABO"
+                (change)="onHandoverTypeChange()"
+                class="text-blue-600"
+              />
+              <span class="text-sm text-gray-700">NHS → LABO (Bàn giao vào phòng lab)</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                [(ngModel)]="handoverForm.handoverType"
+                value="LABO_TO_NHS"
+                (change)="onHandoverTypeChange()"
+                class="text-blue-600"
+              />
+              <span class="text-sm text-gray-700">LABO → NHS (Trả mẫu từ phòng lab)</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Date/Time -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Thời gian bàn giao</label>
+          <input
+            type="datetime-local"
+            [(ngModel)]="handoverForm.handoverDate"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
+        <!-- From Department -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Bộ phận bàn giao</label>
+          <input
+            type="text"
+            [(ngModel)]="handoverForm.fromDepartment"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
+        <!-- To Department -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Bộ phận nhận</label>
+          <input
+            type="text"
+            [(ngModel)]="handoverForm.toDepartment"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
+        <!-- Handed By -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1"
+            >Người bàn giao <span class="text-red-500">*</span></label
+          >
+          <input
+            type="text"
+            [(ngModel)]="handoverForm.handedByName"
+            placeholder="Họ tên người bàn giao"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
+        <!-- Received By -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1"
+            >Người nhận <span class="text-red-500">*</span></label
+          >
+          <input
+            type="text"
+            [(ngModel)]="handoverForm.receivedByName"
+            placeholder="Họ tên người nhận"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
+        <!-- Notes -->
+        <div class="md:col-span-2">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Ghi chú chung</label>
+          <textarea
+            [(ngModel)]="handoverForm.notes"
+            rows="2"
+            placeholder="Ghi chú về tình trạng mẫu, điều kiện bảo quản..."
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+          ></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- Samples List -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg font-semibold text-gray-900">Danh sách mẫu bàn giao</h2>
+        <button
+          (click)="addSampleItem()"
+          class="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
+        >
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M12 4v16m8-8H4"
+            />
+          </svg>
+          Thêm mẫu
+        </button>
+      </div>
+
+      @if (items().length === 0) {
+        <div class="text-center py-10 text-gray-400">
+          <svg
+            class="w-12 h-12 mx-auto mb-2 opacity-30"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+            />
+          </svg>
+          <p class="text-sm">Chưa có mẫu nào. Nhấn "Thêm mẫu" để thêm.</p>
+        </div>
+      }
+
+      @for (item of items(); track $index) {
+        <div class="border border-gray-200 rounded-lg p-4 mb-3 relative">
+          <button
+            (click)="removeItem($index)"
+            class="absolute top-3 right-3 p-1 text-gray-400 hover:text-red-500"
+          >
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
+          <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">Mã mẫu</label>
+              <input
+                type="text"
+                [(ngModel)]="item.sampleCode"
+                placeholder="VD: SP-20240320-0001"
+                class="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">Loại mẫu</label>
+              <select
+                [(ngModel)]="item.sampleType"
+                class="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+              >
+                @for (type of sampleTypes; track type) {
+                  <option [value]="type">{{ type }}</option>
+                }
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">Tên bệnh nhân</label>
+              <input
+                type="text"
+                [(ngModel)]="item.patientName"
+                placeholder="Họ tên BN"
+                class="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">Số lượng</label>
+              <input
+                type="number"
+                [(ngModel)]="item.quantity"
+                min="1"
+                class="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">Đơn vị</label>
+              <input
+                type="text"
+                [(ngModel)]="item.unit"
+                placeholder="Lọ/Ống..."
+                class="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">Tình trạng</label>
+              <select
+                [(ngModel)]="item.condition"
+                class="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+              >
+                @for (opt of conditionOptions; track opt.value) {
+                  <option [value]="opt.value">{{ opt.label }}</option>
+                }
+              </select>
+            </div>
+            <div class="md:col-span-3">
+              <label class="block text-xs text-gray-500 mb-1">Ghi chú mẫu</label>
+              <input
+                type="text"
+                [(ngModel)]="item.notes"
+                placeholder="Ghi chú về mẫu này..."
+                class="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+        </div>
+      }
+    </div>
+
+    <!-- Actions -->
+    <div class="flex justify-end gap-3">
+      <button
+        (click)="back()"
+        class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
+      >
+        Hủy
+      </button>
+      <button
+        (click)="submit()"
+        [disabled]="saving() || !canSubmit()"
+        class="px-6 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+      >
+        @if (saving()) {
+          <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle
+              class="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              stroke-width="4"
+            />
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+          </svg>
+          Đang lưu...
+        } @else {
+          Xác nhận bàn giao
+        }
+      </button>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,98 @@
+<div class="modal-overlay" (click)="close()">
+  <div class="modal-content modal-lg" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>Ket qua xet nghiem</h3>
+      <button class="close-btn" (click)="close()">&times;</button>
+    </div>
+
+    <div class="modal-body">
+      <!-- Order Info -->
+      <div class="order-info-grid">
+        <div class="info-item">
+          <strong>Benh nhan:</strong>
+          <span>{{ order.patientName }} ({{ order.patientCode }})</span>
+        </div>
+        <div class="info-item">
+          <strong>Loai XN:</strong>
+          <span>{{ order.orderType }}</span>
+        </div>
+        <div class="info-item">
+          <strong>BS chi dinh:</strong>
+          <span>{{ order.orderedByName }}</span>
+        </div>
+        <div class="info-item">
+          <strong>Ngay chi dinh:</strong>
+          <span>{{ order.orderedAt | date:'dd/MM/yyyy HH:mm' }}</span>
+        </div>
+        <div class="info-item">
+          <strong>Trang thai:</strong>
+          <span [class]="getStatusClass(order.status)">{{ getStatusLabel(order.status) }}</span>
+        </div>
+        @if (order.completedAt) {
+        <div class="info-item">
+          <strong>Hoan thanh:</strong>
+          <span>{{ order.completedAt | date:'dd/MM/yyyy HH:mm' }}</span>
+        </div>
+        }
+      </div>
+
+      @if (hasAnyAbnormal()) {
+      <div class="alert-banner">
+        Co ket qua bat thuong - Vui long xem cac chi so duoc danh dau
+      </div>
+      }
+
+      <!-- Results Table -->
+      <div class="table-container" id="printable-results">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Ma XN</th>
+              <th>Ten xet nghiem</th>
+              <th>Ket qua</th>
+              <th>Don vi</th>
+              <th>Gia tri tham khao</th>
+              <th>Trang thai</th>
+              <th>Ghi chu</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (test of order.tests; track test.id) {
+            <tr [class.abnormal-row]="test.isAbnormal">
+              <td class="code-cell">{{ test.testCode }}</td>
+              <td>{{ test.testName }}</td>
+              <td class="result-cell" [class.abnormal-value]="test.isAbnormal">
+                {{ test.resultValue || '---' }}
+              </td>
+              <td>{{ test.resultUnit || '---' }}</td>
+              <td class="ref-range">{{ test.referenceRange || '---' }}</td>
+              <td>
+                @if (test.isAbnormal) {
+                <span class="status-badge abnormal">Bat thuong</span>
+                } @else if (test.resultValue) {
+                <span class="status-badge normal">Binh thuong</span>
+                } @else {
+                <span class="text-muted">Chua co KQ</span>
+                }
+              </td>
+              <td class="notes-cell">{{ test.notes || '---' }}</td>
+            </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      @if (order.notes) {
+      <div class="order-notes">
+        <strong>Ghi chu chung:</strong>
+        <p>{{ order.notes }}</p>
+      </div>
+      }
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-secondary" (click)="printResults()">In ket qua</button>
+      <button class="btn btn-primary" (click)="close()">Dong</button>
+    </div>
+  </div>
+</div>

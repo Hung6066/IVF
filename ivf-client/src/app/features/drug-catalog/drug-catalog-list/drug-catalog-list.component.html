@@ -1,0 +1,235 @@
+<div class="p-6">
+  <div class="flex items-center justify-between mb-6">
+    <h1 class="text-2xl font-bold text-gray-800">Danh mục thuốc</h1>
+    <button
+      (click)="openCreate()"
+      class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700"
+    >
+      <i class="fas fa-plus mr-1"></i> Thêm thuốc
+    </button>
+  </div>
+
+  <!-- Search bar -->
+  <div class="flex gap-3 mb-5">
+    <input
+      [(ngModel)]="searchQuery"
+      (keydown.enter)="search()"
+      placeholder="Tìm theo tên, mã thuốc..."
+      class="flex-1 border rounded-lg px-3 py-2 text-sm"
+    />
+    <select
+      [(ngModel)]="filterCategory"
+      (change)="search()"
+      class="border rounded-lg px-3 py-2 text-sm"
+    >
+      <option value="">Tất cả nhóm</option>
+      @for (c of categories; track c) {
+        <option [value]="c">{{ categoryLabels[c] }}</option>
+      }
+    </select>
+    <button (click)="search()" class="px-4 py-2 bg-gray-100 rounded-lg text-sm hover:bg-gray-200">
+      <i class="fas fa-search"></i>
+    </button>
+  </div>
+
+  <!-- Table -->
+  <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+    @if (loading()) {
+      <div class="p-8 text-center text-gray-400">
+        <i class="fas fa-spinner fa-spin mr-2"></i>Đang tải...
+      </div>
+    } @else if (items().length === 0) {
+      <div class="p-8 text-center text-gray-400">Chưa có thuốc nào trong danh mục.</div>
+    } @else {
+      <table class="min-w-full text-sm">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-4 py-3 text-left font-semibold text-gray-600">Mã</th>
+            <th class="px-4 py-3 text-left font-semibold text-gray-600">Tên thuốc</th>
+            <th class="px-4 py-3 text-left font-semibold text-gray-600">Tên gốc</th>
+            <th class="px-4 py-3 text-left font-semibold text-gray-600">Nhóm</th>
+            <th class="px-4 py-3 text-left font-semibold text-gray-600">Đơn vị</th>
+            <th class="px-4 py-3 text-left font-semibold text-gray-600">Liều mặc định</th>
+            <th class="px-4 py-3 text-center font-semibold text-gray-600">Trạng thái</th>
+            <th class="px-4 py-3 text-center font-semibold text-gray-600">Thao tác</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (item of items(); track item.id) {
+            <tr class="border-t hover:bg-gray-50">
+              <td class="px-4 py-3 font-mono text-gray-700">{{ item.code }}</td>
+              <td class="px-4 py-3 font-medium text-gray-900">{{ item.name }}</td>
+              <td class="px-4 py-3 text-gray-600">{{ item.genericName }}</td>
+              <td class="px-4 py-3">
+                <span class="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-xs">{{
+                  categoryLabels[item.category]
+                }}</span>
+              </td>
+              <td class="px-4 py-3 text-gray-600">{{ item.unit }}</td>
+              <td class="px-4 py-3 text-gray-500 text-xs">{{ item.defaultDosage || '—' }}</td>
+              <td class="px-4 py-3 text-center">
+                @if (item.isActive) {
+                  <span class="px-2 py-0.5 bg-green-50 text-green-700 rounded-full text-xs"
+                    >Hoạt động</span
+                  >
+                } @else {
+                  <span class="px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full text-xs"
+                    >Ngừng</span
+                  >
+                }
+              </td>
+              <td class="px-4 py-3 text-center">
+                <div class="flex items-center justify-center gap-2">
+                  <button
+                    (click)="openEdit(item)"
+                    class="text-blue-600 hover:text-blue-800 text-xs"
+                  >
+                    Sửa
+                  </button>
+                  <button
+                    (click)="toggleActive(item)"
+                    class="text-xs"
+                    [class.text-red-500]="item.isActive"
+                    [class.hover:text-red-700]="item.isActive"
+                    [class.text-green-600]="!item.isActive"
+                    [class.hover:text-green-800]="!item.isActive"
+                  >
+                    {{ item.isActive ? 'Vô hiệu' : 'Kích hoạt' }}
+                  </button>
+                </div>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+      <!-- Pagination -->
+      <div class="px-4 py-3 border-t flex items-center justify-between text-sm text-gray-500">
+        <span>Tổng: {{ total() }} thuốc</span>
+        <div class="flex gap-2">
+          <button
+            (click)="prevPage()"
+            [disabled]="page() === 1"
+            class="px-3 py-1 border rounded disabled:opacity-40"
+          >
+            Trước
+          </button>
+          <span class="px-3 py-1">{{ page() }} / {{ totalPages }}</span>
+          <button
+            (click)="nextPage()"
+            [disabled]="page() >= totalPages"
+            class="px-3 py-1 border rounded disabled:opacity-40"
+          >
+            Sau
+          </button>
+        </div>
+      </div>
+    }
+  </div>
+</div>
+
+<!-- Modal form -->
+@if (showForm()) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-lg mx-4 p-6">
+      <h2 class="text-lg font-bold text-gray-800 mb-4">
+        {{ editingItem() ? 'Sửa thuốc' : 'Thêm thuốc mới' }}
+      </h2>
+
+      @if (error()) {
+        <div class="mb-3 p-2 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
+          {{ error() }}
+        </div>
+      }
+
+      <div class="space-y-3">
+        @if (!editingItem()) {
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1"
+              >Mã thuốc <span class="text-red-500">*</span></label
+            >
+            <input
+              [(ngModel)]="form.code"
+              class="w-full border rounded px-3 py-2 text-sm"
+              placeholder="VD: FSH-001"
+            />
+          </div>
+        }
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1"
+              >Tên thuốc <span class="text-red-500">*</span></label
+            >
+            <input [(ngModel)]="form.name" class="w-full border rounded px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1"
+              >Tên gốc <span class="text-red-500">*</span></label
+            >
+            <input [(ngModel)]="form.genericName" class="w-full border rounded px-3 py-2 text-sm" />
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Nhóm thuốc</label>
+            <select [(ngModel)]="form.category" class="w-full border rounded px-3 py-2 text-sm">
+              @for (c of categories; track c) {
+                <option [value]="c">{{ categoryLabels[c] }}</option>
+              }
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1"
+              >Đơn vị <span class="text-red-500">*</span></label
+            >
+            <input
+              [(ngModel)]="form.unit"
+              class="w-full border rounded px-3 py-2 text-sm"
+              placeholder="ống, viên, ml..."
+            />
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Hoạt chất</label>
+            <input
+              [(ngModel)]="form.activeIngredient"
+              class="w-full border rounded px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Liều mặc định</label>
+            <input
+              [(ngModel)]="form.defaultDosage"
+              class="w-full border rounded px-3 py-2 text-sm"
+              placeholder="VD: 150 IU/ngày"
+            />
+          </div>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Ghi chú</label>
+          <textarea
+            [(ngModel)]="form.notes"
+            rows="2"
+            class="w-full border rounded px-3 py-2 text-sm"
+          ></textarea>
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-3 mt-5">
+        <button
+          (click)="showForm.set(false)"
+          class="px-4 py-2 border rounded text-sm text-gray-700 hover:bg-gray-50"
+        >
+          Hủy
+        </button>
+        <button
+          (click)="save()"
+          [disabled]="saving()"
+          class="px-6 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:opacity-50"
+        >
+          {{ saving() ? 'Đang lưu...' : 'Lưu' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

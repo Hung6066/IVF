@@ -1,0 +1,80 @@
+<div class="modal-overlay" (click)="close()">
+  <div class="modal-content modal-lg" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>Quyet dinh dieu tri - {{ consultation.patientName }}</h3>
+      <button class="close-btn" (click)="close()">&times;</button>
+    </div>
+
+    <form (ngSubmit)="onSubmit()">
+      <div class="modal-body">
+        <!-- Patient Info -->
+        <div class="patient-summary">
+          <span><strong>Ma BN:</strong> {{ consultation.patientCode }}</span>
+          <span><strong>Bac si:</strong> {{ consultation.doctorName }}</span>
+        </div>
+
+        <!-- Previous findings summary -->
+        @if (consultation.chiefComplaint || consultation.physicalExamination) {
+        <div class="previous-findings">
+          <h4>Thong tin kham</h4>
+          @if (consultation.chiefComplaint) {
+          <div class="finding-row">
+            <strong>Ly do kham:</strong>
+            <span>{{ consultation.chiefComplaint }}</span>
+          </div>
+          }
+          @if (consultation.physicalExamination) {
+          <div class="finding-row">
+            <strong>Kham lam sang:</strong>
+            <span>{{ consultation.physicalExamination }}</span>
+          </div>
+          }
+        </div>
+        }
+
+        <!-- Diagnosis -->
+        <div class="form-group">
+          <label class="form-label">Chan doan *</label>
+          <textarea class="form-control" [(ngModel)]="form.diagnosis" name="diagnosis"
+            rows="3" placeholder="Chan doan benh ly, nguyen nhan vo sinh..."></textarea>
+        </div>
+
+        <!-- Treatment Method -->
+        <div class="form-group">
+          <label class="form-label">Phuong phap dieu tri de xuat *</label>
+          <div class="method-grid">
+            @for (method of treatmentMethods; track method.value) {
+            <label class="method-option" [class.selected]="form.recommendedMethod === method.value">
+              <input type="radio" [(ngModel)]="form.recommendedMethod" [value]="method.value"
+                name="recommendedMethod" />
+              <span class="method-label">{{ method.label }}</span>
+            </label>
+            }
+          </div>
+        </div>
+
+        <!-- Treatment Plan / Rationale -->
+        <div class="form-group">
+          <label class="form-label">Ke hoach dieu tri & Ly do lua chon</label>
+          <textarea class="form-control" [(ngModel)]="form.treatmentPlan" name="treatmentPlan"
+            rows="4" placeholder="Mo ta chi tiet ke hoach dieu tri, ly do lua chon phuong phap, phac do du kien..."></textarea>
+        </div>
+
+        <!-- Patient Consent Acknowledgment -->
+        <div class="consent-section">
+          <label class="consent-check">
+            <input type="checkbox" [(ngModel)]="patientConsent" name="patientConsent" />
+            <span>Benh nhan da duoc tu van va dong y voi phuong phap dieu tri</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" (click)="close()">Huy</button>
+        <button type="submit" class="btn btn-primary" [disabled]="saving()">
+          {{ saving() ? 'Dang luu...' : 'Xac nhan quyet dinh' }}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>

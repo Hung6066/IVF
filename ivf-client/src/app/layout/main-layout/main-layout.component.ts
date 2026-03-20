@@ -51,7 +51,13 @@ const FALLBACK_MENU: MenuSection[] = [
       { icon: '💉', label: 'Tiêm', route: '/injection', permission: 'ViewCycles' },
       { icon: '🏦', label: 'NHTT', route: '/sperm-bank', permission: 'ViewSpermBank' },
       { icon: '💊', label: 'Nhà thuốc', route: '/pharmacy', permission: 'ViewPrescriptions' },
-      { icon: '💰', label: 'Hoá đơn', route: '/billing', permission: 'ViewBilling' },
+      { icon: '�', label: 'Thủ thuật', route: '/procedure', permission: 'ViewCycles' },
+      { icon: '❄️', label: 'FET', route: '/fet', permission: 'ViewCycles' },
+      { icon: '📋', label: 'Đồng thuận', route: '/consent', permission: 'ViewCycles' },
+      { icon: '🥚', label: 'Người cho trứng', route: '/egg-donor', permission: 'ViewCycles' },
+      { icon: '📦', label: 'Kho vật tư', route: '/inventory', permission: 'ViewCycles' },
+      { icon: '📁', label: 'Hồ sơ giấy', route: '/file-tracking', permission: 'ViewPatients' },
+      { icon: '�💰', label: 'Hoá đơn', route: '/billing', permission: 'ViewBilling' },
       { icon: '📅', label: 'Lịch hẹn', route: '/appointments', permission: 'ViewSchedule' },
       { icon: '📈', label: 'Báo cáo', route: '/reports', permission: 'ViewReports' },
     ],
@@ -69,6 +75,13 @@ const FALLBACK_MENU: MenuSection[] = [
       { icon: '📝', label: 'Nhật ký', route: '/admin/audit-logs', permission: 'ViewAuditLog' },
       { icon: '🔔', label: 'Thông báo', route: '/admin/notifications', adminOnly: true },
       { icon: '🔏', label: 'Ký số', route: '/admin/digital-signing', adminOnly: true },
+      { icon: '💊', label: 'Danh mục thuốc', route: '/admin/drug-catalog', adminOnly: true },
+      {
+        icon: '📝',
+        label: 'Mẫu toa thuốc',
+        route: '/admin/prescription-templates',
+        adminOnly: true,
+      },
       { icon: '🏛️', label: 'Tenant CA', route: '/admin/tenant-ca', platformAdminOnly: true },
       { icon: '📝', label: 'DNS Records', route: '/admin/dns-records', platformAdminOnly: true },
     ],
@@ -168,10 +181,13 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
       this.consentBanner.loadConsentStatus();
     }
 
-    const token = localStorage.getItem('ivf_access_token');
-    if (token) {
-      await this.initializeSignalR(token);
-    }
+    // Subscribe to push notifications for toast display
+    // (SignalRService auto-connects when authenticated via effect())
+    this.signalRService.notification$.subscribe((notification) => {
+      if (notification) {
+        this.displayToast(notification);
+      }
+    });
   }
 
   /** Load menu configuration from the API */
@@ -209,21 +225,6 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
 
   async ngOnDestroy() {
     await this.signalRService.stopConnections();
-  }
-
-  private async initializeSignalR(token: string) {
-    try {
-      await this.signalRService.startNotificationConnection();
-      await this.signalRService.startQueueConnection();
-
-      this.signalRService.notification$.subscribe((notification) => {
-        if (notification) {
-          this.displayToast(notification);
-        }
-      });
-    } catch (error) {
-      console.error('SignalR initialization error:', error);
-    }
   }
 
   private displayToast(notification: any) {
