@@ -13,7 +13,7 @@ public class PatientRepository : IPatientRepository
     public PatientRepository(IvfDbContext context) => _context = context;
 
     public async Task<Patient?> GetByIdAsync(Guid id, CancellationToken ct = default)
-        => await _context.Patients.AsNoTracking().FirstOrDefaultAsync(p => p.Id == id, ct);
+        => await _context.Patients.FirstOrDefaultAsync(p => p.Id == id, ct);
 
     public async Task<Patient?> GetByCodeAsync(string code, CancellationToken ct = default)
         => await _context.Patients.AsNoTracking().FirstOrDefaultAsync(p => p.PatientCode == code, ct);
@@ -93,7 +93,10 @@ public class PatientRepository : IPatientRepository
 
     public Task UpdateAsync(Patient patient, CancellationToken ct = default)
     {
-        _context.Patients.Update(patient);
+        // When loaded via GetByIdAsync (tracked), EF Core detects only truly changed properties.
+        // Only call Update() for detached entities (edge case) to avoid marking all props Modified.
+        if (_context.Entry(patient).State == EntityState.Detached)
+            _context.Patients.Update(patient);
         return Task.CompletedTask;
     }
 

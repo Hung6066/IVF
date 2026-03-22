@@ -94,7 +94,8 @@ public class AuditInterceptor : SaveChangesInterceptor
                 {
                     oldValues = JsonSerializer.Serialize(originals);
                     newValues = JsonSerializer.Serialize(changes);
-                    changedColumns = string.Join(",", columns);
+                    var joined = string.Join(",", columns);
+                    changedColumns = joined.Length <= 500 ? joined : joined[..497] + "...";
                 }
             }
             else if (entry.State == EntityState.Added)

@@ -13,7 +13,6 @@ public class CoupleRepository : ICoupleRepository
 
     public async Task<Couple?> GetByIdAsync(Guid id, CancellationToken ct = default)
         => await _context.Couples
-            .AsNoTracking()
             .Include(c => c.Wife)
             .Include(c => c.Husband)
             .FirstOrDefaultAsync(c => c.Id == id, ct);
@@ -44,7 +43,13 @@ public class CoupleRepository : ICoupleRepository
 
     public Task UpdateAsync(Couple couple, CancellationToken ct = default)
     {
-        _context.Couples.Update(couple);
+        // When loaded via GetByIdAsync (tracked), EF Core detects only truly changed properties.
+        // Only call Update() for detached entities (re-attachment). Tracked entities are already modified.
+        var state = _context.Entry(couple).State;
+        if (state == EntityState.Detached)
+            _context.Couples.Update(couple);
+        // If Unchanged or Added, no explicit Update needed
+        // If Modified (from change tracking), already handled by EF Core
         return Task.CompletedTask;
     }
 }
