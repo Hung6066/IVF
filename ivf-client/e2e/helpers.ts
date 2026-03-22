@@ -36,7 +36,11 @@ export async function expectPageLoaded(page: Page) {
 
 /** Click sidebar menu item theo text */
 export async function clickSidebarMenu(page: Page, text: string) {
-  await page.locator('.sidebar a, .sidebar button, nav a').filter({ hasText: text }).first().click();
+  await page
+    .locator('.sidebar a, .sidebar button, nav a')
+    .filter({ hasText: text })
+    .first()
+    .click();
   await waitForLoad(page);
 }
 
@@ -48,7 +52,11 @@ export async function expectTableVisible(page: Page) {
 
 /** Fill và submit form tìm kiếm */
 export async function searchFor(page: Page, query: string) {
-  const searchInput = page.locator('input[type="search"], input[placeholder*="Tìm"], input[placeholder*="tìm"], input[placeholder*="Search"]').first();
+  const searchInput = page
+    .locator(
+      'input[type="search"], input[placeholder*="Tìm"], input[placeholder*="tìm"], input[placeholder*="Search"]',
+    )
+    .first();
   await searchInput.fill(query);
   await searchInput.press('Enter');
   await waitForLoad(page);
@@ -73,7 +81,7 @@ export function getTokenFromStorageState(): string | null {
 export function authHeaders(): Record<string, string> {
   const token = getTokenFromStorageState();
   return {
-    'Authorization': `Bearer ${token}`,
+    Authorization: `Bearer ${token}`,
     'Content-Type': 'application/json',
   };
 }
@@ -131,13 +139,15 @@ export async function getCycleIdFromApi(page: Page): Promise<string | null> {
   if (!token) return null;
   try {
     const res = await page.request.get(`${API}/cycles/active`, {
-      headers: { 'Authorization': `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok()) return null;
     const data = await res.json();
     const items = Array.isArray(data) ? data : (data.items ?? data.data ?? []);
     return items.length > 0 ? items[0].id : null;
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
 /** Lấy full cycle object từ API */
@@ -146,13 +156,15 @@ export async function getCycleFromApi(page: Page): Promise<any | null> {
   if (!token) return null;
   try {
     const res = await page.request.get(`${API}/cycles/active`, {
-      headers: { 'Authorization': `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok()) return null;
     const data = await res.json();
     const items = Array.isArray(data) ? data : (data.items ?? data.data ?? []);
     return items.length > 0 ? items[0] : null;
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
 /** Lấy 1 patient thực từ API */
@@ -161,7 +173,9 @@ export async function getPatientFromApi(page: Page): Promise<any | null> {
     const data = await apiGet(page, '/patients?page=1&pageSize=1');
     const items = extractItems(data);
     return items.length > 0 ? items[0] : null;
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
 /** Lấy 1 couple thực từ API */
@@ -170,7 +184,9 @@ export async function getCoupleFromApi(page: Page): Promise<any | null> {
     const data = await apiGet(page, '/couples');
     const items = extractItems(data);
     return items.length > 0 ? items[0] : null;
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
 /** Chờ trang feature-guarded render xong, trả false nếu bị redirect/trang trắng */
@@ -187,7 +203,7 @@ export async function waitForFeaturePage(page: Page, componentSelector: string):
 export async function ensureTestCycleExists(page: Page): Promise<string | null> {
   const token = getTokenFromStorageState();
   if (!token) return null;
-  const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
+  const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
 
   // 1. Check existing cycle
   try {
@@ -201,7 +217,14 @@ export async function ensureTestCycleExists(page: Page): Promise<string | null> 
 
   // 2. Create wife patient
   const wifeRes = await page.request.post(`${API}/patients`, {
-    headers, data: { fullName: 'E2E Test Wife', dateOfBirth: '1990-01-01', gender: 1, patientType: 0, phone: '0900000001' },
+    headers,
+    data: {
+      fullName: 'E2E Test Wife',
+      dateOfBirth: '1990-01-01',
+      gender: 1,
+      patientType: 0,
+      phone: '0900000001',
+    },
   });
   if (!wifeRes.ok()) return null;
   const wife = await wifeRes.json();
@@ -209,7 +232,14 @@ export async function ensureTestCycleExists(page: Page): Promise<string | null> 
 
   // 3. Create husband patient
   const husbandRes = await page.request.post(`${API}/patients`, {
-    headers, data: { fullName: 'E2E Test Husband', dateOfBirth: '1988-06-15', gender: 0, patientType: 0, phone: '0900000002' },
+    headers,
+    data: {
+      fullName: 'E2E Test Husband',
+      dateOfBirth: '1988-06-15',
+      gender: 0,
+      patientType: 0,
+      phone: '0900000002',
+    },
   });
   if (!husbandRes.ok()) return null;
   const husband = await husbandRes.json();
@@ -217,7 +247,8 @@ export async function ensureTestCycleExists(page: Page): Promise<string | null> 
 
   // 4. Create couple
   const coupleRes = await page.request.post(`${API}/couples`, {
-    headers, data: { wifeId, husbandId, marriageDate: '2015-06-01', infertilityYears: 3 },
+    headers,
+    data: { wifeId, husbandId, marriageDate: '2015-06-01', infertilityYears: 3 },
   });
   if (!coupleRes.ok()) return null;
   const couple = await coupleRes.json();
@@ -225,7 +256,13 @@ export async function ensureTestCycleExists(page: Page): Promise<string | null> 
 
   // 5. Create cycle
   const cycleRes2 = await page.request.post(`${API}/cycles`, {
-    headers, data: { coupleId, method: 2, startDate: new Date().toISOString().split('T')[0], notes: 'E2E test cycle' },
+    headers,
+    data: {
+      coupleId,
+      method: 2,
+      startDate: new Date().toISOString().split('T')[0],
+      notes: 'E2E test cycle',
+    },
   });
   if (!cycleRes2.ok()) return null;
   const cycle = await cycleRes2.json();

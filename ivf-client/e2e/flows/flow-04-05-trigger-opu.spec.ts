@@ -4,8 +4,19 @@
  * FULL TEST: API validation + CRUD
  */
 import {
-  test, expect, navigateTo, waitForLoad, expectPageLoaded, waitForFeaturePage,
-  apiGet, apiPost, apiPut, extractItems, extractItem, getCycleIdFromApi, getPatientFromApi,
+  test,
+  expect,
+  navigateTo,
+  waitForLoad,
+  expectPageLoaded,
+  waitForFeaturePage,
+  apiGet,
+  apiPost,
+  apiPut,
+  extractItems,
+  extractItem,
+  getCycleIdFromApi,
+  getPatientFromApi,
 } from '../helpers';
 
 // ─── API: Appointments CRUD ─────────────────────────────────────────────
@@ -27,7 +38,10 @@ test.describe('Luồng 4 — API: Appointments', () => {
 
   test('4.A3 — POST /appointments tạo lịch hẹn', async ({ page }) => {
     const patient = await getPatientFromApi(page);
-    if (!patient) { test.skip(); return; }
+    if (!patient) {
+      test.skip();
+      return;
+    }
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     const res = await apiPost(page, '/appointments', {
@@ -45,7 +59,10 @@ test.describe('Luồng 4 — API: Appointments', () => {
   });
 
   test('4.A4 — GET /appointments/{id} chi tiết lịch hẹn', async ({ page }) => {
-    if (!appointmentId) { test.skip(); return; }
+    if (!appointmentId) {
+      test.skip();
+      return;
+    }
     const data = await apiGet(page, `/appointments/${appointmentId}`);
     const appt = extractItem(data);
     expect(appt.id).toBe(appointmentId);
@@ -59,7 +76,10 @@ test.describe('Luồng 4 — API: Appointments', () => {
 
   test('4.A6 — GET /appointments/patient/{id} lịch của BN', async ({ page }) => {
     const patient = await getPatientFromApi(page);
-    if (!patient) { test.skip(); return; }
+    if (!patient) {
+      test.skip();
+      return;
+    }
     const data = await apiGet(page, `/appointments/patient/${patient.id}`);
     const items = extractItems(data);
     expect(Array.isArray(items)).toBeTruthy();
@@ -81,7 +101,10 @@ test.describe('Luồng 5 — API: Procedures', () => {
 
   test('5.A2 — GET /procedures/cycle/{id} thủ thuật theo cycle', async ({ page }) => {
     const cycleId = await getCycleIdFromApi(page);
-    if (!cycleId) { test.skip(); return; }
+    if (!cycleId) {
+      test.skip();
+      return;
+    }
     const data = await apiGet(page, `/procedures/cycle/${cycleId}`);
     const items = extractItems(data);
     expect(Array.isArray(items)).toBeTruthy();
@@ -111,7 +134,10 @@ test.describe('Luồng 5 — API: Procedures', () => {
 test.describe('Luồng 4 — API: Trigger Shot', () => {
   test('4.T1 — POST /stimulation/cycle/{id}/trigger ghi nhận trigger', async ({ page }) => {
     const cycleId = await getCycleIdFromApi(page);
-    if (!cycleId) { test.skip(); return; }
+    if (!cycleId) {
+      test.skip();
+      return;
+    }
     const res = await apiPost(page, `/stimulation/cycle/${cycleId}/trigger`, {
       triggerDate: new Date().toISOString().split('T')[0],
       triggerTime: '22:00',
@@ -129,15 +155,17 @@ test.describe('Luồng 4-5 — UI', () => {
   test('4.1 — Mở trang phòng tiêm', async ({ page }) => {
     await navigateTo(page, '/injection');
     await expectPageLoaded(page);
-    if (!await waitForFeaturePage(page, 'app-injection-dashboard, [class*="injection"]')) {
-      test.skip(); return;
+    if (!(await waitForFeaturePage(page, 'app-injection-dashboard, [class*="injection"]'))) {
+      test.skip();
+      return;
     }
   });
 
   test('4.2 — Phòng tiêm: hiển thị hàng đợi', async ({ page }) => {
     await navigateTo(page, '/injection');
-    if (!await waitForFeaturePage(page, 'app-injection-dashboard, [class*="injection"]')) {
-      test.skip(); return;
+    if (!(await waitForFeaturePage(page, 'app-injection-dashboard, [class*="injection"]'))) {
+      test.skip();
+      return;
     }
     const queueSection = page.locator('table.data-table, .table-container, .card, section').first();
     await expect(queueSection).toBeVisible({ timeout: 10_000 });
@@ -146,17 +174,22 @@ test.describe('Luồng 4-5 — UI', () => {
   test('4.3 — Lịch hẹn (appointments)', async ({ page }) => {
     await navigateTo(page, '/appointments');
     await expectPageLoaded(page);
-    if (!await waitForFeaturePage(page, 'app-appointments-dashboard, [class*="appointment"]')) {
-      test.skip(); return;
+    if (!(await waitForFeaturePage(page, 'app-appointments-dashboard, [class*="appointment"]'))) {
+      test.skip();
+      return;
     }
   });
 
   test('4.4 — Tạo lịch hẹn mới', async ({ page }) => {
     await navigateTo(page, '/appointments');
-    if (!await waitForFeaturePage(page, 'app-appointments-dashboard, [class*="appointment"]')) {
-      test.skip(); return;
+    if (!(await waitForFeaturePage(page, 'app-appointments-dashboard, [class*="appointment"]'))) {
+      test.skip();
+      return;
     }
-    const createBtn = page.locator('button').filter({ hasText: /Tạo|Thêm|Đặt lịch/i }).first();
+    const createBtn = page
+      .locator('button')
+      .filter({ hasText: /Tạo|Thêm|Đặt lịch/i })
+      .first();
     if (await createBtn.isVisible()) {
       await createBtn.click();
       await waitForLoad(page);

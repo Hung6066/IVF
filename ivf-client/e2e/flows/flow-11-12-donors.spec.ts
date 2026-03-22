@@ -6,8 +6,18 @@
  * Người cho tinh trùng → Đăng ký → Lưu trữ ngân hàng
  */
 import {
-  test, expect, navigateTo, waitForLoad, expectPageLoaded, waitForFeaturePage,
-  apiGet, apiPost, extractItems, extractItem, uniqueName, getCoupleFromApi,
+  test,
+  expect,
+  navigateTo,
+  waitForLoad,
+  expectPageLoaded,
+  waitForFeaturePage,
+  apiGet,
+  apiPost,
+  extractItems,
+  extractItem,
+  uniqueName,
+  getCoupleFromApi,
 } from '../helpers';
 
 // ─── Luồng 11 — API: Egg Donor Recipients ────────────────────────────────────
@@ -17,17 +27,29 @@ test.describe('Luồng 11 — API: Egg Donor Recipients', () => {
       const data = await apiGet(page, '/egg-donor-recipients?page=1&pageSize=5');
       const items = extractItems(data);
       expect(Array.isArray(items)).toBe(true);
-    } catch { test.skip(); }
+    } catch {
+      test.skip();
+    }
   });
 
   test('11.A2 — GET /egg-donor-recipients/couple/{coupleId} theo couple', async ({ page }) => {
     let couple: any;
-    try { couple = await getCoupleFromApi(page); } catch { test.skip(); return; }
-    if (!couple?.id) { test.skip(); return; }
+    try {
+      couple = await getCoupleFromApi(page);
+    } catch {
+      test.skip();
+      return;
+    }
+    if (!couple?.id) {
+      test.skip();
+      return;
+    }
     try {
       const data = await apiGet(page, `/egg-donor-recipients/couple/${couple.id}`);
       expect(data).toBeDefined();
-    } catch { test.skip(); }
+    } catch {
+      test.skip();
+    }
   });
 
   test('11.A3 — POST /egg-donor-recipients thiếu body → 400', async ({ page }) => {
@@ -43,7 +65,9 @@ test.describe('Luồng 11 — API: Egg Bank', () => {
       const data = await apiGet(page, '/eggbank/donors?page=1&pageSize=5');
       const items = extractItems(data);
       expect(Array.isArray(items)).toBe(true);
-    } catch { test.skip(); }
+    } catch {
+      test.skip();
+    }
   });
 
   test('11.B2 — GET /eggbank/samples/available trả mảng', async ({ page }) => {
@@ -51,7 +75,9 @@ test.describe('Luồng 11 — API: Egg Bank', () => {
       const data = await apiGet(page, '/eggbank/samples/available');
       const items = extractItems(data);
       expect(Array.isArray(items)).toBe(true);
-    } catch { test.skip(); }
+    } catch {
+      test.skip();
+    }
   });
 
   test('11.B3 — POST /eggbank/donors tạo donor mới', async ({ page }) => {
@@ -83,7 +109,9 @@ test.describe('Luồng 12 — API: Sperm Bank', () => {
       const data = await apiGet(page, '/spermbank/donors?page=1&pageSize=5');
       const items = extractItems(data);
       expect(Array.isArray(items)).toBe(true);
-    } catch { test.skip(); }
+    } catch {
+      test.skip();
+    }
   });
 
   test('12.A2 — GET /spermbank/samples/available trả mảng', async ({ page }) => {
@@ -91,7 +119,9 @@ test.describe('Luồng 12 — API: Sperm Bank', () => {
       const data = await apiGet(page, '/spermbank/samples/available');
       const items = extractItems(data);
       expect(Array.isArray(items)).toBe(true);
-    } catch { test.skip(); }
+    } catch {
+      test.skip();
+    }
   });
 
   test('12.A3 — POST /spermbank/donors tạo donor mới', async ({ page }) => {
@@ -119,7 +149,9 @@ test.describe('Luồng 12 — API: Sperm Bank', () => {
     try {
       const data = await apiGet(page, '/spermbank/donors?search=E2E&page=1&pageSize=5');
       expect(data).toBeDefined();
-    } catch { test.skip(); }
+    } catch {
+      test.skip();
+    }
   });
 });
 
@@ -144,15 +176,17 @@ test.describe('Luồng 12: Cho / Nhận tinh trùng', () => {
   test('12.1 — Ngân hàng tinh trùng', async ({ page }) => {
     await navigateTo(page, '/sperm-bank');
     await expectPageLoaded(page);
-    if (!await waitForFeaturePage(page, 'app-sperm-bank-dashboard, [class*="sperm"]')) {
-      test.skip(); return;
+    if (!(await waitForFeaturePage(page, 'app-sperm-bank-dashboard, [class*="sperm"]'))) {
+      test.skip();
+      return;
     }
   });
 
   test('12.2 — Ngân hàng tinh trùng: nội dung', async ({ page }) => {
     await navigateTo(page, '/sperm-bank');
-    if (!await waitForFeaturePage(page, 'app-sperm-bank-dashboard, [class*="sperm"]')) {
-      test.skip(); return;
+    if (!(await waitForFeaturePage(page, 'app-sperm-bank-dashboard, [class*="sperm"]'))) {
+      test.skip();
+      return;
     }
     const content = page.locator('table, .card, [class*="list"]').first();
     await expect(content).toBeVisible({ timeout: 30_000 });
@@ -160,10 +194,14 @@ test.describe('Luồng 12: Cho / Nhận tinh trùng', () => {
 
   test('12.3 — Thêm mẫu mới (nếu có nút)', async ({ page }) => {
     await navigateTo(page, '/sperm-bank');
-    if (!await waitForFeaturePage(page, 'app-sperm-bank-dashboard, [class*="sperm"]')) {
-      test.skip(); return;
+    if (!(await waitForFeaturePage(page, 'app-sperm-bank-dashboard, [class*="sperm"]'))) {
+      test.skip();
+      return;
     }
-    const addBtn = page.locator('button, a').filter({ hasText: /Thêm|Tạo|Nhập|Lưu mẫu/i }).first();
+    const addBtn = page
+      .locator('button, a')
+      .filter({ hasText: /Thêm|Tạo|Nhập|Lưu mẫu/i })
+      .first();
     if (await addBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
       await addBtn.click();
       await waitForLoad(page);

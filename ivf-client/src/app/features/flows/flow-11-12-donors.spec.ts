@@ -64,9 +64,7 @@ describe('Luồng 11 & 12: Hiến trứng + Ngân hàng tinh trùng', () => {
 
     beforeEach(() => {
       mockService = {
-        getDonors: vi.fn().mockReturnValue(
-          of([{ id: 'd1', code: 'SD-001', bloodType: 'A+' }]),
-        ),
+        getDonors: vi.fn().mockReturnValue(of([{ id: 'd1', code: 'SD-001', bloodType: 'A+' }])),
         getSamples: vi.fn().mockReturnValue(
           of([
             { id: 's1', code: 'SS-001', status: 'Available' },

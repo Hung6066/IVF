@@ -5,8 +5,19 @@
  * BN đến lần đầu → Tiếp đón → Tạo hồ sơ → Cấp STT → Tư vấn → Đồng thuận → Hẹn tái khám
  */
 import {
-  test, expect, navigateTo, waitForLoad, expectPageLoaded, waitForFeaturePage,
-  apiGet, apiPost, apiPut, apiDelete, extractItems, extractItem, uniqueName,
+  test,
+  expect,
+  navigateTo,
+  waitForLoad,
+  expectPageLoaded,
+  waitForFeaturePage,
+  apiGet,
+  apiPost,
+  apiPut,
+  apiDelete,
+  extractItems,
+  extractItem,
+  uniqueName,
   getPatientFromApi,
 } from '../helpers';
 
@@ -28,7 +39,11 @@ test.describe('Luồng 1 — API: Patients CRUD', () => {
   test('1.A2 — POST /patients tạo bệnh nhân mới', async ({ page }) => {
     const name = uniqueName('BN_Test');
     const res = await apiPost(page, '/patients', {
-      fullName: name, dateOfBirth: '1995-03-15', gender: 1, patientType: 0, phone: '0912345678',
+      fullName: name,
+      dateOfBirth: '1995-03-15',
+      gender: 1,
+      patientType: 0,
+      phone: '0912345678',
     });
     expect(res.ok).toBeTruthy();
     const patient = extractItem(res.body);
@@ -38,7 +53,10 @@ test.describe('Luồng 1 — API: Patients CRUD', () => {
   });
 
   test('1.A3 — GET /patients/{id} trả đúng bệnh nhân', async ({ page }) => {
-    if (!createdPatientId) { test.skip(); return; }
+    if (!createdPatientId) {
+      test.skip();
+      return;
+    }
     const data = await apiGet(page, `/patients/${createdPatientId}`);
     const patient = extractItem(data);
     expect(patient.id).toBe(createdPatientId);
@@ -46,9 +64,14 @@ test.describe('Luồng 1 — API: Patients CRUD', () => {
   });
 
   test('1.A4 — PUT /patients/{id} cập nhật thành công', async ({ page }) => {
-    if (!createdPatientId) { test.skip(); return; }
+    if (!createdPatientId) {
+      test.skip();
+      return;
+    }
     const res = await apiPut(page, `/patients/${createdPatientId}`, {
-      fullName: 'BN Updated E2E', phone: '0999888777', address: '123 E2E Street',
+      fullName: 'BN Updated E2E',
+      phone: '0999888777',
+      address: '123 E2E Street',
     });
     expect(res.ok).toBeTruthy();
     const updated = extractItem(res.body);
@@ -62,7 +85,10 @@ test.describe('Luồng 1 — API: Patients CRUD', () => {
   });
 
   test('1.A6 — DELETE /patients/{id} xoá mềm', async ({ page }) => {
-    if (!createdPatientId) { test.skip(); return; }
+    if (!createdPatientId) {
+      test.skip();
+      return;
+    }
     const res = await apiDelete(page, `/patients/${createdPatientId}`);
     expect(res.status).toBeLessThan(500);
   });
@@ -86,21 +112,29 @@ test.describe('Luồng 1 — API: Queue', () => {
     try {
       const data = await apiGet(page, '/queue/RECEPTION');
       expect(data).toBeDefined();
-    } catch { /* feature may not be enabled */ }
+    } catch {
+      /* feature may not be enabled */
+    }
   });
 
   test('1.Q2 — POST /queue/issue cấp STT mới', async ({ page }) => {
     const patient = await getPatientFromApi(page);
-    if (!patient) { test.skip(); return; }
+    if (!patient) {
+      test.skip();
+      return;
+    }
     try {
       const res = await apiPost(page, '/queue/issue', {
-        patientId: patient.id, departmentCode: 'RECEPTION',
+        patientId: patient.id,
+        departmentCode: 'RECEPTION',
       });
       if (res.ok) {
         const ticket = extractItem(res.body);
         expect(ticket).toHaveProperty('id');
       }
-    } catch { /* queue feature may not be enabled */ }
+    } catch {
+      /* queue feature may not be enabled */
+    }
   });
 });
 
@@ -114,10 +148,15 @@ test.describe('Luồng 1 — API: Consent Forms', () => {
 
   test('1.C2 — POST /consent-forms tạo consent mới', async ({ page }) => {
     const patient = await getPatientFromApi(page);
-    if (!patient) { test.skip(); return; }
+    if (!patient) {
+      test.skip();
+      return;
+    }
     const res = await apiPost(page, '/consent-forms', {
-      patientId: patient.id, consentType: 'GeneralTreatment',
-      title: `E2E Consent ${Date.now()}`, content: 'Đồng thuận điều trị E2E',
+      patientId: patient.id,
+      consentType: 'GeneralTreatment',
+      title: `E2E Consent ${Date.now()}`,
+      content: 'Đồng thuận điều trị E2E',
     });
     if (res.ok) {
       const consent = extractItem(res.body);
@@ -132,7 +171,9 @@ test.describe('Luồng 1 — UI: Tiếp đón & Tạo hồ sơ', () => {
   test('1.1 — Reception dashboard hiển thị', async ({ page }) => {
     await navigateTo(page, '/reception');
     await expectPageLoaded(page);
-    await expect(page.locator('app-reception-dashboard, [class*="reception"]').first()).toBeVisible();
+    await expect(
+      page.locator('app-reception-dashboard, [class*="reception"]').first(),
+    ).toBeVisible();
   });
 
   test('1.2 — Danh sách BN có dữ liệu', async ({ page }) => {
@@ -175,7 +216,9 @@ test.describe('Luồng 1 — UI: Tiếp đón & Tạo hồ sơ', () => {
   test('1.6 — Tìm kiếm BN trên UI', async ({ page }) => {
     await navigateTo(page, '/patients');
     await waitForLoad(page);
-    const search = page.locator('input[type="search"], input[type="text"], input[placeholder*="Tìm"]').first();
+    const search = page
+      .locator('input[type="search"], input[type="text"], input[placeholder*="Tìm"]')
+      .first();
     if (await search.isVisible({ timeout: 3000 }).catch(() => false)) {
       await search.fill('E2E');
       await search.press('Enter');
@@ -187,8 +230,9 @@ test.describe('Luồng 1 — UI: Tiếp đón & Tạo hồ sơ', () => {
   test('1.7 — Hàng đợi tiếp đón', async ({ page }) => {
     await navigateTo(page, '/queue/RECEPTION');
     await expectPageLoaded(page);
-    if (!await waitForFeaturePage(page, 'app-queue-display, [class*="queue"]')) {
-      test.skip(); return;
+    if (!(await waitForFeaturePage(page, 'app-queue-display, [class*="queue"]'))) {
+      test.skip();
+      return;
     }
   });
 

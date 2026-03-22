@@ -12,7 +12,10 @@ setup('authenticate as admin', async ({ page }) => {
   await page.goto('/login');
 
   // Dismiss cookie consent banner nếu có
-  const acceptBtn = page.locator('button').filter({ hasText: /Accept All|Chấp nhận/i }).first();
+  const acceptBtn = page
+    .locator('button')
+    .filter({ hasText: /Accept All|Chấp nhận/i })
+    .first();
   if (await acceptBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
     await acceptBtn.click();
   }

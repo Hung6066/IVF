@@ -6,9 +6,20 @@
  * Dịch vụ → Tạo hóa đơn → Thanh toán → In phiếu
  */
 import {
-  test, expect, navigateTo, waitForLoad, expectPageLoaded, waitForFeaturePage,
-  apiGet, apiPost, apiPut, extractItems, extractItem, uniqueName,
-  getPatientFromApi, getCycleIdFromApi,
+  test,
+  expect,
+  navigateTo,
+  waitForLoad,
+  expectPageLoaded,
+  waitForFeaturePage,
+  apiGet,
+  apiPost,
+  apiPut,
+  extractItems,
+  extractItem,
+  uniqueName,
+  getPatientFromApi,
+  getCycleIdFromApi,
 } from '../helpers';
 
 // ─── Luồng 14 — API: Inventory CRUD ─────────────────────────────────────────
@@ -48,10 +59,16 @@ test.describe('Luồng 14 — API: Inventory', () => {
       maxStock: 200,
       unitPrice: 15000,
     });
-    if (!createRes.ok) { test.skip(); return; }
+    if (!createRes.ok) {
+      test.skip();
+      return;
+    }
     const created = extractItem(createRes.body);
     const id = created?.id ?? created?.data?.id;
-    if (!id) { test.skip(); return; }
+    if (!id) {
+      test.skip();
+      return;
+    }
     const detail = await apiGet(page, `/inventory/${id}`);
     expect(detail).toBeDefined();
   });
@@ -68,10 +85,16 @@ test.describe('Luồng 14 — API: Inventory', () => {
       maxStock: 100,
       unitPrice: 25000,
     });
-    if (!createRes.ok) { test.skip(); return; }
+    if (!createRes.ok) {
+      test.skip();
+      return;
+    }
     const created = extractItem(createRes.body);
     const id = created?.id ?? created?.data?.id;
-    if (!id) { test.skip(); return; }
+    if (!id) {
+      test.skip();
+      return;
+    }
     const res = await apiPut(page, `/inventory/${id}`, {
       code,
       name: uniqueName('VatTuUpdated'),
@@ -105,13 +128,23 @@ test.describe('Luồng 15 — API: Billing', () => {
       const data = await apiGet(page, '/billing/invoices?page=1&pageSize=5');
       const items = extractItems(data);
       expect(Array.isArray(items)).toBe(true);
-    } catch { test.skip(); }
+    } catch {
+      test.skip();
+    }
   });
 
   test('15.A2 — POST /billing/invoices tạo hóa đơn', async ({ page }) => {
     let patient: any;
-    try { patient = await getPatientFromApi(page); } catch { test.skip(); return; }
-    if (!patient?.id) { test.skip(); return; }
+    try {
+      patient = await getPatientFromApi(page);
+    } catch {
+      test.skip();
+      return;
+    }
+    if (!patient?.id) {
+      test.skip();
+      return;
+    }
     try {
       const res = await apiPost(page, '/billing/invoices', {
         patientId: patient.id,
@@ -119,40 +152,62 @@ test.describe('Luồng 15 — API: Billing', () => {
         notes: 'E2E billing test',
       });
       expect(res.status).toBeLessThan(500);
-    } catch { test.skip(); }
+    } catch {
+      test.skip();
+    }
   });
 
   test('15.A3 — POST /billing/invoices → GET by ID', async ({ page }) => {
     let patient: any;
-    try { patient = await getPatientFromApi(page); } catch { test.skip(); return; }
-    if (!patient?.id) { test.skip(); return; }
+    try {
+      patient = await getPatientFromApi(page);
+    } catch {
+      test.skip();
+      return;
+    }
+    if (!patient?.id) {
+      test.skip();
+      return;
+    }
     try {
       const createRes = await apiPost(page, '/billing/invoices', {
         patientId: patient.id,
         invoiceDate: new Date().toISOString().split('T')[0],
         notes: 'E2E get by ID',
       });
-      if (!createRes.ok) { test.skip(); return; }
+      if (!createRes.ok) {
+        test.skip();
+        return;
+      }
       const created = extractItem(createRes.body);
       const id = created?.id ?? created?.data?.id;
-      if (!id) { test.skip(); return; }
+      if (!id) {
+        test.skip();
+        return;
+      }
       const detail = await apiGet(page, `/billing/invoices/${id}`);
       expect(detail).toBeDefined();
-    } catch { test.skip(); }
+    } catch {
+      test.skip();
+    }
   });
 
   test('15.A4 — POST /billing/invoices thiếu body → trả lỗi', async ({ page }) => {
     try {
       const res = await apiPost(page, '/billing/invoices', {});
       expect(res.status).toBeLessThan(500);
-    } catch { test.skip(); }
+    } catch {
+      test.skip();
+    }
   });
 
   test('15.A5 — GET /billing/services danh sách dịch vụ', async ({ page }) => {
     try {
       const data = await apiGet(page, '/billing/services?page=1&pageSize=5');
       expect(data).toBeDefined();
-    } catch { test.skip(); }
+    } catch {
+      test.skip();
+    }
   });
 });
 
@@ -161,20 +216,28 @@ test.describe('Luồng 14: Quản lý thuốc & vật tư', () => {
   test('14.1 — Trang quản lý kho (inventory)', async ({ page }) => {
     await navigateTo(page, '/inventory');
     await expectPageLoaded(page);
-    if (!await waitForFeaturePage(page, 'app-inventory-stock, [class*="inventory"], table, .card')) {
-      test.skip(); return;
+    if (
+      !(await waitForFeaturePage(page, 'app-inventory-stock, [class*="inventory"], table, .card'))
+    ) {
+      test.skip();
+      return;
     }
   });
 
   test('14.2 — Danh sách thuốc/vật tư', async ({ page }) => {
     await navigateTo(page, '/inventory');
-    await expect(page.locator('h1, table, button, select').first()).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('h1, table, button, select').first()).toBeVisible({
+      timeout: 10_000,
+    });
   });
 
   test('14.3 — Nhập kho mới (nếu có nút)', async ({ page }) => {
     await navigateTo(page, '/inventory');
     await waitForLoad(page);
-    const addBtn = page.locator('button, a').filter({ hasText: /Thêm|Nhập|Tạo/i }).first();
+    const addBtn = page
+      .locator('button, a')
+      .filter({ hasText: /Thêm|Nhập|Tạo/i })
+      .first();
     if (await addBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
       await addBtn.click();
       await waitForLoad(page);
@@ -187,15 +250,21 @@ test.describe('Luồng 15: Thanh toán & Hóa đơn', () => {
   test('15.1 — Danh sách hóa đơn (billing)', async ({ page }) => {
     await navigateTo(page, '/billing');
     await expectPageLoaded(page);
-    if (!await waitForFeaturePage(page, 'app-invoice-list, [class*="invoice"], [class*="billing"]')) {
-      test.skip(); return;
+    if (
+      !(await waitForFeaturePage(page, 'app-invoice-list, [class*="invoice"], [class*="billing"]'))
+    ) {
+      test.skip();
+      return;
     }
   });
 
   test('15.2 — Bảng hóa đơn', async ({ page }) => {
     await navigateTo(page, '/billing');
-    if (!await waitForFeaturePage(page, 'app-invoice-list, [class*="invoice"], [class*="billing"]')) {
-      test.skip(); return;
+    if (
+      !(await waitForFeaturePage(page, 'app-invoice-list, [class*="invoice"], [class*="billing"]'))
+    ) {
+      test.skip();
+      return;
     }
     const table = page.locator('table, .card').first();
     await expect(table).toBeVisible();
@@ -203,10 +272,16 @@ test.describe('Luồng 15: Thanh toán & Hóa đơn', () => {
 
   test('15.3 — Tạo hóa đơn mới', async ({ page }) => {
     await navigateTo(page, '/billing');
-    if (!await waitForFeaturePage(page, 'app-invoice-list, [class*="invoice"], [class*="billing"]')) {
-      test.skip(); return;
+    if (
+      !(await waitForFeaturePage(page, 'app-invoice-list, [class*="invoice"], [class*="billing"]'))
+    ) {
+      test.skip();
+      return;
     }
-    const createBtn = page.locator('button, a').filter({ hasText: /Tạo|Thêm|Hóa đơn mới/i }).first();
+    const createBtn = page
+      .locator('button, a')
+      .filter({ hasText: /Tạo|Thêm|Hóa đơn mới/i })
+      .first();
     if (await createBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
       await createBtn.click();
       await waitForLoad(page);
@@ -216,14 +291,18 @@ test.describe('Luồng 15: Thanh toán & Hóa đơn', () => {
 
   test('15.4 — Tìm kiếm hóa đơn', async ({ page }) => {
     await navigateTo(page, '/billing');
-    if (!await waitForFeaturePage(page, 'app-invoice-list, [class*="invoice"], [class*="billing"]')) {
-      test.skip(); return;
+    if (
+      !(await waitForFeaturePage(page, 'app-invoice-list, [class*="invoice"], [class*="billing"]'))
+    ) {
+      test.skip();
+      return;
     }
-    const searchInput = page.locator('input[type="search"], input[type="text"], input[placeholder*="Tìm"]').first();
+    const searchInput = page
+      .locator('input[type="search"], input[type="text"], input[placeholder*="Tìm"]')
+      .first();
     if (await searchInput.isVisible({ timeout: 3000 }).catch(() => false)) {
       await searchInput.fill('test');
       await waitForLoad(page);
     }
   });
 });
-

@@ -5,8 +5,16 @@
  * Phôi trữ đông → Rã đông → Chuyển phôi
  */
 import {
-  test, expect, navigateTo, waitForLoad, expectPageLoaded,
-  apiGet, apiPost, extractItems, extractItem, getCoupleFromApi,
+  test,
+  expect,
+  navigateTo,
+  waitForLoad,
+  expectPageLoaded,
+  apiGet,
+  apiPost,
+  extractItems,
+  extractItem,
+  getCoupleFromApi,
 } from '../helpers';
 
 // ─── API: FET Cycles ────────────────────────────────────────────────────
@@ -14,7 +22,10 @@ import {
 test.describe('Luồng 8 — API: FET Cycles', () => {
   test('8.A1 — POST /cycles tạo chu kỳ FET (method=4)', async ({ page }) => {
     const couple = await getCoupleFromApi(page);
-    if (!couple) { test.skip(); return; }
+    if (!couple) {
+      test.skip();
+      return;
+    }
     const res = await apiPost(page, '/cycles', {
       coupleId: couple.id,
       method: 4, // FET
@@ -37,7 +48,10 @@ test.describe('Luồng 8 — API: FET Cycles', () => {
 
   test('8.A3 — GET /cycles/couple/{id} lọc theo couple', async ({ page }) => {
     const couple = await getCoupleFromApi(page);
-    if (!couple) { test.skip(); return; }
+    if (!couple) {
+      test.skip();
+      return;
+    }
     const data = await apiGet(page, `/cycles/couple/${couple.id}`);
     const items = extractItems(data);
     expect(Array.isArray(items)).toBeTruthy();
@@ -63,7 +77,10 @@ test.describe('Luồng 8 — UI: Chuyển phôi trữ', () => {
   test('8.3 — Nút tạo FET mới', async ({ page }) => {
     await navigateTo(page, '/fet');
     await waitForLoad(page);
-    const createBtn = page.locator('button, a').filter({ hasText: /Tạo|Thêm|Chuyển phôi/i }).first();
+    const createBtn = page
+      .locator('button, a')
+      .filter({ hasText: /Tạo|Thêm|Chuyển phôi/i })
+      .first();
     if (await createBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
       await expect(createBtn).toBeVisible();
     }
@@ -72,8 +89,12 @@ test.describe('Luồng 8 — UI: Chuyển phôi trữ', () => {
   test('8.4 — Chi tiết FET (nếu có dữ liệu)', async ({ page }) => {
     await navigateTo(page, '/fet');
     await waitForLoad(page);
-    await expect(page.locator('app-fet-list, [class*="fet"], table, .card, h1, h2').first()).toBeVisible({ timeout: 10_000 });
-    const detailLink = page.locator('a[href*="/fet/"], tr[class*="clickable"], [routerLink*="/fet/"]').first();
+    await expect(
+      page.locator('app-fet-list, [class*="fet"], table, .card, h1, h2').first(),
+    ).toBeVisible({ timeout: 10_000 });
+    const detailLink = page
+      .locator('a[href*="/fet/"], tr[class*="clickable"], [routerLink*="/fet/"]')
+      .first();
     if (await detailLink.isVisible({ timeout: 3000 }).catch(() => false)) {
       await detailLink.click();
       await waitForLoad(page);

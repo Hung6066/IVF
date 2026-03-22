@@ -44,9 +44,7 @@ describe('Luồng 8: Chuyển phôi đông lạnh (FET)', () => {
     });
 
     it('tải danh sách FET với phân trang', () => {
-      expect(mockFetService.search).toHaveBeenCalledWith(
-        undefined, undefined, 1, 20,
-      );
+      expect(mockFetService.search).toHaveBeenCalledWith(undefined, undefined, 1, 20);
     });
 
     it('tìm kiếm reset page về 1', () => {

@@ -25,9 +25,9 @@ describe('Luồng 9 & 10: Thử thai Beta HCG + Theo dõi thai kỳ', () => {
     beforeEach(() => {
       mockService = {
         getByCycle: vi.fn().mockReturnValue(of(fakePregnancy)),
-        getBetaHcgResults: vi.fn().mockReturnValue(
-          of([{ id: 'r1', betaHcg: 250, testDate: '2025-01-15' }]),
-        ),
+        getBetaHcgResults: vi
+          .fn()
+          .mockReturnValue(of([{ id: 'r1', betaHcg: 250, testDate: '2025-01-15' }])),
         recordBetaHcg: vi.fn().mockReturnValue(of(fakePregnancy)),
       };
 
@@ -83,7 +83,10 @@ describe('Luồng 9 & 10: Thử thai Beta HCG + Theo dõi thai kỳ', () => {
       component.submit();
 
       expect(mockService.recordBetaHcg).toHaveBeenCalledWith(
-        'cycle-1', 350, '2025-01-20', 'Kết quả tốt',
+        'cycle-1',
+        350,
+        '2025-01-20',
+        'Kết quả tốt',
       );
     });
 

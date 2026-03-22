@@ -31,11 +31,9 @@ describe('Luồng 7: Nuôi phôi – Chuyển phôi – Đông phôi', () => {
         getUltrasoundsByCycle: vi.fn().mockReturnValue(of([])),
       };
       mockEmbryoService = {
-        getEmbryosByCycle: vi.fn().mockReturnValue(
-          of([
-            { id: 'e1', code: 'E001', grade: 'AA', day: 5, status: 'Frozen' },
-          ]),
-        ),
+        getEmbryosByCycle: vi
+          .fn()
+          .mockReturnValue(of([{ id: 'e1', code: 'E001', grade: 'AA', day: 5, status: 'Frozen' }])),
       };
       mockNotification = {
         success: vi.fn(),

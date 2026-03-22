@@ -56,25 +56,19 @@ describe('Luồng 14 & 15: Kho vật tư + Thanh toán', () => {
     it('tìm kiếm theo tên vật tư', () => {
       component.searchQuery = 'Progesterone';
       component.load();
-      expect(mockService.search).toHaveBeenCalledWith(
-        'Progesterone', undefined, false, 1, 20,
-      );
+      expect(mockService.search).toHaveBeenCalledWith('Progesterone', undefined, false, 1, 20);
     });
 
     it('lọc theo danh mục', () => {
       component.filterCategory = 'Thuốc';
       component.load();
-      expect(mockService.search).toHaveBeenCalledWith(
-        undefined, 'Thuốc', false, 1, 20,
-      );
+      expect(mockService.search).toHaveBeenCalledWith(undefined, 'Thuốc', false, 1, 20);
     });
 
     it('lọc tồn kho thấp', () => {
       component.lowStockOnly = true;
       component.load();
-      expect(mockService.search).toHaveBeenCalledWith(
-        undefined, undefined, true, 1, 20,
-      );
+      expect(mockService.search).toHaveBeenCalledWith(undefined, undefined, true, 1, 20);
     });
 
     it('điều hướng đến trang nhập kho', () => {
@@ -100,15 +94,22 @@ describe('Luồng 14 & 15: Kho vật tư + Thanh toán', () => {
 
     beforeEach(() => {
       mockBillingService = {
-        getInvoices: vi.fn().mockReturnValue(
-          of([{ id: 'inv1', code: 'HD-001', status: 'Paid', date: '15/01/2025', total: 5000000 }]),
-        ),
+        getInvoices: vi
+          .fn()
+          .mockReturnValue(
+            of([
+              { id: 'inv1', code: 'HD-001', status: 'Paid', date: '15/01/2025', total: 5000000 },
+            ]),
+          ),
         getPayments: vi.fn().mockReturnValue(of([])),
         getRevenueChartData: vi.fn().mockReturnValue(of([])),
         getStats: vi.fn().mockReturnValue({
-          todayInvoices: 5, todayRevenue: 25000000,
-          pendingPayments: 2, weekRevenue: 100000000,
-          monthRevenue: 400000000, quarterRevenue: 1200000000,
+          todayInvoices: 5,
+          todayRevenue: 25000000,
+          pendingPayments: 2,
+          weekRevenue: 100000000,
+          monthRevenue: 400000000,
+          quarterRevenue: 1200000000,
         }),
       };
 
