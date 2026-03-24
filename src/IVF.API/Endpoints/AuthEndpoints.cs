@@ -234,7 +234,18 @@ public static class AuthEndpoints
 
             // 6.1. Step-up authentication — risk-based MFA escalation
             var stepUpDecision = await stepUpAuth.EvaluateStepUpAsync(user.Id, assessment, deviceTrust);
-            if (stepUpDecision.RequiresStepUp)
+
+            // In Development, skip step-up for localhost (allows Playwright E2E tests to run without 2FA)
+            // Uses Connection.RemoteIpAddress (not X-Forwarded-For) to prevent spoofing
+            var remoteIp = httpContext.Connection.RemoteIpAddress;
+            var isLocalhostIp = remoteIp != null && (
+                System.Net.IPAddress.IsLoopback(remoteIp) ||
+                (remoteIp.IsIPv4MappedToIPv6 && System.Net.IPAddress.IsLoopback(remoteIp.MapToIPv4())));
+            var isDev = httpContext.RequestServices.GetRequiredService<Microsoft.Extensions.Hosting.IHostEnvironment>().IsDevelopment()
+                || Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") is "Development";
+            var skipStepUp = isDev && isLocalhostIp;
+
+            if (!skipStepUp && stepUpDecision.RequiresStepUp)
             {
                 if (stepUpDecision.RequiredAction == "block")
                 {

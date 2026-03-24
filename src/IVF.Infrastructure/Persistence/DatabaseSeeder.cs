@@ -23,14 +23,19 @@ public static class DatabaseSeeder
 
             Console.WriteLine("[Seeder] Starting database seed...");
 
+            // Resolve root tenant Id from DB (slug = "default")
+            var rootTenantId = await IVF.Infrastructure.Seeding.TenantSeeder.GetRootTenantIdAsync(context);
+
             // Seed Users
             var adminUser = User.Create(
                 "admin",
                 BCrypt.Net.BCrypt.HashPassword("Admin@123"),
                 "Quản trị viên",
                 "Admin",
-                "IT"
+                "IT",
+                tenantId: rootTenantId
             );
+            adminUser.SetPlatformAdmin(true);
 
             var doctorUser = User.Create(
                 "doctor1",

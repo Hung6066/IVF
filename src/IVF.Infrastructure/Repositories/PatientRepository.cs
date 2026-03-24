@@ -102,8 +102,22 @@ public class PatientRepository : IPatientRepository
 
     public async Task<string> GenerateCodeAsync(CancellationToken ct = default)
     {
-        var count = await _context.Patients.CountAsync(ct);
-        return $"BN-{DateTime.Now:yyyy}-{count + 1:D6}";
+        var year = DateTime.Now.Year;
+        var prefix = $"BN-{year}-";
+        var maxCode = await _context.Patients
+            .IgnoreQueryFilters()
+            .Where(p => p.PatientCode.StartsWith(prefix))
+            .OrderByDescending(p => p.PatientCode)
+            .Select(p => p.PatientCode)
+            .FirstOrDefaultAsync(ct);
+
+        int nextNum = 1;
+        if (maxCode != null && maxCode.Length == prefix.Length + 6
+            && int.TryParse(maxCode[prefix.Length..], out var n))
+        {
+            nextNum = n + 1;
+        }
+        return $"{prefix}{nextNum:D6}";
     }
 
     public async Task<int> GetTotalCountAsync(CancellationToken ct = default)

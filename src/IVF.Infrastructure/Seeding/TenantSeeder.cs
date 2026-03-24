@@ -9,7 +9,18 @@ namespace IVF.Infrastructure.Seeding;
 
 public static class TenantSeeder
 {
-    public static readonly Guid DefaultTenantId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+    private const string RootTenantSlug = "default";
+
+    /// <summary>Returns the root tenant Id by resolving from the DB (slug = "default").</summary>
+    public static async Task<Guid> GetRootTenantIdAsync(IvfDbContext context)
+    {
+        var id = await context.Tenants
+            .IgnoreQueryFilters()
+            .Where(t => t.Slug == RootTenantSlug)
+            .Select(t => (Guid?)t.Id)
+            .FirstOrDefaultAsync();
+        return id ?? Guid.Empty;
+    }
 
     public static async Task SeedAsync(IServiceProvider serviceProvider)
     {
@@ -17,48 +28,46 @@ public static class TenantSeeder
         var context = scope.ServiceProvider.GetRequiredService<IvfDbContext>();
         var logger = scope.ServiceProvider.GetRequiredService<ILogger<IvfDbContext>>();
 
-        // Skip if default tenant already exists
-        if (await context.Tenants.AnyAsync(t => t.Id == DefaultTenantId))
+        // Skip if default tenant already exists (look up by slug, not hardcoded Id)
+        if (await context.Tenants.IgnoreQueryFilters().AnyAsync(t => t.Slug == RootTenantSlug))
             return;
 
         logger.LogInformation("Seeding default tenant...");
 
-        // Create the default/platform tenant
+        // Create the default/platform tenant — Id is auto-generated (Guid.NewGuid())
         var tenant = Tenant.Create(
             "IVF Platform Default",
-            "default",
+            RootTenantSlug,
             "admin@ivf-platform.vn",
             "0123456789",
             "Hà Nội, Việt Nam");
         tenant.Activate();
         tenant.SetResourceLimits(999, 99999, 1_048_576, true, true, true, true);
         tenant.SetRootTenant(true);
-
-        // Set the Id to our well-known value
-        typeof(Tenant).GetProperty("Id")!.SetValue(tenant, DefaultTenantId);
         context.Tenants.Add(tenant);
 
         // Create platform subscription
         var subscription = TenantSubscription.Create(
-            DefaultTenantId, SubscriptionPlan.Enterprise, BillingCycle.Annually, 0);
+            tenant.Id, SubscriptionPlan.Enterprise, BillingCycle.Annually, 0);
         context.TenantSubscriptions.Add(subscription);
 
         // Create initial usage record
         var now = DateTime.UtcNow;
-        var usage = TenantUsageRecord.Create(DefaultTenantId, now.Year, now.Month);
+        var usage = TenantUsageRecord.Create(tenant.Id, now.Year, now.Month);
         context.TenantUsageRecords.Add(usage);
 
         await context.SaveChangesAsync();
 
-        // Migrate existing records: set TenantId = DefaultTenantId where TenantId is empty
-        await MigrateExistingDataAsync(context, logger);
+        logger.LogInformation("Default tenant seeded with Id={TenantId}", tenant.Id);
+
+        // Migrate existing records: set TenantId = tenant.Id where TenantId is empty
+        await MigrateExistingDataAsync(context, tenant.Id, logger);
 
         logger.LogInformation("Default tenant seeded and existing data migrated");
     }
 
-    private static async Task MigrateExistingDataAsync(IvfDbContext context, ILogger logger)
+    private static async Task MigrateExistingDataAsync(IvfDbContext context, Guid defaultId, ILogger logger)
     {
-        var defaultId = DefaultTenantId;
 
         // Use raw SQL for efficient bulk update of all tenant entities with empty TenantId
         var tables = new[]

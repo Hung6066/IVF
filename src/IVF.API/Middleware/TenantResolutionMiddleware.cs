@@ -35,8 +35,8 @@ public class TenantResolutionMiddleware
                 }
                 else
                 {
-                    // Platform admin without X-Tenant-Id sees all data (no filter)
-                    // _currentTenantId stays null → query filter bypassed
+                    // Platform admin without X-Tenant-Id falls back to their own (root) tenant
+                    dbContext.SetCurrentTenant(tenantId);
                 }
             }
             else

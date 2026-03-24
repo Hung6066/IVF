@@ -120,9 +120,9 @@ public static class FeaturePlanSeeder
         await context.SaveChangesAsync();
 
         // ── Seed TenantFeatures for root tenant (all features enabled) ──────────────────
-        var rootTenantId = Guid.Parse("00000000-0000-0000-0000-000000000001");
-        var rootTenant = await context.Tenants.FindAsync(rootTenantId);
-        if (rootTenant != null)
+        var rootTenantId = await IVF.Infrastructure.Seeding.TenantSeeder.GetRootTenantIdAsync(context);
+        var rootTenant = rootTenantId != Guid.Empty ? await context.Tenants.FindAsync(rootTenantId) : null;
+        if (rootTenant != null && rootTenantId != Guid.Empty)
         {
             foreach (var feature in features.Values)
                 await context.TenantFeatures.AddAsync(TenantFeature.Create(rootTenantId, feature.Id));
