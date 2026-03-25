@@ -27,7 +27,13 @@ public class OocyteSampleRepository : IOocyteSampleRepository
 
     public async Task<string> GenerateCodeAsync(CancellationToken ct = default)
     {
-        var count = await _context.OocyteSamples.CountAsync(ct);
-        return $"OC-{DateTime.Now:yyyyMMdd}-{count + 1:D4}";
+        var prefix = $"OC-{DateTime.Now:yyyyMMdd}-";
+        return await CodeGenerator.NextAsync(_context,
+            () => _context.OocyteSamples.IgnoreQueryFilters()
+                .Where(o => o.SampleCode.StartsWith(prefix))
+                .OrderByDescending(o => o.SampleCode)
+                .Select(o => o.SampleCode)
+                .FirstOrDefaultAsync(ct),
+            prefix, padding: 4, ct);
     }
 }

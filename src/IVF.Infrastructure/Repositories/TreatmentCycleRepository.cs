@@ -44,10 +44,16 @@ public class TreatmentCycleRepository : ITreatmentCycleRepository
         return Task.CompletedTask;
     }
 
-    public async Task<string> GenerateCodeAsync(CancellationToken ct = default)
+    public Task<string> GenerateCodeAsync(CancellationToken ct = default)
     {
-        var count = await _context.TreatmentCycles.CountAsync(ct);
-        return $"CK-{DateTime.Now:yyyy}-{count + 1:D4}";
+        var prefix = $"CK-{DateTime.Now.Year}-";
+        return CodeGenerator.NextAsync(_context,
+            () => _context.TreatmentCycles.IgnoreQueryFilters()
+                .Where(c => c.CycleCode.StartsWith(prefix))
+                .OrderByDescending(c => c.CycleCode)
+                .Select(c => c.CycleCode)
+                .FirstOrDefaultAsync(ct),
+            prefix, padding: 4, ct);
     }
 
     public async Task<int> GetActiveCountAsync(CancellationToken ct = default)

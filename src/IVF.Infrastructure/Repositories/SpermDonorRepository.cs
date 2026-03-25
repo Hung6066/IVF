@@ -34,7 +34,13 @@ public class SpermDonorRepository : ISpermDonorRepository
 
     public async Task<string> GenerateCodeAsync(CancellationToken ct = default)
     {
-        var count = await _context.SpermDonors.CountAsync(ct);
-        return $"NHTT-{DateTime.Now:yyyy}-{count + 1:D4}";
+        var prefix = $"NHTT-{DateTime.Now.Year}-";
+        return await CodeGenerator.NextAsync(_context,
+            () => _context.SpermDonors.IgnoreQueryFilters()
+                .Where(d => d.DonorCode.StartsWith(prefix))
+                .OrderByDescending(d => d.DonorCode)
+                .Select(d => d.DonorCode)
+                .FirstOrDefaultAsync(ct),
+            prefix, padding: 4, ct);
     }
 }

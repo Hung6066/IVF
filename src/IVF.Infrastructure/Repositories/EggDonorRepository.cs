@@ -32,9 +32,15 @@ public class EggDonorRepository : IEggDonorRepository
     public Task UpdateAsync(EggDonor donor, CancellationToken ct = default)
     { _context.EggDonors.Update(donor); return Task.CompletedTask; }
 
-    public async Task<string> GenerateCodeAsync(CancellationToken ct = default)
+    public Task<string> GenerateCodeAsync(CancellationToken ct = default)
     {
-        var count = await _context.EggDonors.CountAsync(ct);
-        return $"NHN-{DateTime.Now:yyyy}-{count + 1:D4}";
+        var prefix = $"NHN-{DateTime.Now.Year}-";
+        return CodeGenerator.NextAsync(_context,
+            () => _context.EggDonors.IgnoreQueryFilters()
+                .Where(d => d.DonorCode.StartsWith(prefix))
+                .OrderByDescending(d => d.DonorCode)
+                .Select(d => d.DonorCode)
+                .FirstOrDefaultAsync(ct),
+            prefix, padding: 4, ct);
     }
 }

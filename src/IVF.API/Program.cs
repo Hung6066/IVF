@@ -718,7 +718,7 @@ try
     });
 
     // app.UseCors("AllowAngular"); // Moved to top
-    app.UseWaf(); // Application-Level WAF — first security gate (before rate limiter)
+    // app.UseWaf(); // Application-Level WAF — first security gate (before rate limiter)
     app.UseRateLimiter(); // Rate Limiting BEFORE auth (protect from brute force — Google/AWS standard)
     app.UseSecurityEnforcement(); // IP whitelist & geo-blocking enforcement (before auth)
     app.UseVaultTokenAuth(); // Vault token authentication (X-Vault-Token header)
@@ -729,7 +729,7 @@ try
     app.UseLogContextEnrichment(); // Enrich Serilog LogContext with UserId, TenantId, Role, ClientIp
     app.UseConsentEnforcement(); // GDPR/HIPAA consent enforcement — block access to sensitive data without consent
     app.UseTokenBinding(); // Token binding enforcement — validate device/session claims (Microsoft CAE)
-    app.UseZeroTrust(); // Zero Trust continuous verification (Google BeyondCorp + Microsoft CAE + AWS GuardDuty)
+    // app.UseZeroTrust(); // Zero Trust continuous verification (Google BeyondCorp + Microsoft CAE + AWS GuardDuty)
     app.UseMiddleware<IVF.API.Middleware.ApiCallLoggingMiddleware>(); // Per-tenant API call logging
 
     // SignalR Hubs

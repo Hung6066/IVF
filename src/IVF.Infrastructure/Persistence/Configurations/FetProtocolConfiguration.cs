@@ -17,7 +17,7 @@ public class FetProtocolConfiguration : IEntityTypeConfiguration<FetProtocol>
         builder.Property(e => e.EstrogenDose).HasMaxLength(100);
         builder.Property(e => e.ProgesteroneDrug).HasMaxLength(200);
         builder.Property(e => e.ProgesteroneDose).HasMaxLength(100);
-        builder.Property(e => e.EndometriumPattern).HasMaxLength(10);
+        builder.Property(e => e.EndometriumPattern).HasMaxLength(100);
         builder.Property(e => e.EndometriumThickness).HasPrecision(5, 2);
         builder.Property(e => e.EmbryoGrade).HasMaxLength(20);
         builder.Property(e => e.Notes).HasMaxLength(2000);

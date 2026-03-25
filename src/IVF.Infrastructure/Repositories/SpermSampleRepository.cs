@@ -27,7 +27,13 @@ public class SpermSampleRepository : ISpermSampleRepository
 
     public async Task<string> GenerateCodeAsync(CancellationToken ct = default)
     {
-        var count = await _context.SpermSamples.CountAsync(ct);
-        return $"SP-{DateTime.Now:yyyyMMdd}-{count + 1:D4}";
+        var prefix = $"SP-{DateTime.Now:yyyyMMdd}-";
+        return await CodeGenerator.NextAsync(_context,
+            () => _context.SpermSamples.IgnoreQueryFilters()
+                .Where(s => s.SampleCode.StartsWith(prefix))
+                .OrderByDescending(s => s.SampleCode)
+                .Select(s => s.SampleCode)
+                .FirstOrDefaultAsync(ct),
+            prefix, padding: 4, ct);
     }
 }

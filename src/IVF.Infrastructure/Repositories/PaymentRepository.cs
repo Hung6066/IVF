@@ -21,7 +21,13 @@ public class PaymentRepository : IPaymentRepository
 
     public async Task<string> GeneratePaymentNumberAsync(CancellationToken ct = default)
     {
-        var count = await _context.Payments.CountAsync(ct);
-        return $"PAY-{DateTime.Now:yyyyMMdd}-{count + 1:D6}";
+        var prefix = $"PAY-{DateTime.Now:yyyyMMdd}-";
+        return await CodeGenerator.NextAsync(_context,
+            () => _context.Payments.IgnoreQueryFilters()
+                .Where(p => p.PaymentNumber.StartsWith(prefix))
+                .OrderByDescending(p => p.PaymentNumber)
+                .Select(p => p.PaymentNumber)
+                .FirstOrDefaultAsync(ct),
+            prefix, padding: 6, ct);
     }
 }

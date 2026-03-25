@@ -49,7 +49,13 @@ public class EmbryoFreezingContractRepository : IEmbryoFreezingContractRepositor
 
     public async Task<string> GenerateContractNumberAsync(CancellationToken ct = default)
     {
-        var count = await _context.EmbryoFreezingContracts.CountAsync(ct);
-        return $"HĐ-TRU-{DateTime.Now:yyyyMM}-{count + 1:D4}";
+        var prefix = $"HĐ-TRU-{DateTime.Now:yyyyMM}-";
+        return await CodeGenerator.NextAsync(_context,
+            () => _context.EmbryoFreezingContracts.IgnoreQueryFilters()
+                .Where(c => c.ContractNumber.StartsWith(prefix))
+                .OrderByDescending(c => c.ContractNumber)
+                .Select(c => c.ContractNumber)
+                .FirstOrDefaultAsync(ct),
+            prefix, padding: 4, ct);
     }
 }

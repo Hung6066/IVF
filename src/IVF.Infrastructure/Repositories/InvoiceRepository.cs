@@ -37,8 +37,14 @@ public class InvoiceRepository : IInvoiceRepository
 
     public async Task<string> GenerateInvoiceNumberAsync(CancellationToken ct = default)
     {
-        var count = await _context.Invoices.CountAsync(ct);
-        return $"INV-{DateTime.Now:yyyy}-{count + 1:D6}";
+        var prefix = $"INV-{DateTime.Now.Year}-";
+        return await CodeGenerator.NextAsync(_context,
+            () => _context.Invoices.IgnoreQueryFilters()
+                .Where(i => i.InvoiceNumber.StartsWith(prefix))
+                .OrderByDescending(i => i.InvoiceNumber)
+                .Select(i => i.InvoiceNumber)
+                .FirstOrDefaultAsync(ct),
+            prefix, padding: 6, ct);
     }
 
     public async Task<decimal> GetMonthlyRevenueAsync(int month, int year, CancellationToken ct = default)
